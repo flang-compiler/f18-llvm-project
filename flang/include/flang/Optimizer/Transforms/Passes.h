@@ -26,7 +26,7 @@ class KindMapping;
 std::unique_ptr<mlir::Pass> createFIRToStdPass(const KindMapping &);
 
 /// Effects aware CSE pass
-std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createCSEPass();
+std::unique_ptr<mlir::Pass> createCSEPass();
 
 /// Convert FIR loop constructs to the Affine dialect
 std::unique_ptr<mlir::Pass> createPromoteToAffinePass();
@@ -40,7 +40,7 @@ std::unique_ptr<mlir::Pass> createLowerToLoopPass();
 /// form. This pass is a port of LLVM's mem2reg pass, but modified for the FIR
 /// dialect as well as the restructuring of MLIR's representation to present PHI
 /// nodes as block arguments.
-std::unique_ptr<mlir::OpPassBase<mlir::FuncOp>> createMemToRegPass();
+std::unique_ptr<mlir::Pass> createMemToRegPass();
 
 } // namespace fir
 
