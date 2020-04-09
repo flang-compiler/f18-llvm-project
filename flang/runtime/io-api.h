@@ -22,12 +22,14 @@ class NamelistGroup;
 } // namespace Fortran::runtime
 
 namespace Fortran::runtime::io {
-
 class IoStatementState;
 using Cookie = IoStatementState *;
 using ExternalUnit = int;
 using AsynchronousId = int;
 static constexpr ExternalUnit DefaultUnit{-1}; // READ(*), WRITE(*), PRINT
+} // namespace Fortran::runtime::io
+
+namespace Fortran::runtime::io {
 
 extern "C" {
 
@@ -295,4 +297,5 @@ enum Iostat IONAME(EndIoStatement)(Cookie);
 
 } // extern "C"
 } // namespace Fortran::runtime::io
+
 #endif

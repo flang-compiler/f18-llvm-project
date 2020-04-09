@@ -1,7 +1,6 @@
 // Test the FIR operations
 
 // RUN: tco -emit-fir %s | tco -emit-fir | FileCheck %s
-// UNSUPPORTED: !fir
 
 // CHECK-LABEL: func @it1() -> !fir.int<4>
 func @it1() -> !fir.int<4>
@@ -154,7 +153,7 @@ func @loop() {
   %c10 = constant 10 : index
   %ct = constant true
   // CHECK: fir.loop %{{.*}} = %{{.*}} to %{{.*}} {
-  %i = fir.loop %i = %c1 to %c10 {
+  fir.loop %i = %c1 to %c10 {
     // CHECK: fir.where %{{.*}} {
     fir.where %ct {
       fir.call @nop() : () -> ()

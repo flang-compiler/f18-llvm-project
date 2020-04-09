@@ -127,6 +127,7 @@ class CplxType : public mlir::Type::TypeBase<CplxType, mlir::Type,
 public:
   using Base::Base;
   static CplxType get(mlir::MLIRContext *ctxt, KindTy kind);
+  mlir::Type getEleTy() const;
   KindTy getFKind() const;
 };
 
@@ -324,6 +325,21 @@ public:
   /// The number of dimensions of the sequence
   unsigned getDimension() const { return getShape().size(); }
 
+  /// Number of rows of constant extent
+  unsigned getConstantRows() const;
+
+  /// Is the shape of the sequence constant?
+  bool hasConstantShape() const { return getConstantRows() == getDimension(); }
+
+  /// Does the sequence have unknown shape? (`array<* x T>`)
+  bool hasUnknownShape() const { return getShape().empty(); }
+
+  /// Is the interior of the sequence constant? Check if the array is
+  /// one of constant shape (`array<C...xCxT>`), unknown shape
+  /// (`array<*xT>`), or rows with shape and ending with column(s) of
+  /// unknown extent (`array<C...xCx?...x?xT>`).
+  bool hasConstantInterior() const;
+
   /// The value `-1` represents an unknown extent for a dimension
   static constexpr Extent getUnknownExtent() { return -1; }
 
@@ -393,6 +409,10 @@ public:
 mlir::Type parseFirType(FIROpsDialect *, mlir::DialectAsmParser &parser);
 
 void printFirType(FIROpsDialect *, mlir::Type ty, mlir::DialectAsmPrinter &p);
+
+/// Guarantee `type` is a scalar integral type (standard Integer, standard
+/// Index, or FIR Int). Aborts execution if condition is false.
+void verifyIntegralType(mlir::Type type);
 
 } // namespace fir
 

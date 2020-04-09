@@ -330,7 +330,14 @@ void BigRadixFloatingPointNumber<PREC,
   }
 }
 
-template <int PREC>
+template void BigRadixFloatingPointNumber<8,16>::LoseLeastSignificantDigit();
+template void BigRadixFloatingPointNumber<11,16>::LoseLeastSignificantDigit();
+template void BigRadixFloatingPointNumber<24,16>::LoseLeastSignificantDigit();
+template void BigRadixFloatingPointNumber<53,16>::LoseLeastSignificantDigit();
+template void BigRadixFloatingPointNumber<64,16>::LoseLeastSignificantDigit();
+template void BigRadixFloatingPointNumber<113,16>::LoseLeastSignificantDigit();
+
+template<int PREC>
 ConversionToDecimalResult ConvertToDecimal(char *buffer, std::size_t size,
     enum DecimalConversionFlags flags, int digits,
     enum FortranRounding rounding, BinaryFloatingPointNumber<PREC> x) {

@@ -1,4 +1,3 @@
-
 add_library(FortranCommon
   Fortran.cpp
   Fortran-features.cpp

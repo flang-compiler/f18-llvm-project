@@ -8,11 +8,7 @@ target_link_libraries(quick-sanity-test
   LLVMSupport
 )
 
-add_executable(thorough-test
-  thorough-test.cpp
-)
-
-target_link_libraries(thorough-test
+add_flang_test(thorough-test Thorough
   FortranDecimal
   LLVMSupport
 )

@@ -11,8 +11,12 @@
 //
 //===----------------------------------------------------------------------===//
 
+#include "flang/Optimizer/CodeGen/CodeGen.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
+#include "flang/Optimizer/Support/InternalNames.h"
 #include "flang/Optimizer/Support/KindMapping.h"
+#include "flang/Optimizer/Transforms/Passes.h"
+#include "mlir/Conversion/LoopToStandard/ConvertLoopToStandard.h"
 #include "mlir/IR/MLIRContext.h"
 #include "mlir/IR/Module.h"
 #include "mlir/Parser.h"
@@ -76,15 +80,28 @@ static int compileFIR() {
   ToolOutputFile out(outputFilename, ec, sys::fs::OF_None);
 
   // run passes
+  fir::NameUniquer uniquer;
+  fir::KindMapping kindMap{context.get()};
   mlir::PassManager pm{context.get()};
   mlir::applyPassManagerCLOptions(pm);
   if (emitFir) {
     // parse the input and pretty-print it back out
     // -emit-fir intentionally disables all the passes
   } else {
-    // TODO: Actually add passes when added to FIR code base
     // add all the passes
     // the user can disable them individually
+    pm.addPass(mlir::createCanonicalizerPass());
+    // convert fir dialect to affine
+    pm.addPass(fir::createPromoteToAffinePass());
+    // convert fir dialect to loop
+    pm.addPass(fir::createLowerToLoopPass());
+    pm.addPass(fir::createFIRToStdPass(kindMap));
+    // convert loop dialect to standard
+    pm.addPass(mlir::createLowerToCFGPass());
+    pm.addPass(fir::createMemToRegPass());
+    pm.addPass(fir::createCSEPass());
+    pm.addPass(fir::createFIRToLLVMPass(uniquer));
+    pm.addPass(fir::createLLVMDialectToLLVMPass(out.os()));
   }
 
   // run the pass manager

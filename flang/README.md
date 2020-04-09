@@ -6,109 +6,47 @@
 
 -->
 
-# F18
+# FIR
 
-F18 is a ground-up implementation of a Fortran front end written in modern C++.
-F18, when combined with LLVM, is intended to replace the Flang compiler.
+Working branch for FIR development.
 
-Flang is a Fortran compiler targeting LLVM.
-Visit the [Flang wiki](https://github.com/flang-compiler/flang/wiki)
-for more information about Flang.
+## Monorepo now contains MLIR
 
-## Getting Started
+### In-tree build
 
-Read more about f18 in the [documentation directory](documentation).
-Start with the [compiler overview](documentation/Overview.md).
+This is quite similar to the old way, but with a few subtle differences.
 
-To better understand Fortran as a language
-and the specific grammar accepted by f18,
-read [Fortran For C Programmers](documentation/FortranForCProgrammers.md)
-and
-f18's specifications of the [Fortran grammar](documentation/f2018-grammar.txt)
-and
-the [OpenMP grammar](documentation/OpenMP-4.5-grammar.txt).
-
-Treatment of language extensions is covered
-in [this document](documentation/Extensions.md).
-
-To understand the compilers handling of intrinsics,
-see the [discussion of intrinsics](documentation/Intrinsics.md).
-
-To understand how an f18 program communicates with libraries at runtime,
-see the discussion of [runtime descriptors](documentation/RuntimeDescriptor.md).
-
-If you're interested in contributing to the compiler,
-read the [style guide](documentation/C++style.md)
-and
-also review [how f18 uses modern C++ features](documentation/C++17.md).
-
-## Building F18
-
-### Get the Source Code
+1. Get the stuff.
 
 ```
-cd where/you/want/the/source
-git clone https://github.com/flang-compiler/f18.git
+  git clone git@github.com:flang-compiler/f18-llvm-project.git
+  git clone git@github.com:schweitzpgi/f18.git 
 ```
 
-### Supported C++ compilers
+2. Get "on" the right branches.
 
-F18 is written in C++17.
-
-The code has been compiled and tested with
-GCC versions 7.2.0, 7.3.0, 8.1.0, and 8.2.0.
-
-The code has been compiled and tested with
-clang version 7.0 and 8.0
-using either GNU's libstdc++ or LLVM's libc++.
-
-### LLVM dependency
-
-F18 uses components from LLVM.
-
-The instructions to build LLVM can be found at
-https://llvm.org/docs/GettingStarted.html.
-
-We highly recommend using the same compiler to compile both llvm and f18.
-
-The f18 CMakeList.txt file uses
-the variable `LLVM_DIR` to find the installed LLVM components
-and
-the variable `MLIR_DIR` to find the installed MLIR components.
-
-To get the correct LLVM and MLIR libraries included in your f18 build,
-define LLVM_DIR and MLIR_DIR on the cmake command line.
 ```
-LLVM=<LLVM_BUILD_DIR>/lib/cmake/llvm \
-MLIR=<LLVM_BUILD_DIR>/lib/cmake/mlir \
-cmake -DLLVM_DIR=$LLVM -DMLIR_DIR=$MLIR ...
+  (cd f18-llvm-project ; git checkout mono)
+  (cd f18 ; git checkout mono)
 ```
-where `LLVM_BUILD_DIR` is
-the top-level directory where LLVM was built.
+             
+3. Setup the LLVM space for in-tree builds.
+   
+``` 
+  (cd f18-llvm-project ; ln -s ../f18 flang)
+```
 
-### LLVM dependency when building f18 with Fortran IR
+4. Create a build space for cmake and make (or ninja)
 
-If you do not want to build Fortran IR, add `-DLINK_WITH_FIR=Off` to f18 cmake
-command and ignore the rest of this section.
+```
+  mkdir build
+  cd build
+  cmake ../f18-llvm-project/llvm -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS="flang;mlir" -DCMAKE_CXX_STANDARD=17 -DLLVM_BUILD_TOOLS=On -DLLVM_INSTALL_UTILS=On <other-arguments>
+```
 
-If you intend to build f18 with Fortran IR (`-DLINK_WITH_FIR` On by default),
-you must:
-- build LLVM with the same compiler and options as the one you are using
-to build F18.
-- pass `-DCMAKE_CXX_STANDARD=17 -DLLVM_ENABLE_PROJECTS="mlir"`
-to LLVM cmake command.
-- install LLVM somewhere with `make install` in order to get the required
-AddMLIR cmake file (it is not generated in LLVM build directory).
+5. Build everything
 
-Installing LLVM from packages is most likely not an option as it will not include
-MLIR and not be built following C++17 standard.
-
-MLIR is under active development and the most recent development version
-may be incompatible. A branch named `f18` is available inside LLVM fork in
-https://github.com/flang-compiler/f18-llvm-project. It contains a version of LLVM
-that is known be compatible to build f18 with FIR.
-
-The fastest way to get set up is to do:
+One can, for example, do this with make as follows.
 
 ```
 cd where/you/want/to/build/llvm
@@ -124,91 +62,71 @@ make
 make install
 ```
 
-Then, `-DLLVM_DIR` would have to be set to
- `<where/you/want/to/build/llvm>/install/lib/cmake/llvm`
-and, `-DMLIR_DIR` would have to be set to
- `<where/you/want/to/build/llvm>/install/lib/cmake/mlir`
+Or, of course, use their favorite build tool (such as ninja).
 
-in f18 cmake command.
+### Out-of-tree build
 
-To run lit tests,
-`-DLLVM_EXTERNAL_LIT=<where/you/want/to/build/llvm>/build/bin/llvm-lit` must be
-added to f18 cmake command. This is because `llvm-lit` is not part of
-LLVM installation.
+1. Get the stuff is the same as above. Get the code from the same repos.
 
-Note that when using some advanced options from f18 cmake file it may be
-necessary to reproduce their effects in LLVM cmake command.
+2. Get on the right branches. Again, same as above.
 
-### Building f18 with GCC
+3. SKIP step 3 above. We're not going to build `flang` yet.
 
-By default,
-cmake will search for g++ on your PATH.
-The g++ version must be one of the supported versions
-in order to build f18.
+4. Create a build space for cmake and make (or ninja)
 
-Or,
-cmake will use the variable CXX to find the C++ compiler.
-CXX should include the full path to the compiler
-or a name that will be found on your PATH,
-e.g. g++-8.3, assuming g++-8.3 is on your PATH.
 ```
-export CXX=g++-8.3
-```
-or
-```
-CXX=/opt/gcc-8.3/bin/g++-8.3 cmake ...
+  mkdir build
+  cd build
+  export CC=<my-favorite-C-compiler>
+  export CXX=<my-favorite-C++-compiler>
+  cmake -GNinja ../f18-llvm-project/llvm -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=X86 -DLLVM_ENABLE_PROJECTS=mlir -DCMAKE_CXX_STANDARD=17 -DLLVM_BUILD_TOOLS=On -DLLVM_INSTALL_UTILS=On -DCMAKE_INSTALL_PREFIX=<install-llvm-here> <other-arguments>
 ```
 
-### Building f18 with clang
+5. Build and install
 
-To build f18 with clang,
-cmake needs to know how to find clang++
-and the GCC library and tools that were used to build clang++.
-
-CXX should include the full path to clang++
-or clang++ should be found on your PATH.
 ```
-export CXX=clang++
+  ninja
+  ninja install
 ```
 
-### Installation Directory
+6. Add the new installation to your PATH
 
-To specify a custom install location,
-add
-`-DCMAKE_INSTALL_PREFIX=<INSTALL_PREFIX>`
-to the cmake command
-where `<INSTALL_PREFIX>`
-is the path where f18 should be installed.
-
-### Build Types
-
-To create a debug build,
-add
-`-DCMAKE_BUILD_TYPE=Debug`
-to the cmake command.
-Debug builds execute slowly.
-
-To create a release build,
-add
-`-DCMAKE_BUILD_TYPE=Release`
-to the cmake command.
-Release builds execute quickly.
-
-### Build F18
 ```
-cd ~/f18/build
-cmake -DLLVM_DIR=$LLVM -DMLIR_DIR=$MLIR ~/f18/src
-make
+  PATH=<install-llvm-here>/bin:$PATH
 ```
 
-### How to Run the Regression Tests
+7. Create a build space for another round of cmake and make (or ninja)
 
-To run all tests:
 ```
-cd ~/f18/build
-cmake -DLLVM_DIR=$LLVM -DMLIR_DIR=$MLIR ~/f18/src
-make test check-all
+  mkdir build-flang
+  cd build-flang
+  cmake -GNinja ../f18 -DLLVM_DIR=<install-llvm-here> -DCMAKE_BUILD_TYPE=RelWithDebInfo -DLLVM_TARGETS_TO_BUILD=X86 -DCMAKE_CXX_STANDARD=17 -DLLVM_BUILD_TOOLS=On -DCMAKE_INSTALL_PREFIX=<install-flang-here> <other-arguments>
 ```
+Note: if you plan on running lit regression tests, you should either:
+- Use `-DLLVM_DIR=<build-llvm-here>` instead of `-DLLVM_DIR=<install-llvm-here>`
+- Or, keep `-DLLVM_DIR=<install-llvm-here>` but add `-DLLVM_EXTERNAL_LIT=<path to llvm-lit>`.
+A valid `llvm-lit` path is `<build-llvm-here>/bin/llvm-lit`.
+Note that LLVM must also have been built with `-DLLVM_INSTALL_UTILS=On` so that tools required by tests like `FileCheck` are available in `<install-llvm-here>`.
+
+8. Build and install
+
+```
+  ninja
+  ninja check-flang
+  ninja install
+```
+
+### Running regression tests
+
+Inside `build` for in-tree builds or inside `build-flang` for out-of-tree builds:
+
+```
+  ninja check-flang
+```
+
+Special CMake instructions given above are required while building out-of-tree so that lit regression tests can be run.
+
+### Problems
 
 To run individual regression tests llvm-lit needs to know the lit
 configuration for f18. The parameters in charge of this are:

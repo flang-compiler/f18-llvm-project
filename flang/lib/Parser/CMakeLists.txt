@@ -1,4 +1,3 @@
-
 add_library(FortranParser
   Fortran-parsers.cpp
   char-buffer.cpp

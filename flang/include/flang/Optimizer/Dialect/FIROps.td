@@ -194,8 +194,8 @@ class fir_AllocatableBaseOp<string mnemonic, list<OpTrait> traits = []> :
   );
 }
 
-class fir_AllocatableOp<string mnemonic, list<OpTrait> traits =[]> :
-    fir_AllocatableBaseOp<mnemonic, !listconcat([NoSideEffect], traits)>,
+class fir_AllocatableOp<string mnemonic, list<OpTrait> traits = []> :
+    fir_AllocatableBaseOp<mnemonic, traits>,
     fir_TwoBuilders<fir_AllocateOpBuilder, fir_NamedAllocateOpBuilder>,
     Arguments<(ins TypeAttr:$in_type, Variadic<AnyIntegerType>:$args)> {
 
@@ -301,7 +301,7 @@ class fir_AllocatableOp<string mnemonic, list<OpTrait> traits =[]> :
 
 // Memory SSA operations
 
-def fir_AllocaOp : fir_AllocatableOp<"alloca"> {
+def fir_AllocaOp : fir_AllocatableOp<"alloca", [MemoryEffects<[MemAlloc]>]> {
   let summary = "allocate storage for a temporary on the stack given a type";
   let description = [{
     This primitive operation is used to allocate an object on the stack.  A
@@ -344,7 +344,7 @@ def fir_AllocaOp : fir_AllocatableOp<"alloca"> {
   }];
 }
 
-def fir_LoadOp : fir_OneResultOp<"load", []> {
+def fir_LoadOp : fir_OneResultOp<"load", [MemoryEffects<[MemRead]>]> {
   let summary = "load a value from a memory reference";
   let description = [{
     Load a value from a memory reference into an ssa-value (virtual register).
@@ -402,7 +402,7 @@ def fir_LoadOp : fir_OneResultOp<"load", []> {
   }];
 }
 
-def fir_StoreOp : fir_Op<"store", []> {
+def fir_StoreOp : fir_Op<"store", [MemoryEffects<[MemWrite]>]> {
   let summary = "store an SSA-value to a memory location";
 
   let description = [{
@@ -459,7 +459,7 @@ def fir_StoreOp : fir_Op<"store", []> {
   }];
 }
 
-def fir_UndefOp : fir_OneResultOp<"undefined", [NoSideEffect]> {
+def fir_UndefOp : fir_OneResultOp<"undefined", []> {
   let summary = "explicit undefined value of some type";
   let description = [{
     Constructs an ssa-value of the specified type with an undefined value.
@@ -479,13 +479,13 @@ def fir_UndefOp : fir_OneResultOp<"undefined", [NoSideEffect]> {
   let assemblyFormat = "type($intype) attr-dict";
 
   let verifier = [{
-    if (auto ref = getType().dyn_cast<fir::ReferenceType>())
-      return emitOpError("undefined values of type !fir.ref not allowed");
+    // allow `undef : ref<T>` since it is a possible from transformations
     return mlir::success();
   }];
 }
 
-def fir_AllocMemOp : fir_AllocatableOp<"allocmem"> {
+def fir_AllocMemOp :
+    fir_AllocatableOp<"allocmem", [MemoryEffects<[MemAlloc]>]> {
   let summary = "allocate storage on the heap for an object of a given type";
 
   let description = [{
@@ -514,7 +514,7 @@ def fir_AllocMemOp : fir_AllocatableOp<"allocmem"> {
   }];
 }
 
-def fir_FreeMemOp : fir_Op<"freemem", []> {
+def fir_FreeMemOp : fir_Op<"freemem", [MemoryEffects<[MemFree]>]> {
   let summary = "free a heap object";
 
   let description = [{
@@ -553,29 +553,15 @@ class fir_SwitchTerminatorOp<string mnemonic, list<OpTrait> traits = []> :
 
   let successors = (successor VariadicSuccessor<AnySuccessor>:$targets);
 
-  let builders = [OpBuilder<
-    "Builder *, OperationState &result, Value selector,"
-    "ValueRange properOperands, ArrayRef<Block *> destinations,"
-    "ArrayRef<ValueRange> operands = {},"
-    "ArrayRef<NamedAttribute> attributes = {}",
-    [{
-      result.addOperands(selector);
-      result.addOperands(properOperands);
-      for (auto kvp : llvm::zip(destinations, operands)) {
-        result.addSuccessors(std::get<0>(kvp));
-        result.addOperands(std::get<1>(kvp));
-      }
-      result.addAttributes(attributes);
-    }]
-  >];
-
   string extraSwitchClassDeclaration = [{
     using Conditions = mlir::Value;
 
     static constexpr llvm::StringRef getCasesAttr() { return "case_tags"; }
 
     // The number of destination conditions that may be tested
-    unsigned getNumConditions() { return getNumDest(); }
+    unsigned getNumConditions() {
+      return getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).size();
+    }
 
     // The selector is the value being tested to determine the destination
     mlir::Value getSelector() { return selector(); }
@@ -602,11 +588,50 @@ class fir_SwitchTerminatorOp<string mnemonic, list<OpTrait> traits = []> :
       else
         p.printSuccessor(succ);
     }
+
+    unsigned targetOffsetSize();
   }];
 }
 
 class fir_IntegralSwitchTerminatorOp<string mnemonic,
     list<OpTrait> traits = []> : fir_SwitchTerminatorOp<mnemonic, traits> {
+
+  let skipDefaultBuilders = 1;
+  let builders = [OpBuilder<
+    "Builder *builder, OperationState &result, Value selector,"
+    "ArrayRef<int64_t> compareOperands, ArrayRef<Block *> destinations,"
+    "ArrayRef<ValueRange> destOperands = {},"
+    "ArrayRef<NamedAttribute> attributes = {}",
+    [{
+      result.addOperands(selector);
+      llvm::SmallVector<mlir::Attribute, 8> ivalues;
+      for (auto iv : compareOperands)
+        ivalues.push_back(builder->getI64IntegerAttr(iv));
+      ivalues.push_back(builder->getUnitAttr());
+      result.addAttribute(getCasesAttr(), builder->getArrayAttr(ivalues));
+      const auto count = destinations.size();
+      for (auto d : destinations)
+        result.addSuccessors(d);
+      const auto opCount = destOperands.size();
+      llvm::SmallVector<int32_t, 8> argOffs;
+      int32_t sumArgs = 0;
+      for (std::remove_const_t<decltype(count)> i = 0; i != count; ++i) {
+        if (i < opCount) {
+          result.addOperands(destOperands[i]);
+          const auto argSz = destOperands[i].size();
+          argOffs.push_back(argSz);
+          sumArgs += argSz;
+        } else {
+          argOffs.push_back(0);
+        }
+      }
+      result.addAttribute(getOperandSegmentSizeAttr(),
+                          builder->getI32VectorAttr({1, 0, sumArgs}));
+      result.addAttribute(getTargetOffsetAttr(),
+                          builder->getI32VectorAttr(argOffs));
+      result.addAttributes(attributes);
+    }]
+  >];
 
   let parser = [{
     mlir::OpAsmParser::OperandType selector;
@@ -680,14 +705,17 @@ class fir_IntegralSwitchTerminatorOp<string mnemonic,
           getSelector().getType().isa<fir::IntType>()))
       return emitOpError("must be an integer");
     auto cases = getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).getValue();
-    auto count = getNumConditions();
+    auto count = getNumDest();
+    if (count == 0)
+      return emitOpError("must have at least one successor");
+    if (getNumConditions() != count)
+      return emitOpError("number of cases and targets don't match");
+    if (targetOffsetSize() != count)
+      return emitOpError("incorrect number of successor operand groups");
     for (decltype(count) i = 0; i != count; ++i) {
       auto &attr = cases[i];
-      if (attr.isa<mlir::IntegerAttr>() || attr.isa<mlir::UnitAttr>()) {
-        // ok
-      } else {
+      if (!(attr.isa<mlir::IntegerAttr>() || attr.isa<mlir::UnitAttr>()))
         return emitOpError("invalid case alternative");
-      }
     }
     return mlir::success();
   }];
@@ -756,6 +784,17 @@ def fir_SelectCaseOp : fir_SwitchTerminatorOp<"select_case"> {
     ```
   }];
 
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<"Builder *builder, OperationState &result, Value selector,"
+    "ArrayRef<mlir::Attribute> compareAttrs, ArrayRef<ValueRange> cmpOperands,"
+    "ArrayRef<Block *> destinations, ArrayRef<ValueRange> destOperands = {},"
+    "ArrayRef<NamedAttribute> attributes = {}">,
+    OpBuilder<"Builder *builder, OperationState &result, Value selector,"
+    "ArrayRef<mlir::Attribute> compareAttrs, ArrayRef<Value> cmpOpList,"
+    "ArrayRef<Block *> destinations, ArrayRef<ValueRange> destOperands = {},"
+    "ArrayRef<NamedAttribute> attributes = {}">];
+
   let parser = "return parseSelectCase(parser, result);";
 
   let printer = [{
@@ -792,23 +831,30 @@ def fir_SelectCaseOp : fir_SwitchTerminatorOp<"select_case"> {
           getSelector().getType().isa<fir::CharacterType>()))
       return emitOpError("must be an integer, character, or logical");
     auto cases = getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).getValue();
-    auto count = getNumConditions();
+    auto count = getNumDest();
+    if (count == 0)
+      return emitOpError("must have at least one successor");
+    if (getNumConditions() != count)
+      return emitOpError("number of conditions and successors don't match");
+    if (compareOffsetSize() != count)
+      return emitOpError("incorrect number of compare operand groups");
+    if (targetOffsetSize() != count)
+      return emitOpError("incorrect number of successor operand groups");
     for (decltype(count) i = 0; i != count; ++i) {
       auto &attr = cases[i];
-      if (attr.isa<fir::PointIntervalAttr>() ||
-          attr.isa<fir::LowerBoundAttr>() ||
-          attr.isa<fir::UpperBoundAttr>() ||
-          attr.isa<fir::ClosedIntervalAttr>() ||
-          attr.isa<mlir::UnitAttr>()) {
-        // ok
-      } else {
+      if (!(attr.isa<fir::PointIntervalAttr>() ||
+            attr.isa<fir::LowerBoundAttr>() ||
+            attr.isa<fir::UpperBoundAttr>() ||
+            attr.isa<fir::ClosedIntervalAttr>() ||
+            attr.isa<mlir::UnitAttr>()))
         return emitOpError("incorrect select case attribute type");
-      }
     }
     return mlir::success();
   }];
 
-  let extraClassDeclaration = extraSwitchClassDeclaration;
+  let extraClassDeclaration = extraSwitchClassDeclaration#[{
+    unsigned compareOffsetSize();
+  }];
 }
 
 def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
@@ -830,6 +876,39 @@ def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
           unit, ^bb5]
     ```
   }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [OpBuilder<
+    "Builder *builder, OperationState &result, Value selector,"
+    "ArrayRef<mlir::Attribute> typeOperands,"
+    "ArrayRef<Block *> destinations, ArrayRef<ValueRange> destOperands = {},"
+    "ArrayRef<NamedAttribute> attributes = {}",
+    [{
+      result.addOperands(selector);
+      result.addAttribute(getCasesAttr(), builder->getArrayAttr(typeOperands));
+      const auto count = destinations.size();
+      for (auto d : destinations)
+        result.addSuccessors(d);
+      const auto opCount = destOperands.size();
+      llvm::SmallVector<int32_t, 8> argOffs;
+      int32_t sumArgs = 0;
+      for (std::remove_const_t<decltype(count)> i = 0; i != count; ++i) {
+        if (i < opCount) {
+          result.addOperands(destOperands[i]);
+          const auto argSz = destOperands[i].size();
+          argOffs.push_back(argSz);
+          sumArgs += argSz;
+        } else {
+          argOffs.push_back(0);
+        }
+      }
+      result.addAttribute(getOperandSegmentSizeAttr(),
+                          builder->getI32VectorAttr({1, 0, sumArgs}));
+      result.addAttribute(getTargetOffsetAttr(),
+                          builder->getI32VectorAttr(argOffs));
+      result.addAttributes(attributes);
+    }]
+  >];
 
   let parser = "return parseSelectType(parser, result);";
 
@@ -854,15 +933,18 @@ def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
     if (!(getSelector().getType().isa<fir::BoxType>()))
       return emitOpError("must be a boxed type");
     auto cases = getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).getValue();
-    auto count = getNumConditions();
+    auto count = getNumDest();
+    if (count == 0)
+      return emitOpError("must have at least one successor");
+    if (getNumConditions() != count)
+      return emitOpError("number of conditions and successors don't match");
+    if (targetOffsetSize() != count)
+      return emitOpError("incorrect number of successor operand groups");
     for (decltype(count) i = 0; i != count; ++i) {
       auto &attr = cases[i];
-      if (attr.isa<fir::ExactTypeAttr>() || attr.isa<fir::SubclassAttr>() ||
-          attr.isa<mlir::UnitAttr>()) {
-        // ok
-      } else {
+      if (!(attr.isa<fir::ExactTypeAttr>() || attr.isa<fir::SubclassAttr>() ||
+            attr.isa<mlir::UnitAttr>()))
         return emitOpError("invalid type-case alternative");
-      }
     }
     return mlir::success();
   }];
@@ -927,7 +1009,7 @@ def fir_HasValueOp : fir_Op<"has_value", [Terminator, HasParent<"GlobalOp">]> {
 
 // Operations on !fir.box<T> type objects
 
-def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
+def fir_EmboxOp : fir_Op<"embox", [MemoryEffects<[MemAlloc]>]> {
   let summary = "boxes a given reference and (optional) dimension information";
 
   let description = [{
@@ -1021,10 +1103,7 @@ def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
   }];
 }
 
-def fir_EmboxCharOp : fir_Op<"emboxchar", [NoSideEffect]> {
-  let arguments = (ins AnyReferenceLike:$memref, AnyIntegerLike:$len);
-  let results = (outs fir_BoxCharType);
-
+def fir_EmboxCharOp : fir_Op<"emboxchar", [MemoryEffects<[MemAlloc]>]> {
   let summary = "boxes a given CHARACTER reference and its LEN parameter";
 
   let description = [{
@@ -1046,6 +1125,10 @@ def fir_EmboxCharOp : fir_Op<"emboxchar", [NoSideEffect]> {
     This buffer and its LEN value (10) are wrapped into a pair in `%6`.
   }];
 
+  let arguments = (ins AnyReferenceLike:$memref, AnyIntegerLike:$len);
+  
+  let results = (outs fir_BoxCharType);
+
   let assemblyFormat = [{
     $memref `,` $len attr-dict `:` functional-type(operands, results)
   }];
@@ -1058,8 +1141,7 @@ def fir_EmboxCharOp : fir_Op<"emboxchar", [NoSideEffect]> {
   }];
 }
 
-def fir_EmboxProcOp : fir_Op<"emboxproc", [NoSideEffect]> {
-
+def fir_EmboxProcOp : fir_Op<"emboxproc", [MemoryEffects<[MemAlloc]>]> {
   let summary = "boxes a given procedure and optional host context";
 
   let description = [{
@@ -1148,7 +1230,7 @@ def fir_EmboxProcOp : fir_Op<"emboxproc", [NoSideEffect]> {
   }];
 }
 
-def fir_UnboxOp : fir_SimpleOp<"unbox", [NoSideEffect]> {
+def fir_UnboxOp : fir_SimpleOp<"unbox", []> {
   let summary = "unbox the boxed value into a tuple value";
 
   let description = [{
@@ -1176,7 +1258,7 @@ def fir_UnboxOp : fir_SimpleOp<"unbox", [NoSideEffect]> {
   );
 }
 
-def fir_UnboxCharOp : fir_SimpleOp<"unboxchar", [NoSideEffect]> {
+def fir_UnboxCharOp : fir_SimpleOp<"unboxchar", []> {
   let summary = "unbox a boxchar value into a pair value";
 
   let description = [{
@@ -1194,7 +1276,7 @@ def fir_UnboxCharOp : fir_SimpleOp<"unboxchar", [NoSideEffect]> {
   let results = (outs fir_ReferenceType, AnyIntegerLike);
 }
 
-def fir_UnboxProcOp : fir_SimpleOp<"unboxproc", [NoSideEffect]> {
+def fir_UnboxProcOp : fir_SimpleOp<"unboxproc", []> {
   let summary = "unbox a boxproc value into a pair value";
 
   let description = [{
@@ -1219,7 +1301,7 @@ def fir_UnboxProcOp : fir_SimpleOp<"unboxproc", [NoSideEffect]> {
   let results = (outs FunctionType, fir_ReferenceType:$refTuple);
 }
 
-def fir_BoxAddrOp : fir_SimpleOneResultOp<"box_addr", [NoSideEffect]> {
+def fir_BoxAddrOp : fir_SimpleOneResultOp<"box_addr", []> {
   let summary = "return a memory reference to the boxed value";
 
   let description = [{
@@ -1238,9 +1320,11 @@ def fir_BoxAddrOp : fir_SimpleOneResultOp<"box_addr", [NoSideEffect]> {
   let arguments = (ins fir_BoxType:$val);
 
   let results = (outs AnyReferenceLike);
+
+  let hasFolder = 1;
 }
 
-def fir_BoxCharLenOp : fir_SimpleOp<"boxchar_len", [NoSideEffect]> {
+def fir_BoxCharLenOp : fir_SimpleOp<"boxchar_len", []> {
   let summary = "return the LEN type parameter from a boxchar value";
 
   let description = [{
@@ -1255,9 +1339,11 @@ def fir_BoxCharLenOp : fir_SimpleOp<"boxchar_len", [NoSideEffect]> {
   let arguments = (ins fir_BoxCharType:$val);
 
   let results = (outs AnyIntegerLike);
+
+  let hasFolder = 1;
 }
 
-def fir_BoxDimsOp : fir_Op<"box_dims", [NoSideEffect]> {
+def fir_BoxDimsOp : fir_Op<"box_dims", []> {
   let summary = "return the dynamic dimension information for the boxed value";
 
   let description = [{
@@ -1288,7 +1374,7 @@ def fir_BoxDimsOp : fir_Op<"box_dims", [NoSideEffect]> {
   }];
 }
 
-def fir_BoxEleSizeOp : fir_SimpleOneResultOp<"box_elesize", [NoSideEffect]> {
+def fir_BoxEleSizeOp : fir_SimpleOneResultOp<"box_elesize", []> {
   let summary = "return the size of an element of the boxed value";
 
   let description = [{
@@ -1309,7 +1395,7 @@ def fir_BoxEleSizeOp : fir_SimpleOneResultOp<"box_elesize", [NoSideEffect]> {
   let results = (outs AnyIntegerLike);
 }
 
-def fir_BoxIsAllocOp : fir_SimpleOp<"box_isalloc", [NoSideEffect]> {
+def fir_BoxIsAllocOp : fir_SimpleOp<"box_isalloc", []> {
   let summary = "is the boxed value an ALLOCATABLE?";
 
   let description = [{
@@ -1332,7 +1418,7 @@ def fir_BoxIsAllocOp : fir_SimpleOp<"box_isalloc", [NoSideEffect]> {
   let results = (outs BoolLike);
 }
 
-def fir_BoxIsArrayOp : fir_SimpleOp<"box_isarray", [NoSideEffect]> {
+def fir_BoxIsArrayOp : fir_SimpleOp<"box_isarray", []> {
   let summary = "is the boxed value an array?";
 
   let description = [{
@@ -1353,7 +1439,7 @@ def fir_BoxIsArrayOp : fir_SimpleOp<"box_isarray", [NoSideEffect]> {
   let results = (outs BoolLike);
 }
 
-def fir_BoxIsPtrOp : fir_SimpleOp<"box_isptr", [NoSideEffect]> {
+def fir_BoxIsPtrOp : fir_SimpleOp<"box_isptr", []> {
   let summary = "is the boxed value a POINTER?";
 
   let description = [{
@@ -1371,7 +1457,7 @@ def fir_BoxIsPtrOp : fir_SimpleOp<"box_isptr", [NoSideEffect]> {
   let results = (outs BoolLike);
 }
 
-def fir_BoxProcHostOp : fir_SimpleOp<"boxproc_host", [NoSideEffect]> {
+def fir_BoxProcHostOp : fir_SimpleOp<"boxproc_host", []> {
   let summary = "returns the host instance pointer (or null)";
 
   let description = [{
@@ -1393,7 +1479,7 @@ def fir_BoxProcHostOp : fir_SimpleOp<"boxproc_host", [NoSideEffect]> {
   let results = (outs fir_ReferenceType);
 }
 
-def fir_BoxRankOp : fir_SimpleOneResultOp<"box_rank", [NoSideEffect]> {
+def fir_BoxRankOp : fir_SimpleOneResultOp<"box_rank", []> {
   let summary = "return the number of dimensions for the boxed value";
 
   let description = [{
@@ -1415,7 +1501,7 @@ def fir_BoxRankOp : fir_SimpleOneResultOp<"box_rank", [NoSideEffect]> {
   let results = (outs AnyIntegerType);
 }
 
-def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", [NoSideEffect]> {
+def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", []> {
   let summary = "return the type descriptor for the boxed value";
 
   let description = [{
@@ -1435,7 +1521,7 @@ def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", [NoSideEffect]> {
 
 // Record and array type operations
 
-def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
+def fir_CoordinateOp : fir_Op<"coordinate_of", []> {
   let summary = "Finds the coordinate (location) of a value in memory";
 
   let description = [{
@@ -1451,8 +1537,8 @@ def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
 
     ```mlir
       %i = ... : index
-      %h = ... : !fir.heap<!fir.array<?:f32>>
-      %p = fir.coordinate_of %h, %i : (!fir.heap<!fir.array<?:f32>>, index) -> !fir.ref<f32>
+      %h = ... : !fir.heap<!fir.array<100 x f32>>
+      %p = fir.coordinate_of %h, %i : (!fir.heap<!fir.array<100 x f32>>, index) -> !fir.ref<f32>
     ```
 
     In the example, `%p` will be a pointer to the `%i`-th f32 value in the
@@ -1463,10 +1549,16 @@ def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
 
   let results = (outs fir_ReferenceType);
 
-  let assemblyFormat = [{
-    operands attr-dict `:` functional-type(operands, results)
-  }];
+  let parser = "return parseCoordinateOp(parser, result);";
 
+  let printer = [{
+    p << getOperationName() << ' ' << getOperation()->getOperands();
+    p.printOptionalAttrDict(getAttrs(), /*elidedAttrs=*/{baseType()});
+    p << " : ";
+    p.printFunctionalType(getOperation()->getOperandTypes(),
+        getOperation()->getResultTypes());
+  }];
+  
   let verifier = [{
     // Recovering a LEN type parameter only makes sense from a boxed value
     for (auto co : coor())
@@ -1476,11 +1568,31 @@ def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
         if (!ref().getType().dyn_cast<BoxType>())
           return emitOpError("len_param_index must be used on box type");
       }
+    if (auto attr = getAttr(CoordinateOp::baseType())) {
+      if (!attr.isa<mlir::TypeAttr>())
+        return emitOpError("improperly constructed");
+    } else {
+      return emitOpError("must have base type");
+    }
     return mlir::success();
+  }];
+
+  let skipDefaultBuilders = 1;
+  let builders = [
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "Type type, Value ref, ValueRange coor,"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "Type type, ValueRange operands,"
+	      "ArrayRef<NamedAttribute> attrs = {}">];
+	      
+  let extraClassDeclaration = [{
+    static constexpr llvm::StringRef baseType() { return "base_type"; }
+    mlir::Type getBaseType();
   }];
 }
 
-def fir_ExtractValueOp : fir_OneResultOp<"extract_value", [NoSideEffect]> {
+def fir_ExtractValueOp : fir_OneResultOp<"extract_value", []> {
   let summary = "Extract a value from an aggregate SSA-value";
 
   let description = [{
@@ -1508,7 +1620,7 @@ def fir_ExtractValueOp : fir_OneResultOp<"extract_value", [NoSideEffect]> {
   }];
 }
 
-def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
+def fir_FieldIndexOp : fir_OneResultOp<"field_index", []> {
   let summary = "create a field index value from a field identifier";
 
   let description = [{
@@ -1594,7 +1706,7 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
   }];
 }
 
-def fir_GenDimsOp : fir_OneResultOp<"gendims", [NoSideEffect]> {
+def fir_GenDimsOp : fir_OneResultOp<"gendims", [MemoryEffects<[MemAlloc]>]> {
 
   let summary = "generate a value of type `!fir.dims`";
 
@@ -1608,7 +1720,7 @@ def fir_GenDimsOp : fir_OneResultOp<"gendims", [NoSideEffect]> {
     stride must not be zero.
 
     ```mlir
-      %d = fir.gendims %l, %u, %s : (index, index, index) -> !fir.dims<1>
+      %d = fir.gendims %lo, %ext, %str : (index, index, index) -> !fir.dims<1>
     ```
   }];
 
@@ -1630,7 +1742,7 @@ def fir_GenDimsOp : fir_OneResultOp<"gendims", [NoSideEffect]> {
   }];
 }
 
-def fir_InsertValueOp : fir_OneResultOp<"insert_value", [NoSideEffect]> {
+def fir_InsertValueOp : fir_OneResultOp<"insert_value", []> {
   let summary = "insert a new sub-value into a copy of an existing aggregate";
 
   let description = [{
@@ -1659,7 +1771,7 @@ def fir_InsertValueOp : fir_OneResultOp<"insert_value", [NoSideEffect]> {
   }];
 }
 
-def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {
+def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", []> {
   let summary =
     "create a field index value from a LEN type parameter identifier";
 
@@ -1723,7 +1835,7 @@ def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {
 
 def ImplicitFirTerminator : SingleBlockImplicitTerminator<"FirEndOp">;
 
-def fir_LoopOp : fir_Op<"loop", [ImplicitFirTerminator]> {
+def fir_LoopOp : fir_Op<"loop", [ImplicitFirTerminator, RecursiveSideEffects]> {
   let summary = "generalized loop operation";
   let description = [{
     Generalized high-level looping construct. This operation is similar to
@@ -1745,46 +1857,73 @@ def fir_LoopOp : fir_Op<"loop", [ImplicitFirTerminator]> {
   }];
 
   let arguments = (ins
-    Index:$lowerBound,
-    Index:$upperBound,
-    Variadic<Index>:$optStep,
+    Variadic<Index>:$indexArgs,
     OptionalAttr<I64Attr>:$constantStep,
+    OptionalAttr<I64Attr>:$constantLowerBound,
+    OptionalAttr<I64Attr>:$constantUpperBound,
     OptionalAttr<UnitAttr>:$unordered
   );
 
-  let results = (outs Variadic<Index>:$lastVal);
+  let results = (outs);
 
   let regions = (region SizedRegion<1>:$region);
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "int64_t lowerBound, int64_t upperBound, int64_t step = 1,"
+              "bool unordered = false,"
+              "ArrayRef<NamedAttribute> attributes = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
               "mlir::Value lowerBound, mlir::Value upperBound,"
-              "ValueRange step = {}, ArrayRef<NamedAttribute> attributes = {}">
+              "mlir::Value step, bool unordered = false,"
+              "ArrayRef<NamedAttribute> attributes = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "mlir::Value lowerBound, mlir::Value upperBound,"
+              "bool unordered = false,"
+              "ArrayRef<NamedAttribute> attributes = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "mlir::Value lowerBound, mlir::Value upperBound,"
+              "int64_t step, bool unordered = false,"
+              "ArrayRef<NamedAttribute> attributes = {}">
   ];
 
   let parser = "return parseLoopOp(parser, result);";
 
   let printer = [{
-    p << getOperationName() << ' ' << getInductionVar() << " = "
-      << lowerBound() << " to " << upperBound();
-    auto s = optStep();
-    if (s.begin() != s.end()) {
-      p << " step ";
-      p.printOperand(*s.begin());
+    p << getOperationName() << ' ' << getInductionVar() << " = ";
+    if (constantLowerBound())
+      p << "(" << *constantLowerBound() << ")";
+    else
+      p.printOperand(getLowerBoundOperand());
+    p << " to ";
+    if (constantUpperBound())
+      p << "(" << *constantUpperBound() << ")";
+    else
+      p.printOperand(getUpperBoundOperand());
+    if (constantStep()) {
+      p << " step (" << *constantStep() << ")";
+    } else {
+      if (indexArgs().size() > 2) {
+        p << " step ";
+        p.printOperand(getStepOperand());
+      }
     }
     if (unordered())
       p << " unordered";
     p.printRegion(region(), /*printEntryBlockArgs=*/false,
                             /*printBlockTerminators=*/false);
-    p.printOptionalAttrDict(getAttrs(), {unorderedAttrName(), stepAttrName()});
+    p.printOptionalAttrDict(getAttrs(), {unorderedAttrName(), stepAttrName(),
+                            lowerAttrName(), upperAttrName()});
   }];
 
   let verifier = [{
-    auto step = optStep();
-    if (step.begin() != step.end()) {
+    const auto argSize = indexArgs().size();
+    if (!((argSize == 0) || (argSize == 2) || (argSize == 3)))
+      return emitOpError("wrong number of ssa arguments");
+    if (argSize > 2) {
       // FIXME: size of step must be 1
-      auto *s = (*step.begin()).getDefiningOp();
+      auto *s = (*(indexArgs().begin() + 2)).getDefiningOp();
       if (auto cst = dyn_cast_or_null<mlir::ConstantIndexOp>(s))
         if (cst.getValue() == 0)
           return emitOpError("constant step operand must be nonzero");
@@ -1797,20 +1936,18 @@ def fir_LoopOp : fir_Op<"loop", [ImplicitFirTerminator]> {
         !body->getArgument(0).getType().isIndex())
       return emitOpError("expected body to have a single index argument for "
                          "the induction variable");
-    if (lastVal().size() > 1)
-      return emitOpError("can only return one final value of iterator");
     return mlir::success();
   }];
 
   let extraClassDeclaration = [{
-    static constexpr const char *unorderedAttrName() { return "unordered"; }
-    static constexpr const char *stepAttrName() { return "step"; }
-
-    /// Is this an unordered loop?
-    bool isUnordered() { return getAttr(unorderedAttrName()).isa<UnitAttr>(); }
-
-    /// Does loop set (and return) the final value of the control variable?
-    bool hasLastValue() { return lastVal().size(); }
+    static constexpr llvm::StringRef unorderedAttrName() { return "unordered"; }
+    static constexpr llvm::StringRef stepAttrName() { return "constantStep"; }
+    static constexpr llvm::StringRef upperAttrName() {
+      return "constantUpperBound";
+    }
+    static constexpr llvm::StringRef lowerAttrName() {
+      return "constantLowerBound";
+    }
 
     /// Get the body of the loop
     mlir::Block *getBody() { return &region().front(); }
@@ -1818,26 +1955,33 @@ def fir_LoopOp : fir_Op<"loop", [ImplicitFirTerminator]> {
     /// Get the block argument corresponding to the loop control value (PHI)
     mlir::Value getInductionVar() { return getBody()->getArgument(0); }
 
-    /// Get a builder to insert operations into the LoopOp
-    mlir::OpBuilder getBodyBuilder() {
-      return mlir::OpBuilder(getBody(), std::prev(getBody()->end()));
+    mlir::Value getLowerBoundOperand() {
+      if (indexArgs().size() != 0)
+        return *indexArgs().begin();
+      return {};
+    }
+    
+    mlir::Value getUpperBoundOperand() {
+      if (indexArgs().size() != 0)
+        return *(indexArgs().begin() + 1);
+      return {};
     }
 
-    void setLowerBound(mlir::Value bound) {
-      getOperation()->setOperand(0, bound);
+    mlir::Value getStepOperand() {
+      if (indexArgs().size() == 3)
+        return *(indexArgs().begin() + 2);
+      return {};
     }
 
-    void setUpperBound(mlir::Value bound) {
-      getOperation()->setOperand(1, bound);
-    }
-
-    void setStep(mlir::Value step) {
-      getOperation()->setOperand(2, step);
+    void setUnordered() {
+      getOperation()->setAttr(unorderedAttrName(),
+                              mlir::UnitAttr::get(getContext()));
     }
   }];
 }
 
-def fir_WhereOp : fir_Op<"where", [ImplicitFirTerminator]> {
+def fir_WhereOp :
+    fir_Op<"where", [ImplicitFirTerminator, RecursiveSideEffects]> {
   let summary = "generalized conditional operation";
   let description = [{
     To conditionally execute operations (typically) within the body of a
@@ -1873,7 +2017,8 @@ def fir_WhereOp : fir_Op<"where", [ImplicitFirTerminator]> {
 
     // Print the 'else' regions if it exists and has a block.
     auto &otherReg = otherRegion();
-    if (!otherReg.empty()) {
+    if (!otherReg.empty() && !otherReg.front().empty() &&
+        otherReg.front().front().isKnownNonTerminator()) {
       p << " otherwise";
       p.printRegion(otherReg, /*printEntryBlockArgs=*/false,
           /*printBlockTerminators=*/false);
@@ -1904,11 +2049,13 @@ def fir_WhereOp : fir_Op<"where", [ImplicitFirTerminator]> {
       return mlir::OpBuilder(&body, std::prev(body.end()));
     }
   }];
+
+  let hasFolder = 1;
 }
 
 // Procedure call operations
 
-def fir_CallOp : fir_Op<"call", []> {
+def fir_CallOp : fir_Op<"call", [MemoryEffects<[MemRead, MemWrite]>]> {
   let summary = "call a procedure";
 
   let description = [{
@@ -1938,7 +2085,7 @@ def fir_CallOp : fir_Op<"call", []> {
   }];
 }
 
-def fir_DispatchOp : fir_Op<"dispatch", []> {
+def fir_DispatchOp : fir_Op<"dispatch", [MemoryEffects<[MemRead, MemWrite]>]> {
   let summary = "call a type-bound procedure";
 
   let description = [{
@@ -2012,7 +2159,7 @@ def fir_DispatchOp : fir_Op<"dispatch", []> {
 
 // Constant operations that support Fortran
 
-def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
+def fir_StringLitOp : fir_Op<"string_lit", []> {
   let summary = "create a string literal constant";
 
   let description = [{
@@ -2039,7 +2186,8 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
     else if (auto v = val.dyn_cast<mlir::ArrayAttr>())
       result.attributes.push_back(builder.getNamedAttr(xlist(), v));
     else
-      return mlir::failure();
+      return parser.emitError(parser.getCurrentLocation(),
+                              "found an invalid constant");
     mlir::IntegerAttr sz;
     mlir::Type type;
     if (parser.parseLParen() ||
@@ -2047,9 +2195,11 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
         parser.parseRParen() ||
         parser.parseColonType(type))
       return mlir::failure();
+    if (!(type.isa<fir::CharacterType>() || type.isa<mlir::IntegerType>()))
+      return parser.emitError(parser.getCurrentLocation(),
+                              "must have character type");
     type = fir::SequenceType::get({sz.getInt()}, type);
-    if (!type ||
-        parser.addTypesToList(type, result.types))
+    if (!type || parser.addTypesToList(type, result.types))
       return mlir::failure();
     return mlir::success();
   }];
@@ -2097,8 +2247,7 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
 // Complex operations
 
 class fir_ArithmeticOp<string mnemonic, list<OpTrait> traits = []> :
-    fir_Op<mnemonic,
-       !listconcat(traits, [NoSideEffect, SameOperandsAndResultType])>,
+    fir_Op<mnemonic, !listconcat(traits, [SameOperandsAndResultType])>,
     Results<(outs AnyType)> {
   let parser = [{
     return impl::parseOneResultSameOperandTypeOp(parser, result);
@@ -2108,8 +2257,7 @@ class fir_ArithmeticOp<string mnemonic, list<OpTrait> traits = []> :
 }
 
 class fir_UnaryArithmeticOp<string mnemonic, list<OpTrait> traits = []> :
-      fir_Op<mnemonic,
-         !listconcat(traits, [NoSideEffect, SameOperandsAndResultType])>,
+      fir_Op<mnemonic, !listconcat(traits, [SameOperandsAndResultType])>,
       Results<(outs AnyType)> {
   let parser = [{
     return impl::parseOneResultSameOperandTypeOp(parser, result);
@@ -2123,7 +2271,7 @@ def FirRealAttr : Attr<CPred<"$_self.isa<fir::RealAttr>()">, "FIR real attr"> {
   let returnType = [{ llvm::APFloat }];
 }
 
-def fir_ConstfOp : fir_Op<"constf", [NoSideEffect]> {
+def fir_ConstfOp : fir_Op<"constf", []> {
   let summary = "create a floating point constant";
 
   let description = [{
@@ -2154,15 +2302,21 @@ class RealArithmeticOp<string mnemonic, list<OpTrait> traits = []> :
       fir_ArithmeticOp<mnemonic, traits>,
       Arguments<(ins AnyRealLike:$lhs, AnyRealLike:$rhs)>;
 
-def fir_AddfOp : RealArithmeticOp<"addf", [Commutative]>;
-def fir_SubfOp : RealArithmeticOp<"subf">;
-def fir_MulfOp : RealArithmeticOp<"mulf", [Commutative]>;
+def fir_AddfOp : RealArithmeticOp<"addf", [Commutative]> {
+  let hasFolder = 1;
+}
+def fir_SubfOp : RealArithmeticOp<"subf"> {
+  let hasFolder = 1;
+}
+def fir_MulfOp : RealArithmeticOp<"mulf", [Commutative]> {
+  let hasFolder = 1;
+}
 def fir_DivfOp : RealArithmeticOp<"divf">;
 def fir_ModfOp : RealArithmeticOp<"modf">;
 // Pow is a builtin call and not a primitive
 
-def fir_CmpfOp : fir_Op<"cmpf",
-    [NoSideEffect, SameTypeOperands, SameOperandsAndResultShape]> {
+def fir_CmpfOp :
+    fir_Op<"cmpf", [SameTypeOperands, SameOperandsAndResultShape]> {
   let summary = "floating-point comparison operator";
 
   let description = [{
@@ -2197,8 +2351,7 @@ def fir_CmpfOp : fir_Op<"cmpf",
   }];
 }
 
-def fir_ConstcOp : fir_Op<"constc", [NoSideEffect]>,
-    Results<(outs fir_ComplexType)> {
+def fir_ConstcOp : fir_Op<"constc", []>, Results<(outs fir_ComplexType)> {
   let summary = "create a complex constant";
 
   let description = [{
@@ -2266,8 +2419,8 @@ def fir_MulcOp : ComplexArithmeticOp<"mulc", [Commutative]>;
 def fir_DivcOp : ComplexArithmeticOp<"divc">;
 // Pow is a builtin call and not a primitive
 
-def fir_CmpcOp : fir_Op<"cmpc",
-    [NoSideEffect, SameTypeOperands, SameOperandsAndResultShape]> {
+def fir_CmpcOp :
+    fir_Op<"cmpc", [SameTypeOperands, SameOperandsAndResultShape]> {
   let summary = "complex floating-point comparison operator";
 
   let description = [{
@@ -2302,8 +2455,9 @@ def fir_CmpcOp : fir_Op<"cmpc",
 
 // Other misc. operations
 
-def fir_AddrOfOp : fir_OneResultOp<"address_of", [NoSideEffect]> {
+def fir_AddrOfOp : fir_OneResultOp<"address_of", []> {
   let summary = "convert a symbol to an SSA value";
+  
   let description = [{
     Convert a symbol (a function or global reference) to an SSA-value to be
     used in other Operations.
@@ -2320,8 +2474,9 @@ def fir_AddrOfOp : fir_OneResultOp<"address_of", [NoSideEffect]> {
   let assemblyFormat = "`(` $symbol `)` attr-dict `:` type($resTy)";
 }
 
-def fir_ConvertOp : fir_OneResultOp<"convert", [NoSideEffect]> {
+def fir_ConvertOp : fir_OneResultOp<"convert", []> {
   let summary = "encapsulates all Fortran scalar type conversions";
+  
   let description = [{
     Generalized type conversion. Convert the ssa value from type T to type U.
     Not all pairs of types have conversions. When types T and U are the same
@@ -2340,6 +2495,8 @@ def fir_ConvertOp : fir_OneResultOp<"convert", [NoSideEffect]> {
   let assemblyFormat = [{
     $value attr-dict `:` functional-type($value, results)
   }];
+
+  let hasFolder = 1;
 }
 
 def FortranTypeAttr : Attr<And<[CPred<"$_self.isa<TypeAttr>()">,
@@ -2355,7 +2512,7 @@ def FortranTypeAttr : Attr<And<[CPred<"$_self.isa<TypeAttr>()">,
   let convertFromStorage = "$_self.getValue().cast<Type>()";
 }
 
-def fir_GenTypeDescOp : fir_OneResultOp<"gentypedesc", [NoSideEffect]> {
+def fir_GenTypeDescOp : fir_OneResultOp<"gentypedesc", []> {
   let summary = "generate a type descriptor for a given type";
   let description = [{
     Generates a constant object that is an abstract type descriptor of the
@@ -2454,105 +2611,85 @@ def fir_GlobalOp : fir_Op<"global", [IsolatedFromAbove, Symbol]> {
         %z = constant 0 : index
         %o = constant 1 : index
         %4 = fir.insert_value %3, %1, %z : (tuple<i32, f32>, i32, index) -> tuple<i32, f32>
-        %5 = fir.insert_value %4, %1, %o : (tuple<i32, f32>, f32, index) -> tuple<i32, f32>
-        return %5
+        %5 = fir.insert_value %4, %2, %o : (tuple<i32, f32>, f32, index) -> tuple<i32, f32>
+        fir.has_value %5 : tuple<i32, f32>
       }
     ```
   }];
 
   let arguments = (ins
     StrAttr:$sym_name,
-    OptionalAttr<AnyAttr>:$initval,
-    UnitAttr:$constant,
-    TypeAttr:$type
+    SymbolRefAttr:$symref,
+    TypeAttr:$type,
+    OptionalAttr<AnyAttr>:$initVal,
+    OptionalAttr<UnitAttr>:$constant,
+    OptionalAttr<StrAttr>:$linkName
   );
-
-  let results = (outs fir_ReferenceType:$resultType);
 
   let regions = (region AtMostRegion<1>:$region);
 
-  let parser = [{
-    // Parse the name as a symbol reference attribute.
-    SymbolRefAttr nameAttr;
-    if (parser.parseAttribute(nameAttr, mlir::SymbolTable::getSymbolAttrName(),
-                              result.attributes))
-      return failure();
-
-    auto &builder = parser.getBuilder();
-    auto name = nameAttr.getRootReference();
-    result.attributes.back().second = builder.getStringAttr(name);
-
-    bool simpleInitializer = false;
-    if (!parser.parseOptionalLParen()) {
-      Attribute attr;
-      if (parser.parseAttribute(attr, initValAttrName(), result.attributes) ||
-          parser.parseRParen())
-        return failure();
-      simpleInitializer = true;
-    }
-
-    if (succeeded(parser.parseOptionalKeyword(constantAttrName()))) {
-      // if "constant" keyword then mark this as a constant, not a variable
-      result.addAttribute(constantAttrName(), builder.getUnitAttr());
-    }
-
-    mlir::Type globalType;
-    if (parser.parseColonType(globalType))
-      return failure();
-
-    result.addAttribute(typeAttrName(), mlir::TypeAttr::get(globalType));
-
-    if (!simpleInitializer) {
-      // Parse the optional initializer body.
-      if (parser.parseRegion(*result.addRegion(), llvm::None, llvm::None))
-        return failure();
-    }
-
-    auto refTy = AllocaOp::wrapResultType(globalType);
-    if (parser.addTypeToList(refTy, result.types))
-      return failure();
-    return success();
-  }];
+  let parser = "return parseGlobalOp(parser, result);";
 
   let printer = [{
-    auto varName = getAttrOfType<StringAttr>(
-      mlir::SymbolTable::getSymbolAttrName()).getValue();
-    p << getOperationName() << " @" << varName;
-    if (auto iv = initval().getValueOr(Attribute())) {
-      p << '(';
-      p.printAttribute(iv);
-      p << ')';
-    }
+    p << getOperationName();
+    if (linkName().hasValue())
+      p << ' ' << linkName().getValue();
+    p << ' ';
+    p.printAttributeWithoutType(getAttr(symbolAttrName()));
+    if (auto val = getValueOrNull())
+      p << '(' << val << ')';
     if (getAttr(constantAttrName()))
-      p << ' ' << constantAttrName();
+      p << " constant";
     p << " : ";
     p.printType(getType());
-    Region &body = getOperation()->getRegion(0);
-    if (!body.empty())
-      p.printRegion(body, /*printEntryBlockArgs=*/false,
-                          /*printBlockTerminators=*/true);
+    if (hasInitializationBody())
+      p.printRegion(getOperation()->getRegion(0), /*printEntryBlockArgs=*/false,
+                    /*printBlockTerminators=*/true);
   }];
 
   let skipDefaultBuilders = 1;
   let builders = [
     OpBuilder<"mlir::Builder *builder, OperationState &result,"
-              "StringRef name, Type type, ArrayRef<NamedAttribute> attrs = {}",
-    [{
-      result.addAttribute(typeAttrName(), mlir::TypeAttr::get(type));
-      result.addAttribute(mlir::SymbolTable::getSymbolAttrName(),
-                          builder->getStringAttr(name));
-      result.addAttributes(attrs);
-    }]>
+              "StringRef name, Type type, ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "StringRef name, bool isConstant, Type type,"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "StringRef name, Type type, StringAttr linkage = {},"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "StringRef name, bool isConstant, Type type,"
+	      "StringAttr linkage = {},"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "StringRef name, Type type, Attribute initVal,"
+	      "StringAttr linkage = {},"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
+    OpBuilder<"mlir::Builder *builder, OperationState &result,"
+              "StringRef name, bool isConstant, Type type,"
+	      "Attribute initVal, StringAttr linkage = {},"
+	      "ArrayRef<NamedAttribute> attrs = {}">,
   ];
 
   let extraClassDeclaration = [{
+    static constexpr llvm::StringRef symbolAttrName() { return "symref"; }
     static constexpr llvm::StringRef constantAttrName() { return "constant"; }
-    static constexpr llvm::StringRef initValAttrName() { return "initval"; }
+    static constexpr llvm::StringRef initValAttrName() { return "initVal"; }
+    static constexpr llvm::StringRef linkageAttrName() { return "linkName"; }
     static constexpr llvm::StringRef typeAttrName() { return "type"; }
 
+    /// The printable type of the global
     mlir::Type getType() {
       return getAttrOfType<TypeAttr>(typeAttrName()).getValue();
     }
+
+    /// The semantic type of the global
+    mlir::Type resultType() {
+      return fir::AllocaOp::wrapResultType(getType());
+    }
+    
+    /// Return the initializer attribute if it exists, or a null attribute.
+    Attribute getValueOrNull() { return initVal().getValueOr(Attribute()); }
 
     /// Append the next initializer value to the `GlobalOp` to construct
     /// the variable's initial value.
@@ -2563,6 +2700,19 @@ def fir_GlobalOp : fir_Op<"global", [IsolatedFromAbove, Symbol]> {
 
     /// A GlobalOp has one block.
     mlir::Block &getBlock() { return getRegion().front(); }
+
+    /// Determine if `linkage` is a supported keyword
+    static mlir::ParseResult verifyValidLinkage(StringRef linkage);
+
+    bool hasInitializationBody() {
+      return (getOperation()->getNumRegions() == 1) && !getRegion().empty() &&
+        !isa<fir::FirEndOp>(getBlock().front());
+    }
+
+    mlir::FlatSymbolRefAttr getSymbol() {
+      return mlir::FlatSymbolRefAttr::get(getAttrOfType<mlir::StringAttr>(
+          mlir::SymbolTable::getSymbolAttrName()).getValue(), getContext());
+    }
   }];
 }
 

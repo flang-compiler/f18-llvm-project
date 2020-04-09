@@ -1,4 +1,5 @@
 add_llvm_library(FIRSupport
+  InternalNames.cpp
   KindMapping.cpp
 )
 

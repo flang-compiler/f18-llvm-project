@@ -1,4 +1,3 @@
-
 add_library(FortranEvaluate
   call.cpp
   characteristics.cpp
