@@ -68,7 +68,6 @@ standalone build.
 
 # How to Generate FIR Documentation
 
-If flang was built with `-DLINK_WITH_FIR=On` (`On` by default), it is
-possible to generate FIR language documentation by running `make
-flang-doc`. This will create `docs/Dialect/FIRLangRef.md` in f18 build
+It  is possible  to generate  FIR language  documentation by  running `make
+flang-doc`.   This  will   create  `docs/Dialect/FIRLangRef.md` in  build
 directory.
