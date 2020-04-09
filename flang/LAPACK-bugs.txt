@@ -1,17 +1,21 @@
 NEED ATTENTION
 ______________
 
-[Eric] error: branch has N operands for successor #M, but target block has K
 [Eric] UNREACHABLE executed at Lower/ConvertExpr.cpp:403!  CHAR comparison
 
-[Varun] UNREACHABLE executed at Lower/Bridge.cpp:1061!  DATA
-[Varun] UNREACHABLE executed at Lower/Bridge.cpp:1241!  local w/ initializer (implied SAVE)
+[Varun] DATA
+UNREACHABLE Lower/Bridge.cpp:1068!
+[Varun] local w/ initializer (implied SAVE)
+UNREACHABLE Lower/Bridge.cpp:1248!
 
-UNREACHABLE executed at Lower/Bridge.cpp:1236!  adjustable array?
 UNREACHABLE executed at Lower/ConvertExpr.cpp:798!  intrinsic subroutine
+UNREACHABLE executed at Lower/Bridge.cpp:1243!  adjustable array?
+
 
 FIXED
 _____
+
+error: branch has N operands for successor #M, but target block has K
 
 UNREACHABLE executed at Lower/IO.cpp:764!       FORMAT
 
