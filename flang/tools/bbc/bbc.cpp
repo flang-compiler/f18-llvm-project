@@ -201,7 +201,7 @@ static void convertFortranSourceToMLIR(
   pm.addPass(fir::createLowerToLoopPass());
   pm.addPass(fir::createFIRToStdPass(kindMap));
   pm.addPass(mlir::createLowerToCFGPass());
-  pm.addPass(fir::createMemToRegPass());
+  //pm.addPass(fir::createMemToRegPass());
   pm.addPass(fir::createCSEPass());
   pm.addPass(mlir::createCanonicalizerPass());
 
