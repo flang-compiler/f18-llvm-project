@@ -2,6 +2,7 @@ NEED ATTENTION
 ______________
 
 [Eric] UNREACHABLE executed at Lower/ConvertExpr.cpp:403!  CHAR comparison
+[Eric] UNREACHABLE executed at Lower/Bridge.cpp:1243!  adjustable array?
 
 [Varun] DATA
 UNREACHABLE Lower/Bridge.cpp:1068!
@@ -9,7 +10,6 @@ UNREACHABLE Lower/Bridge.cpp:1068!
 UNREACHABLE Lower/Bridge.cpp:1248!
 
 UNREACHABLE executed at Lower/ConvertExpr.cpp:798!  intrinsic subroutine
-UNREACHABLE executed at Lower/Bridge.cpp:1243!  adjustable array?
 
 
 FIXED

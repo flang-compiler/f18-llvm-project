@@ -244,24 +244,19 @@ public:
   /// Create a temporary. A temp is allocated using `fir.alloca` and can be read
   /// and written using `fir.load` and `fir.store`, resp.  The temporary can be
   /// given a name via a front-end `Symbol` or a `StringRef`.
-  mlir::Value createTemporary(mlir::Location loc, SymMap &symMap,
-                              mlir::Type type,
-                              llvm::ArrayRef<mlir::Value> shape = {},
-                              const Fortran::semantics::Symbol *symbol = {},
-                              llvm::StringRef name = {});
+  mlir::Value createTemporary(mlir::Location loc, mlir::Type type,
+                              llvm::StringRef name = {},
+                              llvm::ArrayRef<mlir::Value> shape = {});
 
-  mlir::Value createTemporary(SymMap &symMap, mlir::Type type,
-                              llvm::ArrayRef<mlir::Value> shape = {},
-                              const Fortran::semantics::Symbol *symbol = {},
-                              llvm::StringRef name = {}) {
-    return createTemporary(getLoc(), symMap, type, shape, symbol, name);
+  mlir::Value createTemporary(mlir::Type type, llvm::StringRef name = {},
+                              llvm::ArrayRef<mlir::Value> shape = {}) {
+    return createTemporary(getLoc(), type, name, shape);
   }
 
   /// Create an unnamed and untracked temporary on the stack.
   mlir::Value createTemporary(mlir::Type type,
                               llvm::ArrayRef<mlir::Value> shape) {
-    SymMap fakeMap;
-    return createTemporary(getLoc(), fakeMap, type, shape);
+    return createTemporary(getLoc(), type, llvm::StringRef{}, shape);
   }
 
   /// Create a global value.

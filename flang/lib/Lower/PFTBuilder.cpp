@@ -7,22 +7,16 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/PFTBuilder.h"
+#include "flang/Lower/Utils.h"
 #include "flang/Parser/dump-parse-tree.h"
 #include "flang/Parser/parse-tree-visitor.h"
-#include "flang/Semantics/symbol.h"
+#include "flang/Semantics/semantics.h"
+#include "flang/Semantics/tools.h"
 #include "llvm/Support/CommandLine.h"
-#include <algorithm>
-#include <cassert>
-#include <utility>
 
-template <typename A>
-static const A &removeIndirection(const A &a) {
-  return a;
-}
-template <typename A>
-static const A &removeIndirection(const Fortran::common::Indirection<A> &a) {
-  return a.value();
-}
+static llvm::cl::opt<bool> clDisableStructuredFir(
+    "no-structured-fir", llvm::cl::desc("disable generation of structured FIR"),
+    llvm::cl::init(false), llvm::cl::Hidden);
 
 namespace Fortran::lower {
 namespace {
@@ -69,7 +63,9 @@ struct UnwrapStmt<parser::UnlabeledStatement<A>> {
 /// limit the bridge to one such instantiation.
 class PFTBuilder {
 public:
-  PFTBuilder() : pgm{new pft::Program}, parentVariantStack{*pgm.get()} {}
+  PFTBuilder(const Fortran::semantics::SemanticsContext &semanticsContext)
+      : pgm{std::make_unique<pft::Program>()}, parentVariantStack{*pgm.get()},
+        semanticsContext{semanticsContext} {}
 
   /// Get the result
   std::unique_ptr<pft::Program> result() { return std::move(pgm); }
@@ -77,7 +73,7 @@ public:
   template <typename A>
   constexpr bool Pre(const A &a) {
     if constexpr (pft::isFunctionLike<A>) {
-      return enterFunction(a);
+      return enterFunction(a, semanticsContext);
     } else if constexpr (pft::isConstruct<A>) {
       return enterConstruct(a);
     } else if constexpr (UnwrapStmt<A>::isStmt) {
@@ -174,9 +170,11 @@ private:
 
   /// Initialize a new function-like unit and make it the builder's focus.
   template <typename A>
-  bool enterFunction(const A &func) {
-    auto &unit =
-        addFunction(pft::FunctionLikeUnit{func, parentVariantStack.back()});
+  bool
+  enterFunction(const A &func,
+                const Fortran::semantics::SemanticsContext &semanticsContext) {
+    auto &unit = addFunction(pft::FunctionLikeUnit{
+        func, parentVariantStack.back(), semanticsContext});
     labelEvaluationMap = &unit.labelEvaluationMap;
     assignSymbolLabelMap = &unit.assignSymbolLabelMap;
     functionList = &unit.nestedFunctions;
@@ -708,10 +706,12 @@ private:
   }
 
   std::unique_ptr<pft::Program> pgm;
+  std::vector<pft::ParentVariant> parentVariantStack;
+  const Fortran::semantics::SemanticsContext &semanticsContext;
+
   /// functionList points to the internal or module procedure function list
   /// of a FunctionLikeUnit or a ModuleLikeUnit.  It may be null.
   std::list<pft::FunctionLikeUnit> *functionList{nullptr};
-  std::vector<pft::ParentVariant> parentVariantStack;
   std::vector<pft::Evaluation *> constructStack{};
   std::vector<pft::Evaluation *> doConstructStack{};
   /// evaluationListStack is the current nested construct evaluationList state.
@@ -866,35 +866,43 @@ private:
 };
 
 } // namespace
+} // namespace Fortran::lower
 
 template <typename A, typename T>
-static pft::FunctionLikeUnit::FunctionStatement getFunctionStmt(const T &func) {
-  return std::get<parser::Statement<A>>(func.t);
+static Fortran::lower::pft::FunctionLikeUnit::FunctionStatement
+getFunctionStmt(const T &func) {
+  return std::get<Fortran::parser::Statement<A>>(func.t);
 }
 template <typename A, typename T>
-static pft::ModuleLikeUnit::ModuleStatement getModuleStmt(const T &mod) {
-  return std::get<parser::Statement<A>>(mod.t);
+static Fortran::lower::pft::ModuleLikeUnit::ModuleStatement
+getModuleStmt(const T &mod) {
+  return std::get<Fortran::parser::Statement<A>>(mod.t);
 }
 
-static const semantics::Symbol *
-getSymbol(std::optional<pft::FunctionLikeUnit::FunctionStatement> &beginStmt) {
+static const Fortran::semantics::Symbol *getSymbol(
+    std::optional<Fortran::lower::pft::FunctionLikeUnit::FunctionStatement>
+        &beginStmt) {
   if (!beginStmt)
     return nullptr;
 
-  const auto *symbol = beginStmt->visit(common::visitors{
-      [](const parser::Statement<parser::ProgramStmt> &stmt)
-          -> const semantics::Symbol * { return stmt.statement.v.symbol; },
-      [](const parser::Statement<parser::FunctionStmt> &stmt)
-          -> const semantics::Symbol * {
-        return std::get<parser::Name>(stmt.statement.t).symbol;
+  const auto *symbol = beginStmt->visit(Fortran::common::visitors{
+      [](const Fortran::parser::Statement<Fortran::parser::ProgramStmt> &stmt)
+          -> const Fortran::semantics::Symbol * {
+        return stmt.statement.v.symbol;
       },
-      [](const parser::Statement<parser::SubroutineStmt> &stmt)
-          -> const semantics::Symbol * {
-        return std::get<parser::Name>(stmt.statement.t).symbol;
+      [](const Fortran::parser::Statement<Fortran::parser::FunctionStmt> &stmt)
+          -> const Fortran::semantics::Symbol * {
+        return std::get<Fortran::parser::Name>(stmt.statement.t).symbol;
       },
-      [](const parser::Statement<parser::MpSubprogramStmt> &stmt)
-          -> const semantics::Symbol * { return stmt.statement.v.symbol; },
-      [](const auto &) -> const semantics::Symbol * {
+      [](const Fortran::parser::Statement<Fortran::parser::SubroutineStmt>
+             &stmt) -> const Fortran::semantics::Symbol * {
+        return std::get<Fortran::parser::Name>(stmt.statement.t).symbol;
+      },
+      [](const Fortran::parser::Statement<Fortran::parser::MpSubprogramStmt>
+             &stmt) -> const Fortran::semantics::Symbol * {
+        return stmt.statement.v.symbol;
+      },
+      [](const auto &) -> const Fortran::semantics::Symbol * {
         llvm_unreachable("unknown FunctionLike beginStmt");
         return nullptr;
       }});
@@ -902,91 +910,218 @@ getSymbol(std::optional<pft::FunctionLikeUnit::FunctionStatement> &beginStmt) {
   return symbol;
 }
 
-llvm::cl::opt<bool> clDisableStructuredFir(
-    "no-structured-fir", llvm::cl::desc("disable generation of structured FIR"),
-    llvm::cl::init(false), llvm::cl::Hidden);
-
-bool pft::Evaluation::lowerAsStructured() const {
+bool Fortran::lower::pft::Evaluation::lowerAsStructured() const {
   return !lowerAsUnstructured();
 }
 
-bool pft::Evaluation::lowerAsUnstructured() const {
+bool Fortran::lower::pft::Evaluation::lowerAsUnstructured() const {
   return isUnstructured || clDisableStructuredFir;
 }
 
-pft::FunctionLikeUnit *pft::Evaluation::getOwningProcedure() const {
+Fortran::lower::pft::FunctionLikeUnit *
+Fortran::lower::pft::Evaluation::getOwningProcedure() const {
   return std::visit(
       Fortran::common::visitors{
           [](Fortran::lower::pft::FunctionLikeUnit *c) { return c; },
           [&](Fortran::lower::pft::Evaluation *c) {
             return c->getOwningProcedure();
           },
-          [](auto *) -> pft::FunctionLikeUnit * { return nullptr; },
+          [](auto *) -> Fortran::lower::pft::FunctionLikeUnit * {
+            return nullptr;
+          },
       },
       parentVariant.p);
 }
 
-pft::FunctionLikeUnit::FunctionLikeUnit(const parser::MainProgram &func,
-                                        const pft::ParentVariant &parent)
-    : ProgramUnit{func, parent}, endStmt{
-                                     getFunctionStmt<parser::EndProgramStmt>(
-                                         func)} {
-  const auto &ps{
-      std::get<std::optional<parser::Statement<parser::ProgramStmt>>>(func.t)};
+namespace {
+/// This helper class is for sorting the symbols in the symbol table. We want
+/// the symbols in an order such that a symbol will be visited after those it
+/// depends upon. Otherwise this sort is stable and preserves the order of the
+/// symbol table, which is sorted by name.
+struct SymbolDependenceDepth {
+  explicit SymbolDependenceDepth(
+      std::vector<std::vector<Fortran::lower::pft::Variable>> &vars)
+      : vars{vars} {}
+
+  // Recursively visit each symbol to determine the height of its dependence on
+  // other symbols.
+  int analyze(const Fortran::semantics::Symbol &sym) {
+    auto done = seen.insert(&sym);
+    if (!done.second)
+      return 0;
+    if (Fortran::semantics::IsDummy(sym)) {
+      // Trivial base case. Add to the list in case it's pass-by-value.
+      adjustSize(1);
+      vars[0].emplace_back(sym);
+      return 0;
+    }
+    if (Fortran::semantics::IsProcedure(sym)) {
+      // TODO: add declaration?
+      return 0;
+    }
+    if (sym.has<Fortran::semantics::UseDetails>() ||
+        sym.has<Fortran::semantics::HostAssocDetails>() ||
+        sym.has<Fortran::semantics::NamelistDetails>() ||
+        sym.has<Fortran::semantics::MiscDetails>()) {
+      // FIXME: do we want to do anything with any of these?
+      return 0;
+    }
+
+    // Symbol must be something lowering will have to allocate.
+    bool global = Fortran::semantics::IsSaved(sym);
+    int depth = 0;
+    const auto *symTy = sym.GetType();
+    assert(symTy && "symbol must have a type");
+
+    // check CHARACTER's length
+    if (symTy->category() == Fortran::semantics::DeclTypeSpec::Character)
+      if (auto e = symTy->characterTypeSpec().length().GetExplicit())
+        for (const auto &s : Fortran::evaluate::CollectSymbols(*e))
+          depth = std::max(analyze(s) + 1, depth);
+
+    if (const auto *details =
+            sym.detailsIf<Fortran::semantics::ObjectEntityDetails>()) {
+      auto doExplicit = [&](const auto &bound) {
+        if (bound.isExplicit()) {
+          Fortran::semantics::SomeExpr e{*bound.GetExplicit()};
+          for (const auto &s : Fortran::evaluate::CollectSymbols(e))
+            depth = std::max(analyze(s) + 1, depth);
+        }
+      };
+      // handle any symbols in array bound declarations
+      for (const auto &subs : details->shape()) {
+        doExplicit(subs.lbound());
+        doExplicit(subs.ubound());
+      }
+      // handle any symbols in coarray bound declarations
+      for (const auto &subs : details->coshape()) {
+        doExplicit(subs.lbound());
+        doExplicit(subs.ubound());
+      }
+      // handle any symbols in initialization expressions
+      if (auto e = details->init()) {
+        assert(global && "should have been marked implicitly SAVE");
+        for (const auto &s : Fortran::evaluate::CollectSymbols(*e))
+          depth = std::max(analyze(s) + 1, depth);
+      }
+    }
+    adjustSize(depth + 1);
+    vars[depth].emplace_back(sym, global, depth);
+    return depth;
+  }
+
+  // Save the final list of symbols as a single vector and free the rest.
+  void finalize() {
+    for (int i = 1, end = vars.size(); i < end; ++i)
+      vars[0].insert(vars[0].end(), vars[i].begin(), vars[i].end());
+    vars.resize(1);
+  }
+
+private:
+  // Make sure the table is of appropriate size.
+  void adjustSize(std::size_t size) {
+    if (vars.size() < size)
+      vars.resize(size);
+  }
+
+  llvm::SmallSet<const Fortran::semantics::Symbol *, 32> seen;
+  std::vector<std::vector<Fortran::lower::pft::Variable>> &vars;
+};
+} // namespace
+
+void Fortran::lower::pft::FunctionLikeUnit::processSymbolTable(
+    const Fortran::semantics::Scope &scope) {
+  SymbolDependenceDepth sdd{varList};
+  for (const auto &iter : scope) {
+    sdd.analyze(iter.second.get());
+    // llvm::outs() << iter.second.get() << '\n';
+  }
+  sdd.finalize();
+}
+
+Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
+    const Fortran::parser::MainProgram &func,
+    const Fortran::lower::pft::ParentVariant &parent,
+    const Fortran::semantics::SemanticsContext &semanticsContext)
+    : ProgramUnit{func, parent},
+      endStmt{getFunctionStmt<Fortran::parser::EndProgramStmt>(func)} {
+  const auto &ps{std::get<
+      std::optional<Fortran::parser::Statement<Fortran::parser::ProgramStmt>>>(
+      func.t)};
   if (ps.has_value()) {
     beginStmt = ps.value();
     symbol = getSymbol(beginStmt);
+    processSymbolTable(*symbol->scope());
+  } else {
+    processSymbolTable(semanticsContext.FindScope(
+        std::get<Fortran::parser::Statement<Fortran::parser::EndProgramStmt>>(
+            func.t)
+            .source));
   }
 }
 
-pft::FunctionLikeUnit::FunctionLikeUnit(const parser::FunctionSubprogram &func,
-                                        const pft::ParentVariant &parent)
+Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
+    const Fortran::parser::FunctionSubprogram &func,
+    const Fortran::lower::pft::ParentVariant &parent,
+    const Fortran::semantics::SemanticsContext &)
     : ProgramUnit{func, parent},
-      beginStmt{getFunctionStmt<parser::FunctionStmt>(func)},
-      endStmt{getFunctionStmt<parser::EndFunctionStmt>(func)}, symbol{getSymbol(
-                                                                   beginStmt)} {
+      beginStmt{getFunctionStmt<Fortran::parser::FunctionStmt>(func)},
+      endStmt{getFunctionStmt<Fortran::parser::EndFunctionStmt>(func)},
+      symbol{getSymbol(beginStmt)} {
+  processSymbolTable(*symbol->scope());
 }
 
-pft::FunctionLikeUnit::FunctionLikeUnit(
-    const parser::SubroutineSubprogram &func, const pft::ParentVariant &parent)
+Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
+    const Fortran::parser::SubroutineSubprogram &func,
+    const Fortran::lower::pft::ParentVariant &parent,
+    const Fortran::semantics::SemanticsContext &)
     : ProgramUnit{func, parent},
-      beginStmt{getFunctionStmt<parser::SubroutineStmt>(func)},
-      endStmt{getFunctionStmt<parser::EndSubroutineStmt>(func)},
-      symbol{getSymbol(beginStmt)} {}
+      beginStmt{getFunctionStmt<Fortran::parser::SubroutineStmt>(func)},
+      endStmt{getFunctionStmt<Fortran::parser::EndSubroutineStmt>(func)},
+      symbol{getSymbol(beginStmt)} {
+  processSymbolTable(*symbol->scope());
+}
 
-pft::FunctionLikeUnit::FunctionLikeUnit(
+Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     const parser::SeparateModuleSubprogram &func,
-    const pft::ParentVariant &parent)
+    const Fortran::lower::pft::ParentVariant &parent,
+    const Fortran::semantics::SemanticsContext &)
     : ProgramUnit{func, parent},
-      beginStmt{getFunctionStmt<parser::MpSubprogramStmt>(func)},
-      endStmt{getFunctionStmt<parser::EndMpSubprogramStmt>(func)},
-      symbol{getSymbol(beginStmt)} {}
+      beginStmt{getFunctionStmt<Fortran::parser::MpSubprogramStmt>(func)},
+      endStmt{getFunctionStmt<Fortran::parser::EndMpSubprogramStmt>(func)},
+      symbol{getSymbol(beginStmt)} {
+  processSymbolTable(*symbol->scope());
+}
 
-pft::ModuleLikeUnit::ModuleLikeUnit(const parser::Module &m,
-                                    const pft::ParentVariant &parent)
-    : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::ModuleStmt>(m)},
-      endStmt{getModuleStmt<parser::EndModuleStmt>(m)} {}
+Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
+    const parser::Module &m, const Fortran::lower::pft::ParentVariant &parent)
+    : ProgramUnit{m, parent},
+      beginStmt{getModuleStmt<Fortran::parser::ModuleStmt>(m)},
+      endStmt{getModuleStmt<Fortran::parser::EndModuleStmt>(m)} {}
 
-pft::ModuleLikeUnit::ModuleLikeUnit(const parser::Submodule &m,
-                                    const pft::ParentVariant &parent)
-    : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::SubmoduleStmt>(
-                                  m)},
-      endStmt{getModuleStmt<parser::EndSubmoduleStmt>(m)} {}
+Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
+    const Fortran::parser::Submodule &m,
+    const Fortran::lower::pft::ParentVariant &parent)
+    : ProgramUnit{m, parent},
+      beginStmt{getModuleStmt<Fortran::parser::SubmoduleStmt>(m)},
+      endStmt{getModuleStmt<Fortran::parser::EndSubmoduleStmt>(m)} {}
 
-pft::BlockDataUnit::BlockDataUnit(const parser::BlockData &bd,
-                                  const pft::ParentVariant &parent)
+Fortran::lower::pft::BlockDataUnit::BlockDataUnit(
+    const Fortran::parser::BlockData &bd,
+    const Fortran::lower::pft::ParentVariant &parent)
     : ProgramUnit{bd, parent} {}
 
-std::unique_ptr<pft::Program> createPFT(const parser::Program &root) {
-  PFTBuilder walker;
+std::unique_ptr<Fortran::lower::pft::Program> Fortran::lower::createPFT(
+    const Fortran::parser::Program &root,
+    const Fortran::semantics::SemanticsContext &semanticsContext) {
+  PFTBuilder walker(semanticsContext);
   Walk(root, walker);
   return walker.result();
 }
 
-void dumpPFT(llvm::raw_ostream &outputStream, pft::Program &pft) {
+void Fortran::lower::dumpPFT(llvm::raw_ostream &outputStream,
+                             Fortran::lower::pft::Program &pft) {
   PFTDumper{}.dumpPFT(outputStream, pft);
 }
 
-void pft::Program::dump() { dumpPFT(llvm::errs(), *this); }
-
-} // namespace Fortran::lower
+void Fortran::lower::pft::Program::dump() { dumpPFT(llvm::errs(), *this); }

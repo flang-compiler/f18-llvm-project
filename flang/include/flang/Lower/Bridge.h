@@ -41,6 +41,7 @@ struct Program;
 } // namespace parser
 namespace semantics {
 class Symbol;
+class SemanticsContext;
 } // namespace semantics
 } // namespace Fortran
 
@@ -146,7 +147,8 @@ public:
   const parser::CookedSource *getCookedSource() const { return cooked; }
 
   /// Cross the bridge from the Fortran parse-tree, etc. to FIR+OpenMP+MLIR
-  void lower(const parser::Program &program, fir::NameUniquer &uniquer);
+  void lower(const parser::Program &program, fir::NameUniquer &uniquer,
+             const Fortran::semantics::SemanticsContext &semanticsContext);
 
 private:
   explicit LoweringBridge(const common::IntrinsicTypeDefaultKinds &defaultKinds,

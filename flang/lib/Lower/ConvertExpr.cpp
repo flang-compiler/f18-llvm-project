@@ -202,9 +202,11 @@ class ExprLowering {
   /// one.
   mlir::Value gen(Fortran::semantics::SymbolRef sym) {
     // FIXME: not all symbols are local
+    if (auto val = symMap.lookupSymbol(sym))
+      return val;
     auto addr = builder.createTemporary(
-        getLoc(), symMap, converter.genType(sym), llvm::None, &*sym);
-    assert(addr && "failed generating symbol address");
+        getLoc(), converter.genType(sym), sym->name().ToString());
+    symMap.addSymbol(sym, addr);
     return addr;
   }
 
@@ -846,7 +848,7 @@ class ExprLowering {
       } else {
         // create a temp to store the expression value
         auto val = genval(*expr);
-        auto addr = builder.createTemporary(getLoc(), symMap, val.getType());
+        auto addr = builder.createTemporary(getLoc(), val.getType());
         builder.create<fir::StoreOp>(getLoc(), val, addr);
         argTypes.push_back(addr.getType());
         operands.push_back(addr);

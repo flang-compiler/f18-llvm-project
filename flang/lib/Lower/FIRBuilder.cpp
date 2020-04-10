@@ -52,34 +52,24 @@ Fortran::lower::FirOpBuilder::createIntegerConstant(mlir::Type intType,
   return createHere<mlir::ConstantOp>(intType, getIntegerAttr(intType, cst));
 }
 
-/// Create a temporary variable
-/// `symbol` will be nullptr for an anonymous temporary
+/// Create a temporary variable on the stack. Anonymous temporaries have no
+/// `name` value.
 mlir::Value Fortran::lower::FirOpBuilder::createTemporary(
-    mlir::Location loc, Fortran::lower::SymMap &symMap, mlir::Type type,
-    llvm::ArrayRef<mlir::Value> shape, const Fortran::semantics::Symbol *symbol,
-    llvm::StringRef name) {
-  if (symbol)
-    if (auto val = symMap.lookupSymbol(*symbol)) {
-      if (auto op = val.getDefiningOp())
-        return op->getResult(0);
-      return val;
-    }
-
+    mlir::Location loc, mlir::Type type, llvm::StringRef name,
+    llvm::ArrayRef<mlir::Value> shape) {
   auto insPt = saveInsertionPoint();
-  setInsertionPointToStart(getEntryBlock());
-  fir::AllocaOp ae;
+  if (shape.empty())
+    setInsertionPointToStart(getEntryBlock());
+  else
+    setInsertionPointAfter(shape.back().getDefiningOp());
   assert(!type.isa<fir::ReferenceType>() && "cannot be a reference");
-  if (symbol) {
-    ae = create<fir::AllocaOp>(loc, type, symbol->name().ToString(), llvm::None,
-                               shape);
-    symMap.addSymbol(*symbol, ae);
-  } else {
-    ae = create<fir::AllocaOp>(loc, type, name, llvm::None, shape);
-  }
+  auto ae = create<fir::AllocaOp>(loc, type, name, llvm::None, shape);
   restoreInsertionPoint(insPt);
   return ae;
 }
 
+/// Create a global variable in the (read-only) data section. A global variable
+/// must have a unique name to identify and reference it.
 fir::GlobalOp Fortran::lower::FirOpBuilder::createGlobal(
     mlir::Location loc, mlir::Type type, llvm::StringRef name,
     mlir::StringAttr linkage, mlir::Attribute value, bool isConst) {
