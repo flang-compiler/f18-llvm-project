@@ -2,6 +2,7 @@ set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wno-error -Wno-unused-parameter")
 
 add_library(FortranLower
   Bridge.cpp
+  CharRT.cpp
   ConvertExpr.cpp
   ConvertType.cpp
   FIRBuilder.cpp
