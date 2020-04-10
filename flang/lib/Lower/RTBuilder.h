@@ -72,6 +72,18 @@ constexpr TypeBuilderFunc getModel<const char *>() {
   return getModel<char *>();
 }
 template <>
+constexpr TypeBuilderFunc getModel<const char16_t *>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return fir::ReferenceType::get(mlir::IntegerType::get(16, context));
+  };
+}
+template <>
+constexpr TypeBuilderFunc getModel<const char32_t *>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return fir::ReferenceType::get(mlir::IntegerType::get(32, context));
+  };
+}
+template <>
 constexpr TypeBuilderFunc getModel<void **>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
     return fir::ReferenceType::get(
