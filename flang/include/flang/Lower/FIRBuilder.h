@@ -45,6 +45,7 @@ public:
   /// Find `symbol` and return its value if it appears in the current mappings.
   mlir::Value lookupSymbol(semantics::SymbolRef symbol);
 
+  void erase(semantics::SymbolRef sym) { symbolMap.erase(&*sym); }
   void clear() { symbolMap.clear(); }
 
 private:

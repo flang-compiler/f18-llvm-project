@@ -947,12 +947,6 @@ struct SymbolDependenceDepth {
     auto done = seen.insert(&sym);
     if (!done.second)
       return 0;
-    if (semantics::IsDummy(sym)) {
-      // Trivial base case. Add to the list in case it's pass-by-value.
-      adjustSize(1);
-      vars[0].emplace_back(sym);
-      return 0;
-    }
     if (semantics::IsProcedure(sym)) {
       // TODO: add declaration?
       return 0;
