@@ -991,7 +991,8 @@ struct SymbolDependenceDepth {
       }
       // handle any symbols in initialization expressions
       if (auto e = details->init()) {
-        assert(global && "should have been marked implicitly SAVE");
+        // A PARAMETER may not be marked as implicitly SAVE, so set the flag.
+        global = true;
         for (const auto &s : evaluate::CollectSymbols(*e))
           depth = std::max(analyze(s) + 1, depth);
       }
