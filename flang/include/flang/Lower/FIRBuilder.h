@@ -292,6 +292,10 @@ public:
                         linkage);
   }
 
+  /// Convert a StringRef string into a fir::StringLitOp.
+  fir::StringLitOp createStringLit(mlir::Location loc, mlir::Type eleTy,
+                                   llvm::StringRef string);
+
   /// Get a function by name. If the function exists in the current module, it
   /// is returned. Otherwise, a null FuncOp is returned.
   mlir::FuncOp getNamedFunction(llvm::StringRef name) {

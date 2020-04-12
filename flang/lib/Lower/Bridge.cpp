@@ -345,7 +345,7 @@ private:
   void switchInsertionPointToOtherwise(fir::WhereOp &where) {
     builder->setInsertionPointToStart(&where.otherRegion().front());
   }
-  
+
   template <typename A>
   mlir::OpBuilder::InsertPoint genWhereCondition(fir::WhereOp &where,
 						 const A *stmt) {
@@ -353,7 +353,7 @@ private:
         toLocation(),
         Fortran::semantics::GetExpr(
             std::get<Fortran::parser::ScalarLogicalExpr>(stmt->t)));
-    where = builder->create<fir::WhereOp>(toLocation(), cond, true);
+        where = builder->create<fir::WhereOp>(toLocation(), cond, true);
     auto insPt = builder->saveInsertionPoint();
     switchInsertionPointToWhere(where);
     return insPt;
@@ -620,8 +620,8 @@ private:
         } else if (e.isA<Fortran::parser::ElseStmt>()) {
           // otherwise block
           switchInsertionPointToOtherwise(underWhere);
-	} else if (e.isA<Fortran::parser::EndIfStmt>()) {
-	  builder->restoreInsertionPoint(insPt);
+        } else if (e.isA<Fortran::parser::EndIfStmt>()) {
+          builder->restoreInsertionPoint(insPt);
         } else {
           genFIR(e, /*unstructuredContext*/ false);
         }
@@ -867,11 +867,13 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::PrintStmt &stmt) {
-    genPrintStatement(*this, stmt);
+    genPrintStatement(*this, stmt,
+                      eval.getOwningProcedure()->labelEvaluationMap);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::ReadStmt &stmt) {
-    genReadStatement(*this, stmt);
+    genReadStatement(*this, stmt,
+                     eval.getOwningProcedure()->labelEvaluationMap);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::RewindStmt &stmt) {
@@ -879,7 +881,8 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::WriteStmt &stmt) {
-    genWriteStatement(*this, stmt);
+    genWriteStatement(*this, stmt,
+                      eval.getOwningProcedure()->labelEvaluationMap);
   }
 
   void genFIR(Fortran::lower::pft::Evaluation &eval,
@@ -1050,7 +1053,8 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::FormatStmt &) {
-    TODO();
+    // do nothing. FORMAT statements have no semantics. They may be lowered if
+    // used by a data transfer statement.
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::EntryStmt &) {

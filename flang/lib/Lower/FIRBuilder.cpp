@@ -377,6 +377,20 @@ struct CharacterOpsBuilderImpl {
 };
 } // namespace
 
+fir::StringLitOp Fortran::lower::FirOpBuilder::createStringLit(
+    mlir::Location loc, mlir::Type eleTy, llvm::StringRef data) {
+  auto strAttr = mlir::StringAttr::get(data, getContext());
+  auto valTag = mlir::Identifier::get(fir::StringLitOp::value(), getContext());
+  mlir::NamedAttribute dataAttr(valTag, strAttr);
+  auto sizeTag = mlir::Identifier::get(fir::StringLitOp::size(), getContext());
+  mlir::NamedAttribute sizeAttr(sizeTag, getI64IntegerAttr(data.size()));
+  llvm::SmallVector<mlir::NamedAttribute, 2> attrs{dataAttr, sizeAttr};
+  auto arrTy =
+      fir::SequenceType::get(fir::SequenceType::Shape(1, data.size()), eleTy);
+  return create<fir::StringLitOp>(loc, llvm::ArrayRef<mlir::Type>{arrTy},
+                                  llvm::None, attrs);
+}
+
 template <typename T>
 void Fortran::lower::CharacterOpsBuilder<T>::createCopy(mlir::Value dest,
                                                         mlir::Value src,

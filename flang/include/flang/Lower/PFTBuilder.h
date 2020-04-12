@@ -19,7 +19,6 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/SmallSet.h"
 #include "llvm/Support/raw_ostream.h"
-#include <memory>
 
 namespace mlir {
 class Block;
@@ -36,6 +35,7 @@ struct FunctionLikeUnit;
 // Using std::list for a list of Evaluations preserves the option to do
 // O(1) time insertions anywhere.
 using EvaluationList = std::list<Evaluation>;
+using LabelEvalMap = llvm::DenseMap<Fortran::parser::Label, Evaluation *>;
 
 struct ParentVariant {
   template <typename A>
@@ -352,7 +352,7 @@ struct FunctionLikeUnit : public ProgramUnit {
   std::optional<FunctionStatement> beginStmt;
   FunctionStatement endStmt;
   EvaluationList evaluationList;
-  llvm::DenseMap<parser::Label, Evaluation *> labelEvaluationMap;
+  LabelEvalMap labelEvaluationMap;
   SymbolLabelMap assignSymbolLabelMap;
   std::list<FunctionLikeUnit> nestedFunctions;
   /// Symbol associated to this FunctionLikeUnit.

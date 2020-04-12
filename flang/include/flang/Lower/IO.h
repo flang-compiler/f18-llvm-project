@@ -16,8 +16,10 @@
 ///
 //===----------------------------------------------------------------------===//
 
-#ifndef FORTRAN_LOWER_IO_H_
-#define FORTRAN_LOWER_IO_H_
+#ifndef FORTRAN_LOWER_IO_H
+#define FORTRAN_LOWER_IO_H
+
+#include "llvm/ADT/DenseMap.h"
 
 namespace mlir {
 class Value;
@@ -25,6 +27,7 @@ class Value;
 
 namespace Fortran {
 namespace parser {
+using Label = std::uint64_t;
 struct BackspaceStmt;
 struct CloseStmt;
 struct EndfileStmt;
@@ -42,6 +45,11 @@ namespace lower {
 
 class AbstractConverter;
 class BridgeImpl;
+
+namespace pft {
+struct Evaluation;
+using LabelEvalMap = llvm::DenseMap<Fortran::parser::Label, Evaluation *>;
+} // namespace pft
 
 /// Generate IO call(s) for BACKSPACE; return the IOSTAT code
 mlir::Value genBackspaceStatement(AbstractConverter &,
@@ -65,10 +73,14 @@ mlir::Value genInquireStatement(AbstractConverter &,
 mlir::Value genOpenStatement(AbstractConverter &, const parser::OpenStmt &);
 
 /// Generate IO call(s) for PRINT
-void genPrintStatement(AbstractConverter &, const parser::PrintStmt &);
+void genPrintStatement(AbstractConverter &converter,
+                       const parser::PrintStmt &stmt,
+                       pft::LabelEvalMap &labelMap);
 
 /// Generate IO call(s) for READ; return the IOSTAT code
-mlir::Value genReadStatement(AbstractConverter &, const parser::ReadStmt &);
+mlir::Value genReadStatement(AbstractConverter &converter,
+                             const parser::ReadStmt &stmt,
+                             pft::LabelEvalMap &labelMap);
 
 /// Generate IO call(s) for REWIND; return the IOSTAT code
 mlir::Value genRewindStatement(AbstractConverter &, const parser::RewindStmt &);
@@ -77,9 +89,11 @@ mlir::Value genRewindStatement(AbstractConverter &, const parser::RewindStmt &);
 mlir::Value genWaitStatement(AbstractConverter &, const parser::WaitStmt &);
 
 /// Generate IO call(s) for WRITE; return the IOSTAT code
-mlir::Value genWriteStatement(AbstractConverter &, const parser::WriteStmt &);
+mlir::Value genWriteStatement(AbstractConverter &converter,
+                              const parser::WriteStmt &stmt,
+                              pft::LabelEvalMap &labelMap);
 
 } // namespace lower
 } // namespace Fortran
 
-#endif // FORTRAN_LOWER_IO_H_
+#endif // FORTRAN_LOWER_IO_H
