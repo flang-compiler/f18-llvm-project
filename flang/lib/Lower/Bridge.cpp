@@ -314,6 +314,8 @@ private:
                            const Fortran::semantics::Symbol &symbol) {
     if (Fortran::semantics::IsFunction(symbol)) {
       // FUNCTION
+      if (funit.finalBlock)
+        builder->setInsertionPoint(funit.finalBlock, funit.finalBlock->end());
       genReturnSymbol(symbol);
       return;
     }
