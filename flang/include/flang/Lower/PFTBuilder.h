@@ -318,7 +318,7 @@ private:
   const Fortran::semantics::Symbol *sym;
   int depth;
   bool global;
-  bool heap{false};
+  //bool heap{false}; // variable needs deallocation on exit
 };
 
 /// Function-like units may contain evaluations (executable statements) and
