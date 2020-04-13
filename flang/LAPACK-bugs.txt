@@ -3,8 +3,8 @@ ______________
 
 [Eric]
 
-  CHARACTER comparison calls
-  . UNREACHABLE executed at Lower/ConvertExpr.cpp:405!
+  We do not correctly handle adjusted arrays of CHARACTER with adjusted LEN
+  . bbc: IR/Types.h:279: U mlir::Type::cast() const [U = fir::ReferenceType]: Assertion `isa<U>()' failed.
 
 [Varun]
 
@@ -21,12 +21,12 @@ ______________
   . bbc: Lower/Intrinsics.cpp:504: Assertion `arg != nullptr' failed.
   . bbc: Lower/Intrinsics.cpp:628: Assertion `false && "no runtime found for this intrinsics"' failed.
 
-  We do not correctly handle adjusted arrays of CHARACTER with adjusted LEN
-  . bbc: IR/Types.h:279: U mlir::Type::cast() const [U = fir::ReferenceType]: Assertion `isa<U>()' failed.
-
 
 FIXED
 _____
+
+
+CHARACTER comparison calls: UNREACHABLE executed at Lower/ConvertExpr.cpp:405!
 
 UNREACHABLE executed at Lower/ConvertExpr.cpp:798!  intrinsic subroutine
 
