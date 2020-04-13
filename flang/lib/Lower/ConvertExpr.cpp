@@ -12,6 +12,7 @@
 #include "flang/Evaluate/fold.h"
 #include "flang/Evaluate/real.h"
 #include "flang/Lower/Bridge.h"
+#include "flang/Lower/CharRT.h"
 #include "flang/Lower/ConvertType.h"
 #include "flang/Lower/FIRBuilder.h"
 #include "flang/Lower/Runtime.h"
@@ -173,29 +174,36 @@ class ExprLowering {
     }
   }
 
-  template <typename OpTy, typename A>
-  mlir::Value createCompareOp(const A &ex, mlir::CmpIPredicate pred,
-                              mlir::Value lhs, mlir::Value rhs) {
-    assert(lhs && rhs && "argument did not lower");
-    auto x = builder.create<OpTy>(getLoc(), pred, lhs, rhs);
-    return x.getResult();
+  template <typename OpTy>
+  mlir::Value createCompareOp(mlir::CmpIPredicate pred, mlir::Value lhs,
+                              mlir::Value rhs) {
+    return builder.create<OpTy>(getLoc(), pred, lhs, rhs);
   }
   template <typename OpTy, typename A>
   mlir::Value createCompareOp(const A &ex, mlir::CmpIPredicate pred) {
-    return createCompareOp<OpTy>(ex, pred, genval(ex.left()),
-                                 genval(ex.right()));
+    return createCompareOp<OpTy>(pred, genval(ex.left()), genval(ex.right()));
   }
-  template <typename OpTy, typename A>
-  mlir::Value createFltCmpOp(const A &ex, mlir::CmpFPredicate pred,
-                             mlir::Value lhs, mlir::Value rhs) {
-    assert(lhs && rhs && "argument did not lower");
-    auto x = builder.create<OpTy>(getLoc(), pred, lhs, rhs);
-    return x.getResult();
+
+  template <typename OpTy>
+  mlir::Value createFltCmpOp(mlir::CmpFPredicate pred, mlir::Value lhs,
+                             mlir::Value rhs) {
+    return builder.create<OpTy>(getLoc(), pred, lhs, rhs);
   }
   template <typename OpTy, typename A>
   mlir::Value createFltCmpOp(const A &ex, mlir::CmpFPredicate pred) {
-    return createFltCmpOp<OpTy>(ex, pred, genval(ex.left()),
-                                genval(ex.right()));
+    return createFltCmpOp<OpTy>(pred, genval(ex.left()), genval(ex.right()));
+  }
+
+  /// Create a call to the runtime to compare two CHARACTER values.
+  /// Precondition: This assumes that the two values have `fir.boxchar` type.
+  mlir::Value createCharCompare(mlir::CmpIPredicate pred, mlir::Value lhs,
+                                mlir::Value rhs) {
+    return Fortran::lower::genBoxCharCompare(converter, getLoc(), pred, lhs,
+                                             rhs);
+  }
+  template <typename A>
+  mlir::Value createCharCompare(const A &ex, mlir::CmpIPredicate pred) {
+    return createCharCompare(pred, genval(ex.left()), genval(ex.right()));
   }
 
   /// Returns a reference to a symbol or its box/boxChar descriptor if it has
@@ -204,8 +212,8 @@ class ExprLowering {
     // FIXME: not all symbols are local
     if (auto val = symMap.lookupSymbol(sym))
       return val;
-    auto addr = builder.createTemporary(
-        getLoc(), converter.genType(sym), sym->name().ToString());
+    auto addr = builder.createTemporary(getLoc(), converter.genType(sym),
+                                        sym->name().ToString());
     symMap.addSymbol(sym, addr);
     return addr;
   }
@@ -395,14 +403,15 @@ class ExprLowering {
           createFltCmpOp<fir::CmpfOp>(op, translateFloatRelational(op.opr));
     } else if constexpr (TC == Fortran::lower::ComplexCat) {
       bool eq{op.opr == Fortran::common::RelationalOperator::EQ};
-      assert(eq || op.opr == Fortran::common::RelationalOperator::NE &&
-                       "relation undefined for complex");
+      if (!eq && op.opr != Fortran::common::RelationalOperator::NE)
+        llvm_unreachable("relation undefined for complex");
       builder.setLocation(getLoc());
       result = builder.createComplexCompare(genval(op.left()),
                                             genval(op.right()), eq);
     } else {
       static_assert(TC == Fortran::lower::CharacterCat);
-      TODO();
+      builder.setLocation(getLoc());
+      result = createCharCompare(op, translateRelational(op.opr));
     }
     return result;
   }
