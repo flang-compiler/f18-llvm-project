@@ -24,7 +24,12 @@ namespace mlir {
 class Block;
 }
 
-namespace Fortran::lower {
+namespace Fortran {
+namespace semantics {
+class SemanticsContext;
+class Scope;
+} // namespace semantics
+namespace lower {
 namespace pft {
 
 struct Evaluation;
@@ -134,7 +139,7 @@ public:
 
   template <typename B>
   constexpr const B &get() const {
-    return std::get<ConstRef<B>>> (u).get();
+    return std::get<ConstRef<B>> > (u).get();
   }
   template <typename B>
   constexpr const B *getIf() const {
@@ -298,6 +303,24 @@ struct ProgramUnit : ProgramVariant {
   ParentVariant parentVariant;
 };
 
+/// A variable captures an object to be created per the declaration part of a
+/// function like unit.
+struct Variable {
+  explicit Variable(const Fortran::semantics::Symbol &sym, bool global = false,
+                    int depth = 0)
+      : sym{&sym}, depth{depth}, global{global} {}
+
+  const Fortran::semantics::Symbol &getSymbol() const { return *sym; }
+  bool isGlobal() const { return global; }
+  int getDepth() const { return depth; }
+
+private:
+  const Fortran::semantics::Symbol *sym;
+  int depth;
+  bool global;
+  //bool heap{false}; // variable needs deallocation on exit
+};
+
 /// Function-like units may contain evaluations (executable statements) and
 /// nested function-like units (internal procedures and function statements).
 struct FunctionLikeUnit : public ProgramUnit {
@@ -312,16 +335,25 @@ struct FunctionLikeUnit : public ProgramUnit {
                        parser::Statement<parser::MpSubprogramStmt>,
                        parser::Statement<parser::EndMpSubprogramStmt>>;
 
-  FunctionLikeUnit(const parser::MainProgram &f,
-                   const ParentVariant &parentVariant);
-  FunctionLikeUnit(const parser::FunctionSubprogram &f,
-                   const ParentVariant &parentVariant);
-  FunctionLikeUnit(const parser::SubroutineSubprogram &f,
-                   const ParentVariant &parentVariant);
-  FunctionLikeUnit(const parser::SeparateModuleSubprogram &f,
-                   const ParentVariant &parentVariant);
+  FunctionLikeUnit(
+      const parser::MainProgram &f, const ParentVariant &parentVariant,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::FunctionSubprogram &f, const ParentVariant &parentVariant,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::SubroutineSubprogram &f, const ParentVariant &parentVariant,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
+  FunctionLikeUnit(
+      const parser::SeparateModuleSubprogram &f,
+      const ParentVariant &parentVariant,
+      const Fortran::semantics::SemanticsContext &semanticsContext);
   FunctionLikeUnit(FunctionLikeUnit &&) = default;
   FunctionLikeUnit(const FunctionLikeUnit &) = delete;
+
+  void processSymbolTable(const Fortran::semantics::Scope &);
+
+  std::vector<Variable> getOrderedSymbolTable() { return varList[0]; }
 
   bool isMainProgram() const {
     return endStmt.isA<parser::Statement<parser::EndProgramStmt>>();
@@ -362,6 +394,7 @@ struct FunctionLikeUnit : public ProgramUnit {
   const semantics::Symbol *symbol{nullptr};
   /// Terminal basic block (if any)
   mlir::Block *finalBlock{};
+  std::vector<std::vector<Variable>> varList;
 };
 
 /// Module-like units contain a list of function-like units.
@@ -419,11 +452,14 @@ private:
 /// PFT captures a structured view of a program.  A program is a list of units.
 /// A function like unit contains a list of evaluations.  An evaluation is
 /// either a statement, or a construct with a nested list of evaluations.
-std::unique_ptr<pft::Program> createPFT(const parser::Program &root);
+std::unique_ptr<pft::Program>
+createPFT(const parser::Program &root,
+          const Fortran::semantics::SemanticsContext &semanticsContext);
 
 /// Dumper for displaying a PFT.
 void dumpPFT(llvm::raw_ostream &outputStream, pft::Program &pft);
 
-} // namespace Fortran::lower
+} // namespace lower
+} // namespace Fortran
 
 #endif // FORTRAN_LOWER_PFTBUILDER_H
