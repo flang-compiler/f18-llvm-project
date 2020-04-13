@@ -66,28 +66,65 @@ static mlir::FuncOp getRuntimeFunc(Fortran::lower::FirOpBuilder &builder) {
   return func;
 }
 
+/// Helper function to recover the KIND from the FIR type.
+static int discoverKind(mlir::Type ty) {
+  if (auto charTy = ty.dyn_cast<fir::CharacterType>())
+    return charTy.getFKind();
+  if (auto eleTy = fir::dyn_cast_ptrEleTy(ty))
+    return discoverKind(eleTy);
+  if (auto arrTy = ty.dyn_cast<fir::SequenceType>())
+    return discoverKind(arrTy.getEleTy());
+  if (auto boxTy = ty.dyn_cast<fir::BoxCharType>())
+    return discoverKind(boxTy.getEleTy());
+  if (auto boxTy = ty.dyn_cast<fir::BoxType>())
+    return discoverKind(boxTy.getEleTy());
+  llvm_unreachable("unexpected character type");
+}
+
 //===----------------------------------------------------------------------===//
 // Lower character operations
 //===----------------------------------------------------------------------===//
 
-mlir::Value Fortran::lower::genRawCharCompare(
-    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-    Fortran::common::RelationalOperator cmp, mlir::Value lhsBuff,
-    mlir::Value lhsLen, mlir::Value rhsBuff, mlir::Value rhsLen) {
+mlir::Value
+Fortran::lower::genRawCharCompare(Fortran::lower::AbstractConverter &converter,
+                                  mlir::Location loc, mlir::CmpIPredicate cmp,
+                                  mlir::Value lhsBuff, mlir::Value lhsLen,
+                                  mlir::Value rhsBuff, mlir::Value rhsLen) {
   auto &builder = converter.getFirOpBuilder();
   builder.setLocation(loc);
   mlir::FuncOp beginFunc;
-  beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar1)>(builder);
-  beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar2)>(builder);
-  beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar4)>(builder);
-  return {};
+  switch (discoverKind(lhsBuff.getType())) {
+  case 1:
+    beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar1)>(builder);
+    break;
+  case 2:
+    beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar2)>(builder);
+    break;
+  case 4:
+    beginFunc = getRuntimeFunc<mkRTKey(CharacterCompareScalar4)>(builder);
+    break;
+  default:
+    llvm_unreachable("runtime does not support CHARACTER KIND");
+  }
+  auto fTy = beginFunc.getType();
+  auto lptr = builder.create<fir::ConvertOp>(loc, fTy.getInput(0), lhsBuff);
+  auto llen = builder.create<fir::ConvertOp>(loc, fTy.getInput(2), lhsLen);
+  auto rptr = builder.create<fir::ConvertOp>(loc, fTy.getInput(1), rhsBuff);
+  auto rlen = builder.create<fir::ConvertOp>(loc, fTy.getInput(3), rhsLen);
+  llvm::SmallVector<mlir::Value, 4> args = {lptr, rptr, llen, rlen};
+  auto tri = builder.create<mlir::CallOp>(loc, beginFunc, args).getResult(0);
+  auto zero = builder.createIntegerConstant(tri.getType(), 0);
+  return builder.create<mlir::CmpIOp>(loc, cmp, tri, zero);
 }
 
-mlir::Value Fortran::lower::genBoxCharCompare(
-    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-    Fortran::common::RelationalOperator cmp, mlir::Value lhs, mlir::Value rhs) {
+mlir::Value
+Fortran::lower::genBoxCharCompare(Fortran::lower::AbstractConverter &converter,
+                                  mlir::Location loc, mlir::CmpIPredicate cmp,
+                                  mlir::Value lhs, mlir::Value rhs) {
   auto &builder = converter.getFirOpBuilder();
   builder.setLocation(loc);
+  assert(lhs.getType().isa<fir::BoxCharType>() && "not a boxchar");
+  assert(rhs.getType().isa<fir::BoxCharType>() && "not a boxchar");
   auto lhsPair = builder.materializeCharacter(lhs);
   auto rhsPair = builder.materializeCharacter(rhs);
   return genRawCharCompare(converter, loc, cmp, lhsPair.first, lhsPair.second,

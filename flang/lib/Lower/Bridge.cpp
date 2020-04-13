@@ -1580,36 +1580,6 @@ private:
 
   mlir::Location toLocation() { return toLocation(currentPosition); }
 
-  // TODO: should these be moved to convert-expr?
-  template <mlir::CmpIPredicate ICMPOPC>
-  mlir::Value genCompare(mlir::Value lhs, mlir::Value rhs) {
-    auto lty = lhs.getType();
-    assert(lty == rhs.getType());
-    if (lty.isSignlessIntOrIndex())
-      return builder->create<mlir::CmpIOp>(lhs.getLoc(), ICMPOPC, lhs, rhs);
-    if (fir::LogicalType::kindof(lty.getKind()))
-      return builder->create<mlir::CmpIOp>(lhs.getLoc(), ICMPOPC, lhs, rhs);
-    if (fir::CharacterType::kindof(lty.getKind())) {
-      // FIXME
-      // return builder->create<mlir::CallOp>(lhs->getLoc(), );
-    }
-    mlir::emitError(toLocation(), "cannot generate operation on this type");
-    return {};
-  }
-
-  mlir::Value genGE(mlir::Value lhs, mlir::Value rhs) {
-    return genCompare<mlir::CmpIPredicate::sge>(lhs, rhs);
-  }
-  mlir::Value genLE(mlir::Value lhs, mlir::Value rhs) {
-    return genCompare<mlir::CmpIPredicate::sle>(lhs, rhs);
-  }
-  mlir::Value genEQ(mlir::Value lhs, mlir::Value rhs) {
-    return genCompare<mlir::CmpIPredicate::eq>(lhs, rhs);
-  }
-  mlir::Value genAND(mlir::Value lhs, mlir::Value rhs) {
-    return builder->create<mlir::AndOp>(lhs.getLoc(), lhs, rhs);
-  }
-
   mlir::MLIRContext &mlirContext;
   const Fortran::parser::CookedSource *cooked;
   mlir::ModuleOp &module;
