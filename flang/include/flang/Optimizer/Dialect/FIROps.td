@@ -2497,6 +2497,27 @@ def fir_ConvertOp : fir_OneResultOp<"convert", []> {
   }];
 
   let hasFolder = 1;
+
+  let verifier = [{
+    auto inType = value().getType();
+    auto outType = getType();
+    if ((isPointerCompatible(inType) && isPointerCompatible(outType)) ||
+        (isIntegerCompatible(inType) && isIntegerCompatible(outType)) ||
+        (isIntegerCompatible(inType) && isFloatCompatible(outType)) ||
+        (isFloatCompatible(inType) && isIntegerCompatible(outType)) ||
+        (isFloatCompatible(inType) && isFloatCompatible(outType)) ||
+        (isIntegerCompatible(inType) && isPointerCompatible(outType)) ||
+        (isPointerCompatible(inType) && isIntegerCompatible(outType)) ||
+        (inType.isa<fir::BoxType>() && outType.isa<fir::BoxType>()))
+      return mlir::success();
+    return emitOpError("invalid type conversion");
+  }];
+
+  let extraClassDeclaration = [{
+    static bool isIntegerCompatible(mlir::Type ty);
+    static bool isFloatCompatible(mlir::Type ty);
+    static bool isPointerCompatible(mlir::Type ty);
+  }];
 }
 
 def FortranTypeAttr : Attr<And<[CPred<"$_self.isa<TypeAttr>()">,
