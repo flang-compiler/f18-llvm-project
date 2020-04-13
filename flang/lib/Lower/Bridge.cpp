@@ -1346,6 +1346,10 @@ private:
         auto len =
             genExprValue(Fortran::evaluate::AsGenericExpr(std::move(*expr)));
         if (Fortran::semantics::IsDummy(sym)) {
+          if (hasDynamicShape) {
+            // case: `CHARACTER(LEN=i_arg) :: c_var(dims)`
+            TODO();
+          }
           // case: `CHARACTER(LEN=i_arg) :: c_arg`
           // Rebox the argument with the user-specified length. An alternative
           // lowering would be to unbox the buffer reference and keep track of
