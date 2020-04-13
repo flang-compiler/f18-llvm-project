@@ -346,6 +346,8 @@ private:
                            const Fortran::semantics::Symbol &symbol) {
     if (Fortran::semantics::IsFunction(symbol)) {
       // FUNCTION
+      if (funit.finalBlock)
+        builder->setInsertionPoint(funit.finalBlock, funit.finalBlock->end());
       genReturnSymbol(symbol);
       return;
     }
@@ -897,11 +899,13 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::PrintStmt &stmt) {
-    genPrintStatement(*this, stmt);
+    genPrintStatement(*this, stmt,
+                      eval.getOwningProcedure()->labelEvaluationMap);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::ReadStmt &stmt) {
-    genReadStatement(*this, stmt);
+    genReadStatement(*this, stmt,
+                     eval.getOwningProcedure()->labelEvaluationMap);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::RewindStmt &stmt) {
@@ -909,7 +913,8 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::WriteStmt &stmt) {
-    genWriteStatement(*this, stmt);
+    genWriteStatement(*this, stmt,
+                      eval.getOwningProcedure()->labelEvaluationMap);
   }
 
   void genFIR(Fortran::lower::pft::Evaluation &eval,
@@ -1080,7 +1085,8 @@ private:
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::FormatStmt &) {
-    TODO();
+    // do nothing. FORMAT statements have no semantics. They may be lowered if
+    // used by a data transfer statement.
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::EntryStmt &) {

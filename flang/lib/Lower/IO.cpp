@@ -11,7 +11,9 @@
 #include "RTBuilder.h"
 #include "flang/Lower/Bridge.h"
 #include "flang/Lower/FIRBuilder.h"
+#include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/Runtime.h"
+#include "flang/Lower/Utils.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/tools.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
@@ -326,6 +328,24 @@ lowerStringLit(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
         loc, builder.getIntegerAttr(ty2, kindVal));
     return {buff, len, kind};
   }
+  return {buff, len, mlir::Value{}};
+}
+
+/// Pass the body of the FORMAT statement in as if it were a CHARACTER literal
+/// constant. TODO: This feels dumb. Isn't there a front-end method to get this?
+/// If not, why not?
+static std::tuple<mlir::Value, mlir::Value, mlir::Value>
+lowerSourceTextAsStringLit(Fortran::lower::AbstractConverter &converter,
+                           mlir::Location loc, llvm::StringRef text,
+                           mlir::Type ty0, mlir::Type ty1) {
+  text = text.drop_front(text.find('('));
+  text = text.take_front(text.rfind(')') + 1);
+  auto &builder = converter.getFirOpBuilder();
+  auto lit = builder.createStringLit(
+      loc, /*FIXME*/fir::CharacterType::get(builder.getContext(), 1), text);
+  auto data = builder.materializeCharacter(lit);
+  auto buff = builder.create<fir::ConvertOp>(loc, ty0, data.first);
+  auto len = builder.create<fir::ConvertOp>(loc, ty1, data.second);
   return {buff, len, mlir::Value{}};
 }
 
@@ -758,29 +778,37 @@ constexpr bool isDataTransferNamelist<Fortran::parser::PrintStmt>(
 
 static std::tuple<mlir::Value, mlir::Value, mlir::Value>
 genFormat(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-          const Fortran::parser::Format &format, mlir::Type ty0,
-          mlir::Type ty1) {
+          const Fortran::parser::Format &format, mlir::Type ty0, mlir::Type ty1,
+          Fortran::lower::pft::LabelEvalMap &labelMap) {
   if (auto *e = std::get_if<Fortran::parser::Expr>(&format.u))
     return lowerStringLit(converter, loc, *e, ty0, ty1);
-  TODO(); // handle Label case
+  if (auto *lab = std::get_if<Fortran::parser::Label>(&format.u)) {
+    auto iter = labelMap.find(*lab);
+    assert(iter != labelMap.end() && "FORMAT not found in PROCEDURE");
+    return lowerSourceTextAsStringLit(
+        converter, loc, toStringRef(iter->second->position), ty0, ty1);
+  }
+  llvm_unreachable("* case should be handled elsewhere as transfer list");
 }
 
 template <typename A>
 std::tuple<mlir::Value, mlir::Value, mlir::Value>
 getFormat(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-          const A &stmt, mlir::Type ty0, mlir::Type ty1) {
+          const A &stmt, mlir::Type ty0, mlir::Type ty1,
+          Fortran::lower::pft::LabelEvalMap &labelMap) {
   if (stmt.format && !formatIsActuallyNamelist(*stmt.format))
-    return genFormat(converter, loc, *stmt.format, ty0, ty1);
+    return genFormat(converter, loc, *stmt.format, ty0, ty1, labelMap);
   return genFormat(converter, loc, *getIOControl<Fortran::parser::Format>(stmt),
-                   ty0, ty1);
+                   ty0, ty1, labelMap);
 }
 template <>
 std::tuple<mlir::Value, mlir::Value, mlir::Value>
 getFormat<Fortran::parser::PrintStmt>(
     Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-    const Fortran::parser::PrintStmt &stmt, mlir::Type ty0, mlir::Type ty1) {
+    const Fortran::parser::PrintStmt &stmt, mlir::Type ty0, mlir::Type ty1,
+    Fortran::lower::pft::LabelEvalMap &labelMap) {
   return genFormat(converter, loc, std::get<Fortran::parser::Format>(stmt.t),
-                   ty0, ty1);
+                   ty0, ty1, labelMap);
 }
 
 static std::tuple<mlir::Value, mlir::Value, mlir::Value>
@@ -1027,7 +1055,8 @@ void populateArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
                        mlir::Location loc, const A &stmt,
                        mlir::FunctionType ioFuncTy, bool isFormatted,
                        bool isList, bool isIntern, bool isOtherIntern,
-                       bool isAsynch, bool isNml) {
+                       bool isAsynch, bool isNml,
+                       Fortran::lower::pft::LabelEvalMap &labelMap) {
   auto &builder = converter.getFirOpBuilder();
   if constexpr (hasIOCtrl) {
     // READ/WRITE cases have a wide variety of argument permutations
@@ -1050,7 +1079,7 @@ void populateArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
         // | [format, LEN], ...
         auto pair =
             getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1));
+                      ioFuncTy.getInput(ioArgs.size() + 1), labelMap);
         ioArgs.push_back(std::get<0>(pair));
         ioArgs.push_back(std::get<1>(pair));
       }
@@ -1071,7 +1100,7 @@ void populateArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
         // | [format, LEN], ...
         auto pair =
             getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1));
+                      ioFuncTy.getInput(ioArgs.size() + 1), labelMap);
         ioArgs.push_back(std::get<0>(pair));
         ioArgs.push_back(std::get<1>(pair));
       }
@@ -1086,7 +1115,7 @@ void populateArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
         // [format, LEN], ...
         auto pair =
             getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1));
+                      ioFuncTy.getInput(ioArgs.size() + 1), labelMap);
         ioArgs.push_back(std::get<0>(pair));
         ioArgs.push_back(std::get<1>(pair));
       }
@@ -1101,7 +1130,7 @@ void populateArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
       // [format, LEN], ...
       auto pair =
           getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                    ioFuncTy.getInput(ioArgs.size() + 1));
+                    ioFuncTy.getInput(ioArgs.size() + 1), labelMap);
       ioArgs.push_back(std::get<0>(pair));
       ioArgs.push_back(std::get<1>(pair));
     }
@@ -1122,8 +1151,9 @@ const std::list<Fortran::parser::OutputItem> &getOutputItems(const A &stmt) {
 }
 
 template <bool isInput, bool hasIOCtrl = true, typename A>
-static mlir::Value genDataTransfer(Fortran::lower::AbstractConverter &converter,
-                                   const A &stmt) {
+static mlir::Value
+genDataTransfer(Fortran::lower::AbstractConverter &converter, const A &stmt,
+                Fortran::lower::pft::LabelEvalMap &labelMap) {
   auto &builder = converter.getFirOpBuilder();
   auto loc = converter.getCurrentLocation();
   const bool isFormatted = isDataTransferFormatted(stmt);
@@ -1143,7 +1173,7 @@ static mlir::Value genDataTransfer(Fortran::lower::AbstractConverter &converter,
   llvm::SmallVector<mlir::Value, 8> ioArgs;
   populateArguments<hasIOCtrl>(ioArgs, converter, loc, stmt, ioFuncTy,
                                isFormatted, isList, isIntern, isOtherIntern,
-                               isAsynch, isNml);
+                               isAsynch, isNml, labelMap);
   // filename and line are universal and always last
   ioArgs.push_back(
       getDefaultFilename(builder, loc, ioFuncTy.getInput(ioArgs.size())));
@@ -1199,22 +1229,26 @@ static mlir::Value genDataTransfer(Fortran::lower::AbstractConverter &converter,
 
 void Fortran::lower::genPrintStatement(
     Fortran::lower::AbstractConverter &converter,
-    const Fortran::parser::PrintStmt &stmt) {
+    const Fortran::parser::PrintStmt &stmt,
+    Fortran::lower::pft::LabelEvalMap &labelMap) {
   // PRINT does not take an io-control-spec. It only has a format specifier, so
   // it is a simplified case of WRITE.
-  genDataTransfer</*isInput=*/false, /*ioCtrl=*/false>(converter, stmt);
+  genDataTransfer</*isInput=*/false, /*ioCtrl=*/false>(converter, stmt,
+                                                       labelMap);
 }
 
 mlir::Value
 Fortran::lower::genWriteStatement(Fortran::lower::AbstractConverter &converter,
-                                  const Fortran::parser::WriteStmt &stmt) {
-  return genDataTransfer</*isInput=*/false>(converter, stmt);
+                                  const Fortran::parser::WriteStmt &stmt,
+                                  Fortran::lower::pft::LabelEvalMap &labelMap) {
+  return genDataTransfer</*isInput=*/false>(converter, stmt, labelMap);
 }
 
 mlir::Value
 Fortran::lower::genReadStatement(Fortran::lower::AbstractConverter &converter,
-                                 const Fortran::parser::ReadStmt &stmt) {
-  return genDataTransfer</*isInput=*/true>(converter, stmt);
+                                 const Fortran::parser::ReadStmt &stmt,
+                                 Fortran::lower::pft::LabelEvalMap &labelMap) {
+  return genDataTransfer</*isInput=*/true>(converter, stmt, labelMap);
 }
 
 mlir::Value Fortran::lower::genInquireStatement(

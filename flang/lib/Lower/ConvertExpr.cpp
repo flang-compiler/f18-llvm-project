@@ -796,7 +796,7 @@ class ExprLowering {
   genIntrinsicRef(const Fortran::evaluate::ProcedureRef &procRef,
                   const Fortran::evaluate::SpecificIntrinsic &intrinsic,
                   mlir::ArrayRef<mlir::Type> resultType) {
-    if (resultType.size() == 1)
+    if (resultType.size() != 1)
       TODO(); // Intrinsic subroutine
 
     llvm::SmallVector<mlir::Value, 2> operands;
