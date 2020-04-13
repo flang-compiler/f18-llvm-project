@@ -312,6 +312,22 @@ mlir::OpFoldResult fir::ConvertOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
   return {};
 }
 
+bool fir::ConvertOp::isIntegerCompatible(mlir::Type ty) {
+  return ty.isa<mlir::IntegerType>() || ty.isa<mlir::IndexType>() ||
+         ty.isa<fir::IntType>() || ty.isa<fir::LogicalType>() ||
+         ty.isa<fir::CharacterType>();
+}
+
+bool fir::ConvertOp::isFloatCompatible(mlir::Type ty) {
+  return ty.isa<mlir::FloatType>() || ty.isa<fir::RealType>();
+}
+
+bool fir::ConvertOp::isPointerCompatible(mlir::Type ty) {
+  return ty.isa<fir::ReferenceType>() || ty.isa<fir::PointerType>() ||
+         ty.isa<fir::HeapType>() || ty.isa<mlir::MemRefType>() ||
+         ty.isa<fir::TypeDescType>();
+}
+
 //===----------------------------------------------------------------------===//
 // CoordinateOp
 //===----------------------------------------------------------------------===//
