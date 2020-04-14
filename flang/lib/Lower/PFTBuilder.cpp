@@ -483,14 +483,22 @@ private:
             markBranchTarget(eval, std::get<1>(s.t));
             markBranchTarget(eval, std::get<2>(s.t));
             markBranchTarget(eval, std::get<3>(s.t));
+            if (semantics::ExprHasTypeCategory(
+                    *semantics::GetExpr(std::get<parser::Expr>(s.t)),
+                    common::TypeCategory::Real)) {
+              // Real expression evaluation uses an additional local block.
+              eval.localBlocks.emplace_back(nullptr);
+            }
           },
           [&](const parser::AssignStmt &s) { // legacy label assignment
             auto &label = std::get<parser::Label>(s.t);
             const auto *sym = std::get<parser::Name>(s.t).symbol;
             assert(sym && "missing AssignStmt symbol");
-            lower::pft::Evaluation *t{labelEvaluationMap->find(label)->second};
-            if (!t->isA<parser::FormatStmt>()) {
-              markBranchTarget(eval, label);
+            lower::pft::Evaluation *target{
+                labelEvaluationMap->find(label)->second};
+            assert(target && "missing branch target evaluation");
+            if (!target->isA<parser::FormatStmt>()) {
+              target->isNewBlock = true;
             }
             auto iter = assignSymbolLabelMap->find(*sym);
             if (iter == assignSymbolLabelMap->end()) {
