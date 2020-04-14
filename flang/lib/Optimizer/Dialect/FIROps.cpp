@@ -15,6 +15,7 @@
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Function.h"
+#include "mlir/IR/Matchers.h"
 #include "mlir/IR/Module.h"
 #include "llvm/ADT/StringSwitch.h"
 
@@ -309,6 +310,20 @@ mlir::ParseResult fir::parseCmpcOp(mlir::OpAsmParser &parser,
 mlir::OpFoldResult fir::ConvertOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
   if (value().getType() == getType())
     return value();
+  if (matchPattern(value(), m_Op<fir::ConvertOp>())) {
+    auto inner = cast<fir::ConvertOp>(value().getDefiningOp());
+    // (convert (convert 'a : logical -> i1) : i1 -> logical) ==> forward 'a
+    if (auto toTy = getType().dyn_cast<fir::LogicalType>())
+      if (auto fromTy = inner.value().getType().dyn_cast<fir::LogicalType>())
+        if (inner.getType().isa<mlir::IntegerType>() && (toTy == fromTy))
+          return inner.value();
+    // (convert (convert 'a : i1 -> logical) : logical -> i1) ==> forward 'a
+    if (auto toTy = getType().dyn_cast<mlir::IntegerType>())
+      if (auto fromTy = inner.value().getType().dyn_cast<mlir::IntegerType>())
+        if (inner.getType().isa<fir::LogicalType>() && (toTy == fromTy) &&
+            (fromTy.getWidth() == 1))
+          return inner.value();
+  }
   return {};
 }
 
