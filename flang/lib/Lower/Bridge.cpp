@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/Bridge.h"
+#include "SymbolMap.h"
 #include "flang/Lower/ConvertExpr.h"
 #include "flang/Lower/ConvertType.h"
 #include "flang/Lower/FIRBuilder.h"
@@ -380,12 +381,12 @@ private:
 
   template <typename A>
   mlir::OpBuilder::InsertPoint genWhereCondition(fir::WhereOp &where,
-						 const A *stmt) {
+                                                 const A *stmt) {
     auto cond = createLogicalExprAsI1(
         toLocation(),
         Fortran::semantics::GetExpr(
             std::get<Fortran::parser::ScalarLogicalExpr>(stmt->t)));
-        where = builder->create<fir::WhereOp>(toLocation(), cond, true);
+    where = builder->create<fir::WhereOp>(toLocation(), cond, true);
     auto insPt = builder->saveInsertionPoint();
     switchInsertionPointToWhere(where);
     return insPt;

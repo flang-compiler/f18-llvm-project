@@ -25,32 +25,9 @@
 #include "llvm/ADT/DenseMap.h"
 #include "llvm/ADT/Optional.h"
 
-namespace Fortran {
-namespace semantics {
-class Symbol;
-using SymbolRef = common::Reference<const Symbol>;
-} // namespace semantics
-
-namespace lower {
+namespace Fortran::lower {
 
 class AbstractConverter;
-
-/// Helper class to map front-end symbols to their MLIR representation. This
-/// provides a way to lookup the fir.alloca location of a variable, for example.
-class SymMap {
-public:
-  /// Add `symbol` to the current map and  bind to `value`.
-  void addSymbol(semantics::SymbolRef symbol, mlir::Value value);
-
-  /// Find `symbol` and return its value if it appears in the current mappings.
-  mlir::Value lookupSymbol(semantics::SymbolRef symbol);
-
-  void erase(semantics::SymbolRef sym) { symbolMap.erase(&*sym); }
-  void clear() { symbolMap.clear(); }
-
-private:
-  llvm::DenseMap<const semantics::Symbol *, mlir::Value> symbolMap;
-};
 
 //===----------------------------------------------------------------------===//
 // FirOpBuilder interface extensions
@@ -372,7 +349,6 @@ private:
   llvm::Optional<mlir::Location> currentLoc{};
 };
 
-} // namespace lower
-} // namespace Fortran
+} // namespace Fortran::lower
 
 #endif // FORTRAN_LOWER_FIRBUILDER_H

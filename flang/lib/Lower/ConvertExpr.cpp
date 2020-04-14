@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/ConvertExpr.h"
+#include "SymbolMap.h"
 #include "flang/Common/default-kinds.h"
 #include "flang/Common/unwrap.h"
 #include "flang/Evaluate/fold.h"
@@ -241,7 +242,7 @@ class ExprLowering {
   mlir::Value genval(const Fortran::evaluate::DescriptorInquiry &desc) {
     auto descRef = symMap.lookupSymbol(desc.base().GetLastSymbol());
     assert(descRef && "no mlir::Value associated to Symbol");
-    auto descType = descRef.getType();
+    auto descType = descRef.getAddr().getType();
     mlir::Value res{};
     switch (desc.field()) {
     case Fortran::evaluate::DescriptorInquiry::Field::Len:

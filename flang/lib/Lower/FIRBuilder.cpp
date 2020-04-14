@@ -7,22 +7,12 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/FIRBuilder.h"
+#include "SymbolMap.h"
 #include "flang/Lower/Bridge.h"
 #include "flang/Lower/ConvertType.h"
 #include "flang/Optimizer/Dialect/FIROpsSupport.h"
 #include "flang/Semantics/symbol.h"
 #include "llvm/Support/ErrorHandling.h"
-
-void Fortran::lower::SymMap::addSymbol(Fortran::semantics::SymbolRef symbol,
-                                       mlir::Value value) {
-  symbolMap.try_emplace(&*symbol, value);
-}
-
-mlir::Value
-Fortran::lower::SymMap::lookupSymbol(Fortran::semantics::SymbolRef symbol) {
-  auto iter{symbolMap.find(&*symbol)};
-  return (iter == symbolMap.end()) ? nullptr : iter->second;
-}
 
 mlir::FuncOp Fortran::lower::FirOpBuilder::createFunction(
     mlir::Location loc, mlir::ModuleOp module, llvm::StringRef name,
