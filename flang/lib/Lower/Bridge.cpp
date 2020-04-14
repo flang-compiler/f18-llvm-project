@@ -397,7 +397,7 @@ private:
         toLocation(),
         Fortran::semantics::GetExpr(
             std::get<Fortran::parser::ScalarLogicalExpr>(stmt->t)));
-        where = builder->create<fir::WhereOp>(toLocation(), cond, true);
+    where = builder->create<fir::WhereOp>(toLocation(), cond, true);
     auto insPt = builder->saveInsertionPoint();
     switchInsertionPointToWhere(where);
     return insPt;
@@ -923,7 +923,7 @@ private:
     };
     for (Fortran::lower::pft::Evaluation *e = eval.controlSuccessor; e;
          e = e->controlSuccessor) {
-      const auto *caseStmt = e->getIf<Fortran::parser::CaseStmt>();
+      const auto &caseStmt = e->getIf<Fortran::parser::CaseStmt>();
       assert(e->block && "missing CaseStmt block");
       const auto &caseSelector =
           std::get<Fortran::parser::CaseSelector>(caseStmt->t);
