@@ -2650,6 +2650,7 @@ void ArgumentAnalyzer::Analyze(
   // be detected and represented (they're not expressions).
   // TODO: C1534: Don't allow a "restricted" specific intrinsic to be passed.
   std::optional<ActualArgument> actual;
+  bool isAltReturn{false};
   std::visit(common::visitors{
                  [&](const common::Indirection<parser::Expr> &x) {
                    // TODO: Distinguish & handle procedure name and
@@ -2662,6 +2663,7 @@ void ArgumentAnalyzer::Analyze(
                          "alternate return specification may not appear on"
                          " function reference"_err_en_US);
                    }
+                   isAltReturn = true;
                  },
                  [&](const parser::ActualArg::PercentRef &) {
                    context_.Say("TODO: %REF() argument"_err_en_US);
@@ -2676,7 +2678,7 @@ void ArgumentAnalyzer::Analyze(
       actual->set_keyword(argKW->v.source);
     }
     actuals_.emplace_back(std::move(*actual));
-  } else {
+  } else if (!isAltReturn) {
     fatalErrors_ = true;
   }
 }

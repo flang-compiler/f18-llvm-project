@@ -336,14 +336,12 @@ public:
             symbol->detailsIf<Fortran::semantics::SubprogramDetails>()) {
       if (proc->isFunction())
         returnTys.emplace_back(gen(proc->result()));
+      else if (Fortran::semantics::HasAlternateReturns(symbol))
+        returnTys.emplace_back(mlir::IndexType::get(context));
       for (auto *arg : proc->dummyArgs()) {
-        // Nullptr args are alternate returns indicators
-        if (arg) {
+        // A nullptr arg is an alternate return label specifier; skip it.
+        if (arg)
           inputTys.emplace_back(genDummyArgType(*arg));
-        } else {
-          // Handle alt-return
-          TODO();
-        }
       }
     } else if (symbol->detailsIf<Fortran::semantics::ProcEntityDetails>()) {
       // TODO Should probably use Fortran::evaluate::Characteristics for that.

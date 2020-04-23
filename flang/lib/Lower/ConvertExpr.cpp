@@ -50,6 +50,7 @@ class ExprLowering {
   Fortran::lower::SymMap &symMap;
   const Fortran::lower::IntrinsicLibrary &intrinsics;
   bool genLogicalAsI1{false};
+  bool genAltReturnCall{false};
 
   mlir::Location getLoc() { return location; }
 
@@ -744,7 +745,8 @@ class ExprLowering {
               mlir::Value total = zero;
               assert(arr.shape.size() == aref.subscript().size());
               for (const auto &pair : llvm::zip(arr.shape, aref.subscript())) {
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy,genval(std::get<1>(pair)));
+                auto val = builder.create<fir::ConvertOp>(
+                    loc, idxTy, genval(std::get<1>(pair)));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, one);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -764,8 +766,10 @@ class ExprLowering {
               auto subiter = aref.subscript().begin();
               for (auto asct = arr.shape.size(); asct;
                    --asct, ++asiter, ++subiter, --subct) {
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy,genval(*subiter));
-                auto lb = builder.create<fir::ConvertOp>(loc, idxTy, std::get<0>(*asiter));
+                auto val = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                          genval(*subiter));
+                auto lb = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                         std::get<0>(*asiter));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, lb);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -774,7 +778,8 @@ class ExprLowering {
               }
               if (subct) {
                 assert(subct == 1);
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy,genval(*subiter));
+                auto val = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                          genval(*subiter));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, one);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -789,7 +794,8 @@ class ExprLowering {
               mlir::Value total = zero;
               assert(arr.shape.size() == aref.subscript().size());
               for (const auto &pair : llvm::zip(arr.shape, aref.subscript())) {
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy,genval(std::get<1>(pair)));
+                auto val = builder.create<fir::ConvertOp>(
+                    loc, idxTy, genval(std::get<1>(pair)));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, one);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -809,8 +815,10 @@ class ExprLowering {
               auto subiter = aref.subscript().begin();
               for (auto asct = arr.shape.size(); asct;
                    --asct, ++asiter, ++subiter, --subct) {
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy, genval(*subiter));
-                auto lb = builder.create<fir::ConvertOp>(loc, idxTy,std::get<0>(*asiter));
+                auto val = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                          genval(*subiter));
+                auto lb = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                         std::get<0>(*asiter));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, lb);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -819,7 +827,8 @@ class ExprLowering {
               }
               if (subct) {
                 assert(subct == 1);
-                auto val = builder.create<fir::ConvertOp>(loc, idxTy,genval(*subiter));
+                auto val = builder.create<fir::ConvertOp>(loc, idxTy,
+                                                          genval(*subiter));
                 auto diff = builder.create<mlir::SubIOp>(loc, val, one);
                 auto prod = builder.create<mlir::MulIOp>(loc, delta, diff);
                 total = builder.create<mlir::AddIOp>(loc, prod, total);
@@ -1008,8 +1017,11 @@ class ExprLowering {
     resTy.push_back(converter.genType(TC, KIND));
     return genProcedureRef(funRef, resTy);
   }
+
   mlir::Value genval(const Fortran::evaluate::ProcedureRef &procRef) {
     llvm::SmallVector<mlir::Type, 1> resTy;
+    if (genAltReturnCall)
+      resTy.push_back(mlir::IndexType::get(builder.getContext()));
     return genProcedureRef(procRef, resTy);
   }
 
@@ -1078,10 +1090,11 @@ public:
                         const Fortran::lower::SomeExpr &vop,
                         Fortran::lower::SymMap &map,
                         const Fortran::lower::IntrinsicLibrary &intr,
-                        bool logicalAsI1 = false)
+                        bool logicalAsI1 = false, bool altReturnCall = false)
       : location{loc}, converter{converter},
         builder{converter.getFirOpBuilder()}, expr{vop}, symMap{map},
-        intrinsics{intr}, genLogicalAsI1{logicalAsI1} {}
+        intrinsics{intr}, genLogicalAsI1{logicalAsI1}, genAltReturnCall{
+                                                           altReturnCall} {}
 
   /// Lower the expression `expr` into MLIR standard dialect
   mlir::Value gen() { return gen(expr); }
@@ -1095,7 +1108,7 @@ mlir::Value Fortran::lower::createSomeExpression(
     const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
     Fortran::lower::SymMap &symMap,
     const Fortran::lower::IntrinsicLibrary &intrinsics) {
-  return ExprLowering{loc, converter, expr, symMap, intrinsics, false}.genval();
+  return ExprLowering{loc, converter, expr, symMap, intrinsics}.genval();
 }
 
 mlir::Value Fortran::lower::createI1LogicalExpression(
@@ -1104,6 +1117,15 @@ mlir::Value Fortran::lower::createI1LogicalExpression(
     Fortran::lower::SymMap &symMap,
     const Fortran::lower::IntrinsicLibrary &intrinsics) {
   return ExprLowering{loc, converter, expr, symMap, intrinsics, true}.genval();
+}
+
+mlir::Value Fortran::lower::createAltReturnCallExpression(
+    mlir::Location loc, Fortran::lower::AbstractConverter &converter,
+    const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
+    Fortran::lower::SymMap &symMap,
+    const Fortran::lower::IntrinsicLibrary &intrinsics) {
+  return ExprLowering{loc, converter, expr, symMap, intrinsics, false, true}
+      .genval();
 }
 
 mlir::Value Fortran::lower::createSomeAddress(
