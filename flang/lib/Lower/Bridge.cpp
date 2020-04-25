@@ -367,12 +367,6 @@ private:
     return createI1LogicalExpression(loc, *this, *expr, localSymbols,
                                      intrinsics);
   }
-  mlir::Value
-  createAltReturnCallExpr(mlir::Location loc,
-                          const Fortran::semantics::SomeExpr *expr) {
-    return createAltReturnCallExpression(loc, *this, *expr, localSymbols,
-                                         intrinsics);
-  }
 
   /// Find the symbol in the local map or return null.
   mlir::Value lookupSymbol(const Fortran::semantics::Symbol &sym) {
@@ -547,19 +541,14 @@ private:
     setCurrentPosition(stmt.v.source);
     assert(stmt.typedCall && "Call was not analyzed");
     Fortran::semantics::SomeExpr expr{*stmt.typedCall};
-    if (!eval.controlSuccessor) {
-      // "Normal" subroutine call without alternate return branching.
-      // Call statement lowering shares code with function call lowering.
-      createFIRExpr(toLocation(), &expr);
-      return;
-    }
-    // Alternate return call.
+    // Call statement lowering shares code with function call lowering.
+    auto res = createFIRExpr(toLocation(), &expr);
+    if (!res)
+      return; // "Normal" subroutine call.
+    // Call with alternate return specifiers.
     // The call returns an index that selects an alternate return branch target.
-    const auto res = createAltReturnCallExpr(toLocation(), &expr);
-    assert(res && "expected alternate return result");
-    constexpr int vSize = 3;
-    llvm::SmallVector<int64_t, vSize> indexList;
-    llvm::SmallVector<mlir::Block *, vSize> blockList;
+    llvm::SmallVector<int64_t, 5> indexList;
+    llvm::SmallVector<mlir::Block *, 5> blockList;
     int64_t index = 0;
     for (const auto &arg :
          std::get<std::list<Fortran::parser::ActualArgSpec>>(stmt.v.t)) {
@@ -604,9 +593,8 @@ private:
               const Fortran::parser::ComputedGotoStmt &stmt) {
     mlir::Value selectExpr = genExprValue(*Fortran::semantics::GetExpr(
         std::get<Fortran::parser::ScalarIntExpr>(stmt.t)));
-    constexpr int vSize = 10;
-    llvm::SmallVector<int64_t, vSize> indexList;
-    llvm::SmallVector<mlir::Block *, vSize> blockList;
+    llvm::SmallVector<int64_t, 10> indexList;
+    llvm::SmallVector<mlir::Block *, 10> blockList;
     int64_t index = 0;
     for (auto &label : std::get<std::list<Fortran::parser::Label>>(stmt.t)) {
       indexList.push_back(++index);
@@ -691,9 +679,8 @@ private:
       return;
     }
     auto labelSet = iter->second;
-    constexpr int vSize = 10;
-    llvm::SmallVector<int64_t, vSize> indexList;
-    llvm::SmallVector<mlir::Block *, vSize> blockList;
+    llvm::SmallVector<int64_t, 10> indexList;
+    llvm::SmallVector<mlir::Block *, 10> blockList;
     auto addLabel = [&](Fortran::parser::Label label) {
       indexList.push_back(label);
       blockList.push_back(blockOfLabel(eval, label));
@@ -1044,10 +1031,9 @@ private:
     const auto selectExpr = genExprValue(
         *Fortran::semantics::GetExpr(std::get<ScalarExpr>(stmt.t)));
     const auto selectType = selectExpr.getType();
-    constexpr int vSize = 10;
-    llvm::SmallVector<mlir::Attribute, vSize> attrList;
-    llvm::SmallVector<mlir::Value, vSize> valueList;
-    llvm::SmallVector<mlir::Block *, vSize> blockList;
+    llvm::SmallVector<mlir::Attribute, 10> attrList;
+    llvm::SmallVector<mlir::Value, 10> valueList;
+    llvm::SmallVector<mlir::Block *, 10> blockList;
     auto *defaultBlock = eval.parentConstruct->constructExit->block;
     using CaseValue = Fortran::parser::Scalar<Fortran::parser::ConstantExpr>;
     auto addValue = [&](const CaseValue &caseValue) {
@@ -1473,16 +1459,17 @@ private:
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::ReturnStmt &stmt) {
     auto *funit = eval.getOwningProcedure();
-    assert(funit && "not inside main program or a subprogram");
+    assert(funit && "not inside main program, function or subroutine");
     if (funit->isMainProgram()) {
       genExitRoutine();
       return;
     }
     if (stmt.v) {
       // Alternate return statement -- assign alternate return index.
-      const auto altReturnIndex = builder->createIntegerConstant(
-          builder->getIndexType(),
-          *Fortran::evaluate::ToInt64(*Fortran::semantics::GetExpr(*stmt.v)));
+      auto expr = Fortran::semantics::GetExpr(*stmt.v);
+      assert(expr && "missing alternate return expression");
+      auto altReturnIndex = builder->createHere<fir::ConvertOp>(
+          builder->getIndexType(), genExprValue(*expr));
       builder->create<fir::StoreOp>(toLocation(), altReturnIndex,
                                     getAltReturnResult(*funit));
     }

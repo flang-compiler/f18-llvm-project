@@ -50,7 +50,6 @@ class ExprLowering {
   Fortran::lower::SymMap &symMap;
   const Fortran::lower::IntrinsicLibrary &intrinsics;
   bool genLogicalAsI1{false};
-  bool genAltReturnCall{false};
 
   mlir::Location getLoc() { return location; }
 
@@ -1020,8 +1019,8 @@ class ExprLowering {
 
   mlir::Value genval(const Fortran::evaluate::ProcedureRef &procRef) {
     llvm::SmallVector<mlir::Type, 1> resTy;
-    if (genAltReturnCall)
-      resTy.push_back(mlir::IndexType::get(builder.getContext()));
+    if (procRef.HasAlternateReturns())
+      resTy.push_back(builder.getIndexType());
     return genProcedureRef(procRef, resTy);
   }
 
@@ -1090,11 +1089,10 @@ public:
                         const Fortran::lower::SomeExpr &vop,
                         Fortran::lower::SymMap &map,
                         const Fortran::lower::IntrinsicLibrary &intr,
-                        bool logicalAsI1 = false, bool altReturnCall = false)
+                        bool logicalAsI1 = false)
       : location{loc}, converter{converter},
         builder{converter.getFirOpBuilder()}, expr{vop}, symMap{map},
-        intrinsics{intr}, genLogicalAsI1{logicalAsI1}, genAltReturnCall{
-                                                           altReturnCall} {}
+        intrinsics{intr}, genLogicalAsI1{logicalAsI1} {}
 
   /// Lower the expression `expr` into MLIR standard dialect
   mlir::Value gen() { return gen(expr); }
@@ -1108,7 +1106,7 @@ mlir::Value Fortran::lower::createSomeExpression(
     const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
     Fortran::lower::SymMap &symMap,
     const Fortran::lower::IntrinsicLibrary &intrinsics) {
-  return ExprLowering{loc, converter, expr, symMap, intrinsics}.genval();
+  return ExprLowering{loc, converter, expr, symMap, intrinsics, false}.genval();
 }
 
 mlir::Value Fortran::lower::createI1LogicalExpression(
@@ -1117,15 +1115,6 @@ mlir::Value Fortran::lower::createI1LogicalExpression(
     Fortran::lower::SymMap &symMap,
     const Fortran::lower::IntrinsicLibrary &intrinsics) {
   return ExprLowering{loc, converter, expr, symMap, intrinsics, true}.genval();
-}
-
-mlir::Value Fortran::lower::createAltReturnCallExpression(
-    mlir::Location loc, Fortran::lower::AbstractConverter &converter,
-    const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
-    Fortran::lower::SymMap &symMap,
-    const Fortran::lower::IntrinsicLibrary &intrinsics) {
-  return ExprLowering{loc, converter, expr, symMap, intrinsics, false, true}
-      .genval();
 }
 
 mlir::Value Fortran::lower::createSomeAddress(

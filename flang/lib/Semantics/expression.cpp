@@ -1980,18 +1980,22 @@ void ExpressionAnalyzer::Analyze(const parser::CallStmt &callStmt) {
   const parser::Call &call{callStmt.v};
   auto restorer{GetContextualMessages().SetLocation(call.source)};
   ArgumentAnalyzer analyzer{*this, call.source, true /* allowAssumedType */};
-  for (const auto &arg : std::get<std::list<parser::ActualArgSpec>>(call.t)) {
+  const auto &actualArgList{std::get<std::list<parser::ActualArgSpec>>(call.t)};
+  for (const auto &arg : actualArgList) {
     analyzer.Analyze(arg, true /* is subroutine call */);
   }
   if (!analyzer.fatalErrors()) {
+    // An alternate return specifier actual argument has no code in the call.
+    bool hasAlternateReturns =
+        analyzer.GetActuals().size() < actualArgList.size();
     if (std::optional<CalleeAndArguments> callee{
             GetCalleeAndArguments(std::get<parser::ProcedureDesignator>(call.t),
                 analyzer.GetActuals(), true /* subroutine */)}) {
       ProcedureDesignator *proc{std::get_if<ProcedureDesignator>(&callee->u)};
       CHECK(proc);
       if (CheckCall(call.source, *proc, callee->arguments)) {
-        callStmt.typedCall.reset(
-            new ProcedureRef{std::move(*proc), std::move(callee->arguments)});
+        callStmt.typedCall.reset(new ProcedureRef{std::move(*proc),
+            std::move(callee->arguments), hasAlternateReturns});
       }
     }
   }
