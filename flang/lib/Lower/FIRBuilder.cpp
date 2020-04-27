@@ -1,4 +1,4 @@
-//===-- OpBuilder.cpp -----------------------------------------------------===//
+//===-- FIRBuilder.cpp ----------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -40,6 +40,34 @@ mlir::Value
 Fortran::lower::FirOpBuilder::createIntegerConstant(mlir::Type intType,
                                                     std::int64_t cst) {
   return createHere<mlir::ConstantOp>(intType, getIntegerAttr(intType, cst));
+}
+
+mlir::Value Fortran::lower::FirOpBuilder::createRealConstant(
+    mlir::Location loc, mlir::Type realType, const llvm::APFloat &val) {
+  return create<mlir::ConstantOp>(loc, realType, getFloatAttr(realType, val));
+}
+
+// This seems a bit hacky. The scaling ssa-values must be type `index`. Should
+// these just be constructed with the correct type, rather than massaged lazily
+// here?
+mlir::Value
+Fortran::lower::FirOpBuilder::allocateLocal(mlir::Location loc, mlir::Type ty,
+                                            llvm::StringRef nm,
+                                            llvm::ArrayRef<mlir::Value> shape) {
+  llvm::SmallVector<mlir::Value, 8> indices;
+  auto idxTy = getIndexType();
+  llvm::for_each(shape, [&](mlir::Value sh) {
+    if (sh.getType().isa<mlir::IndexType>()) {
+      indices.push_back(sh);
+    } else {
+      auto cast = create<fir::ConvertOp>(loc, idxTy, sh);
+      indices.push_back(cast);
+    }
+  });
+  // FIXME: have the builder drop the attribute when the name is empty
+  if (nm.size())
+    return create<fir::AllocaOp>(loc, ty, nm, llvm::None, indices);
+  return create<fir::AllocaOp>(loc, ty, llvm::None, indices);
 }
 
 /// Create a temporary variable on the stack. Anonymous temporaries have no
@@ -104,11 +132,11 @@ void Fortran::lower::FirOpBuilder::createLoop(
   assert(step && "step must be an actual Value");
   auto inc = convertToIndexType(step);
   auto loop = createHere<fir::LoopOp>(lbi, ubi, inc);
-  auto *insPt = getInsertionBlock();
+  auto insertPt = saveInsertionPoint();
   setInsertionPointToStart(loop.getBody());
   auto index = loop.getInductionVar();
   bodyGenerator(*this, index);
-  setInsertionPointToEnd(insPt);
+  restoreInsertionPoint(insertPt);
 }
 
 void Fortran::lower::FirOpBuilder::createLoop(
@@ -166,21 +194,40 @@ struct CharacterOpsBuilderImpl {
       return fir::ReferenceType::get(getCharacterType());
     }
 
-    bool isConstant() const { return data.getType().isa<fir::SequenceType>(); }
+    bool needToMaterialize() const {
+      return data.getType().isa<fir::SequenceType>() ||
+             data.getType().isa<fir::CharacterType>();
+    }
+
+    std::optional<fir::SequenceType::Extent> getCompileTimeLength() const {
+      auto type = data.getType();
+      if (type.isa<fir::CharacterType>())
+        return 1;
+      if (auto refType = type.dyn_cast<fir::ReferenceType>())
+        type = refType.getEleTy();
+      if (auto seqType = type.dyn_cast<fir::SequenceType>()) {
+        auto shape = seqType.getShape();
+        assert(shape.size() == 1 && "only scalar character supported");
+        return shape[0];
+      }
+      return {};
+    }
 
     /// Data must be of type:
     /// - fir.ref<fir.char<kind>> (dynamic length)
     /// - fir.ref<fir.array<len x fir.char<kind>>> (len compile time constant).
     /// - fir.array<len x fir.char<kind>> (character constant)
+    /// - fir.char<kind> (length one character)
     mlir::Value data;
     mlir::Value len;
   };
 
-  Char materializeConstant(Char cst) {
-    assert(cst.isConstant() && "expected constant");
-    auto variable = builder.createHere<fir::AllocaOp>(cst.data.getType());
-    builder.createHere<fir::StoreOp>(cst.data, variable);
-    return {variable, cst.len};
+  Char materializeValue(Char str) {
+    if (!str.needToMaterialize())
+      return str;
+    auto variable = builder.createHere<fir::AllocaOp>(str.data.getType());
+    builder.createHere<fir::StoreOp>(str.data, variable);
+    return {variable, str.len};
   }
 
   Char toDataLengthPair(mlir::Value character) {
@@ -192,6 +239,11 @@ struct CharacterOpsBuilderImpl {
           builder.createHere<fir::UnboxCharOp>(refType, lenType, character);
       return {unboxed.getResult(0), unboxed.getResult(1)};
     }
+    if (auto seqType = type.dyn_cast<fir::CharacterType>()) {
+      // Materialize length for usage into character manipulations.
+      auto len = builder.createIntegerConstant(lenType, 1);
+      return {character, len};
+    }
     if (auto refType = type.dyn_cast<fir::ReferenceType>())
       type = refType.getEleTy();
     if (auto seqType = type.dyn_cast<fir::SequenceType>()) {
@@ -201,16 +253,18 @@ struct CharacterOpsBuilderImpl {
       assert(shape.size() == 1 && "only scalar character supported");
       // Materialize length for usage into character manipulations.
       auto len = builder.createIntegerConstant(lenType, shape[0]);
+      // FIXME: this seems to work for tests, but don't think it is correct
+      if (auto load = dyn_cast<fir::LoadOp>(character.getDefiningOp()))
+        return {load.memref(), len};
       return {character, len};
     }
     llvm_unreachable("unexpected character type");
-    return {};
   }
 
   mlir::Value createEmbox(Char str) {
     // BoxChar require a reference.
-    if (str.isConstant())
-      str = materializeConstant(str);
+    if (str.needToMaterialize())
+      str = materializeValue(str);
     auto kind = str.getCharacterType().getFKind();
     auto boxCharType = fir::BoxCharType::get(builder.getContext(), kind);
     auto refType = str.getReferenceType();
@@ -233,7 +287,7 @@ struct CharacterOpsBuilderImpl {
     return builder.createHere<fir::LoadOp>(addr);
   }
   void createStoreCharAt(Char str, mlir::Value index, mlir::Value c) {
-    assert(!str.isConstant() && "cannot store into constant");
+    assert(!str.needToMaterialize() && "not in memory");
     auto addr = builder.createHere<fir::CoordinateOp>(str.getReferenceType(),
                                                       str.data, index);
     builder.createHere<fir::StoreOp>(c, addr);
@@ -262,9 +316,9 @@ struct CharacterOpsBuilderImpl {
 
   Char createTemp(mlir::Type type, mlir::Value len) {
     assert(type.isa<fir::CharacterType>() && "expected fir character type");
-    llvm::SmallVector<mlir::Value, 0> lengths;
     llvm::SmallVector<mlir::Value, 3> sizes{len};
-    auto ref = builder.createHere<fir::AllocaOp>(type, lengths, sizes);
+    auto ref =
+        builder.allocateLocal(builder.getLoc(), type, llvm::StringRef{}, sizes);
     return {ref, len};
   }
 
@@ -276,33 +330,64 @@ struct CharacterOpsBuilderImpl {
     return builder.createHere<fir::AllocaOp>(seqType);
   }
 
+  // Simple length one character assignment without loops.
+  void createLengthOneAssign(Char lhs, Char rhs) {
+    auto addr = lhs.data;
+    auto refType = lhs.getReferenceType();
+    addr = builder.createHere<fir::ConvertOp>(refType, addr);
+
+    auto val = rhs.data;
+    if (!rhs.needToMaterialize()) {
+      mlir::Value rhsAddr = rhs.data;
+      rhsAddr = builder.createHere<fir::ConvertOp>(refType, rhsAddr);
+      val = builder.createHere<fir::LoadOp>(rhsAddr);
+    }
+
+    builder.createHere<fir::StoreOp>(val, addr);
+  }
+
   void createAssign(Char lhs, Char rhs) {
-    Char safe_rhs{rhs};
+    auto rhsCstLen = rhs.getCompileTimeLength();
+    auto lhsCstLen = lhs.getCompileTimeLength();
+    bool compileTimeSameLength =
+        lhsCstLen && rhsCstLen && *lhsCstLen == *rhsCstLen;
+
+    if (compileTimeSameLength && *lhsCstLen == 1) {
+      createLengthOneAssign(lhs, rhs);
+      return;
+    }
+
     // Copy the minimum of the lhs and rhs lengths and pad the lhs remainder
     // if needed.
-    auto cmpLen = builder.createHere<mlir::CmpIOp>(mlir::CmpIPredicate::slt,
-                                                   lhs.len, rhs.len);
-    auto copyCount =
-        builder.createHere<mlir::SelectOp>(cmpLen, lhs.len, rhs.len);
+    mlir::Value copyCount = lhs.len;
+    if (!compileTimeSameLength)
+      copyCount = builder.genMin({lhs.len, rhs.len});
 
-    if (rhs.isConstant()) {
+    Char safeRhs{rhs};
+    if (rhs.needToMaterialize()) {
+      // TODO: revisit now that character constant handling changed.
       // Need to materialize the constant to get its elements.
       // (No equivalent of fir.coordinate_of for array value).
-      safe_rhs = materializeConstant(rhs);
+      safeRhs = materializeValue(rhs);
     } else {
       // If rhs is in memory, always assumes rhs might overlap with lhs
       // in a way that require a temp for the copy. That can be optimize later.
       // Only create a temp of copyCount size because we do not need more from
       // rhs.
-      auto temp = createTemp(rhs.getCharacterType(), copyCount.getResult());
+      auto temp = createTemp(rhs.getCharacterType(), copyCount);
       createCopy(temp, rhs, copyCount);
-      safe_rhs = temp;
+      safeRhs = temp;
     }
 
-    createCopy(lhs, safe_rhs, copyCount);
-    auto one = builder.createIntegerConstant(lhs.len.getType(), 1);
-    auto maxPadding = builder.createHere<mlir::SubIOp>(lhs.len, one);
-    createPadding(lhs, copyCount, maxPadding);
+    // Actual copy
+    createCopy(lhs, safeRhs, copyCount);
+
+    // Pad if needed.
+    if (!compileTimeSameLength) {
+      auto one = builder.createIntegerConstant(lhs.len.getType(), 1);
+      auto maxPadding = builder.createHere<mlir::SubIOp>(lhs.len, one);
+      createPadding(lhs, copyCount, maxPadding);
+    }
   }
 
   mlir::Value createBlankConstant(fir::CharacterType type) {
@@ -313,8 +398,8 @@ struct CharacterOpsBuilderImpl {
 
   Char createSubstring(Char str, llvm::ArrayRef<mlir::Value> bounds) {
     // Constant need to be materialize in memory to use fir.coordinate_of.
-    if (str.isConstant())
-      str = materializeConstant(str);
+    if (str.needToMaterialize())
+      str = materializeValue(str);
 
     auto nbounds{bounds.size()};
     if (nbounds < 1 || nbounds > 2) {
@@ -469,8 +554,8 @@ std::pair<mlir::Value, mlir::Value>
 Fortran::lower::CharacterOpsBuilder<T>::materializeCharacter(mlir::Value str) {
   CharacterOpsBuilderImpl bimpl{impl()};
   auto c = bimpl.toDataLengthPair(str);
-  if (c.isConstant())
-    c = bimpl.materializeConstant(c);
+  if (c.needToMaterialize())
+    c = bimpl.materializeValue(c);
   return {c.data, c.len};
 }
 template std::pair<mlir::Value, mlir::Value>
@@ -510,26 +595,21 @@ template int Fortran::lower::CharacterOpsBuilder<
 
 template <typename T>
 mlir::Type Fortran::lower::CharacterOpsBuilder<T>::getLengthType() {
-  return mlir::IntegerType::get(64, impl().getContext());
+  // FIXME: make this IndexType? Breaks some tests though.
+  return impl().getIntegerType(64);
 }
 template mlir::Type Fortran::lower::CharacterOpsBuilder<
     Fortran::lower::FirOpBuilder>::getLengthType();
+
 //===----------------------------------------------------------------------===//
 // ComplexOpsBuilder implementation
 //===----------------------------------------------------------------------===//
 
 template <typename T>
 mlir::Type Fortran::lower::ComplexOpsBuilder<T>::getComplexPartType(
-    fir::KindTy complexKind) {
-  return convertReal(impl().getContext(), complexKind);
-}
-template mlir::Type Fortran::lower::ComplexOpsBuilder<
-    Fortran::lower::FirOpBuilder>::getComplexPartType(fir::KindTy);
-
-template <typename T>
-mlir::Type Fortran::lower::ComplexOpsBuilder<T>::getComplexPartType(
     mlir::Type complexType) {
-  return getComplexPartType(complexType.cast<fir::CplxType>().getFKind());
+  return Fortran::lower::convertReal(
+      complexType.getContext(), complexType.cast<fir::CplxType>().getFKind());
 }
 template mlir::Type Fortran::lower::ComplexOpsBuilder<
     Fortran::lower::FirOpBuilder>::getComplexPartType(mlir::Type);
@@ -552,6 +632,16 @@ mlir::Value Fortran::lower::ComplexOpsBuilder<T>::createComplex(
 template mlir::Value Fortran::lower::ComplexOpsBuilder<
     Fortran::lower::FirOpBuilder>::createComplex(fir::KindTy, mlir::Value,
                                                  mlir::Value);
+
+template <typename T>
+mlir::Value Fortran::lower::ComplexOpsBuilder<T>::createComplex(
+    mlir::Location loc, mlir::Type cplxTy, mlir::Value real, mlir::Value imag) {
+  mlir::Value und = impl().template create<fir::UndefOp>(loc, cplxTy);
+  return insert<Part::Imag>(insert<Part::Real>(und, real), imag);
+}
+template mlir::Value Fortran::lower::ComplexOpsBuilder<
+    Fortran::lower::FirOpBuilder>::createComplex(mlir::Location, mlir::Type,
+                                                 mlir::Value, mlir::Value);
 
 template <typename T>
 mlir::Value Fortran::lower::ComplexOpsBuilder<T>::createComplexCompare(

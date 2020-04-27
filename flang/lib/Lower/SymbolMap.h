@@ -152,8 +152,9 @@ struct SymIndex {
   }
 
   bool hasConstantShape() const {
-    if (auto arrTy = getAddr().getType().dyn_cast<fir::SequenceType>())
-      return arrTy.hasConstantShape();
+    if (auto eleTy = fir::dyn_cast_ptrEleTy(getAddr().getType()))
+      if (auto arrTy = eleTy.dyn_cast<fir::SequenceType>())
+        return arrTy.hasConstantShape();
     return false;
   }
 

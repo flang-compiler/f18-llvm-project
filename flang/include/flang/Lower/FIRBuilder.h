@@ -67,7 +67,7 @@ public:
 
   /// Return blank character of given \p type !fir.char<kind>
   mlir::Value createBlankConstant(fir::CharacterType type);
-  
+
   /// Lower \p lhs = \p rhs where \p lhs and \p rhs are scalar characters.
   /// It handles cases where \p lhs and \p rhs may overlap.
   void createAssign(mlir::Value lhs, mlir::Value rhs);
@@ -132,14 +132,19 @@ public:
   /// Type helper. They do not create MLIR operations.
   mlir::Type getComplexPartType(mlir::Value cplx);
   mlir::Type getComplexPartType(mlir::Type complexType);
-  mlir::Type getComplexPartType(fir::KindTy complexKind);
 
   /// Complex operation creation helper. They create MLIR operations.
   mlir::Value createComplex(fir::KindTy kind, mlir::Value real,
                             mlir::Value imag);
+
+  /// Create a complex value.
+  mlir::Value createComplex(mlir::Location loc, mlir::Type complexType,
+                            mlir::Value real, mlir::Value imag);
+
   mlir::Value extractComplexPart(mlir::Value cplx, bool isImagPart) {
     return isImagPart ? extract<Part::Imag>(cplx) : extract<Part::Real>(cplx);
   }
+
   /// Returns (Real, Imag) pair of \p cplx
   std::pair<mlir::Value, mlir::Value> extractParts(mlir::Value cplx) {
     return {extract<Part::Real>(cplx), extract<Part::Imag>(cplx)};
@@ -173,6 +178,39 @@ protected:
   }
 };
 
+/// Extension class to facilitate lowering of COMPLEX manipulations in FIR.
+template <typename T>
+class IntrinsicCallOpsBuilder {
+public:
+  // access the implementation
+  T &impl() { return *static_cast<T *>(this); }
+
+  // TODO: Expose interface to get specific intrinsic function address.
+  // TODO: Handle intrinsic subroutine.
+  // TODO: Intrinsics that do not require their arguments to be defined
+  //   (e.g shape inquiries) might not fit in the current interface that
+  //   requires mlir::Value to be provided.
+  // TODO: Error handling interface ?
+  // TODO: Implementation is incomplete. Many intrinsics to tbd.
+
+  /// Generate the FIR+MLIR operations for the generic intrinsic \p name
+  /// with arguments \p args and expected result type \p resultType.
+  /// Returned mlir::Value is the returned Fortran intrinsic value.
+  mlir::Value genIntrinsicCall(llvm::StringRef name, mlir::Type resultType,
+                               llvm::ArrayRef<mlir::Value> args);
+  /// Direct access to intrinsics that may be used by lowering outside
+  /// of intrinsic call lowering.
+
+  /// Generate maximum. There must be at least one argument and all arguments
+  /// must have the same type.
+  mlir::Value genMax(llvm::ArrayRef<mlir::Value> args);
+  /// Generate minimum. Same constraints as genMax.
+  mlir::Value genMin(llvm::ArrayRef<mlir::Value> args);
+  /// Generate power function x**y with given the expected
+  /// result type.
+  mlir::Value genPow(mlir::Type resultType, mlir::Value x, mlir::Value y);
+};
+
 //===----------------------------------------------------------------------===//
 // FirOpBuilder
 //===----------------------------------------------------------------------===//
@@ -181,7 +219,8 @@ protected:
 /// patterns.
 class FirOpBuilder : public mlir::OpBuilder,
                      public CharacterOpsBuilder<FirOpBuilder>,
-                     public ComplexOpsBuilder<FirOpBuilder> {
+                     public ComplexOpsBuilder<FirOpBuilder>,
+                     public IntrinsicCallOpsBuilder<FirOpBuilder> {
 public:
   using OpBuilder::OpBuilder;
 
@@ -219,6 +258,13 @@ public:
 
   /// Create an integer constant of type \p type and value \p i.
   mlir::Value createIntegerConstant(mlir::Type integerType, std::int64_t i);
+
+  mlir::Value createRealConstant(mlir::Location loc, mlir::Type realType,
+                                 const llvm::APFloat &val);
+
+  mlir::Value allocateLocal(mlir::Location loc, mlir::Type ty,
+                            llvm::StringRef nm,
+                            llvm::ArrayRef<mlir::Value> shape);
 
   /// Create a temporary. A temp is allocated using `fir.alloca` and can be read
   /// and written using `fir.load` and `fir.store`, resp.  The temporary can be

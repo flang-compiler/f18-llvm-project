@@ -255,7 +255,7 @@ static void genInputRuntimeFunc(Fortran::lower::FirOpBuilder &builder,
   auto inputFunc = getInputRuntimeFunc(builder, argType, intKind);
   if (auto ty = argType.dyn_cast<fir::CplxType>()) {
     var = builder.create<fir::CoordinateOp>(
-        loc, builder.getRefType(ty.getEleTy()), var,
+        loc, builder.getRefType(builder.getComplexPartType(ty)), var,
         llvm::SmallVector<mlir::Value, 1>{builder.create<mlir::ConstantOp>(
             loc, builder.getI32IntegerAttr(0))});
   }
@@ -276,7 +276,7 @@ static void genInputRuntimeFunc(Fortran::lower::FirOpBuilder &builder,
   }
   if (auto ty = argType.dyn_cast<fir::CplxType>()) {
     auto ptr = builder.create<fir::CoordinateOp>(
-        loc, builder.getRefType(ty.getEleTy()), var,
+        loc, builder.getRefType(builder.getComplexPartType(ty)), var,
         llvm::SmallVector<mlir::Value, 1>{builder.create<mlir::ConstantOp>(
             loc, builder.getI32IntegerAttr(1))});
     auto cst = builder.create<fir::ConvertOp>(loc, cvtTy, ptr);

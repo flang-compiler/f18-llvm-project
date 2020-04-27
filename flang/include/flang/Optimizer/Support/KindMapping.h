@@ -17,10 +17,6 @@ namespace llvm {
 struct fltSemantics;
 } // namespace llvm
 
-namespace mlir {
-class MLIRContext;
-} // namespace mlir
-
 namespace fir {
 
 /// The kind mapping is an encoded string that informs FIR how the Fortran KIND

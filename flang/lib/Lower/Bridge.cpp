@@ -12,7 +12,6 @@
 #include "flang/Lower/ConvertType.h"
 #include "flang/Lower/FIRBuilder.h"
 #include "flang/Lower/IO.h"
-#include "flang/Lower/Intrinsics.h"
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/Runtime.h"
@@ -235,10 +234,7 @@ public:
                         fir::NameUniquer &uniquer)
       : mlirContext{bridge.getMLIRContext()}, cooked{bridge.getCookedSource()},
         module{bridge.getModule()}, defaults{bridge.getDefaultKinds()},
-        intrinsics{Fortran::lower::IntrinsicLibrary(
-            Fortran::lower::IntrinsicLibrary::Version::LLVM,
-            bridge.getMLIRContext())},
-        uniquer{uniquer} {}
+        kindMap{bridge.getKindMap()}, uniquer{uniquer} {}
   virtual ~FirConverter() = default;
 
   /// Convert the PFT to FIR
@@ -355,17 +351,16 @@ private:
 
   mlir::Value createFIRAddr(mlir::Location loc,
                             const Fortran::semantics::SomeExpr *expr) {
-    return createSomeAddress(loc, *this, *expr, localSymbols, intrinsics);
+    return createSomeAddress(loc, *this, *expr, localSymbols);
   }
 
   mlir::Value createFIRExpr(mlir::Location loc,
                             const Fortran::semantics::SomeExpr *expr) {
-    return createSomeExpression(loc, *this, *expr, localSymbols, intrinsics);
+    return createSomeExpression(loc, *this, *expr, localSymbols);
   }
   mlir::Value createLogicalExprAsI1(mlir::Location loc,
                                     const Fortran::semantics::SomeExpr *expr) {
-    return createI1LogicalExpression(loc, *this, *expr, localSymbols,
-                                     intrinsics);
+    return createI1LogicalExpression(loc, *this, *expr, localSymbols);
   }
 
   /// Find the symbol in the local map or return null.
@@ -1283,6 +1278,33 @@ private:
     }
   }
 
+  /// The LHS and RHS on assignments are not always in agreement in terms of
+  /// type. In some cases, the disagreement is between COMPLEX and REAL types.
+  /// In that case, the assignment must insert/extract out of a COMPLEX value to
+  /// be correct and strongly typed.
+  mlir::Value convertOnAssign(mlir::Location loc, mlir::Type toTy,
+                              mlir::Value val) {
+    assert(toTy && "store location must be typed");
+    auto fromTy = val.getType();
+    if (fromTy == toTy)
+      return val;
+    if (fir::isa_real(fromTy) && fir::isa_complex(toTy)) {
+      // imaginary part is zero
+      auto eleTy = builder->getComplexPartType(toTy);
+      auto cast = builder->create<fir::ConvertOp>(loc, eleTy, val);
+      llvm::APFloat zero{
+          kindMap.getFloatSemantics(toTy.cast<fir::CplxType>().getFKind()), 0};
+      auto imag = builder->createRealConstant(loc, eleTy, zero);
+      return builder->createComplex(loc, toTy, cast, imag);
+    }
+    if (fir::isa_complex(fromTy) && fir::isa_real(toTy)) {
+      // drop the imaginary part
+      auto rp = builder->extractComplexPart(val, /*isImagPart=*/false);
+      return builder->create<fir::ConvertOp>(loc, toTy, rp);
+    }
+    return builder->create<fir::ConvertOp>(loc, toTy, val);
+  }
+
   /// Shared for both assignments and pointer assignments.
   void genFIR(const Fortran::evaluate::Assignment &assignment) {
     std::visit(
@@ -1327,8 +1349,7 @@ private:
                   auto addr = genExprAddr(assignment.lhs);
                   auto val = genExprValue(assignment.rhs);
                   auto toTy = fir::dyn_cast_ptrEleTy(addr.getType());
-                  assert(toTy && "store location must be typed");
-                  auto cast = builder->create<fir::ConvertOp>(loc, toTy, val);
+                  auto cast = convertOnAssign(loc, toTy, val);
                   builder->create<fir::StoreOp>(loc, cast, addr);
                 } else if (isCharacterCategory(lhsType->category())) {
                   // Fortran 2018 10.2.1.3 p10 and p11
@@ -1657,9 +1678,9 @@ private:
         for (unsigned i = 0, end = arrTy.getDimension(); i < end; ++i)
           if (typeShape[i] == fir::SequenceType::getUnknownExtent())
             args.push_back(shape[i]);
-        return builder->create<fir::AllocaOp>(loc, ty, nm, llvm::None, args);
+        return builder->allocateLocal(loc, ty, nm, args);
       }
-    return builder->create<fir::AllocaOp>(loc, ty, nm, llvm::None, shape);
+    return builder->allocateLocal(loc, ty, nm, shape);
   }
 
   /// Instantiate a local variable. Precondition: Each variable will be visited
@@ -1771,8 +1792,14 @@ private:
       } else {
         // cast to the known constant parts from the declaration
         auto castTy = fir::ReferenceType::get(genType(sym));
-        if (addr)
-          addr = builder->create<fir::ConvertOp>(loc, castTy, addr);
+        if (addr) {
+          // XXX: special handling for boxchar; see proviso above
+          if (auto box =
+                  dyn_cast_or_null<fir::EmboxCharOp>(addr.getDefiningOp()))
+            addr = builder->create<fir::ConvertOp>(loc, castTy, box.memref());
+          else
+            addr = builder->create<fir::ConvertOp>(loc, castTy, addr);
+        }
       }
       // construct constants and populate `bounds`
       for (const auto &i : llvm::zip(sia.staticLBound, sia.staticShape)) {
@@ -1797,10 +1824,15 @@ private:
           bounds.emplace_back(lb, idx);
           continue;
         }
+        if (low && spec->ubound().isAssumed()) {
+          // An assumed size array. The extent is not computed.
+          auto lb = genExprValue(Fortran::semantics::SomeExpr{*low});
+          bounds.emplace_back(lb, mlir::Value{});
+        }
         break;
       }
 
-      auto unzip =
+      auto unzipInto =
           [&](llvm::SmallVectorImpl<mlir::Value> &shape,
               llvm::ArrayRef<Fortran::lower::SymIndex::Bounds> bounds) {
             std::for_each(bounds.begin(), bounds.end(), [&](const auto &pair) {
@@ -1818,7 +1850,7 @@ private:
         assert(!mustBeDummy);
         llvm::SmallVector<mlir::Value, 8> shape;
         shape.push_back(len);
-        unzip(shape, bounds);
+        unzipInto(shape, bounds);
         auto local = createNewLocal(loc, sym, shape);
         localSymbols.addCharSymbolWithBounds(sym, local, len, bounds);
         return;
@@ -1830,7 +1862,7 @@ private:
       // local array with computed bounds
       assert(!mustBeDummy);
       llvm::SmallVector<mlir::Value, 8> shape;
-      unzip(shape, bounds);
+      unzipInto(shape, bounds);
       auto local = createNewLocal(loc, sym, shape);
       localSymbols.addSymbolWithBounds(sym, local, bounds);
       return;
@@ -1843,7 +1875,10 @@ private:
         return;
       }
       assert(!mustBeDummy);
-      auto local = createNewLocal(loc, sym);
+      auto charTy = genType(sym);
+      auto c = sia.getCharLenConst();
+      mlir::Value local = c ? builder->createCharacterTemp(charTy, *c)
+                            : builder->createCharacterTemp(charTy, len);
       addCharSymbol(sym, local, len);
       return;
     }
@@ -2051,8 +2086,8 @@ private:
   const Fortran::parser::CookedSource *cooked;
   mlir::ModuleOp &module;
   const Fortran::common::IntrinsicTypeDefaultKinds &defaults;
-  Fortran::lower::IntrinsicLibrary intrinsics;
   Fortran::lower::FirOpBuilder *builder = nullptr;
+  const fir::KindMapping &kindMap;
   fir::NameUniquer &uniquer;
   Fortran::lower::SymMap localSymbols;
   Fortran::parser::CharBlock currentPosition;
@@ -2079,8 +2114,8 @@ void Fortran::lower::LoweringBridge::parseSourceFile(llvm::SourceMgr &srcMgr) {
 Fortran::lower::LoweringBridge::LoweringBridge(
     const Fortran::common::IntrinsicTypeDefaultKinds &defaultKinds,
     const Fortran::parser::CookedSource *cooked)
-    : defaultKinds{defaultKinds}, cooked{cooked} {
-  context = std::make_unique<mlir::MLIRContext>();
+    : defaultKinds{defaultKinds}, cooked{cooked},
+      context{std::make_unique<mlir::MLIRContext>()}, kindMap{context.get()} {
   module = std::make_unique<mlir::ModuleOp>(
       mlir::ModuleOp::create(mlir::UnknownLoc::get(context.get())));
 }

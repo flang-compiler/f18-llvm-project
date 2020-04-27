@@ -142,7 +142,10 @@ class CplxType : public mlir::Type::TypeBase<CplxType, mlir::Type,
 public:
   using Base::Base;
   static CplxType get(mlir::MLIRContext *ctxt, KindTy kind);
-  mlir::Type getEleTy() const;
+
+  /// Get the corresponding fir.real<k> type.
+  mlir::Type getElementType() const;
+
   KindTy getFKind() const;
 };
 

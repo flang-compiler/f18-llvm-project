@@ -18,7 +18,7 @@
 #define FORTRAN_LOWER_BRIDGE_H_
 
 #include "flang/Common/Fortran.h"
-#include "mlir/IR/MLIRContext.h"
+#include "flang/Optimizer/Support/KindMapping.h"
 #include "mlir/IR/Module.h"
 
 namespace Fortran {
@@ -60,6 +60,8 @@ namespace Fortran::lower {
 using SomeExpr = evaluate::Expr<evaluate::SomeType>;
 using SymbolRef = common::Reference<const semantics::Symbol>;
 class FirOpBuilder;
+
+//===----------------------------------------------------------------------===//
 
 /// The abstract interface for converter implementations to lower Fortran
 /// front-end fragments such as expressions, types, etc. to the FIR dialect of
@@ -122,6 +124,8 @@ public:
   virtual ~AbstractConverter() = default;
 };
 
+//===----------------------------------------------------------------------===//
+
 /// The lowering bridge converts the front-end parse trees and semantics
 /// checking residual to MLIR (FIR dialect) code.
 class LoweringBridge {
@@ -149,6 +153,9 @@ public:
   void lower(const parser::Program &program, fir::NameUniquer &uniquer,
              const Fortran::semantics::SemanticsContext &semanticsContext);
 
+  /// Get the kind map.
+  const fir::KindMapping &getKindMap() const { return kindMap; }
+
 private:
   explicit LoweringBridge(const common::IntrinsicTypeDefaultKinds &defaultKinds,
                           const parser::CookedSource *cooked);
@@ -159,6 +166,7 @@ private:
   const parser::CookedSource *cooked;
   std::unique_ptr<mlir::MLIRContext> context;
   std::unique_ptr<mlir::ModuleOp> module;
+  fir::KindMapping kindMap;
 };
 
 } // namespace Fortran::lower

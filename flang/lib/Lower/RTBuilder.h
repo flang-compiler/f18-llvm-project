@@ -152,6 +152,20 @@ constexpr TypeBuilderFunc getModel<bool &>() {
     return fir::ReferenceType::get(f(context));
   };
 }
+
+template <>
+constexpr TypeBuilderFunc getModel<float _Complex>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return fir::CplxType::get(context, sizeof(float));
+  };
+}
+template <>
+constexpr TypeBuilderFunc getModel<double _Complex>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return fir::CplxType::get(context, sizeof(double));
+  };
+}
+
 template <>
 constexpr TypeBuilderFunc getModel<const Fortran::runtime::Descriptor &>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
