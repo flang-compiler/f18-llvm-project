@@ -1,5 +1,6 @@
 ! RUN: bbc -emit-fir -o - %s | FileCheck %s
 
+! CHECK: k
 function k(n1, n2)
   ! CHECK-NOT: ^bb
   ! CHECK: [[selector:%[0-9]+]] = fir.call @_QPs
@@ -13,6 +14,7 @@ function k(n1, n2)
 7 k =  1; return
 end
 
+! CHECK: s
 subroutine s(n1, *, n2, *)
   ! CHECK: [[retval:%[0-9]+]] = fir.alloca index {name = "s"}
   ! CHECK-COUNT-3: fir.store {{.*}} to [[retval]] : !fir.ref<index>
@@ -23,6 +25,7 @@ subroutine s(n1, *, n2, *)
   return
 end
 
+! CHECK: main
   print*, k(10,20)
   print*, k(15,15)
   print*, k(20,10)
