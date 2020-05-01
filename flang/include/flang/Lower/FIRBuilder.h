@@ -257,8 +257,12 @@ public:
 
   const fir::KindMapping &getKindMap() { return kindMap; }
 
-  mlir::Value convertOnAssign(mlir::Location loc, mlir::Type toTy,
-                              mlir::Value val);
+  /// The LHS and RHS are not always in agreement in terms of
+  /// type. In some cases, the disagreement is between COMPLEX and other scalar
+  /// types. In that case, the conversion must insert/extract out of a COMPLEX
+  /// value to have the proper semantics and be strongly typed.
+  mlir::Value convertWithSemantics(mlir::Location loc, mlir::Type toTy,
+                                   mlir::Value val);
 
   /// Get the entry block of the current Function
   mlir::Block *getEntryBlock() { return &getFunction().front(); }
@@ -341,6 +345,10 @@ public:
   static fir::GlobalOp getNamedGlobal(mlir::ModuleOp module,
                                       llvm::StringRef name);
 
+  /// Lazy creation of fir.convert op.
+  mlir::Value createConvert(mlir::Location loc, mlir::Type toTy,
+                            mlir::Value val);
+
   /// Create a new FuncOp. If the function may have already been created, use
   /// `addNamedFunction` instead.
   mlir::FuncOp createFunction(mlir::Location loc, llvm::StringRef name,
@@ -399,7 +407,9 @@ public:
   void createLoop(mlir::Value count, const BodyGenerator &bodyGenerator);
 
   /// Cast the input value to IndexType.
-  mlir::Value convertToIndexType(mlir::Value integer);
+  mlir::Value convertToIndexType(mlir::Value val) {
+    return createConvert(getLoc(), getIndexType(), val);
+  }
 
 private:
   llvm::Optional<mlir::Location> currentLoc{};

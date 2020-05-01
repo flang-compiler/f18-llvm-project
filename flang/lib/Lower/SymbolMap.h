@@ -99,7 +99,7 @@ struct SymIndex {
     mlir::Value addr;
     mlir::Value size;                         // element size or null
     llvm::SmallVector<Bounds, 4> shape;       // empty for scalar
-    llvm::SmallVector<mlir::Value, 4> params; // LEN type parameters, if any
+    llvm::SmallVector<mlir::Value, 2> params; // LEN type parameters, if any
   };
 
   //===--------------------------------------------------------------------===//

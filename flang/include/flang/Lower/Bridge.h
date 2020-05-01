@@ -18,8 +18,10 @@
 #define FORTRAN_LOWER_BRIDGE_H_
 
 #include "flang/Common/Fortran.h"
+#include "flang/Lower/Support/BoxValue.h"
 #include "flang/Optimizer/Support/KindMapping.h"
 #include "mlir/IR/Module.h"
+#include <variant>
 
 namespace Fortran {
 namespace common {
@@ -60,6 +62,10 @@ namespace Fortran::lower {
 using SomeExpr = evaluate::Expr<evaluate::SomeType>;
 using SymbolRef = common::Reference<const semantics::Symbol>;
 class FirOpBuilder;
+
+using ExValue =
+    std::variant<fir::UnboxedValue, fir::CharBoxValue, fir::ArrayBoxValue,
+                 fir::CharArrayBoxValue, fir::BoxValue, fir::ProcBoxValue>;
 
 //===----------------------------------------------------------------------===//
 

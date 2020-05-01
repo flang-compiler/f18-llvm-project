@@ -437,7 +437,7 @@ private:
   void genFIRConditionalBranch(mlir::Value &cond, mlir::Block *trueTarget,
                                mlir::Block *falseTarget) {
     auto loc = toLocation();
-    auto bcc = builder->create<fir::ConvertOp>(loc, builder->getI1Type(), cond);
+    auto bcc = builder->createConvert(loc, builder->getI1Type(), cond);
     builder->create<mlir::CondBranchOp>(loc, bcc, trueTarget, llvm::None,
                                         falseTarget, llvm::None);
   }
@@ -513,8 +513,7 @@ private:
   genWhereCondition(const A *stmt, bool withElse = true) {
     auto cond = genExprValue(*Fortran::semantics::GetExpr(
         std::get<Fortran::parser::ScalarLogicalExpr>(stmt->t)));
-    auto bcc = builder->create<fir::ConvertOp>(toLocation(),
-                                               builder->getI1Type(), cond);
+    auto bcc = builder->createConvert(toLocation(), builder->getI1Type(), cond);
     auto where = builder->create<fir::WhereOp>(toLocation(), bcc, withElse);
     auto insPt = builder->saveInsertionPoint();
     builder->setInsertionPointToStart(&where.whereRegion().front());
@@ -524,7 +523,7 @@ private:
   mlir::Value genFIRLoopIndex(const Fortran::parser::ScalarExpr &x,
                               mlir::Type t) {
     mlir::Value v = genExprValue(*Fortran::semantics::GetExpr(x));
-    return builder->create<fir::ConvertOp>(toLocation(), t, v);
+    return builder->createConvert(toLocation(), t, v);
   }
 
   mlir::FuncOp getFunc(llvm::StringRef name, mlir::FunctionType ty) {
@@ -818,8 +817,8 @@ private:
       builder->setInsertionPointToStart(info.doLoop.getBody());
       // Always store iteration ssa-value to the LCV to avoid missing any
       // aliasing of the LCV.
-      auto lcv = builder->create<fir::ConvertOp>(
-          location, info.loopVariableType, info.doLoop.getInductionVar());
+      auto lcv = builder->createConvert(location, info.loopVariableType,
+                                        info.doLoop.getInductionVar());
       builder->create<fir::StoreOp>(location, lcv, info.loopVariable);
       return;
     }
@@ -1038,10 +1037,9 @@ private:
     auto addValue = [&](const CaseValue &caseValue) {
       const auto *expr = Fortran::semantics::GetExpr(caseValue.thing);
       const auto v = Fortran::evaluate::ToInt64(*expr);
-      valueList.push_back(
-          v ? builder->createIntegerConstant(selectType, *v)
-            : builder->create<fir::ConvertOp>(toLocation(), selectType,
-                                              genExprValue(*expr)));
+      valueList.push_back(v ? builder->createIntegerConstant(selectType, *v)
+                            : builder->createConvert(toLocation(), selectType,
+                                                     genExprValue(*expr)));
     };
     for (Fortran::lower::pft::Evaluation *e = eval.controlSuccessor; e;
          e = e->controlSuccessor) {
@@ -1240,8 +1238,7 @@ private:
                 auto idxTy = mlir::IndexType::get(&mlirContext);
                 auto zero = builder->create<mlir::ConstantOp>(
                     toLocation(), idxTy, builder->getIntegerAttr(idxTy, 0));
-                auto cast =
-                    builder->create<fir::ConvertOp>(toLocation(), ty, zero);
+                auto cast = builder->createConvert(toLocation(), ty, zero);
                 builder->create<fir::StoreOp>(toLocation(), cast, load);
               },
               [&](const Fortran::parser::StructureComponent &) { TODO(); },
@@ -1308,7 +1305,8 @@ private:
                   auto val = genExprValue(assignment.rhs);
                   auto addr = genExprValue(assignment.lhs);
                   auto toTy = fir::dyn_cast_ptrEleTy(addr.getType());
-                  auto cast = builder->convertOnAssign(toLocation(), toTy, val);
+                  auto cast =
+                      builder->convertWithSemantics(toLocation(), toTy, val);
                   builder->create<fir::StoreOp>(toLocation(), cast, addr);
                 } else if (isCharacterCategory(lhsType->category())) {
                   TODO();
@@ -1333,7 +1331,7 @@ private:
                   auto addr = genExprAddr(assignment.lhs);
                   auto val = genExprValue(assignment.rhs);
                   auto toTy = fir::dyn_cast_ptrEleTy(addr.getType());
-                  auto cast = builder->convertOnAssign(loc, toTy, val);
+                  auto cast = builder->convertWithSemantics(loc, toTy, val);
                   builder->create<fir::StoreOp>(loc, cast, addr);
                 } else if (isCharacterCategory(lhsType->category())) {
                   // Fortran 2018 10.2.1.3 p10 and p11
@@ -1473,8 +1471,8 @@ private:
       // Alternate return statement -- assign alternate return index.
       auto expr = Fortran::semantics::GetExpr(*stmt.v);
       assert(expr && "missing alternate return expression");
-      auto altReturnIndex = builder->createHere<fir::ConvertOp>(
-          builder->getIndexType(), genExprValue(*expr));
+      auto altReturnIndex = builder->createConvert(
+          toLocation(), builder->getIndexType(), genExprValue(*expr));
       builder->create<fir::StoreOp>(toLocation(), altReturnIndex,
                                     getAltReturnResult(*funit));
     }
@@ -1744,7 +1742,7 @@ private:
         // object shape is constant
         auto castTy = fir::ReferenceType::get(genType(sym));
         if (addr)
-          addr = builder->create<fir::ConvertOp>(loc, castTy, addr);
+          addr = builder->createConvert(loc, castTy, addr);
         if (sia.lboundIsAllOnes()) {
           // if lower bounds are all ones, build simple shaped object
           llvm::SmallVector<mlir::Value, 8> shape;
@@ -1776,9 +1774,9 @@ private:
           // XXX: special handling for boxchar; see proviso above
           if (auto box =
                   dyn_cast_or_null<fir::EmboxCharOp>(addr.getDefiningOp()))
-            addr = builder->create<fir::ConvertOp>(loc, castTy, box.memref());
+            addr = builder->createConvert(loc, castTy, box.memref());
           else
-            addr = builder->create<fir::ConvertOp>(loc, castTy, addr);
+            addr = builder->createConvert(loc, castTy, addr);
         }
       }
       // construct constants and populate `bounds`
@@ -1800,7 +1798,7 @@ private:
           auto diff = builder->create<mlir::SubIOp>(loc, ty, ub, lb);
           auto one = builder->createIntegerConstant(ty, 1);
           auto sz = builder->create<mlir::AddIOp>(loc, ty, diff, one);
-          auto idx = builder->create<fir::ConvertOp>(loc, idxTy, sz);
+          auto idx = builder->createConvert(loc, idxTy, sz);
           bounds.emplace_back(lb, idx);
           continue;
         }

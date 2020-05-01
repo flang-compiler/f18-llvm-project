@@ -86,6 +86,10 @@ Fortran::lower::mangle::mangleName(fir::NameUniquer &uniquer,
           },
           [&](const Fortran::semantics::ProcEntityDetails &) {
             auto modNames = moduleNames(ultimateSymbol);
+            // Does an subprogram declared external ever require a scope prefix?
+            if (Fortran::semantics::IsExternal(ultimateSymbol))
+              return uniquer.doProcedure(llvm::None, llvm::None,
+                                         toStringRef(symbolName));
             return uniquer.doProcedure(modNames, hostName(ultimateSymbol),
                                        toStringRef(symbolName));
           },

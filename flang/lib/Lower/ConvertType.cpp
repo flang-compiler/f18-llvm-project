@@ -34,9 +34,7 @@ int64_t toConstant(const Fortran::evaluate::Expr<A> &e) {
 }
 
 #undef TODO
-#define TODO()                                                                 \
-  assert(false && "not yet implemented");                                      \
-  return {}
+#define TODO() llvm_unreachable("not yet implemented")
 
 // one argument template, must be specialized
 template <Fortran::common::TypeCategory TC>

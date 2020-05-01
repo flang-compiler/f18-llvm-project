@@ -60,7 +60,7 @@ Fortran::lower::FirOpBuilder::allocateLocal(mlir::Location loc, mlir::Type ty,
     if (sh.getType().isa<mlir::IndexType>()) {
       indices.push_back(sh);
     } else {
-      auto cast = create<fir::ConvertOp>(loc, idxTy, sh);
+      auto cast = createConvert(loc, idxTy, sh);
       indices.push_back(cast);
     }
   });
@@ -153,13 +153,8 @@ void Fortran::lower::FirOpBuilder::createLoop(
   createLoop(zero, up, one, bodyGenerator);
 }
 
-/// The LHS and RHS on assignments are not always in agreement in terms of
-/// type. In some cases, the disagreement is between COMPLEX and REAL types.
-/// In that case, the assignment must insert/extract out of a COMPLEX value to
-/// be correct and strongly typed.
-mlir::Value Fortran::lower::FirOpBuilder::convertOnAssign(mlir::Location loc,
-                                                          mlir::Type toTy,
-                                                          mlir::Value val) {
+mlir::Value Fortran::lower::FirOpBuilder::convertWithSemantics(
+    mlir::Location loc, mlir::Type toTy, mlir::Value val) {
   assert(toTy && "store location must be typed");
   auto fromTy = val.getType();
   if (fromTy == toTy)
@@ -169,7 +164,7 @@ mlir::Value Fortran::lower::FirOpBuilder::convertOnAssign(mlir::Location loc,
       fir::isa_complex(toTy)) {
     // imaginary part is zero
     auto eleTy = getComplexPartType(toTy);
-    auto cast = create<fir::ConvertOp>(loc, eleTy, val);
+    auto cast = createConvert(loc, eleTy, val);
     llvm::APFloat zero{
         kindMap.getFloatSemantics(toTy.cast<fir::CplxType>().getFKind()), 0};
     auto imag = createRealConstant(loc, eleTy, zero);
@@ -180,16 +175,17 @@ mlir::Value Fortran::lower::FirOpBuilder::convertOnAssign(mlir::Location loc,
       (toTy.isSignlessInteger() || fir::isa_real(toTy))) {
     // drop the imaginary part
     auto rp = extractComplexPart(val, /*isImagPart=*/false);
-    return create<fir::ConvertOp>(loc, toTy, rp);
+    return createConvert(loc, toTy, rp);
   }
-  return create<fir::ConvertOp>(loc, toTy, val);
+  return createConvert(loc, toTy, val);
 }
 
-mlir::Value
-Fortran::lower::FirOpBuilder::convertToIndexType(mlir::Value integer) {
-  // abort now if not an integral type
-  fir::verifyIntegralType(integer.getType());
-  return createHere<fir::ConvertOp>(getIndexType(), integer);
+mlir::Value Fortran::lower::FirOpBuilder::createConvert(mlir::Location loc,
+                                                        mlir::Type toTy,
+                                                        mlir::Value val) {
+  if (val.getType() != toTy)
+    return create<fir::ConvertOp>(loc, toTy, val);
+  return val;
 }
 
 //===----------------------------------------------------------------------===//
@@ -304,13 +300,14 @@ struct CharacterOpsBuilderImpl {
     // So far, fir.emboxChar fails lowering to llvm when it is given
     // fir.data<fir.array<len x fir.char<kind>>> types, so convert to
     // fir.data<fir.char<kind>> if needed.
+    auto loc = builder.getLoc();
     if (refType != str.data.getType())
-      str.data = builder.createHere<fir::ConvertOp>(refType, str.data);
+      str.data = builder.createConvert(loc, refType, str.data);
     // Convert in case the provided length is not of the integer type that must
     // be used in boxchar.
     auto lenType = builder.getLengthType();
     if (str.len.getType() != lenType)
-      str.len = builder.createHere<fir::ConvertOp>(lenType, str.len);
+      str.len = builder.createConvert(loc, lenType, str.len);
     return builder.createHere<fir::EmboxCharOp>(boxCharType, str.data, str.len);
   }
 
@@ -367,12 +364,13 @@ struct CharacterOpsBuilderImpl {
   void createLengthOneAssign(Char lhs, Char rhs) {
     auto addr = lhs.data;
     auto refType = lhs.getReferenceType();
-    addr = builder.createHere<fir::ConvertOp>(refType, addr);
+    auto loc = builder.getLoc();
+    addr = builder.createConvert(loc, refType, addr);
 
     auto val = rhs.data;
     if (!rhs.needToMaterialize()) {
       mlir::Value rhsAddr = rhs.data;
-      rhsAddr = builder.createHere<fir::ConvertOp>(refType, rhsAddr);
+      rhsAddr = builder.createConvert(loc, refType, rhsAddr);
       val = builder.createHere<fir::LoadOp>(rhsAddr);
     }
 
@@ -433,7 +431,7 @@ struct CharacterOpsBuilderImpl {
 
   mlir::Value createBlankConstant(fir::CharacterType type) {
     auto blank = createBlankConstantCode(type);
-    return builder.createHere<fir::ConvertOp>(type, blank);
+    return builder.createConvert(builder.getLoc(), type, blank);
   }
 
   Char createSubstring(Char str, llvm::ArrayRef<mlir::Value> bounds) {
@@ -449,16 +447,17 @@ struct CharacterOpsBuilderImpl {
     }
     mlir::SmallVector<mlir::Value, 2> castBounds;
     // Convert bounds to length type to do safe arithmetic on it.
+    auto loc = builder.getLoc();
     for (auto bound : bounds)
       castBounds.push_back(
-          builder.createHere<fir::ConvertOp>(builder.getLengthType(), bound));
+          builder.createConvert(loc, builder.getLengthType(), bound));
     auto lowerBound = castBounds[0];
     // FIR CoordinateOp is zero based but Fortran substring are one based.
     auto one = builder.createIntegerConstant(lowerBound.getType(), 1);
     auto offset = builder.createHere<mlir::SubIOp>(lowerBound, one).getResult();
     auto idxType = builder.getIndexType();
     if (offset.getType() != idxType)
-      offset = builder.createHere<fir::ConvertOp>(idxType, offset);
+      offset = builder.createConvert(loc, idxType, offset);
     auto substringRef = builder.createHere<fir::CoordinateOp>(
         str.getReferenceType(), str.data, offset);
 
@@ -485,7 +484,8 @@ struct CharacterOpsBuilderImpl {
     // Note: Runtime for LEN_TRIM should also be available at some
     // point. For now use an inlined implementation.
     auto indexType = builder.getIndexType();
-    mlir::Value len = builder.createHere<fir::ConvertOp>(indexType, str.len);
+    auto loc = builder.getLoc();
+    mlir::Value len = builder.createConvert(loc, indexType, str.len);
     auto one = builder.createIntegerConstant(indexType, 1);
     auto minusOne = builder.createIntegerConstant(indexType, -1);
     auto zero = builder.createIntegerConstant(indexType, 0);
@@ -500,7 +500,7 @@ struct CharacterOpsBuilderImpl {
     auto index = iterWhile.getInductionVar();
     // Look for first non-blank from the right of the character.
     auto c = createLoadCharAt(str, index);
-    c = builder.createHere<fir::ConvertOp>(blank.getType(), c);
+    c = builder.createConvert(loc, blank.getType(), c);
     auto isBlank =
         builder.createHere<mlir::CmpIOp>(mlir::CmpIPredicate::eq, blank, c);
     llvm::SmallVector<mlir::Value, 2> results = {isBlank, index};
@@ -511,7 +511,7 @@ struct CharacterOpsBuilderImpl {
         builder.createHere<mlir::AddIOp>(iterWhile.getResult(1), one);
     auto result =
         builder.createHere<SelectOp>(iterWhile.getResult(0), zero, newLen);
-    return builder.createHere<fir::ConvertOp>(builder.getLengthType(), result);
+    return builder.createConvert(loc, builder.getLengthType(), result);
   }
 
   Fortran::lower::FirOpBuilder &builder;

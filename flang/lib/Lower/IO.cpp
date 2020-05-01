@@ -210,8 +210,8 @@ static void genOutputRuntimeFunc(Fortran::lower::FirOpBuilder &builder,
   auto outputFunc = getOutputRuntimeFunc(builder, argType);
 
   for (auto &op : operands)
-    actuals.emplace_back(builder.create<fir::ConvertOp>(
-        loc, outputFunc.getType().getInput(i++), op));
+    actuals.emplace_back(
+        builder.createConvert(loc, outputFunc.getType().getInput(i++), op));
   makeNextConditionalOn(builder, loc, lastOk, insertPt);
   auto ok = builder.create<mlir::CallOp>(loc, outputFunc, actuals);
   lastOk = ok.getResult(0);
@@ -260,7 +260,7 @@ static void genInputRuntimeFunc(Fortran::lower::FirOpBuilder &builder,
             loc, builder.getI32IntegerAttr(0))});
   }
   auto cvtTy = inputFunc.getType().getInput(1);
-  auto cvt = builder.create<fir::ConvertOp>(loc, cvtTy, var);
+  auto cvt = builder.createConvert(loc, cvtTy, var);
   if (intKind != 0) {
     auto kind = builder.create<mlir::ConstantOp>(
         loc, builder.getI32IntegerAttr(intKind));
@@ -279,7 +279,7 @@ static void genInputRuntimeFunc(Fortran::lower::FirOpBuilder &builder,
         loc, builder.getRefType(builder.getComplexPartType(ty)), var,
         llvm::SmallVector<mlir::Value, 1>{builder.create<mlir::ConstantOp>(
             loc, builder.getI32IntegerAttr(1))});
-    auto cst = builder.create<fir::ConvertOp>(loc, cvtTy, ptr);
+    auto cst = builder.createConvert(loc, cvtTy, ptr);
     makeNextConditionalOn(builder, loc, lastOk, insertPt);
     auto ok = builder.create<mlir::CallOp>(
         loc, inputFunc, llvm::SmallVector<mlir::Value, 2>{cookie, cst});
@@ -295,7 +295,7 @@ static mlir::Value getDefaultFilename(Fortran::lower::FirOpBuilder &builder,
                                       mlir::Location loc, mlir::Type toType) {
   mlir::Value null =
       builder.create<mlir::ConstantOp>(loc, builder.getI64IntegerAttr(0));
-  return builder.create<fir::ConvertOp>(loc, toType, null);
+  return builder.createConvert(loc, toType, null);
 }
 
 static mlir::Value getDefaultLineNo(Fortran::lower::FirOpBuilder &builder,
@@ -308,7 +308,7 @@ static mlir::Value getDefaultScratch(Fortran::lower::FirOpBuilder &builder,
                                      mlir::Location loc, mlir::Type toType) {
   mlir::Value null =
       builder.create<mlir::ConstantOp>(loc, builder.getI64IntegerAttr(0));
-  return builder.create<fir::ConvertOp>(loc, toType, null);
+  return builder.createConvert(loc, toType, null);
 }
 
 static mlir::Value getDefaultScratchLen(Fortran::lower::FirOpBuilder &builder,
@@ -328,8 +328,8 @@ lowerStringLit(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
   auto *expr = Fortran::semantics::GetExpr(syntax);
   auto str = converter.genExprValue(expr, loc);
   auto dataLen = builder.materializeCharacter(str);
-  auto buff = builder.create<fir::ConvertOp>(loc, ty0, dataLen.first);
-  auto len = builder.create<fir::ConvertOp>(loc, ty1, dataLen.second);
+  auto buff = builder.createConvert(loc, ty0, dataLen.first);
+  auto len = builder.createConvert(loc, ty1, dataLen.second);
   if (ty2) {
     auto kindVal = builder.getCharacterKind(str.getType());
     auto kind = builder.create<mlir::ConstantOp>(
@@ -352,8 +352,8 @@ lowerSourceTextAsStringLit(Fortran::lower::AbstractConverter &converter,
   auto lit = builder.createStringLit(
       loc, /*FIXME*/ fir::CharacterType::get(builder.getContext(), 1), text);
   auto data = builder.materializeCharacter(lit);
-  auto buff = builder.create<fir::ConvertOp>(loc, ty0, data.first);
-  auto len = builder.create<fir::ConvertOp>(loc, ty1, data.second);
+  auto buff = builder.createConvert(loc, ty0, data.first);
+  auto len = builder.createConvert(loc, ty1, data.second);
   return {buff, len, mlir::Value{}};
 }
 
@@ -371,7 +371,7 @@ mlir::Value genIntIOOption(Fortran::lower::AbstractConverter &converter,
   mlir::FuncOp ioFunc = getIORuntimeFunc<A>(builder);
   mlir::FunctionType ioFuncTy = ioFunc.getType();
   auto expr = converter.genExprValue(Fortran::semantics::GetExpr(spec.v), loc);
-  auto val = builder.create<fir::ConvertOp>(loc, ioFuncTy.getInput(1), expr);
+  auto val = builder.createConvert(loc, ioFuncTy.getInput(1), expr);
   llvm::SmallVector<mlir::Value, 4> ioArgs = {cookie, val};
   return builder.create<mlir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 }
@@ -850,7 +850,7 @@ static mlir::Value genIOUnit(Fortran::lower::AbstractConverter &converter,
   auto &builder = converter.getFirOpBuilder();
   if (auto *e = std::get_if<Fortran::parser::FileUnitNumber>(&iounit.u)) {
     auto ex = converter.genExprValue(Fortran::semantics::GetExpr(*e), loc);
-    return builder.create<fir::ConvertOp>(loc, ty, ex);
+    return builder.createConvert(loc, ty, ex);
   }
   return builder.create<mlir::ConstantOp>(
       loc, builder.getIntegerAttr(ty, Fortran::runtime::io::DefaultUnit));
@@ -878,7 +878,7 @@ static mlir::Value genBasicIOStmt(Fortran::lower::AbstractConverter &converter,
   mlir::FunctionType beginFuncTy = beginFunc.getType();
   auto unit = converter.genExprValue(
       getExpr<Fortran::parser::FileUnitNumber>(stmt), loc);
-  auto un = builder.create<fir::ConvertOp>(loc, beginFuncTy.getInput(0), unit);
+  auto un = builder.createConvert(loc, beginFuncTy.getInput(0), unit);
   auto file = getDefaultFilename(builder, loc, beginFuncTy.getInput(1));
   auto line = getDefaultLineNo(builder, loc, beginFuncTy.getInput(2));
   llvm::SmallVector<mlir::Value, 4> args{un, file, line};
@@ -929,7 +929,7 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
     auto unit = converter.genExprValue(
         getExpr<Fortran::parser::FileUnitNumber>(stmt), loc);
     beginArgs.push_back(
-        builder.create<fir::ConvertOp>(loc, beginFuncTy.getInput(0), unit));
+        builder.createConvert(loc, beginFuncTy.getInput(0), unit));
     beginArgs.push_back(
         getDefaultFilename(builder, loc, beginFuncTy.getInput(1)));
     beginArgs.push_back(
@@ -972,13 +972,12 @@ Fortran::lower::genWaitStatement(Fortran::lower::AbstractConverter &converter,
   mlir::FunctionType beginFuncTy = beginFunc.getType();
   auto unit = converter.genExprValue(
       getExpr<Fortran::parser::FileUnitNumber>(stmt), loc);
-  auto un = builder.create<fir::ConvertOp>(loc, beginFuncTy.getInput(0), unit);
+  auto un = builder.createConvert(loc, beginFuncTy.getInput(0), unit);
   llvm::SmallVector<mlir::Value, 4> args{un};
   if (hasId) {
     auto id =
         converter.genExprValue(getExpr<Fortran::parser::IdExpr>(stmt), loc);
-    args.push_back(
-        builder.create<fir::ConvertOp>(loc, beginFuncTy.getInput(1), id));
+    args.push_back(builder.createConvert(loc, beginFuncTy.getInput(1), id));
   }
   auto cookie = builder.create<mlir::CallOp>(loc, beginFunc, args).getResult(0);
   ErrorHandling eh{};
