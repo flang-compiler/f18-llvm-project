@@ -19,8 +19,9 @@ set(FLANG_TEST_PARAMS
 
 set(FLANG_TEST_DEPENDS
   f18 FileCheck count not module_files
-  tco
-  bbc
+  opt llc
+  tco bbc
+  FortranRuntime FortranDecimal
 )
 
 add_custom_target(flang-test-depends DEPENDS ${FLANG_TEST_DEPENDS})

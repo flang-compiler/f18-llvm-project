@@ -12,18 +12,13 @@
 #include <memory>
 
 namespace mlir {
-class FuncOp;
-template <typename>
-class OpPassBase;
 class Pass;
 } // namespace mlir
 
 namespace fir {
 
-class KindMapping;
-
 /// Convert fir.select_type to the standard dialect
-std::unique_ptr<mlir::Pass> createFIRToStdPass(const KindMapping &);
+std::unique_ptr<mlir::Pass> createControlFlowLoweringPass();
 
 /// Effects aware CSE pass
 std::unique_ptr<mlir::Pass> createCSEPass();
@@ -31,7 +26,7 @@ std::unique_ptr<mlir::Pass> createCSEPass();
 /// Convert FIR loop constructs to the Affine dialect
 std::unique_ptr<mlir::Pass> createPromoteToAffinePass();
 
-/// Convert `fir.loop` and `fir.where` to `loop.for` and `loop.if`.  This
+/// Convert `fir.do_loop` and `fir.if` to `loop.for` and `loop.if`.  This
 /// conversion enables the `createLowerToCFGPass` to transform these to CFG
 /// form.
 std::unique_ptr<mlir::Pass> createLowerToLoopPass();
