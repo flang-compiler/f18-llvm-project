@@ -580,10 +580,6 @@ private:
   }
 
   void genFIR(Fortran::lower::pft::Evaluation &eval,
-              const Fortran::parser::WaitStmt &stmt) {
-    genWaitStatement(*this, stmt);
-  }
-  void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::WhereStmt &) {
     TODO();
   }
@@ -1168,46 +1164,47 @@ private:
 
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::BackspaceStmt &stmt) {
-    genBackspaceStatement(*this, stmt);
+    genBackspaceStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::CloseStmt &stmt) {
-    genCloseStatement(*this, stmt);
+    genCloseStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::EndfileStmt &stmt) {
-    genEndfileStatement(*this, stmt);
+    genEndfileStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::FlushStmt &stmt) {
-    genFlushStatement(*this, stmt);
+    genFlushStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::InquireStmt &stmt) {
-    genInquireStatement(*this, stmt);
+    genInquireStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::OpenStmt &stmt) {
-    genOpenStatement(*this, stmt);
+    genOpenStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::PrintStmt &stmt) {
-    genPrintStatement(*this, stmt,
-                      eval.getOwningProcedure()->labelEvaluationMap);
+    genPrintStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::ReadStmt &stmt) {
-    genReadStatement(*this, stmt,
-                     eval.getOwningProcedure()->labelEvaluationMap);
+    genReadStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::RewindStmt &stmt) {
-    genRewindStatement(*this, stmt);
+    genRewindStatement(*this, eval, stmt);
+  }
+  void genFIR(Fortran::lower::pft::Evaluation &eval,
+              const Fortran::parser::WaitStmt &stmt) {
+    genWaitStatement(*this, eval, stmt);
   }
   void genFIR(Fortran::lower::pft::Evaluation &eval,
               const Fortran::parser::WriteStmt &stmt) {
-    genWriteStatement(*this, stmt,
-                      eval.getOwningProcedure()->labelEvaluationMap);
+    genWriteStatement(*this, eval, stmt);
   }
 
   //===--------------------------------------------------------------------===//
