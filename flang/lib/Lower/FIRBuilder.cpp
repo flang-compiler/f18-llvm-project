@@ -176,8 +176,8 @@ mlir::Value Fortran::lower::FirOpBuilder::convertOnAssign(mlir::Location loc,
     return createComplex(loc, toTy, cast, imag);
   }
   // FIXME: add a fir::is_integer() test
-  if ((fir::isa_complex(fromTy) || fromTy.isSignlessInteger()) &&
-      fir::isa_real(toTy)) {
+  if (fir::isa_complex(fromTy) &&
+      (toTy.isSignlessInteger() || fir::isa_real(toTy))) {
     // drop the imaginary part
     auto rp = extractComplexPart(val, /*isImagPart=*/false);
     return create<fir::ConvertOp>(loc, toTy, rp);

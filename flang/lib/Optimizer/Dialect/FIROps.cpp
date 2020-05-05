@@ -689,10 +689,6 @@ static mlir::ParseResult parseIterWhileOp(mlir::OpAsmParser &parser,
 }
 
 static mlir::LogicalResult verify(fir::IterWhileOp op) {
-  if (auto cst = dyn_cast_or_null<ConstantIndexOp>(op.step().getDefiningOp()))
-    if (cst.getValue() <= 0)
-      return op.emitOpError("constant step operand must be positive");
-
   // Check that the body defines as single block argument for the induction
   // variable.
   auto *body = op.getBody();
@@ -878,10 +874,6 @@ fir::LoopOp fir::getForInductionVarOwner(mlir::Value val) {
 
 // Lifted from loop.loop
 static mlir::LogicalResult verify(fir::LoopOp op) {
-  if (auto cst = dyn_cast_or_null<ConstantIndexOp>(op.step().getDefiningOp()))
-    if (cst.getValue() <= 0)
-      return op.emitOpError("constant step operand must be positive");
-
   // Check that the body defines as single block argument for the induction
   // variable.
   auto *body = op.getBody();
