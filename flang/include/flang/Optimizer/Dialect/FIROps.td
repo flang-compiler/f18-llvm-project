@@ -1764,7 +1764,7 @@ def fir_InsertValueOp : fir_OneResultOp<"insert_value", [NoSideEffect]> {
   let summary = "insert a new sub-value into a copy of an existing aggregate";
 
   let description = [{
-    Insert a value from an entity with a type composed of tuples, arrays,
+    Insert a value into an entity with a type composed of tuples, arrays,
     and/or derived types. Returns a new ssa value with the same type as the
     original entity. Cannot be used on values of `!fir.box` type.
 
@@ -1783,6 +1783,24 @@ def fir_InsertValueOp : fir_OneResultOp<"insert_value", [NoSideEffect]> {
   let arguments = (ins AnyCompositeLike:$adt, AnyType:$val,
                        Variadic<AnyComponentType>:$coor);
   let results = (outs AnyCompositeLike);
+
+  let assemblyFormat = [{
+    operands attr-dict `:` functional-type(operands, results)
+  }];
+}
+
+def fir_InsertOnRangeOp : fir_OneResultOp<"insert_on_range", [NoSideEffect]> {
+  let summary = "insert sub-value into a range on an existing sequence";
+
+  let description = [{
+    Insert a constant value into an entity with an array type. Returns a
+    new ssa value where the range of offsets from the original array have been
+    replaced with the constant. The result is an array type entity.
+  }];
+
+  let arguments = (ins fir_SequenceType:$seq, AnyType:$val,
+                       Index:$start, Index:$end);
+  let results = (outs fir_SequenceType);
 
   let assemblyFormat = [{
     operands attr-dict `:` functional-type(operands, results)

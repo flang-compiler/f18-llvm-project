@@ -602,7 +602,7 @@ private:
     if constexpr (TC == Fortran::lower::IntegerCat) {
       return genIntegerConstant<KIND>(builder.getContext(), value.ToInt64());
     } else if constexpr (TC == Fortran::lower::LogicalCat) {
-        return genBoolConstant(builder.getContext(), opt->IsTrue());
+      return genBoolConstant(builder.getContext(), value.IsTrue());
     } else if constexpr (TC == Fortran::lower::RealCat) {
       std::string str = value.DumpHexadecimal();
       if constexpr (KIND == 2) {
@@ -623,24 +623,22 @@ private:
         return genRealConstant<KIND>(builder.getContext(), floatVal);
       }
     } else if constexpr (TC == Fortran::lower::ComplexCat) {
-        using TR = Fortran::evaluate::Type<Fortran::lower::RealCat, KIND>;
-        Fortran::evaluate::ComplexConstructor<KIND> ctor(
-            Fortran::evaluate::Expr<TR>{
-                Fortran::evaluate::Constant<TR>{opt->REAL()}},
-            Fortran::evaluate::Expr<TR>{
-                Fortran::evaluate::Constant<TR>{opt->AIMAG()}});
-        auto cplx = genunbox(ctor);
-        assert(cplx && "boxed value not handled");
-        return cplx;
-    } else if constexpr (TC == Fortran::lower::CharacterCat) {
-      return genCharLit<KIND>(con.GetScalarValue().value(), con.LEN());
-      } else {
+      using TR = Fortran::evaluate::Type<Fortran::lower::RealCat, KIND>;
+      Fortran::evaluate::ComplexConstructor<KIND> ctor(
+          Fortran::evaluate::Expr<TR>{
+              Fortran::evaluate::Constant<TR>{value.REAL()}},
+          Fortran::evaluate::Expr<TR>{
+              Fortran::evaluate::Constant<TR>{value.AIMAG()}});
+      auto cplx = genunbox(ctor);
+      assert(cplx && "boxed value not handled");
+      return cplx;
+    } else /*constexpr*/ {
       llvm_unreachable("unhandled constant");
     }
   }
 
   template <Fortran::common::TypeCategory TC, int KIND>
-  mlir::Value genArrayLit(
+  Fortran::lower::ExValue genArrayLit(
       const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>>
           &con) {
     // TODO:
@@ -664,7 +662,7 @@ private:
   }
 
   template <Fortran::common::TypeCategory TC, int KIND>
-  mlir::Value
+  Fortran::lower::ExValue
   genval(const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>>
              &con) {
     // TODO:
@@ -679,8 +677,9 @@ private:
       llvm_unreachable("constant has no value");
     if constexpr (TC == Fortran::lower::CharacterCat) {
       return genCharLit<KIND>(opt.value(), con.LEN());
+    } else {
+      return genScalarLit<TC, KIND>(opt.value());
     }
-    return genScalarLit<TC, KIND>(opt.value());
   }
 
   template <Fortran::common::TypeCategory TC>
