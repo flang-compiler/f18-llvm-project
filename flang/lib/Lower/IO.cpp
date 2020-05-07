@@ -68,15 +68,17 @@ static constexpr std::tuple<
 } // namespace Fortran::lower
 
 namespace {
-struct ErrorHandling {
-  bool hasErrorHandlers() const { return ioStat || err || end || eor || ioMsg; }
-  bool ioStat{};
-  bool err{};
-  bool end{};
-  bool eor{};
-  bool ioMsg{};
+struct ConditionSpecifierInfo {
   const Fortran::semantics::SomeExpr *ioStatExpr{};
   const Fortran::semantics::SomeExpr *ioMsgExpr{};
+  bool hasErr{};
+  bool hasEnd{};
+  bool hasEor{};
+
+  bool hasConditionSpecifiers() const {
+    return ioStatExpr != nullptr || ioMsgExpr != nullptr || hasErr || hasEnd ||
+           hasEor;
+  }
 };
 } // namespace
 
@@ -113,29 +115,29 @@ static mlir::FuncOp getIORuntimeFunc(Fortran::lower::FirOpBuilder &builder) {
   return func;
 }
 
-/// Generate a call to end an IO statement
+/// Generate calls to end an IO statement.  Return the IOSTAT value, if any.
+/// It is the caller's responsibility to generate branches on that value.
 static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
                             mlir::Location loc, mlir::Value cookie,
-                            const ErrorHandling &eh) {
-  // Terminate IO
+                            const ConditionSpecifierInfo &csi) {
   auto &builder = converter.getFirOpBuilder();
-  if (eh.ioMsg) {
-    TODO(); // eh.ioMsgExpr is never set
-    auto getMsg = getIORuntimeFunc<mkIOKey(GetIoMsg)>(builder);
-    auto var = converter.genExprAddr(eh.ioMsgExpr, loc);
-    mlir::Value varLen{}; // FIXME
-    llvm::SmallVector<mlir::Value, 3> args{cookie, var, varLen};
-    builder.create<mlir::CallOp>(loc, getMsg, args);
+  if (csi.ioMsgExpr) {
+    auto getIoMsg = getIORuntimeFunc<mkIOKey(GetIoMsg)>(builder);
+    auto ioMsgVar = converter.genExprAddr(csi.ioMsgExpr, loc);
+    auto ioMsgVarLen = builder.createUnboxChar(ioMsgVar).second;
+    llvm::SmallVector<mlir::Value, 3> args{cookie, ioMsgVar, ioMsgVarLen};
+    builder.create<mlir::CallOp>(loc, getIoMsg, args);
   }
-  auto endIOFunc = getIORuntimeFunc<mkIOKey(EndIoStatement)>(builder);
+  auto endIoStatement = getIORuntimeFunc<mkIOKey(EndIoStatement)>(builder);
   llvm::SmallVector<mlir::Value, 1> endArgs{cookie};
-  auto call = builder.create<mlir::CallOp>(loc, endIOFunc, endArgs);
-  if (eh.ioStat) {
-    TODO(); // eh.ioStatExpr is never set
-    auto ioStatVar = converter.genExprAddr(eh.ioStatExpr, loc);
-    builder.create<fir::StoreOp>(loc, call.getResult(0), ioStatVar);
+  auto call = builder.create<mlir::CallOp>(loc, endIoStatement, endArgs);
+  if (csi.ioStatExpr) {
+    auto ioStatVar = converter.genExprAddr(csi.ioStatExpr, loc);
+    auto ioStatResult = builder.create<fir::ConvertOp>(
+        loc, converter.genType(*csi.ioStatExpr), call.getResult(0));
+    builder.create<fir::StoreOp>(loc, ioStatResult, ioStatVar);
   }
-  return eh.hasErrorHandlers() ? call.getResult(0) : mlir::Value{};
+  return csi.hasConditionSpecifiers() ? call.getResult(0) : mlir::Value{};
 }
 
 /// Make the next `call` in the IO statement conditional on the result `ok`.  If
@@ -562,36 +564,8 @@ mlir::Value genIOOption<Fortran::parser::IoControlSpec::Rec>(
 }
 
 //===----------------------------------------------------------------------===//
-// Gathering of I/O statement error specifiers (if any).
+// Gather I/O statement condition specifier information (if any).
 //===----------------------------------------------------------------------===//
-
-template <typename A>
-void genErrorOption(ErrorHandling &handle, const A &) {}
-template <>
-void genErrorOption<Fortran::parser::MsgVariable>(
-    ErrorHandling &eh, const Fortran::parser::MsgVariable &) {
-  eh.ioMsg = true;
-}
-template <>
-void genErrorOption<Fortran::parser::StatVariable>(
-    ErrorHandling &eh, const Fortran::parser::StatVariable &) {
-  eh.ioStat = true;
-}
-template <>
-void genErrorOption<Fortran::parser::ErrLabel>(
-    ErrorHandling &eh, const Fortran::parser::ErrLabel &) {
-  eh.err = true;
-}
-template <>
-void genErrorOption<Fortran::parser::EndLabel>(
-    ErrorHandling &eh, const Fortran::parser::EndLabel &) {
-  eh.end = true;
-}
-template <>
-void genErrorOption<Fortran::parser::EorLabel>(
-    ErrorHandling &eh, const Fortran::parser::EorLabel &) {
-  eh.eor = true;
-}
 
 template <typename SEEK, typename A>
 static bool hasX(const A &list) {
@@ -617,7 +591,7 @@ static const Fortran::semantics::SomeExpr *getExpr(const A &stmt) {
 
 /// For each specifier, build the appropriate call, threading the cookie, and
 /// returning the insertion point as to the initial context. If there are no
-/// specs, the insertion point is undefined.
+/// specifiers, the insertion point is undefined.
 template <typename A>
 static mlir::OpBuilder::InsertPoint
 threadSpecs(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
@@ -635,32 +609,43 @@ threadSpecs(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
 }
 
 template <typename A>
-static void threadErrors(Fortran::lower::AbstractConverter &converter,
-                         mlir::Location loc, mlir::Value cookie, const A &list,
-                         ErrorHandling &eh) {
-  for (const auto &spec : list)
-    std::visit(Fortran::common::visitors{[&](const auto &x) {
-                 genErrorOption(eh, x);
-               }},
-               spec.u);
-  if (eh.hasErrorHandlers()) {
-    auto &builder = converter.getFirOpBuilder();
-    mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(EnableHandlers)>(builder);
-    mlir::FunctionType ioFuncTy = ioFunc.getType();
-    auto hasIoStat = builder.create<mlir::ConstantOp>(
-        loc, builder.getIntegerAttr(ioFuncTy.getInput(1), eh.ioStat));
-    auto hasErr = builder.create<mlir::ConstantOp>(
-        loc, builder.getIntegerAttr(ioFuncTy.getInput(2), eh.err));
-    auto hasEnd = builder.create<mlir::ConstantOp>(
-        loc, builder.getIntegerAttr(ioFuncTy.getInput(3), eh.end));
-    auto hasEor = builder.create<mlir::ConstantOp>(
-        loc, builder.getIntegerAttr(ioFuncTy.getInput(4), eh.eor));
-    auto hasIoMsg = builder.create<mlir::ConstantOp>(
-        loc, builder.getIntegerAttr(ioFuncTy.getInput(5), eh.ioMsg));
-    llvm::SmallVector<mlir::Value, 4> ioArgs = {cookie, hasIoStat, hasErr,
-                                                hasEnd, hasEor,    hasIoMsg};
-    builder.create<mlir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
+static void
+genConditionHandlerCall(Fortran::lower::AbstractConverter &converter,
+                        mlir::Location loc, mlir::Value cookie,
+                        const A &specList, ConditionSpecifierInfo &csi) {
+  for (const auto &spec : specList) {
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::StatVariable &msgVar) {
+              csi.ioStatExpr = Fortran::semantics::GetExpr(msgVar);
+            },
+            [&](const Fortran::parser::MsgVariable &msgVar) {
+              csi.ioMsgExpr = Fortran::semantics::GetExpr(msgVar);
+            },
+            [&](const Fortran::parser::EndLabel &) { csi.hasEnd = true; },
+            [&](const Fortran::parser::EorLabel &) { csi.hasEor = true; },
+            [&](const Fortran::parser::ErrLabel &) { csi.hasErr = true; },
+            [](const auto &) {}},
+        spec.u);
   }
+  if (!csi.hasConditionSpecifiers())
+    return;
+  auto &builder = converter.getFirOpBuilder();
+  mlir::FuncOp enableHandlers =
+      getIORuntimeFunc<mkIOKey(EnableHandlers)>(builder);
+  mlir::Type boolType = enableHandlers.getType().getInput(1);
+  auto boolValue = [&](bool specifierIsPresent) {
+    return builder.create<mlir::ConstantOp>(
+        loc, builder.getIntegerAttr(boolType, specifierIsPresent));
+  };
+  llvm::SmallVector<mlir::Value, 6> ioArgs = {
+      cookie,
+      boolValue(csi.ioStatExpr != nullptr),
+      boolValue(csi.hasErr),
+      boolValue(csi.hasEnd),
+      boolValue(csi.hasEor),
+      boolValue(csi.ioMsgExpr != nullptr)};
+  builder.create<mlir::CallOp>(loc, enableHandlers, ioArgs);
 }
 
 //===----------------------------------------------------------------------===//
@@ -883,13 +868,13 @@ static mlir::Value genBasicIOStmt(Fortran::lower::AbstractConverter &converter,
   auto line = getDefaultLineNo(builder, loc, beginFuncTy.getInput(2));
   llvm::SmallVector<mlir::Value, 4> args{un, file, line};
   auto cookie = builder.create<mlir::CallOp>(loc, beginFunc, args).getResult(0);
-  ErrorHandling eh{};
-  threadErrors(converter, loc, cookie, stmt.v, eh);
+  ConditionSpecifierInfo csi{};
+  genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
   mlir::Value ok{};
   auto insertPt = threadSpecs(converter, loc, cookie, stmt.v, ok);
   if (insertPt.isSet())
     builder.restoreInsertionPoint(insertPt);
-  return genEndIO(converter, converter.getCurrentLocation(), cookie, eh);
+  return genEndIO(converter, converter.getCurrentLocation(), cookie, csi);
 }
 
 mlir::Value Fortran::lower::genBackspaceStatement(
@@ -945,13 +930,13 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
   }
   auto cookie =
       builder.create<mlir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-  ErrorHandling eh{};
-  threadErrors(converter, loc, cookie, stmt.v, eh);
+  ConditionSpecifierInfo csi{};
+  genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
   mlir::Value ok{};
   auto insertPt = threadSpecs(converter, loc, cookie, stmt.v, ok);
   if (insertPt.isSet())
     builder.restoreInsertionPoint(insertPt);
-  return genEndIO(converter, loc, cookie, eh);
+  return genEndIO(converter, loc, cookie, csi);
 }
 
 mlir::Value
@@ -981,9 +966,9 @@ Fortran::lower::genWaitStatement(Fortran::lower::AbstractConverter &converter,
         builder.create<fir::ConvertOp>(loc, beginFuncTy.getInput(1), id));
   }
   auto cookie = builder.create<mlir::CallOp>(loc, beginFunc, args).getResult(0);
-  ErrorHandling eh{};
-  threadErrors(converter, loc, cookie, stmt.v, eh);
-  return genEndIO(converter, converter.getCurrentLocation(), cookie, eh);
+  ConditionSpecifierInfo csi{};
+  genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
+  return genEndIO(converter, converter.getCurrentLocation(), cookie, csi);
 }
 
 //===----------------------------------------------------------------------===//
@@ -1195,10 +1180,10 @@ genDataTransfer(Fortran::lower::AbstractConverter &converter, const A &stmt,
   mlir::Value cookie =
       builder.create<mlir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 
-  ErrorHandling eh{};
+  ConditionSpecifierInfo csi{};
   mlir::OpBuilder::InsertPoint insertPt;
   if constexpr (hasIOCtrl) {
-    threadErrors(converter, loc, cookie, stmt.controls, eh);
+    genConditionHandlerCall(converter, loc, cookie, stmt.controls, csi);
     insertPt = threadSpecs(converter, loc, cookie, stmt.controls, ok);
   }
   // process the arguments
@@ -1236,7 +1221,7 @@ genDataTransfer(Fortran::lower::AbstractConverter &converter, const A &stmt,
 
   if (insertPt.isSet())
     builder.restoreInsertionPoint(insertPt);
-  return genEndIO(converter, loc, cookie, eh);
+  return genEndIO(converter, loc, cookie, csi);
 }
 
 void Fortran::lower::genPrintStatement(
