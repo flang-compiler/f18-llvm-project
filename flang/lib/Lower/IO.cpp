@@ -123,9 +123,10 @@ static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
   auto &builder = converter.getFirOpBuilder();
   if (csi.ioMsgExpr) {
     auto getIoMsg = getIORuntimeFunc<mkIOKey(GetIoMsg)>(builder);
-    auto ioMsgVar = converter.genExprAddr(csi.ioMsgExpr, loc);
-    auto ioMsgVarLen = builder.createUnboxChar(ioMsgVar).second;
-    llvm::SmallVector<mlir::Value, 3> args{cookie, ioMsgVar, ioMsgVarLen};
+    auto ioMsgVar =
+        builder.createUnboxChar(converter.genExprAddr(csi.ioMsgExpr, loc));
+    llvm::SmallVector<mlir::Value, 3> args{cookie, ioMsgVar.first,
+                                           ioMsgVar.second};
     builder.create<mlir::CallOp>(loc, getIoMsg, args);
   }
   auto endIoStatement = getIORuntimeFunc<mkIOKey(EndIoStatement)>(builder);
