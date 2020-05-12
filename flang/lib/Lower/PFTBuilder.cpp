@@ -306,13 +306,13 @@ private:
   template <typename A>
   void analyzeIoBranches(lower::pft::Evaluation &eval, const A &stmt) {
     auto processIfLabel{[&](const auto &specs) {
-      using LableNodes =
+      using LabelNodes =
           std::tuple<parser::ErrLabel, parser::EorLabel, parser::EndLabel>;
       for (const auto &spec : specs) {
         const auto *label = std::visit(
             [](const auto &label) -> const parser::Label * {
               using B = std::decay_t<decltype(label)>;
-              if constexpr (common::HasMember<B, LableNodes>) {
+              if constexpr (common::HasMember<B, LabelNodes>) {
                 return &label.v;
               }
               return nullptr;
@@ -381,7 +381,7 @@ private:
   }
 
   /// Mark the exit successor of an Evaluation as a new block.
-  void markExitSuccessorAsNewBlock(lower::pft::Evaluation &eval) {
+  void markSuccessorAsNewBlock(lower::pft::Evaluation &eval) {
     exitSuccessor(eval)->isNewBlock = true;
   }
 
@@ -472,8 +472,16 @@ private:
           },
           [&](const parser::GotoStmt &s) { markBranchTarget(eval, s.v); },
           [&](const parser::IfStmt &) { lastIfStmtEvaluation = &eval; },
-          [&](const parser::ReturnStmt &) { eval.isUnstructured = true; },
-          [&](const parser::StopStmt &) { eval.isUnstructured = true; },
+          [&](const parser::ReturnStmt &) {
+            eval.isUnstructured = true;
+            if (eval.lexicalSuccessor->lexicalSuccessor)
+              markSuccessorAsNewBlock(eval);
+          },
+          [&](const parser::StopStmt &) {
+            eval.isUnstructured = true;
+            if (eval.lexicalSuccessor->lexicalSuccessor)
+              markSuccessorAsNewBlock(eval);
+          },
           [&](const parser::ComputedGotoStmt &s) {
             for (auto &label : std::get<std::list<parser::Label>>(s.t)) {
               markBranchTarget(eval, label);
@@ -513,7 +521,7 @@ private:
             // Although this statement is a branch, it doesn't have any
             // explicit control successors.  So the code at the end of the
             // loop won't mark the exit successor.  Do that here.
-            markExitSuccessorAsNewBlock(eval);
+            markSuccessorAsNewBlock(eval);
           },
 
           // Construct statements
@@ -525,7 +533,6 @@ private:
           },
           [&](const parser::SelectCaseStmt &s) {
             insertConstructName(s, parentConstruct);
-            eval.lexicalSuccessor->isNewBlock = true;
             lastConstructStmtEvaluation = &eval;
           },
           [&](const parser::CaseStmt &) {
@@ -630,12 +637,10 @@ private:
           },
           [&](const parser::SelectRankStmt &s) {
             insertConstructName(s, parentConstruct);
-            eval.lexicalSuccessor->isNewBlock = true;
           },
           [&](const parser::SelectRankCaseStmt &) { eval.isNewBlock = true; },
           [&](const parser::SelectTypeStmt &s) {
             insertConstructName(s, parentConstruct);
-            eval.lexicalSuccessor->isNewBlock = true;
           },
           [&](const parser::TypeGuardStmt &) { eval.isNewBlock = true; },
 
@@ -693,7 +698,7 @@ private:
         // eval is the action substatement of an IfStmt.
         if (eval.lowerAsUnstructured()) {
           eval.isNewBlock = true;
-          markExitSuccessorAsNewBlock(eval);
+          markSuccessorAsNewBlock(eval);
           lastIfStmtEvaluation->isUnstructured = true;
         }
         lastIfStmtEvaluation->controlSuccessor = exitSuccessor(eval);
@@ -715,7 +720,7 @@ private:
       // The lexical successor of a branch starts a new block.
       if (eval.controlSuccessor && eval.isActionStmt() &&
           eval.lowerAsUnstructured()) {
-        markExitSuccessorAsNewBlock(eval);
+        markSuccessorAsNewBlock(eval);
       }
     }
   }
