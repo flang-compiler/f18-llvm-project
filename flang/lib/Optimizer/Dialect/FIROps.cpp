@@ -528,7 +528,7 @@ static ParseResult parseGlobalOp(OpAsmParser &parser, OperationState &result) {
     result.addRegion();
   } else {
     // Parse the optional initializer body.
-    if (parser.parseRegion(*result.addRegion(), llvm::None, llvm::None))
+    if (parser.parseOptionalRegion(*result.addRegion(), llvm::None, llvm::None))
       return failure();
   }
 
