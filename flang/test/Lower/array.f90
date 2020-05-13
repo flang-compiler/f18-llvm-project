@@ -39,7 +39,7 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   ! CHECK-LABEL: BeginExternalListOutput
   ! CHECK: %[[a5:.*]] = fir.convert %arg10 : {{.*}} -> !fir.ref<f32>
   ! CHECK: fir.load %arg5 :
-  ! CHECK: %[[x5:.*]] = subi %{{.*}}, %{{.*}} :
+  ! CHECK: %[[x5:.*]] = addi %{{.*}}, %{{.*}} :
   ! CHECK: fir.coordinate_of %[[a5]], %[[x5]] :
   ! CHECK-LABEL: EndIoStatement
   print *, a5(kk)
@@ -48,9 +48,9 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   ! CHECK: fir.load %arg3 :
   ! CHECK-DAG: %[[x6:.*]] = subi %{{.*}}, %{{.*}} :
   ! CHECK-DAG: fir.load %arg4 :
-  ! CHECK: %[[y6:.*]] = subi %{{.*}}, %{{.*}} :
-  ! CHECK: %[[z6:.*]] = muli %{{.}}, %[[y6]] :
-  ! CHECK: %[[w6:.*]] = addi %[[z6]], %[[x6]] :
+  ! CHECK: %[[y6:.*]] = subi %{{.*}}, %{{.*}} : index
+  ! CHECK: %[[z6:.*]] = muli %{{.*}}, %[[y6]] : index
+  ! CHECK: %[[w6:.*]] = addi %[[z6]], %{{.*}} : index
   ! CHECK: fir.coordinate_of %[[a6]], %[[w6]] :
   ! CHECK-LABEL: EndIoStatement
   print *, a6(ii, jj)
@@ -60,8 +60,8 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   ! CHECK-DAG: %[[x7:.*]] = subi %{{.*}}, %{{.*}} :
   ! CHECK-DAG: fir.load %arg4 :
   ! CHECK: %[[y7:.*]] = subi %{{.*}}, %{{.*}} :
-  ! CHECK: %[[z7:.*]] = muli %[[u7:.*]], %[[y7]] :
-  ! CHECK: %[[w7:.*]] = addi %[[z7]], %[[x7]] :
+  ! CHECK: %[[z7:.*]] = muli %[[u7:.*]], %[[y7]] : index
+  ! CHECK: %[[w7:.*]] = addi %[[z7]], %{{.*}} : index
   ! CHECK-DAG: %[[v7:.*]] = muli %[[u7]], %{{.*}} :
   ! CHECK-DAG: fir.load %arg3 :
   ! CHECK: %[[r7:.*]] = subi %{{.*}}, %{{.*}} :
