@@ -1583,21 +1583,25 @@ private:
     setCurrentPosition(eval.position);
     if (unstructuredContext) {
       // When transitioning from unstructured to structured code,
-      // the structured code might be a target that starts a new block.
+      // the structured code could be a target that starts a new block.
       maybeStartBlock(eval.isConstruct() && eval.lowerAsStructured()
                           ? eval.evaluationList->front().block
                           : eval.block);
     }
+
     eval.visit([&](const auto &stmt) { genFIR(eval, stmt); });
+
     if (unstructuredContext && blockIsUnterminated()) {
       // Exit from an unstructured IF or SELECT construct block.
       Fortran::lower::pft::Evaluation *successor{};
-      if (eval.isActionStmt())
+      if (eval.isActionStmt()) {
         successor = eval.controlSuccessor;
-      else if (eval.isConstruct() &&
-               eval.evaluationList->back()
+      } else if (eval.isConstruct()) {
+        assert(!eval.evaluationList->empty() && "empty construct eval list");
+        if (eval.evaluationList->back()
                    .lexicalSuccessor->isIntermediateConstructStmt())
-        successor = eval.constructExit;
+          successor = eval.constructExit;
+      }
       if (successor && successor->block)
         genBranch(successor->block);
     }
