@@ -87,8 +87,11 @@ using Constructs =
                parser::CriticalConstruct, parser::DoConstruct,
                parser::IfConstruct, parser::SelectRankConstruct,
                parser::SelectTypeConstruct, parser::WhereConstruct,
-               parser::ForallConstruct, parser::CompilerDirective,
-               parser::OpenMPConstruct, parser::OmpEndLoopDirective>;
+               parser::ForallConstruct>;
+
+using Directives =
+    std::tuple<parser::CompilerDirective, parser::OpenMPConstruct,
+               parser::OmpEndLoopDirective>;
 
 template <typename A>
 static constexpr bool isActionStmt{common::HasMember<A, ActionStmts>};
@@ -101,6 +104,9 @@ static constexpr bool isConstructStmt{common::HasMember<A, ConstructStmts>};
 
 template <typename A>
 static constexpr bool isConstruct{common::HasMember<A, Constructs>};
+
+template <typename A>
+static constexpr bool isDirective{common::HasMember<A, Directives>};
 
 template <typename A>
 static constexpr bool isIntermediateConstructStmt{common::HasMember<
@@ -175,7 +181,8 @@ template <typename A>
 using MakeReferenceVariant = typename MakeReferenceVariantHelper<A>::type;
 
 using EvaluationTuple =
-    common::CombineTuples<ActionStmts, OtherStmts, ConstructStmts, Constructs>;
+    common::CombineTuples<ActionStmts, OtherStmts, ConstructStmts, Constructs,
+                          Directives>;
 /// Hide non-nullable pointers to the parse-tree node.
 /// Build type std::variant<const A* const, const B* const, ...>
 /// from EvaluationTuple type (std::tuple<A, B, ...>).
@@ -197,7 +204,8 @@ struct Evaluation : EvaluationVariant {
   template <typename A>
   Evaluation(const A &a, const ParentVariant &parentVariant)
       : EvaluationVariant{a}, parentVariant{parentVariant} {
-    static_assert(pft::isConstruct<A>, "must be a construct");
+    static_assert(pft::isConstruct<A> || pft::isDirective<A>,
+                  "must be a construct or directive");
   }
 
   /// Evaluation classification predicates.
@@ -218,10 +226,12 @@ struct Evaluation : EvaluationVariant {
     return visit(common::visitors{
         [](auto &r) { return pft::isConstruct<std::decay_t<decltype(r)>>; }});
   }
-
-  /// For a construct with multiway control-flow semantics, return true if this
-  /// is one of the alternative condition statements of the construct. For
-  /// example, `ELSE IF` in an `IF` construct.
+  constexpr bool isDirective() const {
+    return visit(common::visitors{
+        [](auto &r) { return pft::isDirective<std::decay_t<decltype(r)>>; }});
+  }
+  /// Return the predicate:  "This is a non-initial, non-terminal construct
+  /// statement."  For an IfConstruct, this is ElseIfStmt and ElseStmt.
   constexpr bool isIntermediateConstructStmt() const {
     return visit(common::visitors{[](auto &r) {
       return pft::isIntermediateConstructStmt<std::decay_t<decltype(r)>>;

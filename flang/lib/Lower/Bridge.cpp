@@ -769,17 +769,16 @@ private:
   /// Generate FIR to begin a structured or unstructured increment loop.
   void genFIRIncrementLoopBegin(IncrementLoopInfo &info) {
     auto location = toLocation();
-    mlir::Type type = info.isStructured()
-                          ? mlir::IndexType::get(builder->getContext())
-                          : info.loopVariableType;
+    mlir::Type type =
+        info.isStructured() ? builder->getIndexType() : info.loopVariableType;
     auto lowerValue = genFIRLoopIndex(info.lowerExpr, type);
     auto upperValue = genFIRLoopIndex(info.upperExpr, type);
     info.stepValue =
         info.stepExpr.has_value()
             ? genFIRLoopIndex(*info.stepExpr, type)
-            : (info.isStructured()
-                   ? builder->create<mlir::ConstantIndexOp>(location, 1)
-                   : builder->createIntegerConstant(info.loopVariableType, 1));
+            : info.isStructured()
+                  ? builder->create<mlir::ConstantIndexOp>(location, 1)
+                  : builder->createIntegerConstant(info.loopVariableType, 1);
     assert(info.stepValue && "step value must be set");
     info.loopVariable = createTemp(location, *info.loopVariableSym);
 
@@ -1275,7 +1274,7 @@ private:
                 auto ty = genType(*sym.symbol);
                 auto load = builder->create<fir::LoadOp>(
                     toLocation(), lookupSymbol(*sym.symbol));
-                auto idxTy = mlir::IndexType::get(&mlirContext);
+                auto idxTy = builder->getIndexType();
                 auto zero = builder->create<mlir::ConstantOp>(
                     toLocation(), idxTy, builder->getIntegerAttr(idxTy, 0));
                 auto cast = builder->createConvert(toLocation(), ty, zero);
@@ -1585,8 +1584,7 @@ private:
     if (unstructuredContext) {
       // When transitioning from unstructured to structured code,
       // the structured code might be a target that starts a new block.
-      maybeStartBlock(eval.isConstruct() && eval.lowerAsStructured() &&
-                              !eval.evaluationList->empty()
+      maybeStartBlock(eval.isConstruct() && eval.lowerAsStructured()
                           ? eval.evaluationList->front().block
                           : eval.block);
     }
@@ -1596,7 +1594,7 @@ private:
       Fortran::lower::pft::Evaluation *successor{};
       if (eval.isActionStmt())
         successor = eval.controlSuccessor;
-      else if (eval.isConstruct() && !eval.evaluationList->empty() &&
+      else if (eval.isConstruct() &&
                eval.evaluationList->back()
                    .lexicalSuccessor->isIntermediateConstructStmt())
         successor = eval.constructExit;
@@ -1949,7 +1947,7 @@ private:
         eval.block = builder->createBlock(&builder->getRegion());
       for (size_t i = 0, n = eval.localBlocks.size(); i < n; ++i)
         eval.localBlocks[i] = builder->createBlock(&builder->getRegion());
-      if (eval.isConstruct()) {
+      if (eval.isConstruct() || eval.isDirective()) {
         if (eval.lowerAsUnstructured()) {
           createEmptyBlocks(*eval.evaluationList);
         } else {

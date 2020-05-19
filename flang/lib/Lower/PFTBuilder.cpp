@@ -74,8 +74,9 @@ public:
   constexpr bool Pre(const A &a) {
     if constexpr (lower::pft::isFunctionLike<A>) {
       return enterFunction(a, semanticsContext);
-    } else if constexpr (lower::pft::isConstruct<A>) {
-      return enterConstruct(a);
+    } else if constexpr (lower::pft::isConstruct<A> ||
+                         lower::pft::isDirective<A>) {
+      return enterConstructOrDirective(a);
     } else if constexpr (UnwrapStmt<A>::isStmt) {
       using T = typename UnwrapStmt<A>::Type;
       // Node "a" being visited has one of the following types:
@@ -101,8 +102,9 @@ public:
   constexpr void Post(const A &) {
     if constexpr (lower::pft::isFunctionLike<A>) {
       exitFunction();
-    } else if constexpr (lower::pft::isConstruct<A>) {
-      exitConstruct();
+    } else if constexpr (lower::pft::isConstruct<A> ||
+                         lower::pft::isDirective<A>) {
+      exitConstructOrDirective();
     }
   }
 
@@ -201,20 +203,20 @@ private:
 
   /// Initialize a new construct and make it the builder's focus.
   template <typename A>
-  bool enterConstruct(const A &construct) {
+  bool enterConstructOrDirective(const A &construct) {
     auto &eval = addEvaluation(
         lower::pft::Evaluation{construct, parentVariantStack.back()});
     eval.evaluationList.reset(new lower::pft::EvaluationList);
     pushEvaluationList(eval.evaluationList.get());
     parentVariantStack.emplace_back(eval);
-    constructStack.emplace_back(&eval);
+    constructAndDirectiveStack.emplace_back(&eval);
     return true;
   }
 
-  void exitConstruct() {
+  void exitConstructOrDirective() {
     popEvaluationList();
     parentVariantStack.pop_back();
-    constructStack.pop_back();
+    constructAndDirectiveStack.pop_back();
   }
 
   /// Reset functionList to an enclosing function's functionList.
@@ -269,8 +271,8 @@ private:
   lower::pft::Evaluation &addEvaluation(lower::pft::Evaluation &&eval) {
     assert(functionList && "not in a function");
     assert(evaluationListStack.size() > 0);
-    if (constructStack.size() > 0) {
-      eval.parentConstruct = constructStack.back();
+    if (constructAndDirectiveStack.size() > 0) {
+      eval.parentConstruct = constructAndDirectiveStack.back();
     }
     evaluationListStack.back()->emplace_back(std::move(eval));
     lower::pft::Evaluation *p = &evaluationListStack.back()->back();
@@ -732,7 +734,7 @@ private:
   /// functionList points to the internal or module procedure function list
   /// of a FunctionLikeUnit or a ModuleLikeUnit.  It may be null.
   std::list<lower::pft::FunctionLikeUnit> *functionList{nullptr};
-  std::vector<lower::pft::Evaluation *> constructStack{};
+  std::vector<lower::pft::Evaluation *> constructAndDirectiveStack{};
   std::vector<lower::pft::Evaluation *> doConstructStack{};
   /// evaluationListStack is the current nested construct evaluationList state.
   std::vector<lower::pft::EvaluationList *> evaluationListStack{};
@@ -780,7 +782,7 @@ public:
     for (lower::pft::Evaluation &eval : evaluationList) {
       llvm::StringRef name{evaluationName(eval)};
       std::string bang{eval.isUnstructured ? "!" : ""};
-      if (eval.isConstruct()) {
+      if (eval.isConstruct() || eval.isDirective()) {
         outputStream << indentString << "<<" << name << bang << ">>";
         if (eval.constructExit) {
           outputStream << " -> " << eval.constructExit->printIndex;
