@@ -235,10 +235,6 @@ public:
   template <typename A>
   mlir::LLVM::LLVMType convertPointerLike(A &ty) {
     mlir::Type eleTy = ty.getEleTy();
-    if (auto seqTy = eleTy.dyn_cast<fir::SequenceType>()) {
-      if (!seqTy.hasConstantShape() && seqTy.hasConstantInterior())
-        return unwrap(convertType(seqTy));
-    }
     return unwrap(convertType(eleTy)).getPointerTo();
   }
 
@@ -266,22 +262,18 @@ public:
 
   // fir.array<c ... :any>  -->  llvm<"[...[c x any]]">
   mlir::LLVM::LLVMType convertSequenceType(fir::SequenceType seq) {
-    if (!seq.hasConstantInterior())
-      llvm_unreachable("cannot lower type to LLVM IR");
     auto baseTy = unwrap(convertType(seq.getEleTy()));
-    auto shape = seq.getShape();
     auto constRows = seq.getConstantRows();
-    if (constRows) {
+    if (seq.hasConstantInterior() && constRows) {
       decltype(constRows) i = constRows;
+      auto shape = seq.getShape();
       for (auto e : shape) {
         baseTy = mlir::LLVM::LLVMType::getArrayTy(baseTy, e);
         if (--i == 0)
           break;
       }
-      if (seq.hasConstantShape())
-        return baseTy;
     }
-    return baseTy.getPointerTo();
+    return baseTy;
   }
 
   // tuple<TS...>  -->  llvm<"{ ts... }">
