@@ -311,12 +311,13 @@ static void genInputItemList(Fortran::lower::AbstractConverter &converter,
       itemAddr = complexPartAddr(0); // real part
     itemAddr = builder.createConvert(loc, argType, itemAddr);
     llvm::SmallVector<mlir::Value, 3> inputFuncArgs = {cookie, itemAddr};
-    if (itemType.isa<mlir::IntegerType>())
+    Fortran::lower::CharacterExprHelper helper{builder, loc};
+    if (helper.isCharacter(itemType))
+      TODO();
+    else if (itemType.isa<mlir::IntegerType>())
       inputFuncArgs.push_back(builder.create<mlir::ConstantOp>(
           loc, builder.getI32IntegerAttr(
                    itemType.cast<mlir::IntegerType>().getWidth() / 8)));
-    // else if (itemType.isa<fir::ASCII>())
-    //   ...
     ok = builder.create<mlir::CallOp>(loc, inputFunc, inputFuncArgs)
              .getResult(0);
     if (complexPartType) { // imaginary part
@@ -1165,9 +1166,9 @@ mlir::FuncOp getBeginDataTransfer(FirOpBuilder &builder, bool isFormatted,
   }
 }
 
-/// Get the arguments of a BeginXyz call.
+/// Generate the arguments of a BeginXyz call.
 template <bool hasIOCtrl, typename A>
-void getBeginCallArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
+void genBeginCallArguments(llvm::SmallVector<mlir::Value, 8> &ioArgs,
                            Fortran::lower::AbstractConverter &converter,
                            mlir::Location loc, const A &stmt,
                            mlir::FunctionType ioFuncTy, bool isFormatted,
@@ -1279,7 +1280,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter, const A &stmt,
 
   // Append BeginXyz call arguments.  File name and line number are always last.
   llvm::SmallVector<mlir::Value, 8> ioArgs;
-  getBeginCallArguments<hasIOCtrl>(ioArgs, converter, loc, stmt, ioFuncTy,
+  genBeginCallArguments<hasIOCtrl>(ioArgs, converter, loc, stmt, ioFuncTy,
                                    isFormatted, isList, isIntern, isOtherIntern,
                                    isAsynch, isNml, labelMap);
   ioArgs.push_back(
