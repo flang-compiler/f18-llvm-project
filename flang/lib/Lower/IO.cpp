@@ -173,9 +173,8 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
   // loop scope.  That is done in genIoLoop, but it is enabled here.
   auto whereOp =
       inIterWhileLoop
-          ? builder.create<fir::WhereOp>(loc, builder.getI1Type(), ok,
-                                         /*withOtherwise=*/inIterWhileLoop)
-          : builder.create<fir::WhereOp>(loc, ok, inIterWhileLoop);
+          ? builder.create<fir::WhereOp>(loc, builder.getI1Type(), ok, true)
+          : builder.create<fir::WhereOp>(loc, ok, /*withOtherwise=*/false);
   if (!insertPt.isSet())
     insertPt = builder.saveInsertionPoint();
   builder.setInsertionPointToStart(&whereOp.whereRegion().front());
