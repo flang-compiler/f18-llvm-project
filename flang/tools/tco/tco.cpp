@@ -85,11 +85,11 @@ static int compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
   fir::KindMapping kindMap{context.get()};
   mlir::PassManager pm{context.get()};
   mlir::applyPassManagerCLOptions(pm);
-  if (passPipeline.hasAnyOccurrences()) {
-    passPipeline.addToPipeline(pm);
-  } else if (emitFir) {
+  if (emitFir) {
     // parse the input and pretty-print it back out
     // -emit-fir intentionally disables all the passes
+  } else if (passPipeline.hasAnyOccurrences()) {
+    passPipeline.addToPipeline(pm);
   } else {
     // add all the passes
     // the user can disable them individually
