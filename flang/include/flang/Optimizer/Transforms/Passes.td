@@ -24,4 +24,28 @@ def AffineDialectPromotion : FunctionPass<"promote-to-affine"> {
   let constructor = "fir::createPromoteToAffinePass()";
 }
 
+def BasicCSE : FunctionPass<"basic-cse"> {
+  let summary = "Basic common sub-expression elimination";
+  let description = [{
+      TODO
+  }];
+  let constructor = "fir::createCSEPass()";
+}
+
+def ControlFlowLowering : FunctionPass<"lower-control-flow"> {
+  let summary = "Convert affine dialect, fir.select_type to standard dialect";
+  let description = [{
+      TODO
+  }];
+  let constructor = "fir::createControlFlowLoweringPass()";
+}
+
+def CFGConversion : FunctionPass<"cfg-conversion"> {
+  let summary = "Convert FIR structured control flow ops to CFG ops.";
+  let description = [{
+      TODO
+  }];
+  let constructor = "fir::createFirToCfgPass()";
+}
+
 #endif // FLANG_OPTIMIZER_TRANSFORMS_PASSES

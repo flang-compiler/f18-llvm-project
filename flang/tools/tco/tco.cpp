@@ -52,7 +52,7 @@ static void printModuleBody(mlir::ModuleOp mod, raw_ostream &output) {
 }
 
 // compile a .fir file
-static int compileFIR() {
+static int compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
   // check that there is a file to load
   ErrorOr<std::unique_ptr<MemoryBuffer>> fileOrErr =
       MemoryBuffer::getFileOrSTDIN(inputFilename);
@@ -85,7 +85,9 @@ static int compileFIR() {
   fir::KindMapping kindMap{context.get()};
   mlir::PassManager pm{context.get()};
   mlir::applyPassManagerCLOptions(pm);
-  if (emitFir) {
+  if (passPipeline.hasAnyOccurrences()) {
+    passPipeline.addToPipeline(pm);
+  } else if (emitFir) {
     // parse the input and pretty-print it back out
     // -emit-fir intentionally disables all the passes
   } else {
@@ -125,11 +127,12 @@ static int compileFIR() {
 int main(int argc, char **argv) {
   fir::registerFIR();
   fir::registerFIRPasses();
+  fir::registerOptTransformPasses();
   [[maybe_unused]] InitLLVM y(argc, argv);
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
   mlir::registerPassManagerCLOptions();
   mlir::PassPipelineCLParser passPipe("", "Compiler passes to run");
   cl::ParseCommandLineOptions(argc, argv, "Tilikum Crossing Optimizer\n");
-  return compileFIR();
+  return compileFIR(passPipe);
 }
