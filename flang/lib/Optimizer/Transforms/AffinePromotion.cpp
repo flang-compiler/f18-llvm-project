@@ -33,13 +33,21 @@ namespace {
 
 class AffineLoopAnalysis {
 public:
-  AffineLoopAnalysis(fir::LoopOp op) : legality(analyzeLoop(op)) {}
+  AffineLoopAnalysis(fir::LoopOp op,
+                     DenseMap<Operation *, AffineLoopAnalysis> &analysisMap)
+      : legality(analyzeLoop(op)) {
+    for (auto loopOp : op.getOps<fir::LoopOp>()) {
+      analysisMap.try_emplace(loopOp, loopOp, analysisMap);
+    }
+  }
   bool canPromoteToAffine() { return legality; }
   Optional<int64_t> step;
 
 private:
   bool legality;
   bool analyzeLoop(fir::LoopOp op) {
+    LLVM_DEBUG(llvm::dbgs()<<"analyzing loop: \n";
+               op.dump(););
     return analyzeStep(op.step()) && analyzeMemoryAccess(op);
   }
   bool analyzeStep(const mlir::Value stepValue) {
@@ -58,13 +66,40 @@ private:
       LLVM_DEBUG(
           llvm::dbgs()
               << "AffineLoopAnalysis: cannot promote loop, step not constant\n";
-          if (stepValue.getDefiningOp()) stepValue.getDefiningOp()->print(
-              llvm::dbgs()));
+          if (stepValue.getDefiningOp()) {
+            stepValue.getDefiningOp()->print(llvm::dbgs());
+          });
       return false;
     }
   }
+  bool analyzeLoad(fir::LoadOp loadOp) {
+    if (auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>()) {
+      if (auto dims = acoOp.dims().getDefiningOp<GenDimsOp>()) {
+        auto arrayRef = acoOp.ref();
+        for (auto coor : acoOp.coor()) {
+          llvm::dbgs() << coor;
+        }
+      } else {
+        LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
+                                   "dims in ArrayCoorOp not from GenDimsOp\n";);
+        return false;
+      }
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
+                                 "loadOp uses non ArrayCoorOp\n";);
+      return false;
+    }
+  }
+  bool analyzeStore(fir::StoreOp storeOp) { return true; }
   bool analyzeMemoryAccess(fir::LoopOp loop) {
-    llvm_unreachable("not yet implemented");
+    for (auto loadOp : loop.getOps<fir::LoadOp>()) {
+      if (!analyzeLoad(loadOp))
+        return false;
+    }
+    for (auto storeOp : loop.getOps<fir::StoreOp>()) {
+      if (!analyzeStore(storeOp))
+        return false;
+    }
     return true;
   }
 };
@@ -74,12 +109,14 @@ class AffineFunctionAnalysis {
 public:
   AffineFunctionAnalysis(mlir::FuncOp funcOp) {
     for (fir::LoopOp op : funcOp.getOps<fir::LoopOp>()) {
-      loopAnalysisMap.try_emplace(op, op);
+      loopAnalysisMap.try_emplace(op, op, loopAnalysisMap);
     }
   }
   AffineLoopAnalysis getChildLoopAnalysis(fir::LoopOp op) const {
     auto it = loopAnalysisMap.find_as(op);
     if (it == loopAnalysisMap.end()) {
+      LLVM_DEBUG(llvm::dbgs() << "AffineFunctionAnalysis: not computed for:\n";
+                 op.dump(););
       op.emitError("error in fetching loop analysis during affine promotion\n");
     } else {
       return it->getSecond();
