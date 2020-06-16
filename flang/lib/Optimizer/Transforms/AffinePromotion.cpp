@@ -30,25 +30,26 @@ static llvm::cl::opt<bool>
 using namespace fir;
 
 namespace {
+class AffineFunctionAnalysis;
+class AffineLoopAnalysis;
 
 class AffineLoopAnalysis {
 public:
-  AffineLoopAnalysis(fir::LoopOp op,
-                     DenseMap<Operation *, AffineLoopAnalysis> &analysisMap)
-      : legality(analyzeLoop(op)) {
-    for (auto loopOp : op.getOps<fir::LoopOp>()) {
-      analysisMap.try_emplace(loopOp, loopOp, analysisMap);
-    }
-  }
+  AffineLoopAnalysis(fir::LoopOp op, AffineFunctionAnalysis &afa)
+      : loopOperation(op), legality(analyzeLoop(afa)) {}
   bool canPromoteToAffine() { return legality; }
   Optional<int64_t> step;
+  friend AffineFunctionAnalysis;
 
 private:
+  fir::LoopOp loopOperation;
   bool legality;
-  bool analyzeLoop(fir::LoopOp op) {
-    LLVM_DEBUG(llvm::dbgs()<<"analyzing loop: \n";
-               op.dump(););
-    return analyzeStep(op.step()) && analyzeMemoryAccess(op);
+  AffineLoopAnalysis(bool forcedLegality) : legality(forcedLegality) {}
+  bool analyzeBody(AffineFunctionAnalysis &);
+  bool analyzeLoop(AffineFunctionAnalysis &functionAnalysis) {
+    LLVM_DEBUG(llvm::dbgs() << "AffinLoopAnalysis: \n"; loopOperation.dump(););
+    return analyzeStep(loopOperation.step()) && analyzeMemoryAccess() &&
+           analyzeBody(functionAnalysis);
   }
   bool analyzeStep(const mlir::Value stepValue) {
     auto stepDefinition = stepValue.getDefiningOp<ConstantOp>();
@@ -72,31 +73,14 @@ private:
       return false;
     }
   }
-  bool analyzeLoad(fir::LoadOp loadOp) {
-    if (auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>()) {
-      if (auto dims = acoOp.dims().getDefiningOp<GenDimsOp>()) {
-        auto arrayRef = acoOp.ref();
-        for (auto coor : acoOp.coor()) {
-          llvm::dbgs() << coor;
-        }
-      } else {
-        LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
-                                   "dims in ArrayCoorOp not from GenDimsOp\n";);
-        return false;
-      }
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
-                                 "loadOp uses non ArrayCoorOp\n";);
-      return false;
-    }
-  }
-  bool analyzeStore(fir::StoreOp storeOp) { return true; }
-  bool analyzeMemoryAccess(fir::LoopOp loop) {
-    for (auto loadOp : loop.getOps<fir::LoadOp>()) {
+  bool analyzeLoad(fir::LoadOp);
+  bool analyzeStore(fir::StoreOp);
+  bool analyzeMemoryAccess() {
+    for (auto loadOp : loopOperation.getOps<fir::LoadOp>()) {
       if (!analyzeLoad(loadOp))
         return false;
     }
-    for (auto storeOp : loop.getOps<fir::StoreOp>()) {
+    for (auto storeOp : loopOperation.getOps<fir::StoreOp>()) {
       if (!analyzeStore(storeOp))
         return false;
     }
@@ -109,7 +93,7 @@ class AffineFunctionAnalysis {
 public:
   AffineFunctionAnalysis(mlir::FuncOp funcOp) {
     for (fir::LoopOp op : funcOp.getOps<fir::LoopOp>()) {
-      loopAnalysisMap.try_emplace(op, op, loopAnalysisMap);
+      loopAnalysisMap.try_emplace(op, op, *this);
     }
   }
   AffineLoopAnalysis getChildLoopAnalysis(fir::LoopOp op) const {
@@ -117,15 +101,62 @@ public:
     if (it == loopAnalysisMap.end()) {
       LLVM_DEBUG(llvm::dbgs() << "AffineFunctionAnalysis: not computed for:\n";
                  op.dump(););
-      op.emitError("error in fetching loop analysis during affine promotion\n");
+      op.emitError("error in fetching loop analysis in AffineFunctionAnalysis\n");
+      return AffineLoopAnalysis(false);
     } else {
       return it->getSecond();
     }
   }
+  friend AffineLoopAnalysis;
 
 private:
-  DenseMap<mlir::Operation *, AffineLoopAnalysis> loopAnalysisMap;
+  llvm::DenseMap<mlir::Operation *, AffineLoopAnalysis> loopAnalysisMap;
 };
+
+bool AffineLoopAnalysis::analyzeLoad(fir::LoadOp loadOp) {
+  if (auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>()) {
+    for (auto coordinate : acoOp.coor()) {
+      if (auto blockArg = coordinate.dyn_cast<mlir::BlockArgument>()) {
+        if (isa<fir::LoopOp>(blockArg.getOwner()->getParentOp())) {
+          continue;
+        } else {
+          llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a "
+                          "loop induction variable (owner not loopOp)\n";
+          return false;
+        }
+      } else {
+        llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a loop "
+                        "induction variable (not a block argument)\n";
+        return false;
+      }
+    }
+
+    if (auto dims = acoOp.dims().getDefiningOp<GenDimsOp>()) {
+
+      return true;
+    } else {
+      LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
+                                 "dims in ArrayCoorOp not from GenDimsOp\n";);
+      return false;
+    }
+  } else {
+    LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
+                               "loadOp uses non ArrayCoorOp\n";);
+    return false;
+  }
+}
+bool AffineLoopAnalysis::analyzeStore(fir::StoreOp storeOp) { return true; }
+
+bool AffineLoopAnalysis::analyzeBody(AffineFunctionAnalysis &functionAnalysis) {
+  for (auto loopOp : loopOperation.getOps<fir::LoopOp>()) {
+    auto analysis = functionAnalysis.loopAnalysisMap
+                        .try_emplace(loopOp, loopOp, functionAnalysis)
+                        .first->getSecond();
+    if (!analysis.canPromoteToAffine())
+      return false;
+  }
+  return true;
+}
 
 /// Convert `fir.loop` to `affine.for`
 class AffineLoopConversion : public mlir::OpRewritePattern<fir::LoopOp> {
@@ -137,6 +168,8 @@ public:
   mlir::LogicalResult
   matchAndRewrite(fir::LoopOp loop,
                   mlir::PatternRewriter &rewriter) const override {
+    LLVM_DEBUG(llvm::dbgs() << "AffineLoopConversion: rewriting loop:\n";
+               loop.dump(););
     auto loopAnalysis = functionAnalysis.getChildLoopAnalysis(loop);
     if (loopAnalysis.step.getValue() <= 0) {
       LLVM_DEBUG(llvm::dbgs()
@@ -144,7 +177,7 @@ public:
                         "step not postive\n";);
       return failure();
     }
-    auto loopOps = &loop.getBody()->getOperations();
+    auto &loopOps = loop.getBody()->getOperations();
     for (auto loadOp : loop.getOps<fir::LoadOp>()) {
       if (failed(rewriteLoad(loadOp, rewriter)))
         return failure();
@@ -155,13 +188,21 @@ public:
         ValueRange(loop.upperBound()),
         AffineMap::getMultiDimIdentityMap(1, loop.getContext()),
         loopAnalysis.step.getValue());
-    loop.step().dropAllUses();
-    loop.getBody()->getOperations().pop_back(); // remove fir.result
+
+    rewriter.startRootUpdate(affineFor.getOperation());
     affineFor.getBody()->getOperations().splice(affineFor.getBody()->begin(),
-                                                *loopOps, loopOps->begin(),
-                                                loopOps->end());
-    rewriter.eraseOp(loop);
+                                                loopOps, loopOps.begin(),
+                                                --loopOps.end());
+    rewriter.finalizeRootUpdate(affineFor.getOperation());
+
+    rewriter.startRootUpdate(loop.getOperation());
     loop.getInductionVar().replaceAllUsesWith(affineFor.getInductionVar());
+    rewriter.finalizeRootUpdate(loop.getOperation());
+
+    rewriter.replaceOp(loop, affineFor.getOperation()->getResults());
+
+    LLVM_DEBUG(llvm::dbgs() << "AffineLoopConversion: loop rewriten to:\n";
+               affineFor.dump(););
     return success();
   }
 
