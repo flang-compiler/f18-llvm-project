@@ -36,20 +36,23 @@ class AffineLoopAnalysis;
 class AffineLoopAnalysis {
 public:
   AffineLoopAnalysis(fir::LoopOp op, AffineFunctionAnalysis &afa)
-      : loopOperation(op), legality(analyzeLoop(afa)) {}
+      : legality(analyzeLoop(op, afa)) {}
   bool canPromoteToAffine() { return legality; }
   Optional<int64_t> step;
   friend AffineFunctionAnalysis;
 
 private:
-  fir::LoopOp loopOperation;
   bool legality;
+  struct MemoryLoadAnalysis {};
+  DenseMap<Operation *, MemoryLoadAnalysis> loadAnalysis;
   AffineLoopAnalysis(bool forcedLegality) : legality(forcedLegality) {}
-  bool analyzeBody(AffineFunctionAnalysis &);
-  bool analyzeLoop(AffineFunctionAnalysis &functionAnalysis) {
+  bool analyzeBody(fir::LoopOp, AffineFunctionAnalysis &);
+  bool analyzeLoop(fir::LoopOp loopOperation,
+                   AffineFunctionAnalysis &functionAnalysis) {
     LLVM_DEBUG(llvm::dbgs() << "AffinLoopAnalysis: \n"; loopOperation.dump(););
-    return analyzeStep(loopOperation.step()) && analyzeMemoryAccess() &&
-           analyzeBody(functionAnalysis);
+    return analyzeStep(loopOperation.step()) &&
+           analyzeMemoryAccess(loopOperation) &&
+           analyzeBody(loopOperation, functionAnalysis);
   }
   bool analyzeStep(const mlir::Value stepValue) {
     auto stepDefinition = stepValue.getDefiningOp<ConstantOp>();
@@ -75,7 +78,7 @@ private:
   }
   bool analyzeLoad(fir::LoadOp);
   bool analyzeStore(fir::StoreOp);
-  bool analyzeMemoryAccess() {
+  bool analyzeMemoryAccess(fir::LoopOp loopOperation) {
     for (auto loadOp : loopOperation.getOps<fir::LoadOp>()) {
       if (!analyzeLoad(loadOp))
         return false;
@@ -101,7 +104,8 @@ public:
     if (it == loopAnalysisMap.end()) {
       LLVM_DEBUG(llvm::dbgs() << "AffineFunctionAnalysis: not computed for:\n";
                  op.dump(););
-      op.emitError("error in fetching loop analysis in AffineFunctionAnalysis\n");
+      op.emitError(
+          "error in fetching loop analysis in AffineFunctionAnalysis\n");
       return AffineLoopAnalysis(false);
     } else {
       return it->getSecond();
@@ -112,42 +116,44 @@ public:
 private:
   llvm::DenseMap<mlir::Operation *, AffineLoopAnalysis> loopAnalysisMap;
 };
-
+bool analyzeCoordinate(mlir::Value coordinate) {
+  if (auto blockArg = coordinate.dyn_cast<mlir::BlockArgument>()) {
+    if (isa<fir::LoopOp>(blockArg.getOwner()->getParentOp())) {
+      return true;
+    } else {
+      llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a "
+                      "loop induction variable (owner not loopOp)\n";
+      return false;
+    }
+  } else {
+    llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a loop "
+                    "induction variable (not a block argument)\n";
+    return false;
+  }
+}
 bool AffineLoopAnalysis::analyzeLoad(fir::LoadOp loadOp) {
+  bool canPromote = true;
   if (auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>()) {
     for (auto coordinate : acoOp.coor()) {
-      if (auto blockArg = coordinate.dyn_cast<mlir::BlockArgument>()) {
-        if (isa<fir::LoopOp>(blockArg.getOwner()->getParentOp())) {
-          continue;
-        } else {
-          llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a "
-                          "loop induction variable (owner not loopOp)\n";
-          return false;
-        }
-      } else {
-        llvm::dbgs() << "AffineLoopAnalysis: array coordinate is not a loop "
-                        "induction variable (not a block argument)\n";
-        return false;
-      }
+      canPromote = canPromote && analyzeCoordinate(coordinate);
     }
-
-    if (auto dims = acoOp.dims().getDefiningOp<GenDimsOp>()) {
-
-      return true;
+    if (auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>()) {
     } else {
       LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
                                  "dims in ArrayCoorOp not from GenDimsOp\n";);
-      return false;
+      canPromote = false;
     }
   } else {
     LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
                                "loadOp uses non ArrayCoorOp\n";);
-    return false;
+    canPromote = false;
   }
+  return canPromote;
 }
 bool AffineLoopAnalysis::analyzeStore(fir::StoreOp storeOp) { return true; }
 
-bool AffineLoopAnalysis::analyzeBody(AffineFunctionAnalysis &functionAnalysis) {
+bool AffineLoopAnalysis::analyzeBody(fir::LoopOp loopOperation,
+                                     AffineFunctionAnalysis &functionAnalysis) {
   for (auto loopOp : loopOperation.getOps<fir::LoopOp>()) {
     auto analysis = functionAnalysis.loopAnalysisMap
                         .try_emplace(loopOp, loopOp, functionAnalysis)
@@ -156,6 +162,40 @@ bool AffineLoopAnalysis::analyzeBody(AffineFunctionAnalysis &functionAnalysis) {
       return false;
   }
   return true;
+}
+
+unsigned affineSymbolPosition(unsigned i) { return i == 0 ? 0 : (i - 1) * 3; }
+mlir::AffineExpr createArrayIndexExtent(unsigned i, MLIRContext *c) {
+  if (i == 0) {
+    return mlir::getAffineConstantExpr(1, c);
+  } else {
+    auto lowerBound = mlir::getAffineSymbolExpr(affineSymbolPosition(i), c),
+         upperBound = mlir::getAffineSymbolExpr(affineSymbolPosition(i) + 1, c),
+         stride = mlir::getAffineSymbolExpr(affineSymbolPosition(i) + 2, c);
+    return (upperBound - lowerBound + 1) * stride *
+           createArrayIndexExtent(i - 1, c);
+  }
+}
+mlir::AffineExpr createArrayIndexDimensionPart(unsigned i, MLIRContext *c) {
+  mlir::AffineExpr index = mlir::getAffineDimExpr(i - 1, c),
+                   lowerBound =
+                       mlir::getAffineSymbolExpr(affineSymbolPosition(i), c),
+                   extent = createArrayIndexExtent(i - 1, c);
+
+  return (index - lowerBound) * extent;
+}
+mlir::AffineExpr createArrayIndexAffineExpr(unsigned d, MLIRContext *c) {
+  if (d == 0) {
+    return mlir::getAffineConstantExpr(0, c);
+  } else {
+    return createArrayIndexDimensionPart(d, c) +
+           createArrayIndexAffineExpr(d - 1, c);
+  }
+}
+mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
+                                          MLIRContext *context) {
+  return mlir::AffineMap::get(dimensions, dimensions * 3,
+                              createArrayIndexAffineExpr(dimensions, context));
 }
 
 /// Convert `fir.loop` to `affine.for`
@@ -209,6 +249,12 @@ public:
 private:
   mlir::LogicalResult rewriteLoad(fir::LoadOp op,
                                   mlir::PatternRewriter &rewriter) const {
+    if (auto acoOp = op.memref().getDefiningOp<ArrayCoorOp>()) {
+      llvm::dbgs() << "array load affine expr:\n";
+      unsigned d = acoOp.coor().size();
+      createArrayIndexAffineMap(d, op.getContext()).dump();
+      createArrayIndexAffineMap(3, op.getContext()).dump();
+    }
     return success();
   }
   AffineFunctionAnalysis &functionAnalysis;
