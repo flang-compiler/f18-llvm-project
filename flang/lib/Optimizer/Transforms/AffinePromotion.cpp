@@ -164,38 +164,20 @@ bool AffineLoopAnalysis::analyzeBody(fir::LoopOp loopOperation,
   return true;
 }
 
-unsigned affineSymbolPosition(unsigned i) { return i == 0 ? 0 : (i - 1) * 3; }
-mlir::AffineExpr createArrayIndexExtent(unsigned i, MLIRContext *c) {
-  if (i == 0) {
-    return mlir::getAffineConstantExpr(1, c);
-  } else {
-    auto lowerBound = mlir::getAffineSymbolExpr(affineSymbolPosition(i), c),
-         upperBound = mlir::getAffineSymbolExpr(affineSymbolPosition(i) + 1, c),
-         stride = mlir::getAffineSymbolExpr(affineSymbolPosition(i) + 2, c);
-    return (upperBound - lowerBound + 1) * stride *
-           createArrayIndexExtent(i - 1, c);
-  }
-}
-mlir::AffineExpr createArrayIndexDimensionPart(unsigned i, MLIRContext *c) {
-  mlir::AffineExpr index = mlir::getAffineDimExpr(i - 1, c),
-                   lowerBound =
-                       mlir::getAffineSymbolExpr(affineSymbolPosition(i), c),
-                   extent = createArrayIndexExtent(i - 1, c);
-
-  return (index - lowerBound) * extent;
-}
-mlir::AffineExpr createArrayIndexAffineExpr(unsigned d, MLIRContext *c) {
-  if (d == 0) {
-    return mlir::getAffineConstantExpr(0, c);
-  } else {
-    return createArrayIndexDimensionPart(d, c) +
-           createArrayIndexAffineExpr(d - 1, c);
-  }
-}
 mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
                                           MLIRContext *context) {
-  return mlir::AffineMap::get(dimensions, dimensions * 3,
-                              createArrayIndexAffineExpr(dimensions, context));
+  auto index = mlir::getAffineConstantExpr(0, context);
+  auto extent = mlir::getAffineConstantExpr(1, context);
+  for (unsigned i = 0; i < dimensions; ++i) {
+    mlir::AffineExpr idx = mlir::getAffineDimExpr(i, context),
+                     lowerBound = mlir::getAffineSymbolExpr(i * 3, context),
+                     upperBound = mlir::getAffineSymbolExpr(i * 3 + 1, context),
+                     stride = mlir::getAffineSymbolExpr(i * 3 + 2, context),
+                     currentPart = (idx - lowerBound) * extent;
+    index = currentPart + index;
+    extent = (upperBound - lowerBound + 1) * stride * extent;
+  }
+  return mlir::AffineMap::get(dimensions, dimensions * 3, index);
 }
 
 /// Convert `fir.loop` to `affine.for`
