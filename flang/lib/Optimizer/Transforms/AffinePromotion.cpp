@@ -77,15 +77,14 @@ private:
       return false;
     }
   }
-  bool analyzeLoad(fir::LoadOp);
-  bool analyzeStore(fir::StoreOp);
+  bool analyzeArrayReference(mlir::Value);
   bool analyzeMemoryAccess(fir::LoopOp loopOperation) {
     for (auto loadOp : loopOperation.getOps<fir::LoadOp>()) {
-      if (!analyzeLoad(loadOp))
+      if (!analyzeArrayReference(loadOp.memref()))
         return false;
     }
     for (auto storeOp : loopOperation.getOps<fir::StoreOp>()) {
-      if (!analyzeStore(storeOp))
+      if (!analyzeArrayReference(storeOp.memref()))
         return false;
     }
     return true;
@@ -132,9 +131,9 @@ bool analyzeCoordinate(mlir::Value coordinate) {
     return false;
   }
 }
-bool AffineLoopAnalysis::analyzeLoad(fir::LoadOp loadOp) {
+bool AffineLoopAnalysis::analyzeArrayReference(mlir::Value arrayRef) {
   bool canPromote = true;
-  if (auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>()) {
+  if (auto acoOp = arrayRef.getDefiningOp<ArrayCoorOp>()) {
     for (auto coordinate : acoOp.coor()) {
       canPromote = canPromote && analyzeCoordinate(coordinate);
     }
@@ -146,12 +145,12 @@ bool AffineLoopAnalysis::analyzeLoad(fir::LoadOp loadOp) {
     }
   } else {
     LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
-                               "loadOp uses non ArrayCoorOp\n";);
+                               "array reference uses non ArrayCoorOp\n";);
     canPromote = false;
   }
   return canPromote;
+
 }
-bool AffineLoopAnalysis::analyzeStore(fir::StoreOp storeOp) { return true; }
 
 bool AffineLoopAnalysis::analyzeBody(fir::LoopOp loopOperation,
                                      AffineFunctionAnalysis &functionAnalysis) {
@@ -221,6 +220,11 @@ public:
           return failure();
         }
       }
+      if (isa<fir::StoreOp>(bodyOp)) {
+        if (failed(rewriteStore(cast<fir::StoreOp>(bodyOp), rewriter))) {
+          return failure();
+        }
+      }
     }
 
     rewriter.startRootUpdate(loop.getOperation());
@@ -244,27 +248,40 @@ private:
     op.emitError(
         "AffineLoopConversion: array type in coordinate operation not valid\n");
   }
-  mlir::LogicalResult rewriteLoad(fir::LoadOp loadOp,
-                                  mlir::PatternRewriter &rewriter) const {
-    auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>();
+  std::pair<mlir::AffineApplyOp, fir::ConvertOp>
+  createAffineOps(mlir::Value arrayRef,
+                  mlir::PatternRewriter &rewriter) const {
+    auto acoOp = arrayRef.getDefiningOp<ArrayCoorOp>();
     auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>();
-    rewriter.setInsertionPoint(loadOp);
     auto affineMap =
-        createArrayIndexAffineMap(acoOp.coor().size(), loadOp.getContext());
+        createArrayIndexAffineMap(acoOp.coor().size(), acoOp.getContext());
     SmallVector<mlir::Value, 4> indexArgs;
     indexArgs.append(acoOp.coor().begin(), acoOp.coor().end());
     indexArgs.append(genDim.triples().begin(), genDim.triples().end());
-
-    auto newIndex = rewriter.create<mlir::AffineApplyOp>(acoOp.getLoc(),
-                                                         affineMap, indexArgs);
+    auto affineApply = rewriter.create<mlir::AffineApplyOp>(
+        acoOp.getLoc(), affineMap, indexArgs);
     auto arrayElementType = coordinateArrayElement(acoOp);
     auto newType = mlir::MemRefType::get({-1}, arrayElementType);
-    auto newArray =
+    auto arrayConvert =
         rewriter.create<fir::ConvertOp>(acoOp.getLoc(), newType, acoOp.ref());
-    auto newLoad = rewriter.create<mlir::AffineLoadOp>(
-        loadOp.getLoc(), newArray.getResult(), newIndex.getResult());
+    return std::make_pair(affineApply, arrayConvert);
+  }
 
-    rewriter.replaceOp(loadOp, newLoad.getResult());
+  mlir::LogicalResult rewriteLoad(fir::LoadOp loadOp,
+                                  mlir::PatternRewriter &rewriter) const {
+    rewriter.setInsertionPoint(loadOp);
+    auto affineOps = createAffineOps(loadOp.memref(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::AffineLoadOp>(
+        loadOp, affineOps.second.getResult(), affineOps.first.getResult());
+    return success();
+  }
+  mlir::LogicalResult rewriteStore(fir::StoreOp storeOp,
+                                   mlir::PatternRewriter &rewriter) const {
+    rewriter.setInsertionPoint(storeOp);
+    auto affineOps = createAffineOps(storeOp.memref(), rewriter);
+    rewriter.replaceOpWithNewOp<mlir::AffineStoreOp>(
+        storeOp, storeOp.value(), affineOps.second.getResult(),
+        affineOps.first.getResult());
     return success();
   }
   AffineFunctionAnalysis &functionAnalysis;
