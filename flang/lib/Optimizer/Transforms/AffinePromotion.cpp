@@ -10,6 +10,7 @@
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
 #include "flang/Optimizer/Transforms/Passes.h"
+#include "flang/Optimizer/Dialect/FIRType.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -200,10 +201,7 @@ public:
       return failure();
     }
     auto &loopOps = loop.getBody()->getOperations();
-    for (auto loadOp : loop.getOps<fir::LoadOp>()) {
-      if (failed(rewriteLoad(loadOp, rewriter)))
-        return failure();
-    }
+
     auto affineFor = rewriter.create<mlir::AffineForOp>(
         loop.getLoc(), ValueRange(loop.lowerBound()),
         AffineMap::getMultiDimIdentityMap(1, loop.getContext()),
@@ -217,6 +215,14 @@ public:
                                                 --loopOps.end());
     rewriter.finalizeRootUpdate(affineFor.getOperation());
 
+    for (auto &bodyOp : affineFor.getBody()->getOperations()) {
+      if (isa<fir::LoadOp>(bodyOp)) {
+        if (failed(rewriteLoad(cast<fir::LoadOp>(bodyOp), rewriter))) {
+          return failure();
+        }
+      }
+    }
+
     rewriter.startRootUpdate(loop.getOperation());
     loop.getInductionVar().replaceAllUsesWith(affineFor.getInductionVar());
     rewriter.finalizeRootUpdate(loop.getOperation());
@@ -229,14 +235,23 @@ public:
   }
 
 private:
-  mlir::LogicalResult rewriteLoad(fir::LoadOp op,
+  mlir::LogicalResult rewriteLoad(fir::LoadOp loadOp,
                                   mlir::PatternRewriter &rewriter) const {
-    if (auto acoOp = op.memref().getDefiningOp<ArrayCoorOp>()) {
-      llvm::dbgs() << "array load affine expr:\n";
-      unsigned d = acoOp.coor().size();
-      createArrayIndexAffineMap(d, op.getContext()).dump();
-      createArrayIndexAffineMap(3, op.getContext()).dump();
-    }
+    auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>();
+    auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>();
+    rewriter.setInsertionPoint(loadOp);
+    auto affineMap = createArrayIndexAffineMap(acoOp.coor().size(), loadOp.getContext());
+    SmallVector<mlir::Value, 4> indexArgs;
+    indexArgs.append(acoOp.coor().begin(), acoOp.coor().end());
+    indexArgs.append(genDim.triples().begin(), genDim.triples().end());
+
+    auto newIndex = rewriter.create<mlir::AffineApplyOp>(acoOp.getLoc(), affineMap, indexArgs);
+    auto arrayElementType = acoOp.ref().getType().dyn_cast<ReferenceType>().getEleTy().dyn_cast<SequenceType>().getEleTy();
+    auto newType = mlir::MemRefType::get({-1}, arrayElementType);
+    auto newArray = rewriter.create<fir::ConvertOp>(acoOp.getLoc(), newType, acoOp.ref());
+    auto newLoad = rewriter.create<mlir::AffineLoadOp>(loadOp.getLoc(), newArray.getResult(), newIndex.getResult());
+
+    rewriter.replaceOp(loadOp, newLoad.getResult());
     return success();
   }
   AffineFunctionAnalysis &functionAnalysis;
