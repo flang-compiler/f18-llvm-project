@@ -234,6 +234,12 @@ struct Evaluation : EvaluationVariant {
     return visit(common::visitors{
         [](auto &r) { return pft::isDirective<std::decay_t<decltype(r)>>; }});
   }
+  constexpr bool isNopConstructStmt() const {
+    return visit(common::visitors{[](auto &r) {
+      return pft::isNopConstructStmt<std::decay_t<decltype(r)>>;
+    }});
+  }
+
   /// Return the predicate:  "This is a non-initial, non-terminal construct
   /// statement."  For an IfConstruct, this is ElseIfStmt and ElseStmt.
   constexpr bool isIntermediateConstructStmt() const {
@@ -241,21 +247,27 @@ struct Evaluation : EvaluationVariant {
       return pft::isIntermediateConstructStmt<std::decay_t<decltype(r)>>;
     }});
   }
-  constexpr bool isNopConstructStmt() const {
-    return visit(common::visitors{[](auto &r) {
-      return pft::isNopConstructStmt<std::decay_t<decltype(r)>>;
-    }});
-  }
 
-  /// Return nested evaluation list that may be empty.
-  EvaluationList &getNestedEvaluations() {
-    assert(evaluationList && "no nested evaluations");
-    return *evaluationList;
+  /// Return the first non-nop successor of an evaluation, possibly exiting
+  /// from one or more enclosing constructs.
+  Evaluation *nonNopSuccessor() const {
+    Evaluation *successor = lexicalSuccessor;
+    if (successor && successor->isNopConstructStmt()) {
+      successor = successor->parentConstruct->constructExit;
+    }
+    assert(successor && "missing successor");
+    return successor;
   }
 
   /// Return true if this Evaluation has at least one nested evaluation.
   bool hasNestedEvaluations() const {
     return evaluationList && !evaluationList->empty();
+  }
+
+  /// Return nested evaluation list.
+  EvaluationList &getNestedEvaluations() {
+    assert(evaluationList && "no nested evaluations");
+    return *evaluationList;
   }
 
   Evaluation &getFirstNestedEvaluation() {
@@ -268,8 +280,7 @@ struct Evaluation : EvaluationVariant {
     return evaluationList->back();
   }
 
-  /// Return FunctionLikeUnit to which this evaluation
-  /// belongs. Nullptr if it does not belong to such unit.
+  /// Return the FunctionLikeUnit containing this evaluation (or nullptr).
   FunctionLikeUnit *getOwningProcedure() const;
 
   bool lowerAsStructured() const;
@@ -318,9 +329,9 @@ struct Evaluation : EvaluationVariant {
   Evaluation *controlSuccessor{nullptr}; // set for some statements
   Evaluation *constructExit{nullptr};    // set for constructs
   bool isNewBlock{false};                // evaluation begins a new basic block
-  bool isUnstructured{false};        // evaluation has unstructured control flow
-  bool skip{false};                  // evaluation has been processed in advance
-  class mlir::Block *block{nullptr}; // isNewBlock block
+  bool isUnstructured{false};  // evaluation has unstructured control flow
+  bool skip{false};            // evaluation has been processed in advance
+  mlir::Block *block{nullptr}; // isNewBlock block
   llvm::SmallVector<mlir::Block *, 1> localBlocks{}; // construct local blocks
   int printIndex{0}; // (ActionStmt, ConstructStmt) evaluation index for dumps
 };
