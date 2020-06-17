@@ -9,8 +9,8 @@
 #include "PassDetail.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
-#include "flang/Optimizer/Transforms/Passes.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
+#include "flang/Optimizer/Transforms/Passes.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/Attributes.h"
@@ -235,21 +235,34 @@ public:
   }
 
 private:
+  mlir::Type coordinateArrayElement(fir::ArrayCoorOp op) const {
+    if (auto refType = op.ref().getType().dyn_cast_or_null<ReferenceType>()) {
+      if (auto seqType = refType.getEleTy().dyn_cast_or_null<SequenceType>()) {
+        return seqType.getEleTy();
+      }
+    }
+    op.emitError(
+        "AffineLoopConversion: array type in coordinate operation not valid\n");
+  }
   mlir::LogicalResult rewriteLoad(fir::LoadOp loadOp,
                                   mlir::PatternRewriter &rewriter) const {
     auto acoOp = loadOp.memref().getDefiningOp<ArrayCoorOp>();
     auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>();
     rewriter.setInsertionPoint(loadOp);
-    auto affineMap = createArrayIndexAffineMap(acoOp.coor().size(), loadOp.getContext());
+    auto affineMap =
+        createArrayIndexAffineMap(acoOp.coor().size(), loadOp.getContext());
     SmallVector<mlir::Value, 4> indexArgs;
     indexArgs.append(acoOp.coor().begin(), acoOp.coor().end());
     indexArgs.append(genDim.triples().begin(), genDim.triples().end());
 
-    auto newIndex = rewriter.create<mlir::AffineApplyOp>(acoOp.getLoc(), affineMap, indexArgs);
-    auto arrayElementType = acoOp.ref().getType().dyn_cast<ReferenceType>().getEleTy().dyn_cast<SequenceType>().getEleTy();
+    auto newIndex = rewriter.create<mlir::AffineApplyOp>(acoOp.getLoc(),
+                                                         affineMap, indexArgs);
+    auto arrayElementType = coordinateArrayElement(acoOp);
     auto newType = mlir::MemRefType::get({-1}, arrayElementType);
-    auto newArray = rewriter.create<fir::ConvertOp>(acoOp.getLoc(), newType, acoOp.ref());
-    auto newLoad = rewriter.create<mlir::AffineLoadOp>(loadOp.getLoc(), newArray.getResult(), newIndex.getResult());
+    auto newArray =
+        rewriter.create<fir::ConvertOp>(acoOp.getLoc(), newType, acoOp.ref());
+    auto newLoad = rewriter.create<mlir::AffineLoadOp>(
+        loadOp.getLoc(), newArray.getResult(), newIndex.getResult());
 
     rewriter.replaceOp(loadOp, newLoad.getResult());
     return success();
