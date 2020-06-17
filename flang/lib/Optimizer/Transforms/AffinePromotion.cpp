@@ -149,7 +149,6 @@ bool AffineLoopAnalysis::analyzeArrayReference(mlir::Value arrayRef) {
     canPromote = false;
   }
   return canPromote;
-
 }
 
 bool AffineLoopAnalysis::analyzeBody(fir::LoopOp loopOperation,
@@ -249,8 +248,7 @@ private:
         "AffineLoopConversion: array type in coordinate operation not valid\n");
   }
   std::pair<mlir::AffineApplyOp, fir::ConvertOp>
-  createAffineOps(mlir::Value arrayRef,
-                  mlir::PatternRewriter &rewriter) const {
+  createAffineOps(mlir::Value arrayRef, mlir::PatternRewriter &rewriter) const {
     auto acoOp = arrayRef.getDefiningOp<ArrayCoorOp>();
     auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>();
     auto affineMap =
