@@ -250,13 +250,13 @@ struct Evaluation : EvaluationVariant {
 
   /// Return the first non-nop successor of an evaluation, possibly exiting
   /// from one or more enclosing constructs.
-  Evaluation *nonNopSuccessor() const {
+  Evaluation &nonNopSuccessor() const {
     Evaluation *successor = lexicalSuccessor;
     if (successor && successor->isNopConstructStmt()) {
       successor = successor->parentConstruct->constructExit;
     }
     assert(successor && "missing successor");
-    return successor;
+    return *successor;
   }
 
   /// Return true if this Evaluation has at least one nested evaluation.

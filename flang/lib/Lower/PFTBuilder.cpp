@@ -355,7 +355,7 @@ private:
 
   /// Set the exit of a construct, possibly from multiple enclosing constructs.
   void setConstructExit(lower::pft::Evaluation &eval) {
-    eval.constructExit = eval.evaluationList->back().nonNopSuccessor();
+    eval.constructExit = &eval.evaluationList->back().nonNopSuccessor();
   }
 
   /// Mark the target of a branch as a new block.
@@ -394,7 +394,7 @@ private:
 
   /// Mark the successor of an Evaluation as a new block.
   void markSuccessorAsNewBlock(lower::pft::Evaluation &eval) {
-    eval.nonNopSuccessor()->isNewBlock = true;
+    eval.nonNopSuccessor().isNewBlock = true;
   }
 
   template <typename A>
@@ -554,7 +554,7 @@ private:
             lastConstructStmtEvaluation = &eval;
           },
           [&](const parser::EndSelectStmt &) {
-            eval.nonNopSuccessor()->isNewBlock = true;
+            eval.nonNopSuccessor().isNewBlock = true;
             lastConstructStmtEvaluation = nullptr;
           },
           [&](const parser::ChangeTeamStmt &s) {
@@ -575,7 +575,7 @@ private:
               eval.isUnstructured = true; // infinite loop
               return;
             }
-            eval.nonNopSuccessor()->isNewBlock = true;
+            eval.nonNopSuccessor().isNewBlock = true;
             eval.controlSuccessor = &evaluationList.back();
             if (std::holds_alternative<parser::ScalarLogicalExpr>(control->u)) {
               eval.isUnstructured = true; // while loop
@@ -714,7 +714,7 @@ private:
           markSuccessorAsNewBlock(eval);
           lastIfStmtEvaluation->isUnstructured = true;
         }
-        lastIfStmtEvaluation->controlSuccessor = eval.nonNopSuccessor();
+        lastIfStmtEvaluation->controlSuccessor = &eval.nonNopSuccessor();
         lastIfStmtEvaluation = nullptr;
       }
 
