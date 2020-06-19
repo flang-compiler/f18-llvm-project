@@ -56,8 +56,7 @@ private:
            analyzeBody(loopOperation, functionAnalysis);
   }
   bool analyzeStep(const mlir::Value stepValue) {
-    auto stepDefinition = stepValue.getDefiningOp<ConstantOp>();
-    if (stepDefinition) {
+    if (auto stepDefinition = stepValue.getDefiningOp<ConstantOp>()) {
       if (auto stepAttr = stepDefinition.getValue().dyn_cast<IntegerAttr>()) {
         step = stepAttr.getInt();
         return true;
@@ -67,26 +66,22 @@ private:
                    stepAttr.print(llvm::dbgs()););
         return false;
       }
-    } else {
-      LLVM_DEBUG(
-          llvm::dbgs()
-              << "AffineLoopAnalysis: cannot promote loop, step not constant\n";
-          if (stepValue.getDefiningOp()) {
-            stepValue.getDefiningOp()->print(llvm::dbgs());
-          });
-      return false;
     }
+    LLVM_DEBUG(
+        llvm::dbgs()
+            << "AffineLoopAnalysis: cannot promote loop, step not constant\n";
+        if (stepValue.getDefiningOp()) stepValue.getDefiningOp()->print(
+            llvm::dbgs()););
+    return false;
   }
   bool analyzeArrayReference(mlir::Value);
   bool analyzeMemoryAccess(fir::LoopOp loopOperation) {
-    for (auto loadOp : loopOperation.getOps<fir::LoadOp>()) {
+    for (auto loadOp : loopOperation.getOps<fir::LoadOp>())
       if (!analyzeArrayReference(loadOp.memref()))
         return false;
-    }
-    for (auto storeOp : loopOperation.getOps<fir::StoreOp>()) {
+    for (auto storeOp : loopOperation.getOps<fir::StoreOp>())
       if (!analyzeArrayReference(storeOp.memref()))
         return false;
-    }
     return true;
   }
 };
@@ -95,9 +90,8 @@ private:
 class AffineFunctionAnalysis {
 public:
   AffineFunctionAnalysis(mlir::FuncOp funcOp) {
-    for (fir::LoopOp op : funcOp.getOps<fir::LoopOp>()) {
+    for (fir::LoopOp op : funcOp.getOps<fir::LoopOp>())
       loopAnalysisMap.try_emplace(op, op, *this);
-    }
   }
   AffineLoopAnalysis getChildLoopAnalysis(fir::LoopOp op) const {
     auto it = loopAnalysisMap.find_as(op);
@@ -107,9 +101,8 @@ public:
       op.emitError(
           "error in fetching loop analysis in AffineFunctionAnalysis\n");
       return AffineLoopAnalysis(false);
-    } else {
-      return it->getSecond();
     }
+    return it->getSecond();
   }
   friend AffineLoopAnalysis;
 
@@ -134,15 +127,8 @@ bool analyzeCoordinate(mlir::Value coordinate) {
 bool AffineLoopAnalysis::analyzeArrayReference(mlir::Value arrayRef) {
   bool canPromote = true;
   if (auto acoOp = arrayRef.getDefiningOp<ArrayCoorOp>()) {
-    for (auto coordinate : acoOp.coor()) {
+    for (auto coordinate : acoOp.coor())
       canPromote = canPromote && analyzeCoordinate(coordinate);
-    }
-    if (auto genDim = acoOp.dims().getDefiningOp<GenDimsOp>()) {
-    } else {
-      LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
-                                 "dims in ArrayCoorOp not from GenDimsOp\n";);
-      canPromote = false;
-    }
   } else {
     LLVM_DEBUG(llvm::dbgs() << "AffineLoopAnalysis: cannot promote loop, "
                                "array reference uses non ArrayCoorOp\n";);
@@ -174,7 +160,8 @@ mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
                      stride = mlir::getAffineSymbolExpr(i * 3 + 2, context),
                      currentPart = (idx - lowerBound) * extent;
     index = currentPart + index;
-    extent = (upperBound - lowerBound + 1) * stride * extent;
+    extent =
+        (upperBound - lowerBound + 1) * stride * extent; // TODO negative stride
   }
   return mlir::AffineMap::get(dimensions, dimensions * 3, index);
 }
@@ -202,9 +189,11 @@ public:
 
     auto affineFor = rewriter.create<mlir::AffineForOp>(
         loop.getLoc(), ValueRange(loop.lowerBound()),
-        AffineMap::getMultiDimIdentityMap(1, loop.getContext()),
+        mlir::AffineMap::get(0, 1,
+                             mlir::getAffineSymbolExpr(0, loop.getContext())),
         ValueRange(loop.upperBound()),
-        AffineMap::getMultiDimIdentityMap(1, loop.getContext()),
+        mlir::AffineMap::get(
+            0, 1, 1 + mlir::getAffineSymbolExpr(0, loop.getContext())),
         loopAnalysis.step.getValue());
 
     rewriter.startRootUpdate(affineFor.getOperation());
@@ -246,6 +235,7 @@ private:
     }
     op.emitError(
         "AffineLoopConversion: array type in coordinate operation not valid\n");
+    return mlir::Type();
   }
   std::pair<mlir::AffineApplyOp, fir::ConvertOp>
   createAffineOps(mlir::Value arrayRef, mlir::PatternRewriter &rewriter) const {
