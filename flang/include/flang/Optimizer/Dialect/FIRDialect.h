@@ -62,6 +62,7 @@ using mlir::Pass;
 #define GEN_PASS_REGISTRATION_StripDebugInfo
 #define GEN_PASS_REGISTRATION_PrintOpStats
 #define GEN_PASS_REGISTRATION_Inliner
+#define GEN_PASS_REGISTRATION_SCCP
 #define GEN_PASS_REGISTRATION_MemRefDataFlowOpt
 #define GEN_PASS_REGISTRATION_SymbolDCE
 #define GEN_PASS_REGISTRATION_LocationSnapshot
