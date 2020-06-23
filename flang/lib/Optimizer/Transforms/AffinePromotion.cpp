@@ -140,7 +140,7 @@ mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
                      stride = mlir::getAffineSymbolExpr(i * 3 + 2, context),
                      currentPart = (idx * stride - lowerBound) * accuExtent;
     index = currentPart + index;
-    accuExtent = accuExtent * currentExtent; // TODO negative stride
+    accuExtent = accuExtent * currentExtent;
   }
   return mlir::AffineMap::get(dimensions, dimensions * 3, index);
 }
@@ -225,7 +225,7 @@ private:
     auto upperBound = mlir::getAffineSymbolExpr(1, op.getContext());
     auto step = mlir::getAffineSymbolExpr(2, op.getContext());
     mlir::AffineMap upperBoundMap =
-        mlir::AffineMap::get(0, 3, (upperBound - lowerBound).ceilDiv(step));
+        mlir::AffineMap::get(0, 3, (upperBound - lowerBound + step).floorDiv(step));
     auto genericUpperBound = rewriter.create<mlir::AffineApplyOp>(
         op.getLoc(), upperBoundMap,
         ValueRange({op.lowerBound(), op.upperBound(), op.step()}));
