@@ -3860,7 +3860,8 @@ bool ScalarEvolution::containsAddRecurrence(const SCEV *S) {
   if (I != HasRecMap.end())
     return I->second;
 
-  bool FoundAddRec = SCEVExprContains(S, isa<SCEVAddRecExpr, const SCEV *>);
+  bool FoundAddRec =
+      SCEVExprContains(S, [](const SCEV *S) { return isa<SCEVAddRecExpr>(S); });
   HasRecMap.insert({S, FoundAddRec});
   return FoundAddRec;
 }
@@ -6389,15 +6390,8 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
         if (GetMinTrailingZeros(LHS) >=
             (CIVal.getBitWidth() - CIVal.countLeadingZeros())) {
           // Build a plain add SCEV.
-          const SCEV *S = getAddExpr(LHS, getSCEV(CI));
-          // If the LHS of the add was an addrec and it has no-wrap flags,
-          // transfer the no-wrap flags, since an or won't introduce a wrap.
-          if (const SCEVAddRecExpr *NewAR = dyn_cast<SCEVAddRecExpr>(S)) {
-            const SCEVAddRecExpr *OldAR = cast<SCEVAddRecExpr>(LHS);
-            const_cast<SCEVAddRecExpr *>(NewAR)->setNoWrapFlags(
-                OldAR->getNoWrapFlags());
-          }
-          return S;
+          return getAddExpr(LHS, getSCEV(CI),
+                            (SCEV::NoWrapFlags)(SCEV::FlagNUW | SCEV::FlagNSW));
         }
       }
       break;
@@ -6453,15 +6447,19 @@ const SCEV *ScalarEvolution::createSCEV(Value *V) {
         if (SA->getValue().uge(BitWidth))
           break;
 
-        // It is currently not resolved how to interpret NSW for left
-        // shift by BitWidth - 1, so we avoid applying flags in that
-        // case. Remove this check (or this comment) once the situation
-        // is resolved. See
-        // http://lists.llvm.org/pipermail/llvm-dev/2015-April/084195.html
-        // and http://reviews.llvm.org/D8890 .
+        // We can safely preserve the nuw flag in all cases. It's also safe to
+        // turn a nuw nsw shl into a nuw nsw mul. However, nsw in isolation
+        // requires special handling. It can be preserved as long as we're not
+        // left shifting by bitwidth - 1.
         auto Flags = SCEV::FlagAnyWrap;
-        if (BO->Op && SA->getValue().ult(BitWidth - 1))
-          Flags = getNoWrapFlagsFromUB(BO->Op);
+        if (BO->Op) {
+          auto MulFlags = getNoWrapFlagsFromUB(BO->Op);
+          if ((MulFlags & SCEV::FlagNSW) &&
+              ((MulFlags & SCEV::FlagNUW) || SA->getValue().ult(BitWidth - 1)))
+            Flags = (SCEV::NoWrapFlags)(Flags | SCEV::FlagNSW);
+          if (MulFlags & SCEV::FlagNUW)
+            Flags = (SCEV::NoWrapFlags)(Flags | SCEV::FlagNUW);
+        }
 
         Constant *X = ConstantInt::get(
             getContext(), APInt::getOneBitSet(BitWidth, SA->getZExtValue()));
@@ -6962,6 +6960,10 @@ void ScalarEvolution::forgetValue(Value *V) {
 
     PushDefUseChildren(I, Worklist);
   }
+}
+
+void ScalarEvolution::forgetLoopDispositions(const Loop *L) {
+  LoopDispositions.clear();
 }
 
 /// Get the exact loop backedge taken count considering all loop exits. A
@@ -11204,8 +11206,9 @@ static bool findArrayDimensionsRec(ScalarEvolution &SE,
 // Returns true when one of the SCEVs of Terms contains a SCEVUnknown parameter.
 static inline bool containsParameters(SmallVectorImpl<const SCEV *> &Terms) {
   for (const SCEV *T : Terms)
-    if (SCEVExprContains(T, isa<SCEVUnknown, const SCEV *>))
+    if (SCEVExprContains(T, [](const SCEV *S) { return isa<SCEVUnknown>(S); }))
       return true;
+
   return false;
 }
 

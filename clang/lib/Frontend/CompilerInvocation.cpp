@@ -1081,6 +1081,7 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.XRayInstructionThreshold =
       getLastArgIntValue(Args, OPT_fxray_instruction_threshold_EQ, 200, Diags);
   Opts.XRayIgnoreLoops = Args.hasArg(OPT_fxray_ignore_loops);
+  Opts.XRayOmitFunctionIndex = Args.hasArg(OPT_fno_xray_function_index);
 
   auto XRayInstrBundles =
       Args.getAllArgValues(OPT_fxray_instrumentation_bundle);
@@ -1169,10 +1170,10 @@ static bool ParseCodeGenArgs(CodeGenOptions &Opts, ArgList &Args, InputKind IK,
   Opts.SanitizeCoveragePCTable = Args.hasArg(OPT_fsanitize_coverage_pc_table);
   Opts.SanitizeCoverageStackDepth =
       Args.hasArg(OPT_fsanitize_coverage_stack_depth);
-  Opts.SanitizeCoverageWhitelistFiles =
-      Args.getAllArgValues(OPT_fsanitize_coverage_whitelist);
-  Opts.SanitizeCoverageBlacklistFiles =
-      Args.getAllArgValues(OPT_fsanitize_coverage_blacklist);
+  Opts.SanitizeCoverageAllowlistFiles =
+      Args.getAllArgValues(OPT_fsanitize_coverage_allowlist);
+  Opts.SanitizeCoverageBlocklistFiles =
+      Args.getAllArgValues(OPT_fsanitize_coverage_blocklist);
   Opts.SanitizeMemoryTrackOrigins =
       getLastArgIntValue(Args, OPT_fsanitize_memory_track_origins_EQ, 0, Diags);
   Opts.SanitizeMemoryUseAfterDtor =
@@ -2885,10 +2886,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       !Args.hasArg(OPT_fno_concept_satisfaction_caching);
   if (Args.hasArg(OPT_fconcepts_ts))
     Diags.Report(diag::warn_fe_concepts_ts_flag);
+  // Recovery AST still heavily relies on dependent-type machinery.
   Opts.RecoveryAST =
-      Args.hasFlag(OPT_frecovery_ast, OPT_fno_recovery_ast, false);
+      Args.hasFlag(OPT_frecovery_ast, OPT_fno_recovery_ast, Opts.CPlusPlus);
   Opts.RecoveryASTType =
-+      Args.hasFlag(OPT_frecovery_ast_type, OPT_fno_recovery_ast_type, false);
+      Args.hasFlag(OPT_frecovery_ast_type, OPT_fno_recovery_ast_type, false);
   Opts.HeinousExtensions = Args.hasArg(OPT_fheinous_gnu_extensions);
   Opts.AccessControl = !Args.hasArg(OPT_fno_access_control);
   Opts.ElideConstructors = !Args.hasArg(OPT_fno_elide_constructors);
@@ -3293,6 +3295,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
       Diags.Report(diag::err_drv_invalid_value) << A->getAsString(Args) << Val;
   }
 
+  if (Arg *A = Args.getLastArg(OPT_ftrivial_auto_var_init_stop_after)) {
+    int Val = std::stoi(A->getValue());
+    Opts.TrivialAutoVarInitStopAfter = Val;
+  }
+
   // Parse -fsanitize= arguments.
   parseSanitizerKinds("-fsanitize=", Args.getAllArgValues(OPT_fsanitize_EQ),
                       Diags, Opts.Sanitize);
@@ -3363,6 +3370,7 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.CompleteMemberPointers = Args.hasArg(OPT_fcomplete_member_pointers);
   Opts.BuildingPCHWithObjectFile = Args.hasArg(OPT_building_pch_with_obj);
+  Opts.PCHInstantiateTemplates = Args.hasArg(OPT_fpch_instantiate_templates);
 
   Opts.MatrixTypes = Args.hasArg(OPT_fenable_matrix);
 
@@ -3405,6 +3413,11 @@ static void ParseLangArgs(LangOptions &Opts, ArgList &Args, InputKind IK,
 
   Opts.CompatibilityQualifiedIdBlockParamTypeChecking =
       Args.hasArg(OPT_fcompatibility_qualified_id_block_param_type_checking);
+
+  Opts.RelativeCXXABIVTables =
+      Args.hasFlag(OPT_fexperimental_relative_cxx_abi_vtables,
+                   OPT_fno_experimental_relative_cxx_abi_vtables,
+                   /*default=*/false);
 }
 
 static bool isStrictlyPreprocessorAction(frontend::ActionKind Action) {
@@ -3615,7 +3628,8 @@ static void ParseTargetArgs(TargetOptions &Opts, ArgList &Args,
 
 bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
                                         ArrayRef<const char *> CommandLineArgs,
-                                        DiagnosticsEngine &Diags) {
+                                        DiagnosticsEngine &Diags,
+                                        const char *Argv0) {
   bool Success = true;
 
   // Parse the arguments.
@@ -3735,6 +3749,11 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &Res,
     Res.getCodeGenOpts().FineGrainedBitfieldAccesses = false;
     Diags.Report(diag::warn_drv_fine_grained_bitfield_accesses_ignored);
   }
+
+  // Store the command-line for using in the CodeView backend.
+  Res.getCodeGenOpts().Argv0 = Argv0;
+  Res.getCodeGenOpts().CommandLineArgs = CommandLineArgs;
+
   return Success;
 }
 

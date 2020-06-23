@@ -627,7 +627,8 @@ public:
   /// we won't know until all lvalue-to-rvalue and discarded value conversions
   /// have been applied to all subexpressions of the enclosing full expression.
   /// This is cleared at the end of each full expression.
-  using MaybeODRUseExprSet = llvm::SmallPtrSet<Expr *, 2>;
+  using MaybeODRUseExprSet = llvm::SetVector<Expr *, SmallVector<Expr *, 4>,
+                                             llvm::SmallPtrSet<Expr *, 4>>;
   MaybeODRUseExprSet MaybeODRUseExprs;
 
   std::unique_ptr<sema::FunctionScopeInfo> CachedFunctionScope;
@@ -1862,7 +1863,7 @@ public:
 
   /// Determine whether a declaration is visible to name lookup.
   bool isVisible(const NamedDecl *D) {
-    return !D->isHidden() || isVisibleSlow(D);
+    return D->isUnconditionallyVisible() || isVisibleSlow(D);
   }
 
   /// Determine whether any declaration of an entity is visible.
@@ -2381,11 +2382,13 @@ public:
   void ActOnParamDefaultArgument(Decl *param,
                                  SourceLocation EqualLoc,
                                  Expr *defarg);
-  void ActOnParamUnparsedDefaultArgument(Decl *param,
-                                         SourceLocation EqualLoc,
+  void ActOnParamUnparsedDefaultArgument(Decl *param, SourceLocation EqualLoc,
                                          SourceLocation ArgLoc);
   void ActOnParamDefaultArgumentError(Decl *param, SourceLocation EqualLoc);
-  bool SetParamDefaultArgument(ParmVarDecl *Param, Expr *DefaultArg,
+  ExprResult ConvertParamDefaultArgument(const ParmVarDecl *Param,
+                                         Expr *DefaultArg,
+                                         SourceLocation EqualLoc);
+  void SetParamDefaultArgument(ParmVarDecl *Param, Expr *DefaultArg,
                                SourceLocation EqualLoc);
 
   // Contexts where using non-trivial C union types can be disallowed. This is
@@ -2999,6 +3002,10 @@ public:
                                                 const InternalLinkageAttr &AL);
   CommonAttr *mergeCommonAttr(Decl *D, const ParsedAttr &AL);
   CommonAttr *mergeCommonAttr(Decl *D, const CommonAttr &AL);
+  WebAssemblyImportNameAttr *mergeImportNameAttr(
+      Decl *D, const WebAssemblyImportNameAttr &AL);
+  WebAssemblyImportModuleAttr *mergeImportModuleAttr(
+      Decl *D, const WebAssemblyImportModuleAttr &AL);
 
   void mergeDeclAttributes(NamedDecl *New, Decl *Old,
                            AvailabilityMergeKind AMK = AMK_Redeclaration);
@@ -3695,7 +3702,7 @@ private:
   /// Creates a new TypoExpr AST node.
   TypoExpr *createDelayedTypo(std::unique_ptr<TypoCorrectionConsumer> TCC,
                               TypoDiagnosticGenerator TDG,
-                              TypoRecoveryCallback TRC);
+                              TypoRecoveryCallback TRC, SourceLocation TypoLoc);
 
   // The set of known/encountered (unique, canonicalized) NamespaceDecls.
   //
@@ -3840,32 +3847,28 @@ public:
   /// \param InitDecl A VarDecl to avoid because the Expr being corrected is its
   /// initializer.
   ///
+  /// \param RecoverUncorrectedTypos If true, when typo correction fails, it
+  /// will rebuild the given Expr with all TypoExprs degraded to RecoveryExprs.
+  ///
   /// \param Filter A function applied to a newly rebuilt Expr to determine if
   /// it is an acceptable/usable result from a single combination of typo
   /// corrections. As long as the filter returns ExprError, different
   /// combinations of corrections will be tried until all are exhausted.
-  ExprResult
-  CorrectDelayedTyposInExpr(Expr *E, VarDecl *InitDecl = nullptr,
-                            llvm::function_ref<ExprResult(Expr *)> Filter =
-                                [](Expr *E) -> ExprResult { return E; });
+  ExprResult CorrectDelayedTyposInExpr(
+      Expr *E, VarDecl *InitDecl = nullptr,
+      bool RecoverUncorrectedTypos = false,
+      llvm::function_ref<ExprResult(Expr *)> Filter =
+          [](Expr *E) -> ExprResult { return E; });
 
-  ExprResult
-  CorrectDelayedTyposInExpr(Expr *E,
-                            llvm::function_ref<ExprResult(Expr *)> Filter) {
-    return CorrectDelayedTyposInExpr(E, nullptr, Filter);
-  }
-
-  ExprResult
-  CorrectDelayedTyposInExpr(ExprResult ER, VarDecl *InitDecl = nullptr,
-                            llvm::function_ref<ExprResult(Expr *)> Filter =
-                                [](Expr *E) -> ExprResult { return E; }) {
-    return ER.isInvalid() ? ER : CorrectDelayedTyposInExpr(ER.get(), Filter);
-  }
-
-  ExprResult
-  CorrectDelayedTyposInExpr(ExprResult ER,
-                            llvm::function_ref<ExprResult(Expr *)> Filter) {
-    return CorrectDelayedTyposInExpr(ER, nullptr, Filter);
+  ExprResult CorrectDelayedTyposInExpr(
+      ExprResult ER, VarDecl *InitDecl = nullptr,
+      bool RecoverUncorrectedTypos = false,
+      llvm::function_ref<ExprResult(Expr *)> Filter =
+          [](Expr *E) -> ExprResult { return E; }) {
+    return ER.isInvalid()
+               ? ER
+               : CorrectDelayedTyposInExpr(ER.get(), InitDecl,
+                                           RecoverUncorrectedTypos, Filter);
   }
 
   void diagnoseTypo(const TypoCorrection &Correction,
@@ -4698,6 +4701,10 @@ public:
   /// Figure out if an expression could be turned into a call.
   bool tryExprAsCall(Expr &E, QualType &ZeroArgCallReturnTy,
                      UnresolvedSetImpl &NonTemplateOverloads);
+
+  /// Try to convert an expression \p E to type \p Ty. Returns the result of the
+  /// conversion.
+  ExprResult tryConvertExprToType(Expr *E, QualType Ty);
 
   /// Conditionally issue a diagnostic based on the current
   /// evaluation context.
@@ -8289,6 +8296,12 @@ public:
       /// We are rewriting a comparison operator in terms of an operator<=>.
       RewritingOperatorAsSpaceship,
 
+      /// We are initializing a structured binding.
+      InitializingStructuredBinding,
+
+      /// We are marking a class as __dllexport.
+      MarkingClassDllexported,
+
       /// Added for Template instantiation observation.
       /// Memoization means we are _not_ instantiating a template because
       /// it is already instantiated (but we entered a context where we
@@ -8791,9 +8804,17 @@ public:
       S.VTableUses.swap(SavedVTableUses);
 
       // Restore the set of pending implicit instantiations.
-      assert(S.PendingInstantiations.empty() &&
-             "PendingInstantiations should be empty before it is discarded.");
-      S.PendingInstantiations.swap(SavedPendingInstantiations);
+      if (S.TUKind != TU_Prefix || !S.LangOpts.PCHInstantiateTemplates) {
+        assert(S.PendingInstantiations.empty() &&
+               "PendingInstantiations should be empty before it is discarded.");
+        S.PendingInstantiations.swap(SavedPendingInstantiations);
+      } else {
+        // Template instantiations in the PCH may be delayed until the TU.
+        S.PendingInstantiations.swap(SavedPendingInstantiations);
+        S.PendingInstantiations.insert(S.PendingInstantiations.end(),
+                                       SavedPendingInstantiations.begin(),
+                                       SavedPendingInstantiations.end());
+      }
     }
 
   private:
@@ -11214,6 +11235,8 @@ public:
   QualType CheckMatrixElementwiseOperands(ExprResult &LHS, ExprResult &RHS,
                                           SourceLocation Loc,
                                           bool IsCompAssign);
+  QualType CheckMatrixMultiplyOperands(ExprResult &LHS, ExprResult &RHS,
+                                       SourceLocation Loc, bool IsCompAssign);
 
   bool areLaxCompatibleVectorTypes(QualType srcType, QualType destType);
   bool isLaxVectorConversion(QualType srcType, QualType destType);
@@ -11686,6 +11709,8 @@ public:
     return IdentifyCUDATarget(dyn_cast<FunctionDecl>(CurContext));
   }
 
+  static bool isCUDAImplicitHostDeviceFunction(const FunctionDecl *D);
+
   // CUDA function call preference. Must be ordered numerically from
   // worst to best.
   enum CUDAFunctionPreference {
@@ -12106,6 +12131,15 @@ private:
                                 int ArgNum, unsigned ExpectedFieldNum,
                                 bool AllowName);
   bool SemaBuiltinARMMemoryTaggingCall(unsigned BuiltinID, CallExpr *TheCall);
+
+  // Matrix builtin handling.
+  ExprResult SemaBuiltinMatrixTranspose(CallExpr *TheCall,
+                                        ExprResult CallResult);
+  ExprResult SemaBuiltinMatrixColumnMajorLoad(CallExpr *TheCall,
+                                              ExprResult CallResult);
+  ExprResult SemaBuiltinMatrixColumnMajorStore(CallExpr *TheCall,
+                                               ExprResult CallResult);
+
 public:
   enum FormatStringType {
     FST_Scanf,

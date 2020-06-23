@@ -1010,6 +1010,11 @@ void Sema::ActOnEndOfTranslationUnit() {
                                  LateParsedInstantiations.begin(),
                                  LateParsedInstantiations.end());
     LateParsedInstantiations.clear();
+
+    if (LangOpts.PCHInstantiateTemplates) {
+      llvm::TimeTraceScope TimeScope("PerformPendingInstantiations");
+      PerformPendingInstantiations();
+    }
   }
 
   DiagnoseUnterminatedPragmaPack();
@@ -1952,7 +1957,7 @@ void Sema::PopCompoundScope() {
 /// Determine whether any errors occurred within this function/method/
 /// block.
 bool Sema::hasAnyUnrecoverableErrorsInThisFunction() const {
-  return getCurFunction()->ErrorTrap.hasUnrecoverableErrorOccurred();
+  return getCurFunction()->hasUnrecoverableErrorOccurred();
 }
 
 void Sema::setFunctionHasBranchIntoScope() {

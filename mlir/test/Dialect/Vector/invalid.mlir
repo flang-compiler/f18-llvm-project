@@ -760,7 +760,7 @@ func @contraction(%arg0: vector<7x8x16x15xf32>, %arg1: vector<8x16x7x5xf32>,
 func @contraction(%arg0: vector<4x3xi32>,
                   %arg1: vector<3x7xf32>,
                   %arg2: vector<4x7xf32>) -> vector<4x7xf32> {
-  // expected-error@+1 {{'vector.contract' op failed to verify that first operand lhs and result have same element type}}
+  // expected-error@+1 {{'vector.contract' op failed to verify that lhs and rhs have same element type}}
   %0 = vector.contract #contraction_trait %arg0, %arg1, %arg2
     : vector<4x3xi32>, vector<3x7xf32> into vector<4x7xf32>
 }
@@ -1069,7 +1069,7 @@ func @reduce_elt_type_mismatch(%arg0: vector<16xf32>) -> i32 {
 // -----
 
 func @reduce_unsupported_attr(%arg0: vector<16xf32>) -> i32 {
-  // expected-error@+1 {{'vector.reduction' op attribute 'kind' failed to satisfy constraint: string attribute}}
+  // expected-error@+1 {{attribute 'kind' failed to satisfy constraint: string attribute}}
   %0 = vector.reduction 1234, %arg0 : vector<16xf32> into i32
 }
 

@@ -52,7 +52,7 @@ struct AttributeAbbrev {
 };
 
 struct Abbrev {
-  llvm::yaml::Hex32 Code;
+  Optional<yaml::Hex64> Code;
   llvm::dwarf::Tag Tag;
   llvm::dwarf::Constants Children;
   std::vector<AttributeAbbrev> Attributes;
@@ -64,7 +64,8 @@ struct ARangeDescriptor {
 };
 
 struct ARange {
-  InitialLength Length;
+  dwarf::DwarfFormat Format;
+  uint64_t Length;
   uint16_t Version;
   uint32_t CuOffset;
   uint8_t AddrSize;
@@ -81,8 +82,8 @@ struct RangeEntry {
 
 /// Class that describes a single range list inside the .debug_ranges section.
 struct Ranges {
-  llvm::yaml::Hex32 Offset;
-  llvm::yaml::Hex8 AddrSize;
+  Optional<llvm::yaml::Hex64> Offset;
+  Optional<llvm::yaml::Hex8> AddrSize;
   std::vector<RangeEntry> Entries;
 };
 
@@ -143,7 +144,8 @@ struct LineTableOpcode {
 };
 
 struct LineTable {
-  InitialLength Length;
+  dwarf::DwarfFormat Format;
+  uint64_t Length;
   uint16_t Version;
   uint64_t PrologueLength;
   uint8_t MinInstLength;
@@ -158,12 +160,28 @@ struct LineTable {
   std::vector<LineTableOpcode> Opcodes;
 };
 
+struct SegAddrPair {
+  yaml::Hex64 Segment;
+  yaml::Hex64 Address;
+};
+
+struct AddrTableEntry {
+  dwarf::DwarfFormat Format;
+  Optional<yaml::Hex64> Length;
+  yaml::Hex16 Version;
+  Optional<yaml::Hex8> AddrSize;
+  yaml::Hex8 SegSelectorSize;
+  std::vector<SegAddrPair> SegAddrPairs;
+};
+
 struct Data {
   bool IsLittleEndian;
+  bool Is64bit;
   std::vector<Abbrev> AbbrevDecls;
   std::vector<StringRef> DebugStrings;
   std::vector<ARange> ARanges;
   std::vector<Ranges> DebugRanges;
+  std::vector<AddrTableEntry> DebugAddr;
   Optional<PubSection> PubNames;
   Optional<PubSection> PubTypes;
 
@@ -195,6 +213,8 @@ LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::Entry)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::File)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::LineTable)
 LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::LineTableOpcode)
+LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::SegAddrPair)
+LLVM_YAML_IS_SEQUENCE_VECTOR(llvm::DWARFYAML::AddrTableEntry)
 
 namespace llvm {
 namespace yaml {
@@ -259,8 +279,23 @@ template <> struct MappingTraits<DWARFYAML::LineTable> {
   static void mapping(IO &IO, DWARFYAML::LineTable &LineTable);
 };
 
+template <> struct MappingTraits<DWARFYAML::SegAddrPair> {
+  static void mapping(IO &IO, DWARFYAML::SegAddrPair &SegAddrPair);
+};
+
+template <> struct MappingTraits<DWARFYAML::AddrTableEntry> {
+  static void mapping(IO &IO, DWARFYAML::AddrTableEntry &AddrTable);
+};
+
 template <> struct MappingTraits<DWARFYAML::InitialLength> {
   static void mapping(IO &IO, DWARFYAML::InitialLength &DWARF);
+};
+
+template <> struct ScalarEnumerationTraits<dwarf::DwarfFormat> {
+  static void enumeration(IO &IO, dwarf::DwarfFormat &Format) {
+    IO.enumCase(Format, "DWARF32", dwarf::DWARF32);
+    IO.enumCase(Format, "DWARF64", dwarf::DWARF64);
+  }
 };
 
 #define HANDLE_DW_TAG(unused, name, unused2, unused3, unused4)                 \

@@ -750,6 +750,10 @@ std::string ToolChain::ComputeEffectiveClangTriple(const ArgList &Args,
   return ComputeLLVMTriple(Args, InputType);
 }
 
+std::string ToolChain::computeSysRoot() const {
+  return D.SysRoot;
+}
+
 void ToolChain::AddClangSystemIncludeArgs(const ArgList &DriverArgs,
                                           ArgStringList &CC1Args) const {
   // Each toolchain should provide the appropriate include flags.
@@ -990,6 +994,9 @@ SanitizerMask ToolChain::getSupportedSanitizers() const {
 
 void ToolChain::AddCudaIncludeArgs(const ArgList &DriverArgs,
                                    ArgStringList &CC1Args) const {}
+
+void ToolChain::AddHIPIncludeArgs(const ArgList &DriverArgs,
+                                  ArgStringList &CC1Args) const {}
 
 void ToolChain::AddIAMCUIncludeArgs(const ArgList &DriverArgs,
                                     ArgStringList &CC1Args) const {}

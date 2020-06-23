@@ -2,25 +2,25 @@
 
 ## a) Generate the .debug_aranges section from the "DWARF" entry.
 
-## Generate and verify a big endian object file.
+## Generate and verify a big endian DWARF32 .debug_aranges section.
 
-# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2MSB %s -o %t.be.o
+# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2MSB -DFORMAT=DWARF32 %s -o %t.be.o
 # RUN: llvm-readobj --sections --section-data %t.be.o | \
-# RUN:   FileCheck %s -DADDRALIGN=1 -DSIZE=96 --check-prefixes=DWARF-BE-HEADER,DWARF-BE-CONTENT
+# RUN:   FileCheck -DADDRALIGN=1 -DSIZE=96 %s --check-prefixes=DWARF-HEADER,DWARF-BE-CONTENT
 
-#       DWARF-BE-HEADER: Index: 1
-#  DWARF-BE-HEADER-NEXT: Name: .debug_aranges (1)
-#  DWARF-BE-HEADER-NEXT: Type: SHT_PROGBITS (0x1)
-#  DWARF-BE-HEADER-NEXT: Flags [ (0x0)
-#  DWARF-BE-HEADER-NEXT: ]
-#  DWARF-BE-HEADER-NEXT: Address: 0x0
-#  DWARF-BE-HEADER-NEXT: Offset: 0x40
-#  DWARF-BE-HEADER-NEXT: Size: [[SIZE]]
-#  DWARF-BE-HEADER-NEXT: Link: 0
-#  DWARF-BE-HEADER-NEXT: Info: 0
-#  DWARF-BE-HEADER-NEXT: AddressAlignment: [[ADDRALIGN]]
-#  DWARF-BE-HEADER-NEXT: EntrySize: 0
-#      DWARF-BE-CONTENT: SectionData (
+#          DWARF-HEADER: Index: 1
+#     DWARF-HEADER-NEXT: Name: .debug_aranges (1)
+#     DWARF-HEADER-NEXT: Type: SHT_PROGBITS (0x1)
+#     DWARF-HEADER-NEXT: Flags [ (0x0)
+#     DWARF-HEADER-NEXT: ]
+#     DWARF-HEADER-NEXT: Address: 0x0
+#     DWARF-HEADER-NEXT: Offset: 0x40
+#     DWARF-HEADER-NEXT: Size: [[SIZE]]
+#     DWARF-HEADER-NEXT: Link: 0
+#     DWARF-HEADER-NEXT: Info: 0
+#     DWARF-HEADER-NEXT: AddressAlignment: [[ADDRALIGN]]
+#     DWARF-HEADER-NEXT: EntrySize: 0
+# DWARF-BE-CONTENT-NEXT: SectionData (
 # DWARF-BE-CONTENT-NEXT:   0000: 0000002C 00020000 00000400 00000000
 ##                               |        |   |        | |  |
 ##                               |        |   |        | |  +------- Padding zeros (4-byte)
@@ -69,8 +69,8 @@ FileHeader:
   Machine: EM_X86_64
 DWARF:
   debug_aranges:
-    - Length:
-        TotalLength: 0x2c
+    - Format:   [[FORMAT]]
+      Length:   0x2c
       Version:  2
       CuOffset: 0
       AddrSize: 0x04
@@ -78,8 +78,8 @@ DWARF:
       Descriptors:
         - Address: 0x00001234
           Length:  0x20
-    - Length:
-        TotalLength: 0x2c
+    - Format:   [[FORMAT]]
+      Length:   0x2c
       Version:  2
       CuOffset: 0x65
       AddrSize: 0x08
@@ -90,72 +90,168 @@ DWARF:
         - Address: 0x0000000056780000
           Length:  0x10
 
-## Generate and verify a little endian object file.
+## Generate and verify a little endian DWARF32 .debug_aranges section.
 
-# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2LSB %s -o %t.le.o
+# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2LSB -DFORMAT=DWARF32 %s -o %t.le.o
 # RUN: llvm-readobj --sections --section-data %t.le.o | \
-# RUN:   FileCheck %s --check-prefixes=DWARF-LE-DEFAULT
+# RUN:   FileCheck -DADDRALIGN=1 -DSIZE=96 %s --check-prefixes=DWARF-HEADER,DWARF-LE-CONTENT
 
-#      DWARF-LE-DEFAULT: Section {
-#      DWARF-LE-DEFAULT:   Index: 1
-# DWARF-LE-DEFAULT-NEXT:   Name: .debug_aranges (1)
-# DWARF-LE-DEFAULT-NEXT:   Type: SHT_PROGBITS (0x1)
-# DWARF-LE-DEFAULT-NEXT:   Flags [ (0x0)
-# DWARF-LE-DEFAULT-NEXT:   ]
-# DWARF-LE-DEFAULT-NEXT:   Address: 0x0
-# DWARF-LE-DEFAULT-NEXT:   Offset: 0x40
-# DWARF-LE-DEFAULT-NEXT:   Size: 96
-# DWARF-LE-DEFAULT-NEXT:   Link: 0
-# DWARF-LE-DEFAULT-NEXT:   Info: 0
-# DWARF-LE-DEFAULT-NEXT:   AddressAlignment: 1
-# DWARF-LE-DEFAULT-NEXT:   EntrySize: 0
-# DWARF-LE-DEFAULT-NEXT:   SectionData (
-# DWARF-LE-DEFAULT-NEXT:     0000: 2C000000 02000000 00000400 00000000
-##                                 |        |   |        | |  |
-##                                 |        |   |        | |  +------- Padding zeros (4-byte)
-##                                 |        |   |        | +- SegSize (1-byte) 0x00
-##                                 |        |   |        +- AddrSize (1-byte) 0x04
-##                                 |        |   +-------- CuOffset (4-byte) 0x00
+# DWARF-LE-CONTENT-NEXT: SectionData (
+# DWARF-LE-CONTENT-NEXT:   0000: 2C000000 02000000 00000400 00000000
+##                               |        |   |        | |  |
+##                               |        |   |        | |  +------- Padding zeros (4-byte)
+##                               |        |   |        | +- SegSize (1-byte) 0x00
+##                               |        |   |        +- AddrSize (1-byte) 0x04
+##                               |        |   +-------- CuOffset (4-byte) 0x00
+##                               |        +--- Version (2-byte) 0x02
+##                               +------- InitialLength (4-byte) 0x2c
+##
+# DWARF-LE-CONTENT-NEXT:   0010: 34120000 20000000 00000000 00000000
+##                               |        |        |
+##                               |        |        +---------------- Terminating Entry
+##                               |        +------- Length (4-byte) 0x20
+##                               +------- Address (4-byte) 0x1234
+##
+# DWARF-LE-CONTENT-NEXT:   0020: 2C000000 02006500 00000800 00000000
+##                               |        |   |        | |  |
+##                               |        |   |        | |  +------- Padding zeros (4-byte)
+##                               |        |   |        | +- SegSize (1-byte) 0x00
+##                               |        |   |        +- AddrSize (1-byte) 0x08
+##                               |        |   +-------- CuOffset (4-byte) 0x00
+##                               |        +--- Version (2-byte) 0x02
+##                               +------- InitialLength (4-byte) 0x2c
+##
+# DWARF-LE-CONTENT-NEXT:   0030: 78560000 00000000 20000000 00000000
+##                               |                 |
+##                               |                 +---------------- Length (8-byte) 0x20
+##                               +---------------- Address (8-byte) 0x5678
+##
+# DWARF-LE-CONTENT-NEXT:   0040: 00007856 00000000 10000000 00000000
+##                               |                 |
+##                               |                 +---------------- Length (8-byte) 0x10
+##                               +---------------- Address (8-byte) 0x5678
+##
+# DWARF-LE-CONTENT-NEXT:   0050: 00000000 00000000 00000000 00000000
+##                               |
+##                               +---------------------------------- Terminating entry
+##
+# DWARF-LE-CONTENT-NEXT: )
+
+## Generate and verify a big endian DWARF64 .debug_aranges section.
+
+# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2MSB -DFORMAT=DWARF64 %s -o %t.be.dwarf64.o
+# RUN: llvm-readobj --sections --section-data %t.be.dwarf64.o | \
+# RUN:   FileCheck -DADDRALIGN=1 -DSIZE=120 %s --check-prefixes=DWARF-HEADER,DWARF64-BE-CONTENT
+
+# DWARF64-BE-CONTENT-NEXT: SectionData (
+# DWARF64-BE-CONTENT-NEXT:   0000: FFFFFFFF 00000000 0000002C 00020000
+##                                 |        |                 |   |
+##                                 |        |                 |   +--- CuOffset (8-byte) 0x00
+##                                 |        |                 +--- Version (2-byte) 0x02
+##                                 |        +---------------- Length (8-byte) 0x2c
+##                                 +------- DWARF64 Prefix (4-byte) UINT32_MAX
+##
+# DWARF64-BE-CONTENT-NEXT:   0010: 00000000 00000400 00001234 00000020
+##                                 |            | |  |        |
+##                                 |            | |  |        +------- Length (4-byte) 0x20
+##                                 |            | |  +------- Address (4-byte) 0x1234
+##                                 |            | +- SegSize (1-byte) 0x00
+##                                 |            +- AddrSize (1-byte) 0x04
+##                                 +------------ Lower bytes of CuOffset
+##
+# DWARF64-BE-CONTENT-NEXT:   0020: 00000000 00000000 FFFFFFFF 00000000
+##                                 |                 |        +------- Length (8-byte) 0x2c
+##                                 |                 +------- DWARF64 Prefix
+##                                 +---------------- Terminating Entry (8-byte) 0x00
+##
+# DWARF64-BE-CONTENT-NEXT:   0030: 0000002C 00020000 00000000 00650800
+##                                 |        |   |                 | |
+##                                 |        |   |                 | +- SegSize (1-byte) 0x00
+##                                 |        |   |                 +- AddrSize (1-byte) 0x08
+##                                 |        |   +----------------- CuOffset (8-byte) 0x65
 ##                                 |        +--- Version (2-byte) 0x02
-##                                 +------- InitialLength (4-byte) 0x2c
+##                                 +------- Lower bytes of Length
 ##
-# DWARF-LE-DEFAULT-NEXT:     0010: 34120000 20000000 00000000 00000000
-##                                 |        |        |
-##                                 |        |        +---------------- Terminating Entry
-##                                 |        +------- Length (4-byte) 0x20
-##                                 +------- Address (4-byte) 0x1234
-##
-# DWARF-LE-DEFAULT-NEXT:     0020: 2C000000 02006500 00000800 00000000
-##                                 |        |   |        | |  |
-##                                 |        |   |        | |  +------- Padding zeros (4-byte)
-##                                 |        |   |        | +- SegSize (1-byte) 0x00
-##                                 |        |   |        +- AddrSize (1-byte) 0x08
-##                                 |        |   +-------- CuOffset (4-byte) 0x00
-##                                 |        +--- Version (2-byte) 0x02
-##                                 +------- InitialLength (4-byte) 0x2c
-##
-# DWARF-LE-DEFAULT-NEXT:     0030: 78560000 00000000 20000000 00000000
+# DWARF64-BE-CONTENT-NEXT:   0040: 00000000 00000000 00000000 00005678
 ##                                 |                 |
-##                                 |                 +---------------- Length (8-byte) 0x20
-##                                 +---------------- Address (8-byte) 0x5678
+##                                 |                 +---------------- Address (8-byte) 0x5678
+##                                 +---------------- Padding zeros (8-byte)
 ##
-# DWARF-LE-DEFAULT-NEXT:     0040: 00007856 00000000 10000000 00000000
+# DWARF64-BE-CONTENT-NEXT:   0050: 00000000 00000020 00000000 56780000
 ##                                 |                 |
-##                                 |                 +---------------- Length (8-byte) 0x10
-##                                 +---------------- Address (8-byte) 0x5678
-##                           
-# DWARF-LE-DEFAULT-NEXT:     0050: 00000000 00000000 00000000 00000000
+##                                 |                 +---------------- Address (8-byte) 0x56780000
+##                                 +---------------- Length (8-byte) 0x20
+##
+# DWARF64-BE-CONTENT-NEXT:   0060: 00000000 00000010 00000000 00000000
+##                                 |                 |
+##                                 |                 +---------------- Terminating Entry (16-byte) 0x00
+##                                 +---------------- Length (8-byte) 0x10
+##
+# DWARF64-BE-CONTENT-NEXT:   0070: 00000000 00000000
 ##                                 |
-##                                 +---------------------------------- Terminating entry
+##                                 +---------------- The last bytes of terminating entry.
+# DWARF64-BE-CONTENT-NEXT: )
+
+## Generate and verify a little endian DWARF64 .debug_aranges section.
+
+# RUN: yaml2obj --docnum=1 -DENDIAN=ELFDATA2LSB -DFORMAT=DWARF64 %s -o %t.le.dwarf64.o
+# RUN: llvm-readobj --sections --section-data %t.le.dwarf64.o | \
+# RUN:   FileCheck -DADDRALIGN=1 -DSIZE=120 %s --check-prefixes=DWARF-HEADER,DWARF64-LE-CONTENT
+
+# DWARF64-LE-CONTENT-NEXT: SectionData (
+# DWARF64-LE-CONTENT-NEXT:   0000: FFFFFFFF 2C000000 00000000 02000000
+##                                 |        |                 |   |
+##                                 |        |                 |   +--- CuOffset (8-byte) 0x00
+##                                 |        |                 +--- Version (2-byte) 0x02
+##                                 |        +---------------- Length (8-byte) 0x2c
+##                                 +------- DWARF64 Prefix (4-byte) UINT32_MAX
 ##
-# DWARF-LE-DEFAULT-NEXT:   )
-# DWARF-LE-DEFAULT-NEXT: }
+# DWARF64-LE-CONTENT-NEXT:   0010: 00000000 00000400 34120000 20000000
+##                                 |            | |  |        |
+##                                 |            | |  |        +------- Length (4-byte) 0x20
+##                                 |            | |  +------- Address (4-byte) 0x1234
+##                                 |            | +- SegSize (1-byte) 0x00
+##                                 |            +- AddrSize (1-byte) 0x04
+##                                 +------------ Lower bytes of CuOffset
+##
+# DWARF64-LE-CONTENT-NEXT:   0020: 00000000 00000000 FFFFFFFF 2C000000
+##                                 |                 |        +------- Length (8-byte) 0x2c
+##                                 |                 +------- DWARF64 Prefix
+##                                 +---------------- Terminating Entry (8-byte) 0x00
+##
+# DWARF64-LE-CONTENT-NEXT:   0030: 00000000 02006500 00000000 00000800
+##                                 |        |   |                 | |
+##                                 |        |   |                 | +- SegSize (1-byte) 0x00
+##                                 |        |   |                 +- AddrSize (1-byte) 0x08
+##                                 |        |   +----------------- CuOffset (8-byte) 0x65
+##                                 |        +--- Version (2-byte) 0x02
+##                                 +------- Lower bytes of Length
+##
+# DWARF64-LE-CONTENT-NEXT:   0040: 00000000 00000000 78560000 00000000
+##                                 |                 |
+##                                 |                 +---------------- Address (8-byte) 0x5678
+##                                 +---------------- Padding zeros (8-byte)
+##
+# DWARF64-LE-CONTENT-NEXT:   0050: 20000000 00000000 00007856 00000000
+##                                 |                 |
+##                                 |                 +---------------- Address (8-byte) 0x56780000
+##                                 +---------------- Length (8-byte) 0x20
+##
+# DWARF64-LE-CONTENT-NEXT:   0060: 10000000 00000000 00000000 00000000
+##                                 |                 |
+##                                 |                 +---------------- Terminating Entry (16-byte) 0x00
+##                                 +---------------- Length (8-byte) 0x10
+##
+# DWARF64-LE-CONTENT-NEXT:   0070: 00000000 00000000
+##                                 |
+##                                 +---------------- The last bytes of terminating entry.
+# DWARF64-LE-CONTENT-NEXT: )
 
 ## b) Generate the .debug_aranges section from raw section content.
 
 # RUN: yaml2obj --docnum=2 %s -o %t2.o
 # RUN: llvm-readobj --sections --section-data %t2.o | \
-# RUN:   FileCheck %s -DADDRALIGN=0 -DSIZE=3 --check-prefixes=DWARF-BE-HEADER,ARBITRARY-CONTENT
+# RUN:   FileCheck %s -DADDRALIGN=0 -DSIZE=3 --check-prefixes=DWARF-HEADER,ARBITRARY-CONTENT
 
 #      ARBITRARY-CONTENT: SectionData (
 # ARBITRARY-CONTENT-NEXT:   0000: 112233
@@ -211,8 +307,7 @@ Sections:
     Size: 0x10
 DWARF:
   debug_aranges:
-    - Length:
-        TotalLength: 0x2c
+    - Length:   0x2c
       Version:  2
       CuOffset: 0
       AddrSize: 0x08
@@ -238,8 +333,7 @@ Sections:
     Content: "00"
 DWARF:
   debug_aranges:
-    - Length:
-        TotalLength: 0x2c
+    - Length:   0x2c
       Version:  2
       CuOffset: 0
       AddrSize: 0x08
@@ -304,8 +398,7 @@ Sections:
     Type:         SHT_STRTAB
 DWARF:
   debug_aranges:
-    - Length:
-        TotalLength: 0x2c
+    - Length:   0x2c
       Version:  2
       CuOffset: 0
       AddrSize: 0x08
@@ -314,16 +407,54 @@ DWARF:
         - Address: 0x0000000000001234
           Length:  0x20
 
-## h) Test that yaml2obj will not generate the .debug_aranges section when the "DWARF" entry
-## exists but the "debug_aranges" entry doesn't exist in the "DWARF" entry or the "Sections" entry.
+## h) Test that yaml2obj still generates a .debug_aranges section if we assign an invalid value
+## to 'AddrSize' when the 'Descriptors' list is empty.
 
 # RUN: yaml2obj --docnum=8 %s -o %t8.o
-# RUN: llvm-readelf --sections %t8.o | FileCheck /dev/null --implicit-check-not=.debug_aranges
+# RUN: llvm-readelf --hex-dump=.debug_aranges %t8.o | \
+# RUN:   FileCheck %s --check-prefix=ADDR-SIZE
+
+#      ADDR-SIZE: Hex dump of section '.debug_aranges':
+# ADDR-SIZE-NEXT: 0x00000000 2c000000 02000000 00000700 00000000
+##                                                 ^~ address_size (1-byte) 0x07
+# ADDR-SIZE-NEXT: 0x00000010 00000000 00000000 00000000
 
 --- !ELF
 FileHeader:
   Class:   ELFCLASS64
-  Data:    ELFDATA2MSB
+  Data:    ELFDATA2LSB
   Type:    ET_EXEC
   Machine: EM_X86_64
 DWARF:
+  debug_aranges:
+    - Length:      0x2c
+      Version:     2
+      CuOffset:    0
+      AddrSize:    0x07 ## Invalid address_size.
+      SegSize:     0
+      Descriptors: []
+
+## i) Test that yaml2obj emits an error message if we try to assign an invalid value to
+## 'AddrSize' when the 'Descriptors' list isn't empty.
+
+# RUN: not yaml2obj --docnum=9 %s 2>&1 | \
+# RUN:   FileCheck %s --check-prefix=INVALID-SIZE
+
+# INVALID-SIZE: yaml2obj: error: unable to write debug_aranges address: invalid integer write size: 7
+
+--- !ELF
+FileHeader:
+  Class:   ELFCLASS64
+  Data:    ELFDATA2LSB
+  Type:    ET_EXEC
+  Machine: EM_X86_64
+DWARF:
+  debug_aranges:
+    - Length:      0x2c
+      Version:     2
+      CuOffset:    0
+      AddrSize:    0x07 ## Invalid address_size.
+      SegSize:     0
+      Descriptors:
+        - Address: 0x1234
+          Length:  0x1000

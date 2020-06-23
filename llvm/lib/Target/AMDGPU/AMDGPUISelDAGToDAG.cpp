@@ -28,6 +28,7 @@
 #include "llvm/ADT/SmallVector.h"
 #include "llvm/ADT/StringRef.h"
 #include "llvm/Analysis/LegacyDivergenceAnalysis.h"
+#include "llvm/Analysis/LoopInfo.h"
 #include "llvm/Analysis/ValueTracking.h"
 #include "llvm/CodeGen/FunctionLoweringInfo.h"
 #include "llvm/CodeGen/ISDOpcodes.h"
@@ -715,7 +716,8 @@ void AMDGPUDAGToDAGISel::Select(SDNode *N) {
       (Opc == AMDGPUISD::ATOMIC_INC || Opc == AMDGPUISD::ATOMIC_DEC ||
        Opc == ISD::ATOMIC_LOAD_FADD ||
        Opc == AMDGPUISD::ATOMIC_LOAD_FMIN ||
-       Opc == AMDGPUISD::ATOMIC_LOAD_FMAX)) {
+       Opc == AMDGPUISD::ATOMIC_LOAD_FMAX ||
+       Opc == AMDGPUISD::ATOMIC_LOAD_CSUB)) {
     N = glueCopyToM0LDSInit(N);
     SelectCode(N);
     return;

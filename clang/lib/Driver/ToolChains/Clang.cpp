@@ -1202,12 +1202,14 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
   Args.AddLastArg(CmdArgs, options::OPT_MP);
   Args.AddLastArg(CmdArgs, options::OPT_MV);
 
-  // Add offload include arguments specific for CUDA.  This must happen before
-  // we -I or -include anything else, because we must pick up the CUDA headers
-  // from the particular CUDA installation, rather than from e.g.
-  // /usr/local/include.
+  // Add offload include arguments specific for CUDA/HIP.  This must happen
+  // before we -I or -include anything else, because we must pick up the
+  // CUDA/HIP headers from the particular CUDA/ROCm installation, rather than
+  // from e.g. /usr/local/include.
   if (JA.isOffloading(Action::OFK_Cuda))
     getToolChain().AddCudaIncludeArgs(Args, CmdArgs);
+  if (JA.isOffloading(Action::OFK_HIP))
+    getToolChain().AddHIPIncludeArgs(Args, CmdArgs);
 
   // If we are offloading to a target via OpenMP we need to include the
   // openmp_wrappers folder which contains alternative system headers.
@@ -1239,6 +1241,7 @@ void Clang::AddPreprocessingOptions(Compilation &C, const JobAction &JA,
     if (YcArg && JA.getKind() >= Action::PrecompileJobClass &&
         JA.getKind() <= Action::AssembleJobClass) {
       CmdArgs.push_back(Args.MakeArgString("-building-pch-with-obj"));
+      CmdArgs.push_back(Args.MakeArgString("-fpch-instantiate-templates"));
     }
     if (YcArg || YuArg) {
       StringRef ThroughHeader = YcArg ? YcArg->getValue() : YuArg->getValue();
@@ -2997,7 +3000,7 @@ static void RenderSCPOptions(const ToolChain &TC, const ArgList &Args,
   if (!EffectiveTriple.isOSLinux())
     return;
 
-  if (!EffectiveTriple.isX86())
+  if (!EffectiveTriple.isX86() && !EffectiveTriple.isSystemZ())
     return;
 
   if (Args.hasFlag(options::OPT_fstack_clash_protection,
@@ -3046,6 +3049,21 @@ static void RenderTrivialAutoVarInitOptions(const Driver &D,
       D.Diag(diag::err_drv_trivial_auto_var_init_zero_disabled);
     CmdArgs.push_back(
         Args.MakeArgString("-ftrivial-auto-var-init=" + TrivialAutoVarInit));
+  }
+
+  if (Arg *A =
+          Args.getLastArg(options::OPT_ftrivial_auto_var_init_stop_after)) {
+    if (!Args.hasArg(options::OPT_ftrivial_auto_var_init) ||
+        StringRef(
+            Args.getLastArg(options::OPT_ftrivial_auto_var_init)->getValue()) ==
+            "uninitialized")
+      D.Diag(diag::err_drv_trivial_auto_var_init_stop_after_missing_dependency);
+    A->claim();
+    StringRef Val = A->getValue();
+    if (std::stoi(Val.str()) <= 0)
+      D.Diag(diag::err_drv_trivial_auto_var_init_stop_after_invalid_value);
+    CmdArgs.push_back(
+        Args.MakeArgString("-ftrivial-auto-var-init-stop-after=" + Val));
   }
 }
 
@@ -4442,15 +4460,20 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     if (RelocationModel != llvm::Reloc::Static && !IsPIE)
       A->render(Args, CmdArgs);
 
-  CmdArgs.push_back("-mthread-model");
-  if (Arg *A = Args.getLastArg(options::OPT_mthread_model)) {
-    if (!TC.isThreadModelSupported(A->getValue()))
-      D.Diag(diag::err_drv_invalid_thread_model_for_target)
-          << A->getValue() << A->getAsString(Args);
-    CmdArgs.push_back(A->getValue());
+  {
+    std::string Model;
+    if (Arg *A = Args.getLastArg(options::OPT_mthread_model)) {
+      if (!TC.isThreadModelSupported(A->getValue()))
+        D.Diag(diag::err_drv_invalid_thread_model_for_target)
+            << A->getValue() << A->getAsString(Args);
+      Model = A->getValue();
+    } else
+      Model = TC.getThreadModel();
+    if (Model != "posix") {
+      CmdArgs.push_back("-mthread-model");
+      CmdArgs.push_back(Args.MakeArgString(Model));
+    }
   }
-  else
-    CmdArgs.push_back(Args.MakeArgString(TC.getThreadModel()));
 
   Args.AddLastArg(CmdArgs, options::OPT_fveclib);
 
@@ -4657,7 +4680,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-fforbid-guard-variables");
 
   if (Args.hasFlag(options::OPT_mms_bitfields, options::OPT_mno_ms_bitfields,
-                   false)) {
+                   Triple.isWindowsGNUEnvironment())) {
     CmdArgs.push_back("-mms-bitfields");
   }
 
@@ -5476,7 +5499,7 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   // -fuse-cxa-atexit is default.
   if (!Args.hasFlag(
           options::OPT_fuse_cxa_atexit, options::OPT_fno_use_cxa_atexit,
-          !RawTriple.isOSWindows() &&
+          !RawTriple.isOSAIX() && !RawTriple.isOSWindows() &&
               TC.getArch() != llvm::Triple::xcore &&
               ((RawTriple.getVendor() != llvm::Triple::MipsTechnologies) ||
                RawTriple.hasEnvironment())) ||
@@ -5611,6 +5634,9 @@ void Clang::ConstructJob(Compilation &C, const JobAction &JA,
   if (Args.hasFlag(options::OPT_fpch_validate_input_files_content,
                    options::OPT_fno_pch_validate_input_files_content, false))
     CmdArgs.push_back("-fvalidate-ast-input-files-content");
+  if (Args.hasFlag(options::OPT_fpch_instantiate_templates,
+                   options::OPT_fno_pch_instantiate_templates, false))
+    CmdArgs.push_back("-fpch-instantiate-templates");
 
   Args.AddLastArg(CmdArgs, options::OPT_fexperimental_new_pass_manager,
                   options::OPT_fno_experimental_new_pass_manager);
