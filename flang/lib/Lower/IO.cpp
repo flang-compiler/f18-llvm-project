@@ -253,6 +253,11 @@ genOutputItemList(Fortran::lower::AbstractConverter &converter,
           itemValue);
       outputFuncArgs.push_back(parts.first);
       outputFuncArgs.push_back(parts.second);
+    } else if (fir::isa_ref_type(itemType)) {
+      // TODO: implement array lowering for non-character types
+      mlir::emitError(loc,
+            "Printing array types other than character arrays is not supported");
+      exit(1);
     } else {
       itemValue = builder.createConvert(loc, argType, itemValue);
       outputFuncArgs.push_back(itemValue);
