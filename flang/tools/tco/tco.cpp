@@ -116,7 +116,7 @@ static int compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
   // run the pass manager
   if (mlir::succeeded(pm.run(*owningRef))) {
     // passes ran successfully, so keep the output
-    if (emitFir)
+    if (emitFir || passPipeline.hasAnyOccurrences())
       printModuleBody(*owningRef, out.os());
     out.keep();
     return 0;
