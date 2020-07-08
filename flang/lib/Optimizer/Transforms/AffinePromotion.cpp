@@ -98,9 +98,7 @@ private:
     else
       return {};
   }
-  MaybeAffineExpr toAffineExpr(MaybeAffineExpr e) {
-    return e;
-  }
+  MaybeAffineExpr toAffineExpr(MaybeAffineExpr e) { return e; }
   MaybeAffineExpr toAffineExpr(int64_t value) {
     return {mlir::getAffineConstantExpr(value, firCondition.getContext())};
   }
@@ -120,7 +118,8 @@ private:
         return toAffineExpr(intConstant.getInt());
     if (auto blockArg = value.dyn_cast<mlir::BlockArgument>()) {
       affineArgs.push_back(value);
-      if (isa<fir::LoopOp>(blockArg.getOwner()->getParentOp()))
+      if (isa<fir::LoopOp>(blockArg.getOwner()->getParentOp()) ||
+          isa<mlir::AffineForOp>(blockArg.getOwner()->getParentOp()))
         return {mlir::getAffineDimExpr(dimCount++, value.getContext())};
       return {mlir::getAffineSymbolExpr(symCount++, value.getContext())};
     }
@@ -163,11 +162,9 @@ private:
 class AffineIfAnalysis {
 public:
   AffineIfAnalysis(fir::WhereOp op, AffineFunctionAnalysis &afa)
-      : affineCondition(op.condition()), legality(analyzeIf(op, afa)) {}
+      : legality(analyzeIf(op, afa)) {}
   bool canPromoteToAffine() { return legality; }
-  AffineIfCondition affineCondition;
   friend AffineFunctionAnalysis;
-  friend AffineIfConversion;
 
 private:
   bool legality;
@@ -255,7 +252,7 @@ bool AffineLoopAnalysis::analyzeBody(fir::LoopOp loopOperation,
 }
 
 bool AffineIfAnalysis::analyzeIf(fir::WhereOp op, AffineFunctionAnalysis &afa) {
-  if (affineCondition.integerSet.hasValue() && op.getNumResults() == 0)
+  if (op.getNumResults() == 0)
     return true;
   LLVM_DEBUG(
       llvm::dbgs() << "AffineIfAnalysis: not promoting as op has results\n";);
@@ -302,6 +299,7 @@ public:
     auto loopAndIndex = createAffineFor(loop, rewriter);
     auto affineFor = loopAndIndex.first;
     auto inductionVar = loopAndIndex.second;
+
     rewriter.startRootUpdate(affineFor.getOperation());
     affineFor.getBody()->getOperations().splice(--affineFor.getBody()->end(),
                                                 loopOps, loopOps.begin(),
@@ -440,15 +438,16 @@ public:
     LLVM_DEBUG(llvm::dbgs() << "AffineIfConversion: rewriting where:\n";
                op.dump(););
     auto &whereOps = op.whereRegion().front().getOperations();
-    auto ifAnalysis = functionAnalysis.getChildIfAnalysis(op);
-    if (!ifAnalysis.affineCondition.integerSet) {
-      LLVM_DEBUG(llvm::dbgs()
-                     << "AffineIfConversion: affineCondition not found\n";);
+    auto affineCondition = AffineIfCondition(op.condition());
+    if (!affineCondition.integerSet) {
+      LLVM_DEBUG(
+          llvm::dbgs()
+              << "AffineIfConversion: couldn't calculate affine condition\n";);
       return failure();
     }
     auto affineIf = rewriter.create<mlir::AffineIfOp>(
-        op.getLoc(), ifAnalysis.affineCondition.integerSet.getValue(),
-        ifAnalysis.affineCondition.affineArgs, !op.otherRegion().empty());
+        op.getLoc(), affineCondition.integerSet.getValue(),
+        affineCondition.affineArgs, !op.otherRegion().empty());
     rewriter.startRootUpdate(affineIf);
     affineIf.getThenBlock()->getOperations().splice(
         --affineIf.getThenBlock()->end(), whereOps, whereOps.begin(),
@@ -460,6 +459,8 @@ public:
           --otherOps.end());
     }
     rewriter.finalizeRootUpdate(affineIf);
+    LLVM_DEBUG(llvm::dbgs() << "AffineIfConversion: where converted to:\n";
+               affineIf.dump(););
     rewriter.replaceOp(op, affineIf.getOperation()->getResults());
     return success();
   }
