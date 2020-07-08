@@ -36,8 +36,8 @@ func @calc(%a: !arr_d1, %v: f32) {
   // CHECK: affine.for
   // CHECK-NEXT:   subi
   // CHECK-NEXT:   affine.if
-  // CHECK-NEXT:     fir.array_coor
-  // CHECK-NEXT:     fir.store
+  // CHECK-NEXT:     affine.apply
+  // CHECK-NEXT:     affine.store
   // CHECK-NEXT:   }
   // CHECK-NEXT:   affine.for
   // CHECK-NEXT:     affine.apply
