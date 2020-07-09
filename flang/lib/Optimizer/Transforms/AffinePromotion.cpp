@@ -68,6 +68,9 @@ private:
   }
 };
 
+/// Calculates arguments for creating an IntegerSet symCount, dimCount are the
+/// final number of symbols and dimensions of the affine map. If integer set if
+/// possible is in Optional IntegerSet
 class AffineIfCondition {
 public:
   typedef Optional<mlir::AffineExpr> MaybeAffineExpr;
@@ -102,6 +105,9 @@ private:
   MaybeAffineExpr toAffineExpr(int64_t value) {
     return {mlir::getAffineConstantExpr(value, firCondition.getContext())};
   }
+  /// Returns an AffineExpr if it is a result of operations that can be done
+  /// in an affine expression, this includes -, +, *, rem, constant.
+  /// block arguments of a loopOp or forOp are used as dimensions
   MaybeAffineExpr toAffineExpr(mlir::Value value) {
     if (auto op = value.getDefiningOp<mlir::SubIOp>())
       return affineBinaryOp(
@@ -159,6 +165,7 @@ private:
   }
 };
 
+/// Analysis for affine promotion of fir.if
 class AffineIfAnalysis {
 public:
   AffineIfAnalysis(fir::WhereOp op, AffineFunctionAnalysis &afa)
@@ -172,7 +179,9 @@ private:
   bool analyzeIf(fir::WhereOp, AffineFunctionAnalysis &);
 };
 
-/// builds analysis for all loop operations within a function
+/// Stores analysis objects for all loops and where operations inside a function
+///  these analysis are used twice, first for marking operations for rewrite and
+///  second when doing rewrite.
 class AffineFunctionAnalysis {
 public:
   AffineFunctionAnalysis(mlir::FuncOp funcOp) {
@@ -259,6 +268,10 @@ bool AffineIfAnalysis::analyzeIf(fir::WhereOp op, AffineFunctionAnalysis &afa) {
   return false;
 }
 
+/// AffineMap rewriting fir.array_coor operation to affine apply,
+/// %dim = fir.gendim %lowerBound, %upperBound, %stride
+/// %a = fir.array_coor %arr(%dim) %i
+/// returning affineMap = affine_map<(i)[lb, ub, st] -> (i*st - lb)>
 mlir::AffineMap createArrayIndexAffineMap(unsigned dimensions,
                                           MLIRContext *context) {
   auto index = mlir::getAffineConstantExpr(0, context);
@@ -294,6 +307,7 @@ mlir::Type coordinateArrayElement(fir::ArrayCoorOp op) {
   return mlir::Type();
 }
 
+/// Returns affine.apply and fir.convert from array_coor and gendims
 std::pair<mlir::AffineApplyOp, fir::ConvertOp>
 createAffineOps(mlir::Value arrayRef, mlir::PatternRewriter &rewriter) {
   auto acoOp = arrayRef.getDefiningOp<ArrayCoorOp>();
@@ -335,7 +349,10 @@ void rewriteMemoryOps(Block *block, mlir::PatternRewriter &rewriter) {
       rewriteStore(cast<fir::StoreOp>(bodyOp), rewriter);
   }
 }
-/// Convert `fir.loop` to `affine.for`
+
+/// Convert `fir.loop` to `affine.for`, creates fir.convert for arrays to
+/// memref, rewrites array_coor to affine.apply with affine_map. Rewrites fir
+/// loads and stores to affine.
 class AffineLoopConversion : public mlir::OpRewritePattern<fir::LoopOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
@@ -379,6 +396,7 @@ private:
         return positiveConstantStep(op, constantStep.getValue(), rewriter);
     return genericBounds(op, rewriter);
   }
+  // when step for the loop is positive compile time constant
   std::pair<mlir::AffineForOp, mlir::Value>
   positiveConstantStep(fir::LoopOp op, int64_t step,
                        mlir::PatternRewriter &rewriter) const {
