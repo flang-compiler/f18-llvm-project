@@ -256,3 +256,25 @@ subroutine sqrt_testr(a, b)
   ! CHECK: call {{.*}}sqrt
   b = sqrt(a)
 end subroutine
+
+! IABS
+! CHECK-LABEL: iabs_test
+subroutine iabs_test(a, b)
+  integer :: a, b
+  ! CHECK: shift_right_signed
+  ! CHECK: xor
+  ! CHECK: subi
+  b = iabs(a)
+end subroutine
+
+! IABS - Check is the return type(RT) a default kind.
+! CHECK-LABEL: iabs_test
+subroutine iabs_testRT(a, b)
+  integer(KIND=4) :: a
+  integer(KIND=16) :: b
+  ! CHECK: shift_right_signed
+  ! CHECK: xor
+  ! CHECK: %[[RT:.*]] =  subi
+  ! CHECK: fir.convert %[[RT]] : (i32)
+  b = iabs(a)
+end subroutine

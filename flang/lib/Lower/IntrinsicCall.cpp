@@ -202,6 +202,7 @@ struct IntrinsicLibrary {
                           mlir::FunctionType soughtFuncType);
 
   mlir::Value genAbs(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIAbs(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genAimag(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genAint(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genAnint(mlir::Type, llvm::ArrayRef<mlir::Value>);
@@ -293,6 +294,7 @@ struct IntrinsicHandler {
 using I = IntrinsicLibrary;
 static constexpr IntrinsicHandler handlers[]{
     {"abs", &I::genAbs},
+    {"iabs", &I::genIAbs},
     {"achar", &I::genConversion},
     {"aimag", &I::genAimag},
     {"aint", &I::genAint},
@@ -1041,6 +1043,25 @@ mlir::Value IntrinsicLibrary::genAbs(mlir::Type resultType,
     return genRuntimeCall("hypot", resultType, args);
   }
   llvm_unreachable("unexpected type in ABS argument");
+}
+
+// IABS
+mlir::Value IntrinsicLibrary::genIAbs(mlir::Type resultType,
+                                      llvm::ArrayRef<mlir::Value> args) {
+  assert(args.size() == 1);
+  auto arg = args[0];
+  auto type = arg.getType();
+  if (auto intType = type.dyn_cast<mlir::IntegerType>()) {
+    // At the time of this implementation there is no abs op in mlir.
+    // So, implement abs here without branching(see link for more information).
+    // https://www.geeksforgeeks.org/compute-the-integer-absolute-value-abs-without-branching/
+    auto shift =
+        builder.createIntegerConstant(loc, intType, intType.getWidth() - 1);
+    auto mask = builder.create<mlir::SignedShiftRightOp>(loc, arg, shift);
+    auto xored = builder.create<mlir::XOrOp>(loc, arg, mask);
+    return builder.create<mlir::SubIOp>(loc, xored, mask);
+  }
+  llvm_unreachable("unexpected type in IABS argument");
 }
 
 // AIMAG
