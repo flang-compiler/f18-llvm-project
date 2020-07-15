@@ -42,8 +42,7 @@ public:
   explicit ExprLowering(mlir::Location loc,
                         Fortran::lower::AbstractConverter &converter,
                         Fortran::lower::SymMap &map,
-                        const Fortran::lower::ExpressionContext &context
-                        )
+                        const Fortran::lower::ExpressionContext &context)
       : location{loc}, converter{converter},
         builder{converter.getFirOpBuilder()}, symMap{map}, context{context} {}
 
@@ -311,13 +310,27 @@ private:
   fir::ExtendedValue genval(Fortran::semantics::SymbolRef sym) {
     auto var = gen(sym);
     if (auto *s = var.getUnboxed())
-      if (fir::isReferenceLike(s->getType()))
-        return genLoad(*s);
+      if (fir::isReferenceLike(s->getType())) {
+        // A function with multiple entry points returning different types
+        // tags all result variables with one chosen mlir type to allow them
+        // to share the same storage.  A reference to a result variable of one
+        // of the other types requires conversion to the actual type.
+        auto addr = *s;
+        if (Fortran::semantics::IsFunctionResult(sym)) {
+          auto resultType = converter.genType(*sym);
+          if (addr.getType() != resultType)
+            addr = builder.createConvert(getLoc(),
+                                         builder.getRefType(resultType), addr);
+        }
+        return genLoad(addr);
+      }
     if (inArrayContext()) {
       // FIXME: make this more robust
       auto base = fir::getBase(var);
-      auto ty = builder.getRefType(peelType(base.getType(), context.getLoopVars().size() + 1));
-      auto coor = builder.create<fir::CoordinateOp>(getLoc(), ty, base, context.getLoopVars());
+      auto ty = builder.getRefType(
+          peelType(base.getType(), context.getLoopVars().size() + 1));
+      auto coor = builder.create<fir::CoordinateOp>(getLoc(), ty, base,
+                                                    context.getLoopVars());
       return genLoad(coor);
     }
     return var;
@@ -986,7 +999,8 @@ private:
           auto dlb = builder.createConvert(loc, idxTy, getLB(arr, dim));
           auto diff = builder.create<mlir::SubIOp>(loc, tlb, dlb);
           assert(idx < context.getLoopVars().size());
-          auto sum = builder.create<mlir::AddIOp>(loc, diff, context.getLoopVars()[idx++]);
+          auto sum = builder.create<mlir::AddIOp>(loc, diff,
+                                                  context.getLoopVars()[idx++]);
           auto del = builder.createConvert(loc, idxTy, std::get<2>(*trip));
           auto scaled = builder.create<mlir::MulIOp>(loc, del, delta);
           auto prod = builder.create<mlir::MulIOp>(loc, scaled, sum);
@@ -1069,7 +1083,8 @@ private:
           // triple notation for slicing operation
           auto ty = builder.getIndexType();
           auto step = builder.createConvert(loc, ty, std::get<2>(*range));
-          auto scale = builder.create<mlir::MulIOp>(loc, ty, context.getLoopVars()[i], step);
+          auto scale = builder.create<mlir::MulIOp>(
+              loc, ty, context.getLoopVars()[i], step);
           auto off = builder.createConvert(loc, ty, std::get<0>(*range));
           args.push_back(builder.create<mlir::AddIOp>(loc, ty, off, scale));
         }
