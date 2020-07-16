@@ -458,7 +458,7 @@ class AffineIfConversion : public mlir::OpRewritePattern<fir::WhereOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
   AffineIfConversion(mlir::MLIRContext *context, AffineFunctionAnalysis &afa)
-      : OpRewritePattern(context), functionAnalysis(afa) {}
+      : OpRewritePattern(context) {}
   mlir::LogicalResult
   matchAndRewrite(fir::WhereOp op,
                   mlir::PatternRewriter &rewriter) const override {
@@ -493,9 +493,6 @@ public:
     rewriter.replaceOp(op, affineIf.getOperation()->getResults());
     return success();
   }
-
-private:
-  AffineFunctionAnalysis &functionAnalysis;
 };
 
 /// Promote fir.loop and fir.where to affine.for and affine.if, in the cases
