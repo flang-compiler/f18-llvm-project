@@ -14,11 +14,11 @@ program taskwait
 !$OMP TASKWAIT
 !FIRDialect: omp.taskwait
 !LLVMIRDialect: omp.taskwait
-!LLVMIR: %{{.*}} = call i32 @__kmpc_omp_taskwait(%struct.ident_t* @1, i32 %omp_global_thread_num)
+!LLVMIR: %{{.*}} = call i32 @__kmpc_omp_taskwait(%struct.ident_t* @{{.*}}, i32 %{{.*}})
         c = a + b
 !$OMP TASKWAIT
 !FIRDialect: omp.taskwait
 !LLVMIRDialect: omp.taskwait
-!LLVMIR: %{{.*}} = call i32 @__kmpc_omp_taskwait(%struct.ident_t* @1, i32 %omp_global_thread_num1)
+!LLVMIR: %{{.*}} = call i32 @__kmpc_omp_taskwait(%struct.ident_t* @{{.*}}, i32 %{{.*}})
 
 end program
