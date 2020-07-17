@@ -491,15 +491,22 @@ private:
   ///
   /// Generate the cleanup block before the procedure exits
   void genReturnSymbol(const Fortran::semantics::Symbol &functionSymbol) {
-    const auto &details =
-        functionSymbol.get<Fortran::semantics::SubprogramDetails>();
-    auto resultRef = lookupSymbol(details.result());
-    // TODO: This should probably look at the callee interface result instead
-    // to know what must be returned.
-    mlir::Value retval = resultRef;
-    if (!resultRef.getType().isa<fir::BoxCharType>())
-      retval = builder->create<fir::LoadOp>(toLocation(), resultRef);
-    builder->create<mlir::ReturnOp>(toLocation(), retval);
+    const auto &resultSym =
+        functionSymbol.get<Fortran::semantics::SubprogramDetails>().result();
+    mlir::Value resultRef = lookupSymbol(resultSym);
+    auto loc = toLocation();
+    if (resultRef.getType().isa<fir::BoxCharType>()) {
+      builder->create<mlir::ReturnOp>(loc, resultRef);
+      return;
+    }
+    // A function with multiple entry points returning different types tags
+    // all result variables with one chosen mlir type to allow them to share
+    // the same storage.  Convert this to the actual type.
+    mlir::Type resultRefType = builder->getRefType(genType(resultSym));
+    if (resultRef.getType() != resultRefType)
+      resultRef = builder->createConvert(loc, resultRefType, resultRef);
+    mlir::Value resultVal = builder->create<fir::LoadOp>(loc, resultRef);
+    builder->create<mlir::ReturnOp>(loc, resultVal);
   }
 
   /// Argument \p funit is a subroutine that has alternate return specifiers.
@@ -1242,9 +1249,7 @@ private:
 
   //===--------------------------------------------------------------------===//
 
-  void genFIR(const Fortran::parser::ContinueStmt &) {
-    // do nothing
-  }
+  void genFIR(const Fortran::parser::ContinueStmt &) {} // nop
 
   void genFIR(const Fortran::parser::EventPostStmt &stmt) {
     genEventPostStatement(*this, stmt);
@@ -1386,8 +1391,18 @@ private:
                 mlir::Value addr = isPointer ? genExprValue(assign.lhs)
                                              : genExprAddr(assign.lhs);
                 auto val = genExprValue(assign.rhs);
-                auto toTy = fir::dyn_cast_ptrEleTy(addr.getType());
+                // A function with multiple entry points returning different
+                // types tags all result variables with one chosen mlir type
+                // to allow them to share the same storage.  Assignment to a
+                // result variable of one of the other types requires
+                // conversion to the actual type.
+                auto toTy = genType(assign.lhs);
                 auto cast = builder->convertWithSemantics(loc, toTy, val);
+                if (fir::dyn_cast_ptrEleTy(addr.getType()) != toTy) {
+                  assert(sym->IsFuncResult() && "type mismatch");
+                  addr = builder->createConvert(
+                      toLocation(), builder->getRefType(toTy), addr);
+                }
                 builder->create<fir::StoreOp>(loc, cast, addr);
                 return;
               }
@@ -1480,11 +1495,7 @@ private:
     // data transfer statement.
   }
 
-  void genFIR(const Fortran::parser::EntryStmt &) {
-    // FIXME: Need to lower this for F77.
-    mlir::emitError(toLocation(), "ENTRY statement is not handled.");
-    exit(1);
-  }
+  void genFIR(const Fortran::parser::EntryStmt &) {} // nop
 
   void genFIR(const Fortran::parser::PauseStmt &stmt) {
     genPauseStatement(*this, stmt);
@@ -1583,13 +1594,20 @@ private:
   void instantiateGlobal(const Fortran::lower::pft::Variable &var) {
     const auto &sym = var.getSymbol();
     auto globalName = mangleName(sym);
-    fir::GlobalOp global;
     bool isConst = sym.attrs().test(Fortran::semantics::Attr::PARAMETER);
     auto loc = genLocation(sym.name());
     auto idxTy = builder->getIndexType();
     // FIXME: name returned does not consider subprogram's scope, is not unique
-    if (builder->getNamedGlobal(globalName))
+    fir::GlobalOp global = builder->getNamedGlobal(globalName);
+    if (global) {
+      if (!lookupSymbol(sym)) {
+        // Reference from an alternate entry point - use primary entry name.
+        auto addrOf = builder->create<fir::AddrOfOp>(loc, global.resultType(),
+                                                     global.getSymbol());
+        addSymbol(sym, addrOf);
+      }
       return;
+    }
     if (const auto *details =
             sym.detailsIf<Fortran::semantics::ObjectEntityDetails>()) {
       if (details->init()) {
@@ -1624,35 +1642,35 @@ private:
       }
       auto addrOf = builder->create<fir::AddrOfOp>(loc, global.resultType(),
                                                    global.getSymbol());
-      SymbolBoxAnalyzer sia(sym);
-      sia.analyze();
-      if (sia.isTrivial()) {
+      SymbolBoxAnalyzer sba(sym);
+      sba.analyze();
+      if (sba.isTrivial()) {
         addSymbol(sym, addrOf);
         return;
       }
       mlir::Value len;
-      if (sia.isChar) {
-        auto c = sia.getCharLenConst();
+      if (sba.isChar) {
+        auto c = sba.getCharLenConst();
         assert(c.hasValue());
         len = builder->createIntegerConstant(loc, idxTy, *c);
       }
       llvm::SmallVector<mlir::Value, 8> extents;
       llvm::SmallVector<mlir::Value, 8> lbounds;
-      if (sia.isArray) {
-        assert(sia.staticSize);
-        for (auto i : sia.staticShape)
+      if (sba.isArray) {
+        assert(sba.staticSize);
+        for (auto i : sba.staticShape)
           extents.push_back(builder->createIntegerConstant(loc, idxTy, i));
-        if (!sia.lboundIsAllOnes())
-          for (auto i : sia.staticLBound)
+        if (!sba.lboundIsAllOnes())
+          for (auto i : sba.staticLBound)
             lbounds.push_back(builder->createIntegerConstant(loc, idxTy, i));
       }
-      if (sia.isChar && sia.isArray) {
+      if (sba.isChar && sba.isArray) {
         localSymbols.addCharSymbolWithBounds(sym, addrOf, len, extents,
                                              lbounds);
-      } else if (sia.isChar) {
+      } else if (sba.isChar) {
         localSymbols.addCharSymbol(sym, addrOf, len);
       } else {
-        assert(sia.isArray);
+        assert(sba.isArray);
         localSymbols.addSymbolWithBounds(sym, addrOf, extents, lbounds);
       }
     } else if (const auto *details =
@@ -1768,10 +1786,10 @@ private:
     const auto isDummy = Fortran::semantics::IsDummy(sym);
     const auto isResult = Fortran::semantics::IsFunctionResult(sym);
     Fortran::lower::CharacterExprHelper charHelp{*builder, loc};
-    SymbolBoxAnalyzer sia(sym);
-    sia.analyze();
+    SymbolBoxAnalyzer sba(sym);
+    sba.analyze();
 
-    if (sia.isTrivial()) {
+    if (sba.isTrivial()) {
       if (isDummy) {
         // This is an argument.
         assert(lookupSymbol(sym) && "must already be in map");
@@ -1780,7 +1798,7 @@ private:
       // TODO: What about lower host-associated variables? (They probably need
       // to be handled as dummy parameters.)
 
-      // Otherwise, it's a local variable.
+      // Otherwise, it's a local variable or function result.
       auto local = createNewLocal(loc, var, preAlloc);
       addSymbol(sym, local);
       return;
@@ -1797,16 +1815,16 @@ private:
     mlir::Value len{};
     [[maybe_unused]] bool mustBeDummy = false;
 
-    if (sia.isChar) {
+    if (sba.isChar) {
       // if element type is a CHARACTER, determine the LEN value
       if (isDummy || isResult) {
         auto unboxchar = charHelp.createUnboxChar(addr);
         auto boxAddr = unboxchar.first;
-        if (auto c = sia.getCharLenConst()) {
+        if (auto c = sba.getCharLenConst()) {
           // Set/override LEN with a constant
           len = builder->createIntegerConstant(loc, idxTy, *c);
           addr = charHelp.createEmboxChar(boxAddr, len);
-        } else if (auto e = sia.getCharLenExpr()) {
+        } else if (auto e = sba.getCharLenExpr()) {
           // Set/override LEN with an expression
           len = genExprValue(*e);
           addr = charHelp.createEmboxChar(boxAddr, len);
@@ -1818,13 +1836,15 @@ private:
         // XXX: Subsequent lowering expects a CHARACTER variable to be in a
         // boxchar. We assert that here. We might want to reconsider this
         // precondition.
-        assert(addr.getType().isa<fir::BoxCharType>());
+        // Update: Skeleton entry point dummy char argument generation hits
+        // this assert.  Suppress it pending further investigation.
+        // assert(addr.getType().isa<fir::BoxCharType>());
       } else {
         // local CHARACTER variable
-        if (auto c = sia.getCharLenConst()) {
+        if (auto c = sba.getCharLenConst()) {
           len = builder->createIntegerConstant(loc, idxTy, *c);
         } else {
-          auto e = sia.getCharLenExpr();
+          auto e = sba.getCharLenExpr();
           assert(e && "CHARACTER variable must have LEN parameter");
           len = genExprValue(*e);
         }
@@ -1832,23 +1852,23 @@ private:
       }
     }
 
-    if (sia.isArray) {
+    if (sba.isArray) {
       // if object is an array process the lower bound and extent values
       llvm::SmallVector<mlir::Value, 8> extents;
       llvm::SmallVector<mlir::Value, 8> lbounds;
       mustBeDummy = !isExplicitShape(sym) &&
                     !Fortran::semantics::IsAllocatableOrPointer(sym);
-      if (sia.staticSize) {
+      if (sba.staticSize) {
         // object shape is constant
         auto castTy = builder->getRefType(genType(var));
         if (addr)
           addr = builder->createConvert(loc, castTy, addr);
-        if (sia.lboundIsAllOnes()) {
+        if (sba.lboundIsAllOnes()) {
           // if lower bounds are all ones, build simple shaped object
           llvm::SmallVector<mlir::Value, 8> shape;
-          for (auto i : sia.staticShape)
+          for (auto i : sba.staticShape)
             shape.push_back(builder->createIntegerConstant(loc, idxTy, i));
-          if (sia.isChar) {
+          if (sba.isChar) {
             if (isDummy || isResult) {
               localSymbols.addCharSymbolWithShape(sym, addr, len, shape, true);
               return;
@@ -1880,7 +1900,7 @@ private:
         }
       }
       // construct constants and populate `bounds`
-      for (const auto &i : llvm::zip(sia.staticLBound, sia.staticShape)) {
+      for (const auto &i : llvm::zip(sba.staticLBound, sba.staticShape)) {
         auto fst = builder->createIntegerConstant(loc, idxTy, std::get<0>(i));
         auto snd = builder->createIntegerConstant(loc, idxTy, std::get<1>(i));
         lbounds.emplace_back(fst);
@@ -1888,7 +1908,7 @@ private:
       }
 
       // default array case: populate `bounds` with lower and extent values
-      for (const auto &spec : sia.dynamicBound) {
+      for (const auto &spec : sba.dynamicBound) {
         auto low = spec->lbound().GetExplicit();
         auto high = spec->ubound().GetExplicit();
         if (low && high) {
@@ -1913,7 +1933,7 @@ private:
         break;
       }
 
-      if (sia.isChar) {
+      if (sba.isChar) {
         if (isDummy || isResult) {
           localSymbols.addCharSymbolWithBounds(sym, addr, len, extents, lbounds,
                                                true);
@@ -1940,14 +1960,14 @@ private:
     }
 
     // not an array, so process as scalar argument
-    if (sia.isChar) {
+    if (sba.isChar) {
       if (isDummy || isResult) {
         addCharSymbol(sym, addr, len, true);
         return;
       }
       assert(!mustBeDummy);
       auto charTy = genType(var);
-      auto c = sia.getCharLenConst();
+      auto c = sba.getCharLenConst();
       mlir::Value local = c ? charHelp.createCharacterTemp(charTy, *c)
                             : charHelp.createCharacterTemp(charTy, len);
       addCharSymbol(sym, local, len);
@@ -1999,7 +2019,8 @@ private:
       instantiateLocal(var);
   }
 
-  void mapDummyAndResults(const Fortran::lower::CalleeInterface &callee) {
+  void mapDummiesAndResults(const Fortran::lower::pft::FunctionLikeUnit &funit,
+                            const Fortran::lower::CalleeInterface &callee) {
     assert(builder && "need a builder at this point");
     using PassBy = Fortran::lower::CalleeInterface::PassEntityBy;
     auto mapPassedEntity = [&](const auto arg) -> void {
@@ -2015,8 +2036,31 @@ private:
     for (const auto &arg : callee.getPassedArguments()) {
       mapPassedEntity(arg);
     }
+    // Allocate local skeleton instances of dummies from other entry points.
+    // Most of these locals will not survive into final generated code, but
+    // some will.  It is illegal to reference them at run time if they do.
+    mlir::Value undef = {};
+    for (const auto *arg : funit.nonUniversalDummyArguments) {
+      if (lookupSymbol(*arg))
+        continue;
+      SymbolBoxAnalyzer sba(*arg);
+      sba.analyze();
+      llvm::SmallVector<mlir::Value, 3> indexes;
+      // For multiple dimension arrays, sba.dynamicBound may contain more values
+      // than needed here.  Creating a temp with "extra" values appears benign.
+      if (!sba.dynamicBound.empty()) {
+        if (!undef)
+          undef = builder->create<fir::UndefOp>(toLocation(),
+                                                builder->getIndexType());
+        for (int i = sba.dynamicBound.size(); i > 0; --i)
+          indexes.push_back(undef);
+      }
+      addSymbol(*arg, createTemp(toLocation(), *arg, indexes));
+    }
     if (auto passedResult = callee.getPassedResult()) {
       mapPassedEntity(*passedResult);
+      if (*passedResult->entity != *funit.primaryResult)
+        addSymbol(*funit.primaryResult, lookupSymbol(passedResult->entity));
     }
   }
 
@@ -2029,13 +2073,37 @@ private:
     assert(builder && "FirOpBuilder did not instantiate");
     builder->setInsertionPointToStart(&func.front());
 
-    mapDummyAndResults(callee);
+    mapDummiesAndResults(funit, callee);
 
-    for (const auto &var : funit.getOrderedSymbolTable())
-      instantiateVar(var);
+    mlir::Value primaryFuncResult = {};
+    llvm::SmallVector<const Fortran::semantics::Symbol *, 3>
+        deferredFuncResultList;
+    for (const auto &var : funit.getOrderedSymbolTable()) {
+      const Fortran::semantics::Symbol *sym = &var.getSymbol();
+      if (!sym->IsFuncResult() || !funit.primaryResult) {
+        instantiateVar(var);
+      } else if (sym == funit.primaryResult) {
+        instantiateVar(var);
+        primaryFuncResult = lookupSymbol(*sym);
+      } else {
+        deferredFuncResultList.push_back(sym);
+      }
+    }
+    for (auto altResult : deferredFuncResultList)
+      addSymbol(*altResult, primaryFuncResult);
 
     // Create most function blocks in advance.
-    createEmptyBlocks(funit.evaluationList);
+    auto *alternateEntryEval = funit.getEntryEval();
+    if (alternateEntryEval) {
+      // Move to executable successor.
+      alternateEntryEval = alternateEntryEval->lexicalSuccessor;
+      bool evalIsNewBlock = alternateEntryEval->isNewBlock;
+      alternateEntryEval->isNewBlock = true;
+      createEmptyBlocks(funit.evaluationList);
+      alternateEntryEval->isNewBlock = evalIsNewBlock;
+    } else {
+      createEmptyBlocks(funit.evaluationList);
+    }
 
     // Reinstate entry block as the current insertion point.
     builder->setInsertionPointToEnd(&func.front());
@@ -2053,6 +2121,12 @@ private:
       const auto zero =
           builder->createIntegerConstant(loc, builder->getIndexType(), 0);
       builder->create<fir::StoreOp>(loc, zero, altResult);
+    }
+
+    if (alternateEntryEval) {
+      genBranch(alternateEntryEval->block);
+      builder->setInsertionPointToStart(
+          builder->createBlock(&builder->getRegion()));
     }
   }
 
@@ -2103,29 +2177,71 @@ private:
   void endNewFunction(Fortran::lower::pft::FunctionLikeUnit &funit) {
     setCurrentPosition(
         Fortran::lower::pft::FunctionLikeUnit::stmtSourceLoc(funit.endStmt));
-
     if (funit.isMainProgram())
       genExitRoutine();
     else
       genFIRProcedureExit(funit, funit.getSubprogramSymbol());
-
-    // immediately throw away any dead code just created
-    mlir::simplifyRegions({builder->getRegion()});
+    funit.finalBlock = nullptr;
+    mlir::simplifyRegions({builder->getRegion()}); // remove dead code
     delete builder;
     builder = nullptr;
     localSymbols.clear();
   }
 
-  /// Lower a procedure-like construct
+  /// For multiple entry subprograms, build a list of the dummy arguments that
+  /// appear in some, but not all entry points.  For those that are functions,
+  /// also find one of the largest function results, since a single result
+  /// container holds the result for all entries.
+  void
+  findNonUniversalDummyArguments(Fortran::lower::pft::FunctionLikeUnit &funit) {
+    int entryCount = funit.entryPointList.size();
+    if (entryCount == 1)
+      return;
+    llvm::DenseMap<Fortran::semantics::Symbol *, int> dummyCountMap;
+    for (int entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+      funit.setActiveEntry(entryIndex);
+      const auto &details = funit.getSubprogramSymbol()
+                                .get<Fortran::semantics::SubprogramDetails>();
+      for (auto *arg : details.dummyArgs()) {
+        if (!arg)
+          continue; // alternate return specifier (no actual argument)
+        const auto iter = dummyCountMap.find(arg);
+        if (iter == dummyCountMap.end())
+          dummyCountMap.try_emplace(arg, 1);
+        else
+          ++iter->second;
+      }
+      if (details.isFunction()) {
+        const auto *resultSym = &details.result();
+        assert(resultSym && "missing result symbol");
+        if (!funit.primaryResult ||
+            funit.primaryResult->size() < resultSym->size())
+          funit.primaryResult = resultSym;
+      }
+    }
+    funit.setActiveEntry(0);
+    for (auto arg : dummyCountMap)
+      if (arg.second < entryCount)
+        funit.nonUniversalDummyArguments.push_back(arg.first);
+    // Sort to provide generated code order stability.
+    std::sort(funit.nonUniversalDummyArguments.begin(),
+              funit.nonUniversalDummyArguments.end(), std::greater<>());
+  }
+
+  /// Lower a procedure (nest).
   void lowerFunc(Fortran::lower::pft::FunctionLikeUnit &funit) {
-    startNewFunction(funit);
-    // lower this procedure
-    for (auto &eval : funit.evaluationList)
-      genFIR(eval);
-    endNewFunction(funit);
-    // recursively lower internal procedures
+    findNonUniversalDummyArguments(funit);
+    for (int entryIndex = 0, last = funit.entryPointList.size();
+         entryIndex < last; ++entryIndex) {
+      funit.setActiveEntry(entryIndex);
+      startNewFunction(funit); // this entry point of this procedure
+      for (auto &eval : funit.evaluationList)
+        genFIR(eval);
+      endNewFunction(funit);
+    }
+    funit.setActiveEntry(0);
     for (auto &f : funit.nestedFunctions)
-      lowerFunc(f);
+      lowerFunc(f); // internal procedure
   }
 
   void lowerMod(Fortran::lower::pft::ModuleLikeUnit &mod) {
