@@ -500,8 +500,8 @@ private:
       return;
     }
     // A function with multiple entry points returning different types tags
-    // all result variables with one chosen mlir type to allow them to share
-    // the same storage.  Convert this to the actual type.
+    // all result variables with one of the largest types to allow them to
+    // share the the same storage.  Convert this to the actual type.
     mlir::Type resultRefType = builder->getRefType(genType(resultSym));
     if (resultRef.getType() != resultRefType)
       resultRef = builder->createConvert(loc, resultRefType, resultRef);
@@ -1392,9 +1392,9 @@ private:
                                              : genExprAddr(assign.lhs);
                 auto val = genExprValue(assign.rhs);
                 // A function with multiple entry points returning different
-                // types tags all result variables with one chosen mlir type
-                // to allow them to share the same storage.  Assignment to a
-                // result variable of one of the other types requires
+                // types tags all result variables with one of the largest
+                // types to allow them to share the same storage.  Assignment
+                // to a result variable of one of the other types requires
                 // conversion to the actual type.
                 auto toTy = genType(assign.lhs);
                 auto cast = builder->convertWithSemantics(loc, toTy, val);
@@ -2039,23 +2039,13 @@ private:
     // Allocate local skeleton instances of dummies from other entry points.
     // Most of these locals will not survive into final generated code, but
     // some will.  It is illegal to reference them at run time if they do.
-    mlir::Value undef = {};
     for (const auto *arg : funit.nonUniversalDummyArguments) {
       if (lookupSymbol(*arg))
         continue;
-      SymbolBoxAnalyzer sba(*arg);
-      sba.analyze();
-      llvm::SmallVector<mlir::Value, 3> indexes;
-      // For multiple dimension arrays, sba.dynamicBound may contain more values
-      // than needed here.  Creating a temp with "extra" values appears benign.
-      if (!sba.dynamicBound.empty()) {
-        if (!undef)
-          undef = builder->create<fir::UndefOp>(toLocation(),
-                                                builder->getIndexType());
-        for (int i = sba.dynamicBound.size(); i > 0; --i)
-          indexes.push_back(undef);
-      }
-      addSymbol(*arg, createTemp(toLocation(), *arg, indexes));
+      auto type = genType(*arg);
+      // TODO: Account for VALUE arguments (and possibly other variants).
+      type = builder->getRefType(type);
+      addSymbol(*arg, builder->create<fir::UndefOp>(toLocation(), type));
     }
     if (auto passedResult = callee.getPassedResult()) {
       mapPassedEntity(*passedResult);
@@ -2075,8 +2065,8 @@ private:
 
     mapDummiesAndResults(funit, callee);
 
-    mlir::Value primaryFuncResult = {};
-    llvm::SmallVector<const Fortran::semantics::Symbol *, 3>
+    mlir::Value primaryFuncResult;
+    llvm::SmallVector<const Fortran::semantics::Symbol *, 4>
         deferredFuncResultList;
     for (const auto &var : funit.getOrderedSymbolTable()) {
       const Fortran::semantics::Symbol *sym = &var.getSymbol();
@@ -2188,49 +2178,8 @@ private:
     localSymbols.clear();
   }
 
-  /// For multiple entry subprograms, build a list of the dummy arguments that
-  /// appear in some, but not all entry points.  For those that are functions,
-  /// also find one of the largest function results, since a single result
-  /// container holds the result for all entries.
-  void
-  findNonUniversalDummyArguments(Fortran::lower::pft::FunctionLikeUnit &funit) {
-    int entryCount = funit.entryPointList.size();
-    if (entryCount == 1)
-      return;
-    llvm::DenseMap<Fortran::semantics::Symbol *, int> dummyCountMap;
-    for (int entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
-      funit.setActiveEntry(entryIndex);
-      const auto &details = funit.getSubprogramSymbol()
-                                .get<Fortran::semantics::SubprogramDetails>();
-      for (auto *arg : details.dummyArgs()) {
-        if (!arg)
-          continue; // alternate return specifier (no actual argument)
-        const auto iter = dummyCountMap.find(arg);
-        if (iter == dummyCountMap.end())
-          dummyCountMap.try_emplace(arg, 1);
-        else
-          ++iter->second;
-      }
-      if (details.isFunction()) {
-        const auto *resultSym = &details.result();
-        assert(resultSym && "missing result symbol");
-        if (!funit.primaryResult ||
-            funit.primaryResult->size() < resultSym->size())
-          funit.primaryResult = resultSym;
-      }
-    }
-    funit.setActiveEntry(0);
-    for (auto arg : dummyCountMap)
-      if (arg.second < entryCount)
-        funit.nonUniversalDummyArguments.push_back(arg.first);
-    // Sort to provide generated code order stability.
-    std::sort(funit.nonUniversalDummyArguments.begin(),
-              funit.nonUniversalDummyArguments.end(), std::greater<>());
-  }
-
   /// Lower a procedure (nest).
   void lowerFunc(Fortran::lower::pft::FunctionLikeUnit &funit) {
-    findNonUniversalDummyArguments(funit);
     for (int entryIndex = 0, last = funit.entryPointList.size();
          entryIndex < last; ++entryIndex) {
       funit.setActiveEntry(entryIndex);

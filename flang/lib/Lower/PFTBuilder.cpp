@@ -205,6 +205,7 @@ private:
   void exitFunction() {
     endFunctionBody();
     analyzeBranches(nullptr, *evaluationListStack.back()); // add branch links
+    processEntryPoints();
     popEvaluationList();
     labelEvaluationMap = nullptr;
     assignSymbolLabelMap = nullptr;
@@ -755,6 +756,46 @@ private:
         markSuccessorAsNewBlock(eval);
       }
     }
+  }
+
+  /// For multiple entry subprograms, build a list of the dummy arguments that
+  /// appear in some, but not all entry points.  For those that are functions,
+  /// also find one of the largest function results, since a single result
+  /// container holds the result for all entries.
+  void processEntryPoints() {
+    auto *unit = evaluationListStack.back()->front().getOwningProcedure();
+    int entryCount = unit->entryPointList.size();
+    if (entryCount == 1)
+      return;
+    llvm::DenseMap<Fortran::semantics::Symbol *, int> dummyCountMap;
+    for (int entryIndex = 0; entryIndex < entryCount; ++entryIndex) {
+      unit->setActiveEntry(entryIndex);
+      const auto &details = unit->getSubprogramSymbol()
+                                .get<Fortran::semantics::SubprogramDetails>();
+      for (auto *arg : details.dummyArgs()) {
+        if (!arg)
+          continue; // alternate return specifier (no actual argument)
+        const auto iter = dummyCountMap.find(arg);
+        if (iter == dummyCountMap.end())
+          dummyCountMap.try_emplace(arg, 1);
+        else
+          ++iter->second;
+      }
+      if (details.isFunction()) {
+        const auto *resultSym = &details.result();
+        assert(resultSym && "missing result symbol");
+        if (!unit->primaryResult ||
+            unit->primaryResult->size() < resultSym->size())
+          unit->primaryResult = resultSym;
+      }
+    }
+    unit->setActiveEntry(0);
+    for (auto arg : dummyCountMap)
+      if (arg.second < entryCount)
+        unit->nonUniversalDummyArguments.push_back(arg.first);
+    // Sort to provide generated code order stability.
+    std::sort(unit->nonUniversalDummyArguments.begin(),
+              unit->nonUniversalDummyArguments.end(), std::greater<>());
   }
 
   std::unique_ptr<lower::pft::Program> pgm;

@@ -312,9 +312,9 @@ private:
     if (auto *s = var.getUnboxed())
       if (fir::isReferenceLike(s->getType())) {
         // A function with multiple entry points returning different types
-        // tags all result variables with one chosen mlir type to allow them
-        // to share the same storage.  A reference to a result variable of one
-        // of the other types requires conversion to the actual type.
+        // tags all result variables with one of the largest types to allow
+        // them to share the same storage.  A reference to a result variable
+        // of one of the other types requires conversion to the actual type.
         auto addr = *s;
         if (Fortran::semantics::IsFunctionResult(sym)) {
           auto resultType = converter.genType(*sym);
