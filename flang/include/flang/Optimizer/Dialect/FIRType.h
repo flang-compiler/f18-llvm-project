@@ -137,20 +137,22 @@ class CharacterType
                                   detail::CharacterTypeStorage> {
 public:
   using Base::Base;
+  using LenType = std::int64_t;
+
   static CharacterType get(mlir::MLIRContext *ctxt, KindTy kind,
-                           std::int64_t len = 1);
+                           LenType len = 1);
   static constexpr bool kindof(unsigned kind) {
     return kind == TypeKind::FIR_CHARACTER;
   }
   KindTy getFKind() const;
 
   /// CHARACTER is a singleton and has a LEN of 1.
-  static constexpr std::int64_t singleton() { return 1; }
+  static constexpr LenType singleton() { return 1; }
   /// CHARACTER has an unknown LEN property.
-  static constexpr std::int64_t unknownLen() { return -1; }
+  static constexpr LenType unknownLen() { return -1; }
 
   /// Access to a CHARACTER's LEN property. Defaults to 1.
-  std::int64_t getLen() const;
+  LenType getLen() const;
 };
 
 /// Model of a Fortran COMPLEX intrinsic type, including the KIND type
@@ -489,6 +491,12 @@ inline bool isa_integer(mlir::Type t) {
 /// Is `t` a FIR or MLIR Complex type?
 inline bool isa_complex(mlir::Type t) {
   return t.isa<fir::CplxType>() || t.isa<mlir::ComplexType>();
+}
+
+inline bool isa_char_string(mlir::Type t) {
+  if (auto ct = t.dyn_cast_or_null<fir::CharacterType>())
+    return ct.getLen() != fir::CharacterType::singleton();
+  return false;
 }
 
 } // namespace fir

@@ -92,7 +92,7 @@ CharacterType parseCharacter(mlir::DialectAsmParser &parser) {
     parser.emitError(parser.getCurrentLocation(), "kind value expected");
     return {};
   }
-  std::int64_t len = 1;
+  CharacterType::LenType len = 1;
   if (mlir::succeeded(parser.parseOptionalComma()))
     if (parser.parseInteger(len)) {
       if (mlir::succeeded(parser.parseOptionalQuestion())) {
@@ -397,7 +397,7 @@ namespace detail {
 
 /// `CHARACTER` storage
 struct CharacterTypeStorage : public mlir::TypeStorage {
-  using KeyTy = std::tuple<KindTy, std::int64_t>;
+  using KeyTy = std::tuple<KindTy, CharacterType::LenType>;
 
   static unsigned hashKey(const KeyTy &key) {
     auto hashVal = llvm::hash_combine(std::get<0>(key));
@@ -416,15 +416,15 @@ struct CharacterTypeStorage : public mlir::TypeStorage {
   }
 
   KindTy getFKind() const { return kind; }
-  std::int64_t getLen() const { return len; }
+  CharacterType::LenType getLen() const { return len; }
 
 protected:
   KindTy kind;
-  std::int64_t len;
+  CharacterType::LenType len;
 
 private:
   CharacterTypeStorage() = delete;
-  explicit CharacterTypeStorage(KindTy kind, std::int64_t len)
+  explicit CharacterTypeStorage(KindTy kind, CharacterType::LenType len)
       : kind{kind}, len{len} {}
 };
 
@@ -942,7 +942,8 @@ bool isa_passbyref_type(mlir::Type t) {
 }
 
 bool isa_aggregate(mlir::Type t) {
-  return t.isa<SequenceType>() || t.isa<RecordType>();
+  return t.isa<SequenceType>() || t.isa<RecordType>() ||
+         t.isa<mlir::TupleType>();
 }
 
 mlir::Type dyn_cast_ptrEleTy(mlir::Type t) {
@@ -957,13 +958,15 @@ mlir::Type dyn_cast_ptrEleTy(mlir::Type t) {
 // CHARACTER
 
 CharacterType fir::CharacterType::get(mlir::MLIRContext *ctxt, KindTy kind,
-                                      std::int64_t len) {
+                                      CharacterType::LenType len) {
   return Base::get(ctxt, FIR_CHARACTER, kind, len);
 }
 
 KindTy fir::CharacterType::getFKind() const { return getImpl()->getFKind(); }
 
-std::int64_t fir::CharacterType::getLen() const { return getImpl()->getLen(); }
+CharacterType::LenType fir::CharacterType::getLen() const {
+  return getImpl()->getLen();
+}
 
 // Field
 

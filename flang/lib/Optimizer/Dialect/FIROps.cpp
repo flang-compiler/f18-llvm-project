@@ -409,31 +409,19 @@ bool fir::ConvertOp::isPointerCompatible(mlir::Type ty) {
 
 static mlir::ParseResult parseCoordinateOp(mlir::OpAsmParser &parser,
                                            mlir::OperationState &result) {
-  llvm::ArrayRef<mlir::Type> allOperandTypes;
-  llvm::ArrayRef<mlir::Type> allResultTypes;
-  llvm::SMLoc allOperandLoc = parser.getCurrentLocation();
+  auto loc = parser.getCurrentLocation();
   llvm::SmallVector<mlir::OpAsmParser::OperandType, 4> allOperands;
-  if (parser.parseOperandList(allOperands))
-    return failure();
-  if (parser.parseOptionalAttrDict(result.attributes))
-    return failure();
-  if (parser.parseColon())
-    return failure();
-
   mlir::FunctionType funcTy;
-  if (parser.parseType(funcTy))
-    return failure();
-  allOperandTypes = funcTy.getInputs();
-  allResultTypes = funcTy.getResults();
-  result.addTypes(allResultTypes);
-  if (parser.resolveOperands(allOperands, allOperandTypes, allOperandLoc,
+  if (parser.parseOperandList(allOperands) ||
+      parser.parseOptionalAttrDict(result.attributes) ||
+      parser.parseColonType(funcTy) ||
+      parser.resolveOperands(allOperands, funcTy.getInputs(), loc,
                              result.operands))
     return failure();
-  if (funcTy.getNumInputs()) {
-    // No inputs handled by verify
+  parser.addTypesToList(funcTy.getResults(), result.types);
+  if (funcTy.getNumInputs())
     result.addAttribute(fir::CoordinateOp::baseType(),
                         mlir::TypeAttr::get(funcTy.getInput(0)));
-  }
   return success();
 }
 
