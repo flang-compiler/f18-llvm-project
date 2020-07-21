@@ -1758,13 +1758,16 @@ def fir_CoordinateOp : fir_Op<"coordinate_of", [NoSideEffect]> {
         if (arrTy.getConstantRows() < arrTy.getDimension() - 1)
           return emitOpError("cannot find coordinate with unknown extents");
       }
+      if (!(fir::isa_aggregate(eleTy) || fir::isa_complex(eleTy) ||
+            fir::isa_char_string(eleTy)))
+        return emitOpError("cannot apply coordinate_of to this type");
     }
     // Recovering a LEN type parameter only makes sense from a boxed value
     for (auto co : coor())
       if (dyn_cast_or_null<LenParamIndexOp>(co.getDefiningOp())) {
         if (getNumOperands() != 2)
           return emitOpError("len_param_index must be last argument");
-        if (!ref().getType().dyn_cast<BoxType>())
+        if (!ref().getType().isa<BoxType>())
           return emitOpError("len_param_index must be used on box type");
       }
     if (auto attr = getAttr(CoordinateOp::baseType())) {
@@ -2177,7 +2180,7 @@ def fir_LoopOp : region_Op<"do_loop",
       fir.do_loop %i = %l to %u step %s unordered {
         %x = fir.convert %i : (index) -> i32
         %v = fir.call @compute(%x) : (i32) -> f32
-        %p = fir.coordinate_of %A, %i : (!fir.ref<f32>, index) -> !fir.ref<f32>
+        %p = fir.coordinate_of %A, %i : (!fir.ref<!fir.array<?xf32>>, index) -> !fir.ref<f32>
         fir.store %v to %p : !fir.ref<f32>
       }
     ```
