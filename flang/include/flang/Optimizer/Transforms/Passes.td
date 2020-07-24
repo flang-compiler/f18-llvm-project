@@ -19,15 +19,26 @@ include "mlir/Pass/PassBase.td"
 def AffineDialectPromotion : FunctionPass<"promote-to-affine"> {
   let summary = "Promotes fir.do_loop and fir.where to affine.for and affine.if where possible";
   let description = [{
-    TODO
+    Convert fir operations which satisfy affine constraints to affine dialect.
+
+    `fir.do_loop` to `affine.for` if the loops inside the body can be converted,
+    index for memory loads and stores satisfy affine.apply criteria for symbols
+    and dimensions.
+    `fir.if` to `affine.if`, affine's condition uses an integer set (==, >=) and
+    we try analyze the fir condition's parent operations to construct the integer
+    set.
+    `fir.load/store` to `affine.load/store` this includes also adding a dummy
+    convert to cast `fir.array` to `memref` as affine only works with memref type.
   }];
   let constructor = "fir::createPromoteToAffinePass()";
 }
 
-def AffineDialectDemotion : FunctionPass<"demote-to-affine"> {
+def AffineDialectDemotion : FunctionPass<"demote-affine"> {
   let summary = "Converts affine.load and affine.store back to fir operations";
   let description = [{
-    TODO
+    Affine dialect's default lowering for loads and stores is different from fir as
+    it uses memref and thus we convert the memory operations back to fir loads and
+    stores.
   }];
   let constructor = "fir::createAffineDemotionPass()";
 }
