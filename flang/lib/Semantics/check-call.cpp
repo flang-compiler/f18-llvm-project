@@ -696,8 +696,11 @@ static parser::Messages CheckExplicitInterface(
   if (buffer.empty()) {
     int index{0};
     evaluate::FoldingContext localContext{context, messages};
-    for (auto &actual : actuals) {
-      const auto &dummy{proc.dummyArguments.at(index++)};
+    for (auto &dummy : proc.dummyArguments) {
+      if (std::get_if<characteristics::AlternateReturn>(&dummy.u)) {
+        continue;
+      }
+      auto &actual{actuals.at(index++)};
       if (actual) {
         CheckExplicitInterfaceArg(*actual, dummy, proc, localContext, scope);
       } else if (!dummy.IsOptional()) {
