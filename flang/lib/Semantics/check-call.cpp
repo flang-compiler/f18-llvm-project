@@ -700,8 +700,7 @@ static parser::Messages CheckExplicitInterface(
       if (std::get_if<characteristics::AlternateReturn>(&dummy.u)) {
         continue;
       }
-      auto &actual{actuals.at(index++)};
-      if (actual) {
+      if (auto &actual{actuals.at(index++)}) {
         CheckExplicitInterfaceArg(*actual, dummy, proc, localContext, scope);
       } else if (!dummy.IsOptional()) {
         if (dummy.name.empty()) {
