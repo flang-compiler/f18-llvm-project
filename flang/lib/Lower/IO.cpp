@@ -69,7 +69,11 @@ static constexpr std::tuple<
 } // namespace Fortran::lower
 
 namespace {
-struct ConditionSpecifierInfo {
+/// Fortran IO statements may have optional handling of exceptional conditions
+/// which can change the control-flow of the program, etc. For example,
+/// ERR=<label> branches on an error and IOSTAT=<var> returns a result value by
+/// setting a variable.
+struct ConditionSpecInfo {
   const Fortran::semantics::SomeExpr *ioStatExpr{};
   const Fortran::semantics::SomeExpr *ioMsgExpr{};
   bool hasErr{};
@@ -77,16 +81,14 @@ struct ConditionSpecifierInfo {
   bool hasEor{};
 
   /// Check for any condition specifier that applies to specifier processing.
-  bool hasErrorConditionSpecifier() const {
-    return ioStatExpr != nullptr || hasErr;
-  }
+  bool hasErrorConditionSpec() const { return ioStatExpr != nullptr || hasErr; }
   /// Check for any condition specifier that applies to data transfer items
   /// in a PRINT, READ, WRITE, or WAIT statement.  (WAIT may be irrelevant.)
-  bool hasTransferConditionSpecifier() const {
+  bool hasTransferConditionSpec() const {
     return ioStatExpr != nullptr || hasErr || hasEnd || hasEor;
   }
   /// Check for any condition specifier, including IOMSG.
-  bool hasAnyConditionSpecifier() const {
+  bool hasAnyConditionSpec() const {
     return ioStatExpr != nullptr || ioMsgExpr != nullptr || hasErr || hasEnd ||
            hasEor;
   }
@@ -131,7 +133,7 @@ static mlir::FuncOp getIORuntimeFunc(mlir::Location loc,
 /// It is the caller's responsibility to generate branches on that value.
 static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
                             mlir::Location loc, mlir::Value cookie,
-                            const ConditionSpecifierInfo &csi) {
+                            const ConditionSpecInfo &csi) {
   auto &builder = converter.getFirOpBuilder();
   if (csi.ioMsgExpr) {
     auto getIoMsg = getIORuntimeFunc<mkIOKey(GetIoMsg)>(loc, builder);
@@ -155,8 +157,7 @@ static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
         loc, converter.genType(*csi.ioStatExpr), call.getResult(0));
     builder.create<fir::StoreOp>(loc, ioStatResult, ioStatVar);
   }
-  return csi.hasTransferConditionSpecifier() ? call.getResult(0)
-                                             : mlir::Value{};
+  return csi.hasTransferConditionSpec() ? call.getResult(0) : mlir::Value{};
 }
 
 /// Make the next call in the IO statement conditional on runtime result `ok`.
@@ -170,7 +171,7 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
                                   bool inIterWhileLoop = false) {
   if (!checkResult || !ok)
     // Either I/O calls do not need to be checked, or the next I/O call is the
-    // first potentially fallable call.
+    // first potentially erroneous call.
     return;
   // A previous I/O call for a statement returned the bool `ok`.  If this call
   // is in a fir.iterate_while loop, the result must be propagated up to the
@@ -425,8 +426,8 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
 
 static mlir::Value
 locationToFilename(Fortran::lower::AbstractConverter &converter,
-                   Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
-                   mlir::Type toType) {
+                   mlir::Location loc, mlir::Type toType) {
+  auto &builder = converter.getFirOpBuilder();
   if (auto flc = loc.dyn_cast<mlir::FileLineColLoc>()) {
     auto fn = flc.getFilename();
     auto addr =
@@ -551,9 +552,9 @@ mlir::Value genIOOption<Fortran::parser::FileNameExpr>(
   auto ioFunc = getIORuntimeFunc<mkIOKey(SetFile)>(loc, builder);
   mlir::FunctionType ioFuncTy = ioFunc.getType();
   auto tup = lowerStringLit(converter, loc, spec, ioFuncTy.getInput(1),
-                            ioFuncTy.getInput(2), ioFuncTy.getInput(3));
+                            ioFuncTy.getInput(2));
   llvm::SmallVector<mlir::Value, 4> ioArgs{cookie, std::get<0>(tup),
-                                           std::get<1>(tup), std::get<2>(tup)};
+                                           std::get<1>(tup)};
   return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 }
 
@@ -750,19 +751,40 @@ threadSpecs(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
   return insertPt;
 }
 
+/// Most I/O statements have some form of optional exception condition handling
+/// for when there is a failure. There are 5 basic forms: ERR, EOR, END, IOSTAT,
+/// and IOMSG. The first three cause control-flow to transfer to another
+/// statement. The final two return information from the runtime, via a
+/// variable, about the nature of I/O failure. Not all statements have all 5
+/// forms, but this handler will match the ones that do occur in the spec-list
+/// of a particular statement.
 template <typename A>
 static void
 genConditionHandlerCall(Fortran::lower::AbstractConverter &converter,
                         mlir::Location loc, mlir::Value cookie,
-                        const A &specList, ConditionSpecifierInfo &csi) {
+                        const A &specList, ConditionSpecInfo &csi) {
   for (const auto &spec : specList) {
     std::visit(
         Fortran::common::visitors{
-            [&](const Fortran::parser::StatVariable &msgVar) {
-              csi.ioStatExpr = Fortran::semantics::GetExpr(msgVar);
+            [&](const Fortran::parser::StatVariable &var) {
+              csi.ioStatExpr = Fortran::semantics::GetExpr(var);
             },
-            [&](const Fortran::parser::MsgVariable &msgVar) {
-              csi.ioMsgExpr = Fortran::semantics::GetExpr(msgVar);
+            [&](const Fortran::parser::InquireSpec::IntVar &var) {
+              if (std::get<Fortran::parser::InquireSpec::IntVar::Kind>(var.t) ==
+                  Fortran::parser::InquireSpec::IntVar::Kind::Iostat)
+                csi.ioStatExpr = Fortran::semantics::GetExpr(
+                    std::get<Fortran::parser::ScalarIntVariable>(var.t));
+            },
+            [&](const Fortran::parser::MsgVariable &var) {
+              csi.ioMsgExpr = Fortran::semantics::GetExpr(var);
+            },
+            [&](const Fortran::parser::InquireSpec::CharVar &var) {
+              if (std::get<Fortran::parser::InquireSpec::CharVar::Kind>(
+                      var.t) ==
+                  Fortran::parser::InquireSpec::CharVar::Kind::Iomsg)
+                csi.ioMsgExpr = Fortran::semantics::GetExpr(
+                    std::get<Fortran::parser::ScalarDefaultCharVariable>(
+                        var.t));
             },
             [&](const Fortran::parser::EndLabel &) { csi.hasEnd = true; },
             [&](const Fortran::parser::EorLabel &) { csi.hasEor = true; },
@@ -770,7 +792,7 @@ genConditionHandlerCall(Fortran::lower::AbstractConverter &converter,
             [](const auto &) {}},
         spec.u);
   }
-  if (!csi.hasAnyConditionSpecifier())
+  if (!csi.hasAnyConditionSpec())
     return;
   auto &builder = converter.getFirOpBuilder();
   mlir::FuncOp enableHandlers =
@@ -933,24 +955,37 @@ lowerReferenceAsStringSelect(
 
   auto symbol = GetLastSymbol(&expr);
   Fortran::lower::pft::LabelSet labels;
-  assert(converter.lookupLabelSet(*symbol, labels) &&
-         "ICE: Label not found in map");
+  [[maybe_unused]] auto foundLabelSet =
+      converter.lookupLabelSet(*symbol, labels);
+  assert(foundLabelSet && "Label not found in map");
 
   for (auto label : labels) {
     indexList.push_back(label);
-    auto eval = converter.lookupLabel(label);
-    assert(eval && "ICE: Label is missing from the table");
+    auto *eval = converter.lookupLabel(label);
+    assert(eval && "Label is missing from the table");
 
-    auto stringLit = lowerSourceTextAsStringLit(
-        converter, loc, toStringRef(eval->position), strTy, lenTy);
-    auto stringRef = std::get<0>(stringLit);
-    auto stringLen = std::get<1>(stringLit);
+    auto text = toStringRef(eval->position);
+    mlir::Value stringRef;
+    mlir::Value stringLen;
+    if (eval->isA<Fortran::parser::FormatStmt>()) {
+      assert(text.find('(') != llvm::StringRef::npos &&
+             "FORMAT is unexpectedly ill-formed");
+      // This is a format statement, so extract the spec from the text.
+      auto stringLit =
+          lowerSourceTextAsStringLit(converter, loc, text, strTy, lenTy);
+      stringRef = std::get<0>(stringLit);
+      stringLen = std::get<1>(stringLit);
+    } else {
+      // This is not a format statement, so use null.
+      stringRef = builder.createConvert(
+          loc, strTy,
+          builder.createIntegerConstant(loc, builder.getIndexType(), 0));
+      stringLen = builder.createIntegerConstant(loc, lenTy, 0);
+    }
 
     // Pass the format string reference and the string length out of the select
     // statement
-    llvm::SmallVector<mlir::Value, 8> args;
-    args.push_back(stringRef);
-    args.push_back(stringLen);
+    llvm::SmallVector<mlir::Value, 8> args = {stringRef, stringLen};
     builder.create<mlir::BranchOp>(loc, endBlock, args);
 
     // Add block to the list of cases and make a new one
@@ -1114,16 +1149,15 @@ static mlir::Value genBasicIOStmt(Fortran::lower::AbstractConverter &converter,
   auto unit = converter.genExprValue(
       getExpr<Fortran::parser::FileUnitNumber>(stmt), loc);
   auto un = builder.createConvert(loc, beginFuncTy.getInput(0), unit);
-  auto file =
-      locationToFilename(converter, builder, loc, beginFuncTy.getInput(1));
+  auto file = locationToFilename(converter, loc, beginFuncTy.getInput(1));
   auto line = locationToLineNo(builder, loc, beginFuncTy.getInput(2));
   llvm::SmallVector<mlir::Value, 4> args{un, file, line};
   auto cookie = builder.create<fir::CallOp>(loc, beginFunc, args).getResult(0);
-  ConditionSpecifierInfo csi{};
+  ConditionSpecInfo csi;
   genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
-  mlir::Value ok{};
+  mlir::Value ok;
   auto insertPt = threadSpecs(converter, loc, cookie, stmt.v,
-                              csi.hasErrorConditionSpecifier(), ok);
+                              csi.hasErrorConditionSpec(), ok);
   if (insertPt.isSet())
     builder.restoreInsertionPoint(insertPt);
   return genEndIO(converter, converter.getCurrentLocation(), cookie, csi);
@@ -1168,7 +1202,7 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
     beginArgs.push_back(
         builder.createConvert(loc, beginFuncTy.getInput(0), unit));
     beginArgs.push_back(
-        locationToFilename(converter, builder, loc, beginFuncTy.getInput(1)));
+        locationToFilename(converter, loc, beginFuncTy.getInput(1)));
     beginArgs.push_back(
         locationToLineNo(builder, loc, beginFuncTy.getInput(2)));
   } else {
@@ -1176,17 +1210,17 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
     beginFunc = getIORuntimeFunc<mkIOKey(BeginOpenNewUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     beginArgs.push_back(
-        locationToFilename(converter, builder, loc, beginFuncTy.getInput(0)));
+        locationToFilename(converter, loc, beginFuncTy.getInput(0)));
     beginArgs.push_back(
         locationToLineNo(builder, loc, beginFuncTy.getInput(1)));
   }
   auto cookie =
       builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-  ConditionSpecifierInfo csi{};
+  ConditionSpecInfo csi;
   genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
-  mlir::Value ok{};
+  mlir::Value ok;
   auto insertPt = threadSpecs(converter, loc, cookie, stmt.v,
-                              csi.hasErrorConditionSpecifier(), ok);
+                              csi.hasErrorConditionSpec(), ok);
   if (insertPt.isSet())
     builder.restoreInsertionPoint(insertPt);
   return genEndIO(converter, loc, cookie, csi);
@@ -1218,7 +1252,7 @@ Fortran::lower::genWaitStatement(Fortran::lower::AbstractConverter &converter,
     args.push_back(builder.createConvert(loc, beginFuncTy.getInput(1), id));
   }
   auto cookie = builder.create<fir::CallOp>(loc, beginFunc, args).getResult(0);
-  ConditionSpecifierInfo csi{};
+  ConditionSpecInfo csi;
   genConditionHandlerCall(converter, loc, cookie, stmt.v, csi);
   return genEndIO(converter, converter.getCurrentLocation(), cookie, csi);
 }
@@ -1422,8 +1456,8 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   genBeginCallArguments<hasIOCtrl>(ioArgs, converter, loc, stmt, ioFuncTy,
                                    isFormatted, isList, isIntern, isOtherIntern,
                                    isAsynch, isNml);
-  ioArgs.push_back(locationToFilename(converter, builder, loc,
-                                      ioFuncTy.getInput(ioArgs.size())));
+  ioArgs.push_back(
+      locationToFilename(converter, loc, ioFuncTy.getInput(ioArgs.size())));
   ioArgs.push_back(
       locationToLineNo(builder, loc, ioFuncTy.getInput(ioArgs.size())));
 
@@ -1432,25 +1466,25 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
       builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 
   // Generate an EnableHandlers call and remaining specifier calls.
-  ConditionSpecifierInfo csi;
+  ConditionSpecInfo csi;
   mlir::OpBuilder::InsertPoint insertPt;
   mlir::Value ok;
   if constexpr (hasIOCtrl) {
     genConditionHandlerCall(converter, loc, cookie, stmt.controls, csi);
     insertPt = threadSpecs(converter, loc, cookie, stmt.controls,
-                           csi.hasErrorConditionSpecifier(), ok);
+                           csi.hasErrorConditionSpec(), ok);
   }
 
   // Generate data transfer list calls.
   if constexpr (isInput) // ReadStmt
     genInputItemList(converter, cookie, stmt.items, insertPt,
-                     csi.hasTransferConditionSpecifier(), ok, false);
+                     csi.hasTransferConditionSpec(), ok, false);
   else if constexpr (std::is_same_v<A, Fortran::parser::PrintStmt>)
     genOutputItemList(converter, cookie, std::get<1>(stmt.t), insertPt,
-                      csi.hasTransferConditionSpecifier(), ok, false);
+                      csi.hasTransferConditionSpec(), ok, false);
   else // WriteStmt
     genOutputItemList(converter, cookie, stmt.items, insertPt,
-                      csi.hasTransferConditionSpecifier(), ok, false);
+                      csi.hasTransferConditionSpec(), ok, false);
 
   // Generate end statement call/s.
   if (insertPt.isSet())
@@ -1494,14 +1528,161 @@ getInquireFileExpr(const std::list<Fortran::parser::InquireSpec> *stmt) {
   llvm_unreachable("inquire spec must have a file");
 }
 
+/// Generate calls to the four distinct INQUIRE subhandlers. An INQUIRE may
+/// return values of type CHARACTER, INTEGER, or LOGICAL. There is one
+/// additional special case for INQUIRE with both PENDING and ID specifiers.
+template <typename A>
+static mlir::Value genInquireSpec(Fortran::lower::AbstractConverter &converter,
+                                  mlir::Location loc, mlir::Value cookie,
+                                  mlir::Value idExpr, const A &var) {
+  // default case: do nothing
+  return {};
+}
+/// Specialization for CHARACTER.
+template <>
+mlir::Value genInquireSpec<Fortran::parser::InquireSpec::CharVar>(
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    mlir::Value cookie, mlir::Value idExpr,
+    const Fortran::parser::InquireSpec::CharVar &var) {
+  // IOMSG is handled with exception conditions
+  if (std::get<Fortran::parser::InquireSpec::CharVar::Kind>(var.t) ==
+      Fortran::parser::InquireSpec::CharVar::Kind::Iomsg)
+    return {};
+  auto &builder = converter.getFirOpBuilder();
+  mlir::FuncOp specFunc =
+      getIORuntimeFunc<mkIOKey(InquireCharacter)>(loc, builder);
+  auto specFuncTy = specFunc.getType();
+  const auto *varExpr = Fortran::semantics::GetExpr(
+      std::get<Fortran::parser::ScalarDefaultCharVariable>(var.t));
+  auto str = converter.genExprValue(varExpr, loc);
+  Fortran::lower::CharacterExprHelper helper(builder, loc);
+  auto data = helper.materializeCharacter(str);
+  llvm::SmallVector<mlir::Value, 8> args = {
+      builder.createConvert(loc, specFuncTy.getInput(0), cookie),
+      builder.createIntegerConstant(
+          loc, specFuncTy.getInput(1),
+          Fortran::runtime::io::HashInquiryKeyword(
+              Fortran::parser::InquireSpec::CharVar::EnumToString(
+                  std::get<Fortran::parser::InquireSpec::CharVar::Kind>(var.t))
+                  .c_str())),
+      builder.createConvert(loc, specFuncTy.getInput(2), data.first),
+      builder.createConvert(loc, specFuncTy.getInput(3), data.second)};
+  return builder.create<fir::CallOp>(loc, specFunc, args).getResult(0);
+}
+/// Specialization for INTEGER.
+template <>
+mlir::Value genInquireSpec<Fortran::parser::InquireSpec::IntVar>(
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    mlir::Value cookie, mlir::Value idExpr,
+    const Fortran::parser::InquireSpec::IntVar &var) {
+  // IOSTAT is handled with exception conditions
+  if (std::get<Fortran::parser::InquireSpec::IntVar::Kind>(var.t) ==
+      Fortran::parser::InquireSpec::IntVar::Kind::Iostat)
+    return {};
+  auto &builder = converter.getFirOpBuilder();
+  mlir::FuncOp specFunc =
+      getIORuntimeFunc<mkIOKey(InquireInteger64)>(loc, builder);
+  auto specFuncTy = specFunc.getType();
+  const auto *varExpr = Fortran::semantics::GetExpr(
+      std::get<Fortran::parser::ScalarIntVariable>(var.t));
+  auto addr = converter.genExprAddr(varExpr, loc);
+  auto eleTy = fir::dyn_cast_ptrEleTy(addr.getType());
+  auto bitWidth = eleTy.cast<mlir::IntegerType>().getWidth();
+  auto idxTy = builder.getIndexType();
+  auto kind = builder.createIntegerConstant(loc, idxTy, bitWidth / 8);
+  llvm::SmallVector<mlir::Value, 8> args = {
+      builder.createConvert(loc, specFuncTy.getInput(0), cookie),
+      builder.createIntegerConstant(
+          loc, specFuncTy.getInput(1),
+          Fortran::runtime::io::HashInquiryKeyword(
+              Fortran::parser::InquireSpec::IntVar::EnumToString(
+                  std::get<Fortran::parser::InquireSpec::IntVar::Kind>(var.t))
+                  .c_str())),
+      builder.createConvert(loc, specFuncTy.getInput(2), addr),
+      builder.createConvert(loc, specFuncTy.getInput(3), kind)};
+  return builder.create<fir::CallOp>(loc, specFunc, args).getResult(0);
+}
+/// Specialization for LOGICAL and (PENDING + ID).
+template <>
+mlir::Value genInquireSpec<Fortran::parser::InquireSpec::LogVar>(
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    mlir::Value cookie, mlir::Value idExpr,
+    const Fortran::parser::InquireSpec::LogVar &var) {
+  auto &builder = converter.getFirOpBuilder();
+  auto logVarKind = std::get<Fortran::parser::InquireSpec::LogVar::Kind>(var.t);
+  bool pendId =
+      idExpr &&
+      logVarKind == Fortran::parser::InquireSpec::LogVar::Kind::Pending;
+  mlir::FuncOp specFunc =
+      pendId ? getIORuntimeFunc<mkIOKey(InquirePendingId)>(loc, builder)
+             : getIORuntimeFunc<mkIOKey(InquireLogical)>(loc, builder);
+  auto specFuncTy = specFunc.getType();
+  auto addr = converter.genExprAddr(
+      Fortran::semantics::GetExpr(
+          std::get<Fortran::parser::Scalar<
+              Fortran::parser::Logical<Fortran::parser::Variable>>>(var.t)),
+      loc);
+  llvm::SmallVector<mlir::Value, 8> args = {
+      builder.createConvert(loc, specFuncTy.getInput(0), cookie)};
+  if (pendId)
+    args.push_back(builder.createConvert(loc, specFuncTy.getInput(1), idExpr));
+  else
+    args.push_back(builder.createIntegerConstant(
+        loc, specFuncTy.getInput(1),
+        Fortran::runtime::io::HashInquiryKeyword(
+            Fortran::parser::InquireSpec::LogVar::EnumToString(logVarKind)
+                .c_str())));
+  args.push_back(builder.createConvert(loc, specFuncTy.getInput(2), addr));
+  return builder.create<fir::CallOp>(loc, specFunc, args).getResult(0);
+}
+
+/// If there is an IdExpr in the list of inquire-specs, then lower it and return
+/// the resulting Value. Otherwise, return null.
+static mlir::Value
+lowerIdExpr(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+            const std::list<Fortran::parser::InquireSpec> &ispecs) {
+  for (const auto &spec : ispecs)
+    if (mlir::Value v =
+            std::visit(Fortran::common::visitors{
+                           [&](const Fortran::parser::IdExpr &idExpr) {
+                             return converter.genExprValue(
+                                 Fortran::semantics::GetExpr(idExpr), loc);
+                           },
+                           [](const auto &) { return mlir::Value{}; }},
+                       spec.u))
+      return v;
+  return {};
+}
+
+/// For each inquire-spec, build the appropriate call, threading the cookie, and
+/// returning the insertion point as to the initial context. If there are no
+/// inquire-specs, the insertion point is undefined.
+static mlir::OpBuilder::InsertPoint
+threadInquire(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+              mlir::Value cookie,
+              const std::list<Fortran::parser::InquireSpec> &ispecs,
+              bool checkResult, mlir::Value &ok) {
+  auto &builder = converter.getFirOpBuilder();
+  mlir::OpBuilder::InsertPoint insertPt;
+  mlir::Value idExpr = lowerIdExpr(converter, loc, ispecs);
+  for (const auto &spec : ispecs) {
+    makeNextConditionalOn(builder, loc, insertPt, checkResult, ok);
+    ok = std::visit(Fortran::common::visitors{[&](const auto &x) {
+                      return genInquireSpec(converter, loc, cookie, idExpr, x);
+                    }},
+                    spec.u);
+  }
+  return insertPt;
+}
+
 mlir::Value Fortran::lower::genInquireStatement(
     Fortran::lower::AbstractConverter &converter,
     const Fortran::parser::InquireStmt &stmt) {
   auto &builder = converter.getFirOpBuilder();
   auto loc = converter.getCurrentLocation();
   mlir::FuncOp beginFunc;
-  mlir::Value cookie;
-  ConditionSpecifierInfo csi{};
+  ConditionSpecInfo csi;
+  llvm::SmallVector<mlir::Value, 8> beginArgs;
   const auto *list =
       std::get_if<std::list<Fortran::parser::InquireSpec>>(&stmt.u);
   auto exprPair = getInquireFileExpr(list);
@@ -1517,16 +1698,11 @@ mlir::Value Fortran::lower::genInquireStatement(
     // File unit call.
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
-    auto unit = converter.genExprValue(exprPair.first, loc);
-    auto un = builder.createConvert(loc, beginFuncTy.getInput(0), unit);
-    auto file =
-        locationToFilename(converter, builder, loc, beginFuncTy.getInput(1));
-    auto line = locationToLineNo(builder, loc, beginFuncTy.getInput(2));
-    llvm::SmallVector<mlir::Value, 4> beginArgs{un, file, line};
-    cookie =
-        builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-    // Handle remaining arguments in specifier list.
-    genConditionHandlerCall(converter, loc, cookie, *list, csi);
+    beginArgs = {
+        builder.createConvert(loc, beginFuncTy.getInput(0),
+                              converter.genExprValue(exprPair.first, loc)),
+        locationToFilename(converter, loc, beginFuncTy.getInput(1)),
+        locationToLineNo(builder, loc, beginFuncTy.getInput(2))};
   } else if (inquireFileName()) {
     // Filename call.
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireFile)>(loc, builder);
@@ -1535,41 +1711,40 @@ mlir::Value Fortran::lower::genInquireStatement(
     // Helper to query [BUFFER, LEN].
     Fortran::lower::CharacterExprHelper helper(builder, loc);
     auto dataLen = helper.materializeCharacter(file);
-    auto buff =
-        builder.createConvert(loc, beginFuncTy.getInput(0), dataLen.first);
-    auto len =
-        builder.createConvert(loc, beginFuncTy.getInput(1), dataLen.second);
-    auto kindInt = helper.getCharacterKind(file.getType());
-    mlir::Value kindValue =
-        builder.createIntegerConstant(loc, beginFuncTy.getInput(2), kindInt);
-    auto sourceFile =
-        locationToFilename(converter, builder, loc, beginFuncTy.getInput(3));
-    auto line = locationToLineNo(builder, loc, beginFuncTy.getInput(4));
-    llvm::SmallVector<mlir::Value, 5> beginArgs = {
-        buff, len, kindValue, sourceFile, line,
-    };
-    cookie =
-        builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-    // Handle remaining arguments in specifier list.
-    genConditionHandlerCall(converter, loc, cookie, *list, csi);
+    beginArgs = {
+        builder.createConvert(loc, beginFuncTy.getInput(0), dataLen.first),
+        builder.createConvert(loc, beginFuncTy.getInput(1), dataLen.second),
+        locationToFilename(converter, loc, beginFuncTy.getInput(2)),
+        locationToLineNo(builder, loc, beginFuncTy.getInput(3))};
   } else {
-    // Io length call.
+    // INQUIRE IOLENGTH call.
     const auto *ioLength =
         std::get_if<Fortran::parser::InquireStmt::Iolength>(&stmt.u);
     assert(ioLength && "must have an io length");
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireIoLength)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
-    auto file =
-        locationToFilename(converter, builder, loc, beginFuncTy.getInput(0));
-    auto line = locationToLineNo(builder, loc, beginFuncTy.getInput(1));
-    llvm::SmallVector<mlir::Value, 4> beginArgs{file, line};
-    cookie =
+    beginArgs = {locationToFilename(converter, loc, beginFuncTy.getInput(0)),
+                 locationToLineNo(builder, loc, beginFuncTy.getInput(1))};
+    // The IOLENGTH call is irregular enough to generate immediately here.
+    mlir::Value cookie =
         builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-    // Handle remaining arguments in output list.
     genConditionHandlerCall(
         converter, loc, cookie,
         std::get<std::list<Fortran::parser::OutputItem>>(ioLength->t), csi);
+    return genEndIO(converter, loc, cookie, csi);
   }
+
+  // Common handling for file {unit|name} cases.
+  assert(list && "inquire-spec list must be present");
+  mlir::Value cookie =
+      builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
+  genConditionHandlerCall(converter, loc, cookie, *list, csi);
+  // Handle remaining arguments in specifier list.
+  mlir::Value ok;
+  auto insertPt = threadInquire(converter, loc, cookie, *list,
+                                csi.hasErrorConditionSpec(), ok);
+  if (insertPt.isSet())
+    builder.restoreInsertionPoint(insertPt);
   // Generate end statement call.
   return genEndIO(converter, loc, cookie, csi);
 }

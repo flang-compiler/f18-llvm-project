@@ -20,6 +20,7 @@ ActualArgument::ActualArgument(Expr<SomeType> &&x) : u_{std::move(x)} {}
 ActualArgument::ActualArgument(common::CopyableIndirection<Expr<SomeType>> &&v)
     : u_{std::move(v)} {}
 ActualArgument::ActualArgument(AssumedType x) : u_{x} {}
+ActualArgument::ActualArgument(common::Label x) : u_{x} {}
 ActualArgument::~ActualArgument() {}
 
 ActualArgument::AssumedType::AssumedType(const Symbol &symbol)
@@ -54,9 +55,8 @@ int ActualArgument::Rank() const {
 }
 
 bool ActualArgument::operator==(const ActualArgument &that) const {
-  return keyword_ == that.keyword_ &&
-      isAlternateReturn_ == that.isAlternateReturn_ &&
-      isPassedObject_ == that.isPassedObject_ && u_ == that.u_;
+  return keyword_ == that.keyword_ && isPassedObject_ == that.isPassedObject_ &&
+      u_ == that.u_;
 }
 
 void ActualArgument::Parenthesize() {

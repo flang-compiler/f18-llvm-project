@@ -108,10 +108,9 @@ llvm::raw_ostream &ActualArgument::AsFortran(llvm::raw_ostream &o) const {
   if (keyword_) {
     o << keyword_->ToString() << '=';
   }
-  if (isAlternateReturn_) {
-    o << '*';
-  }
-  if (const auto *expr{UnwrapExpr()}) {
+  if (isAlternateReturn()) {
+    return o << '*' << GetLabel();
+  } else if (const auto *expr{UnwrapExpr()}) {
     return expr->AsFortran(o);
   } else {
     return std::get<AssumedType>(u_).AsFortran(o);

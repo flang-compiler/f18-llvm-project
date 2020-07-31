@@ -162,6 +162,7 @@ static void AddLibmComplexHostProcedures(
 #if LINK_WITH_LIBPGMATH
 // Only use libpgmath for folding if it is available.
 // First declare all libpgmaths functions
+#define PGMATH_LINKING
 #define PGMATH_DECLARE
 #include "../runtime/pgmath.h.inc"
 
