@@ -102,22 +102,41 @@ constexpr TypeBuilderFunc getModel<void **>() {
   };
 }
 template <>
-constexpr TypeBuilderFunc getModel<std::int64_t>() {
+constexpr TypeBuilderFunc getModel<long>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
-    return mlir::IntegerType::get(64, context);
+    return mlir::IntegerType::get(8 * sizeof(long), context);
   };
 }
 template <>
-constexpr TypeBuilderFunc getModel<std::int64_t &>() {
+constexpr TypeBuilderFunc getModel<long &>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
-    TypeBuilderFunc f{getModel<std::int64_t>()};
+    TypeBuilderFunc f{getModel<long>()};
     return fir::ReferenceType::get(f(context));
   };
 }
 template <>
-constexpr TypeBuilderFunc getModel<std::size_t>() {
+constexpr TypeBuilderFunc getModel<long long>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
-    return mlir::IntegerType::get(8 * sizeof(std::size_t), context);
+    return mlir::IntegerType::get(8 * sizeof(long long), context);
+  };
+}
+template <>
+constexpr TypeBuilderFunc getModel<long long &>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    TypeBuilderFunc f{getModel<long long>()};
+    return fir::ReferenceType::get(f(context));
+  };
+}
+template <>
+constexpr TypeBuilderFunc getModel<unsigned long>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return mlir::IntegerType::get(8 * sizeof(unsigned long), context);
+  };
+}
+template <>
+constexpr TypeBuilderFunc getModel<unsigned long long>() {
+  return [](mlir::MLIRContext *context) -> mlir::Type {
+    return mlir::IntegerType::get(8 * sizeof(unsigned long long), context);
   };
 }
 template <>
