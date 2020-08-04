@@ -121,57 +121,6 @@ mlir::Type fir::AllocMemOp::wrapResultType(mlir::Type intype) {
 }
 
 //===----------------------------------------------------------------------===//
-// ArrayCoorOp
-//===----------------------------------------------------------------------===//
-
-/// Custom parser for the fir.embox operation.
-static mlir::ParseResult parseArrayCoorOp(mlir::OpAsmParser &parser,
-                                          mlir::OperationState &result) {
-  mlir::FunctionType type;
-  llvm::SmallVector<mlir::OpAsmParser::OperandType, 8> operands;
-  mlir::OpAsmParser::OperandType memref;
-  unsigned argCounter = 1;
-  if (parser.parseOperand(memref))
-    return mlir::failure();
-  operands.push_back(memref);
-  auto &builder = parser.getBuilder();
-  if (mlir::succeeded(parser.parseOptionalLParen())) {
-    mlir::OpAsmParser::OperandType shape;
-    if (parser.parseOperand(shape) || parser.parseRParen())
-      return mlir::failure();
-    operands.push_back(shape);
-    result.addAttribute(fir::ArrayCoorOp::shapeName(), builder.getUnitAttr());
-    argCounter++;
-  }
-  if (mlir::succeeded(parser.parseOptionalLSquare())) {
-    mlir::OpAsmParser::OperandType slice;
-    if (parser.parseOperand(slice) || parser.parseRSquare())
-      return mlir::failure();
-    operands.push_back(slice);
-    result.addAttribute(fir::ArrayCoorOp::sliceName(), builder.getUnitAttr());
-    argCounter++;
-  }
-  if (parser.parseOperandList(operands, mlir::OpAsmParser::Delimiter::None))
-    return mlir::failure();
-  auto indices = builder.getI32IntegerAttr(operands.size() - argCounter);
-  result.addAttribute(fir::ArrayCoorOp::indicesName(), indices);
-  argCounter = operands.size();
-  if (mlir::succeeded(parser.parseOptionalKeyword("typeparams"))) {
-    if (parser.parseOperandList(operands, mlir::OpAsmParser::Delimiter::None))
-      return mlir::failure();
-    auto lens = builder.getI32IntegerAttr(operands.size() - argCounter);
-    result.addAttribute(fir::ArrayCoorOp::lenpName(), lens);
-  }
-  if (parser.parseOptionalAttrDict(result.attributes) ||
-      parser.parseColonType(type) ||
-      parser.resolveOperands(operands, type.getInputs(), parser.getNameLoc(),
-                             result.operands) ||
-      parser.addTypesToList(type.getResults(), result.types))
-    return mlir::failure();
-  return mlir::success();
-}
-
-//===----------------------------------------------------------------------===//
 // BoxAddrOp
 //===----------------------------------------------------------------------===//
 

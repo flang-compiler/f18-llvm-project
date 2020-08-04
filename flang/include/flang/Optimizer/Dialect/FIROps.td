@@ -1572,8 +1572,7 @@ def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", [NoSideEffect]> {
 }
 
 // Record and array type operations
-
-def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect]> {
+def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegments]> {
   let summary = "Find the coordinate of an element of an array";
 
   let description = [{
@@ -1598,34 +1597,14 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect]> {
     ```
   }];
 
-  let arguments = (ins AnyReferenceLike:$memref, Variadic<AnyEmboxArg>:$args);
+  let arguments = (ins AnyReferenceLike:$memref,
+                       Optional<AnyShapeType>:$shape, Optional<fir_SliceType>:$slice,
+                       Variadic<AnyCoordinateType>:$indices,
+                       Variadic<AnyIntegerType>:$lens);
 
   let results = (outs fir_ReferenceType);
-
-  let parser = "return parseArrayCoorOp(parser, result);";
-
-  let printer = [{
-    p << getOperationName() << ' ';
-    p.printOperand(memref());
-    if (auto shape = getShape()) {
-      p << '(';
-      p.printOperand(shape);
-      p << ')';
-    }
-    if (auto slice = getSlice()) {
-      p << '[';
-      p.printOperand(slice);
-      p << ']';
-    }
-    p << ' ';
-    p.printOperands(getIndices());
-    if (hasLenParams()) {
-      p << " typeparams ";
-      p.printOperands(getLenParams());
-    }
-    p.printOptionalAttrDict(getAttrs(), {indicesName(), lenpName(), shapeName(), sliceName()});
-    p << " : ";
-    p.printFunctionalType(getOperation());
+  let assemblyFormat = [{
+    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lens^)? `:` functional-type(operands, results) attr-dict
   }];
 
   let verifier = [{
@@ -1635,14 +1614,12 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect]> {
     auto arrTy = eleTy.dyn_cast<fir::SequenceType>();
     if (!arrTy)
       return emitOpError("must be a reference to an array");
-    auto shape = getShape();
-    if (!shape)
-      return emitOpError("must have a shape");
-    auto shapeTy = shape.getType();
+    auto shapeOp = shape();
+    auto shapeTy = shapeOp.getType();
     if (!(shapeTy.isa<fir::ShapeType>() || shapeTy.isa<ShapeShiftType>()))
       return emitOpError("must be a shape or shapeshift type");
-    if (auto slice = getSlice()) {
-      auto sliceTy = slice.getType();
+    if (auto sliceOp = slice()) {
+      auto sliceTy = sliceOp.getType();
       if (!sliceTy.isa<fir::SliceType>())
         return emitOpError("must be slice type");
     }
@@ -1656,56 +1633,17 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect]> {
     }
     if (arrDim && arrDim != shapeTyRank)
       return emitOpError("rank of dimension mismatched");
-    if (shapeTyRank != getIndices().size())
+    if (shapeTyRank != indices().size())
       return emitOpError("number of indices do not match dim rank");
     return mlir::success();
   }];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef indicesName() { return "indices"; }
-    static constexpr llvm::StringRef lenpName() { return "len_param_count"; }
-    static constexpr llvm::StringRef shapeName() { return "shape"; }
-    static constexpr llvm::StringRef sliceName() { return "slice"; }
-    bool hasLenParams() { return bool{getAttr(lenpName())}; }
-    mlir::Value getShape() {
-      if (auto x = getAttrOfType<mlir::UnitAttr>(shapeName()))
-        return *std::next(operand_begin());
-      return {};
-    }
-    mlir::Value getSlice() {
-      if (auto x = getAttrOfType<mlir::UnitAttr>(sliceName())) {
-        auto iter = std::next(operand_begin());
-        if (getShape())
-          iter = std::next(iter);
-        return *iter;
-      }
-      return {};
-    }
-    unsigned numIndices() {
-      if (auto x = getAttrOfType<mlir::IntegerAttr>(indicesName()))
-        return x.getInt();
-      return 0;
-    }
-    operand_range getIndices() {
-      auto iter = std::next(operand_begin());
-      if (getShape())
-        iter = std::next(iter);
-      if (getSlice())
-        iter = std::next(iter);
-      return {iter, iter + numIndices()};
-    }
     unsigned numLenParams() {
-      if (auto x = getAttrOfType<mlir::IntegerAttr>(lenpName()))
-        return x.getInt();
       return 0;
     }
     operand_range getLenParams() {
-      auto offset = numIndices();
-      if (getShape())
-        ++offset;
-      if (getSlice())
-        ++offset;
-      return {std::next(operand_begin()) + offset, operand_end()};
+        return {operand_end(), operand_end()};
     }
   }];
 }
@@ -1908,7 +1846,7 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
   }];
 }
 
-def fir_ShapeOp : fir_OneResultOp<"shape", [NoSideEffect]> {
+def fir_ShapeOp : fir_Op<"shape", [NoSideEffect]> {
 
   let summary = "generate an abstract shape vector of type `!fir.shape`";
 
@@ -1942,7 +1880,7 @@ def fir_ShapeOp : fir_OneResultOp<"shape", [NoSideEffect]> {
   }];
 }
 
-def fir_ShapeShiftOp : fir_OneResultOp<"shape_shift", [NoSideEffect]> {
+def fir_ShapeShiftOp : fir_Op<"shape_shift", [NoSideEffect]> {
 
   let summary = [{
     generate an abstract shape and shift vector of type `!fir.shapeshift`
@@ -1983,7 +1921,7 @@ def fir_ShapeShiftOp : fir_OneResultOp<"shape_shift", [NoSideEffect]> {
   }];
 }
 
-def fir_SliceOp : fir_OneResultOp<"slice", [NoSideEffect]> {
+def fir_SliceOp : fir_Op<"slice", [NoSideEffect]> {
 
   let summary = "generate an abstract slice vector of type `!fir.slice`";
 
