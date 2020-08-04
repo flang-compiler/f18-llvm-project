@@ -157,7 +157,7 @@ public:
     auto rankAttr = rewriter.getIntegerAttr(idxTy, rank);
     attrs.push_back(
         rewriter.getNamedAttr(XArrayCoorOp::rankAttrName(), rankAttr));
-    auto lenParamSize = arrCoor.getLenParams().size();
+    auto lenParamSize = arrCoor.lenParams().size();
     auto lenParamAttr = rewriter.getIntegerAttr(idxTy, lenParamSize);
     attrs.push_back(
         rewriter.getNamedAttr(XArrayCoorOp::lenParamAttrName(), lenParamAttr));
@@ -178,7 +178,7 @@ public:
         rewriter.getNamedAttr(XArrayCoorOp::sliceAttrName(), sliceAttr));
     auto xArrCoor = rewriter.create<XArrayCoorOp>(
         loc, arrCoor.getType(), arrCoor.memref(), shapeOpers, shiftOpers,
-        sliceOpers, arrCoor.indices(), arrCoor.getLenParams(), attrs);
+        sliceOpers, arrCoor.indices(), arrCoor.lenParams(), attrs);
     rewriter.replaceOp(arrCoor, xArrCoor.getOperation()->getResults());
     return mlir::success();
   }

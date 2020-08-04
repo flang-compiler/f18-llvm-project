@@ -1600,29 +1600,19 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegmen
   let arguments = (ins AnyReferenceLike:$memref,
                        Optional<AnyShapeType>:$shape, Optional<fir_SliceType>:$slice,
                        Variadic<AnyCoordinateType>:$indices,
-                       Variadic<AnyIntegerType>:$lens);
+                       Variadic<AnyIntegerType>:$lenParams);
 
   let results = (outs fir_ReferenceType);
   let assemblyFormat = [{
-    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lens^)? `:` functional-type(operands, results) attr-dict
+    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lenParams^)? `:` functional-type(operands, results) attr-dict
   }];
 
   let verifier = [{
     auto eleTy = fir::dyn_cast_ptrEleTy(memref().getType());
-    if (!eleTy)
-       return emitOpError("must be a reference type");
     auto arrTy = eleTy.dyn_cast<fir::SequenceType>();
     if (!arrTy)
       return emitOpError("must be a reference to an array");
-    auto shapeOp = shape();
-    auto shapeTy = shapeOp.getType();
-    if (!(shapeTy.isa<fir::ShapeType>() || shapeTy.isa<ShapeShiftType>()))
-      return emitOpError("must be a shape or shapeshift type");
-    if (auto sliceOp = slice()) {
-      auto sliceTy = sliceOp.getType();
-      if (!sliceTy.isa<fir::SliceType>())
-        return emitOpError("must be slice type");
-    }
+
     auto arrDim = arrTy.getDimension();
     unsigned shapeTyRank = 0;
     if (auto s = shapeTy.dyn_cast<fir::ShapeType>()) {
@@ -1636,15 +1626,6 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegmen
     if (shapeTyRank != indices().size())
       return emitOpError("number of indices do not match dim rank");
     return mlir::success();
-  }];
-
-  let extraClassDeclaration = [{
-    unsigned numLenParams() {
-      return 0;
-    }
-    operand_range getLenParams() {
-        return {operand_end(), operand_end()};
-    }
   }];
 }
 

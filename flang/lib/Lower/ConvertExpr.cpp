@@ -1119,16 +1119,15 @@ private:
         auto shapeType =
             fir::ShapeType::get(builder.getContext(), arr.getExtents().size());
         return builder.create<fir::ShapeOp>(loc, shapeType, arr.getExtents());
-      } else {
-        auto shapeType = fir::ShapeShiftType::get(builder.getContext(),
-                                                  arr.getExtents().size());
-        SmallVector<mlir::Value, 8> shapeArgs;
-        for (const auto &pair : llvm::zip(arr.getLBounds(), arr.getExtents())) {
-          shapeArgs.push_back(std::get<0>(pair));
-          shapeArgs.push_back(std::get<1>(pair));
-        }
-        return builder.create<fir::ShapeShiftOp>(loc, shapeType, shapeArgs);
       }
+      auto shapeType = fir::ShapeShiftType::get(builder.getContext(),
+                                                arr.getExtents().size());
+      SmallVector<mlir::Value, 8> shapeArgs;
+      for (const auto &pair : llvm::zip(arr.getLBounds(), arr.getExtents())) {
+        shapeArgs.push_back(std::get<0>(pair));
+        shapeArgs.push_back(std::get<1>(pair));
+      }
+      return builder.create<fir::ShapeShiftOp>(loc, shapeType, shapeArgs);
     };
     auto genWithShape = [&](const auto &arr) -> mlir::Value {
       auto shape = arrShape(arr);
