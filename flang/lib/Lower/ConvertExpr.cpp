@@ -38,7 +38,7 @@
 static llvm::cl::opt<bool> generateArrayCoordinate(
     "gen-array-coor",
     llvm::cl::desc("in lowering create ArrayCoorOp instead of CoordinateOp"),
-    llvm::cl::init(true));
+    llvm::cl::init(false));
 
 namespace {
 

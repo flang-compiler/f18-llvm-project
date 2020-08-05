@@ -1609,22 +1609,35 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegmen
 
   let verifier = [{
     auto eleTy = fir::dyn_cast_ptrEleTy(memref().getType());
+    if (!eleTy)
+       return emitOpError("must be a reference type");
     auto arrTy = eleTy.dyn_cast<fir::SequenceType>();
     if (!arrTy)
       return emitOpError("must be a reference to an array");
-
     auto arrDim = arrTy.getDimension();
-    unsigned shapeTyRank = 0;
-    if (auto s = shapeTy.dyn_cast<fir::ShapeType>()) {
-      shapeTyRank = s.getRank();
-    } else {
-      auto ss = shapeTy.cast<fir::ShapeShiftType>();
-      shapeTyRank = ss.getRank();
+
+    if (auto shapeOp = shape()) {
+      auto shapeTy = shapeOp.getType();
+      unsigned shapeTyRank = 0;
+      if (auto s = shapeTy.dyn_cast<fir::ShapeType>()) {
+        shapeTyRank = s.getRank();
+      } else {
+        auto ss = shapeTy.cast<fir::ShapeShiftType>();
+        shapeTyRank = ss.getRank();
+      }
+      if (arrDim && arrDim != shapeTyRank)
+        return emitOpError("rank of dimension mismatched");
+      if (shapeTyRank != indices().size())
+        return emitOpError("number of indices do not match dim rank");
     }
-    if (arrDim && arrDim != shapeTyRank)
-      return emitOpError("rank of dimension mismatched");
-    if (shapeTyRank != indices().size())
-      return emitOpError("number of indices do not match dim rank");
+
+    if (auto sliceOp = slice()) {
+      if (auto sliceTy = sliceOp.getType().dyn_cast<fir::SliceType>()) {
+        if (sliceTy.getRank() != arrDim)
+          return emitOpError("rank of dimension in slice mismatched");
+      }
+    }
+
     return mlir::success();
   }];
 }

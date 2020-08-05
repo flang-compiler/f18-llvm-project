@@ -627,7 +627,7 @@ func @array_access(%arr : !fir.ref<!fir.array<?x?xf32>>) {
   fir.do_loop %i = %c0 to %c99 step %c1 {
     %c49 = constant 49 : index
     fir.do_loop %j = %c0 to %c49 step %c1 {
-      // CHECK: fir.array_coor %{{.*}}(%[[sh]])[%[[sl]]] %{{.*}}, %{{.*}} :
+      // CHECK: fir.array_coor %{{.*}}(%[[sh]]) [%[[sl]]] %{{.*}}, %{{.*}} :
       %p = fir.array_coor %arr(%shape)[%slice] %i, %j : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
       %x = constant 42.0 : f32
       fir.store %x to %p : !fir.ref<f32>
