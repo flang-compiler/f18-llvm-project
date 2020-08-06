@@ -1158,8 +1158,9 @@ struct SymbolDependenceDepth {
       // FIXME: do we want to do anything with any of these?  Other syms?
       return 0;
     }
+
     if (sym.has<semantics::DerivedTypeDetails>())
-      return 0; // FIXME: Can't do derived type analysis yet.
+      llvm_unreachable("not yet implemented - derived type analysis");
 
     // Symbol must be something lowering will have to allocate.
     bool global = semantics::IsSaved(sym);
