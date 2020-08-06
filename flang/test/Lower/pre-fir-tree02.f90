@@ -329,6 +329,5 @@ end subroutine
 subroutine sub4()
   integer :: i
   print*, "test"
-  ! CHECK: DataStmt
   data i /1/
 end subroutine

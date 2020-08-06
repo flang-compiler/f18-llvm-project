@@ -968,12 +968,9 @@ static lower::pft::ModuleLikeUnit::ModuleStatement getModuleStmt(const T &mod) {
   return std::get<parser::Statement<A>>(mod.t);
 }
 
-static const semantics::Symbol *getSymbol(
-    std::optional<lower::pft::FunctionLikeUnit::FunctionStatement> &beginStmt) {
-  if (!beginStmt)
-    return nullptr;
-
-  const auto *symbol = beginStmt->visit(common::visitors{
+template <typename A>
+static const semantics::Symbol *getSymbol(A &beginStmt) {
+  const auto *symbol = beginStmt.visit(common::visitors{
       [](const parser::Statement<parser::ProgramStmt> &stmt)
           -> const semantics::Symbol * { return stmt.statement.v.symbol; },
       [](const parser::Statement<parser::FunctionStmt> &stmt)
@@ -986,8 +983,14 @@ static const semantics::Symbol *getSymbol(
       },
       [](const parser::Statement<parser::MpSubprogramStmt> &stmt)
           -> const semantics::Symbol * { return stmt.statement.v.symbol; },
+      [](const parser::Statement<parser::ModuleStmt> &stmt)
+          -> const semantics::Symbol * { return stmt.statement.v.symbol; },
+      [](const parser::Statement<parser::SubmoduleStmt> &stmt)
+          -> const semantics::Symbol * {
+        return std::get<parser::Name>(stmt.statement.t).symbol;
+      },
       [](const auto &) -> const semantics::Symbol * {
-        llvm_unreachable("unknown FunctionLike beginStmt");
+        llvm_unreachable("unknown FunctionLike or ModuleLike beginStmt");
         return nullptr;
       }});
   assert(symbol && "parser::Name must have resolved symbol");
@@ -1039,8 +1042,7 @@ struct IntervalSet : public llvm::IntervalMap<std::size_t, std::size_t, 16> {
 // A variable with an offset relative to the subprogram stack but equivalence
 // aliasing a variable in a common will also be marked as contained in a common
 // block. We have to filter this out so that we can correctly map the offsets.
-bool Fortran::lower::declaredInCommonBlock(
-    const semantics::Symbol &sym) {
+bool Fortran::lower::declaredInCommonBlock(const semantics::Symbol &sym) {
   if (auto *common = semantics::FindCommonBlockContaining(sym)) {
     auto &details = common->get<semantics::CommonBlockDetails>();
     for (auto &s : details.objects())
@@ -1151,10 +1153,13 @@ struct SymbolDependenceDepth {
     if (sym.has<semantics::UseDetails>() ||
         sym.has<semantics::HostAssocDetails>() ||
         sym.has<semantics::NamelistDetails>() ||
+        sym.has<semantics::ModuleDetails>() ||
         sym.has<semantics::MiscDetails>()) {
-      // FIXME: do we want to do anything with any of these?
+      // FIXME: do we want to do anything with any of these?  Other syms?
       return 0;
     }
+    if (sym.has<semantics::DerivedTypeDetails>())
+      return 0; // FIXME: Can't do derived type analysis yet.
 
     // Symbol must be something lowering will have to allocate.
     bool global = semantics::IsSaved(sym);
@@ -1262,8 +1267,9 @@ private:
 };
 } // namespace
 
-void Fortran::lower::pft::FunctionLikeUnit::processSymbolTable(
-    const semantics::Scope &scope) {
+static void processSymbolTable(
+    const semantics::Scope &scope,
+    std::vector<std::vector<Fortran::lower::pft::Variable>> &varList) {
   SymbolDependenceDepth sdd{varList};
   if (!scope.equivalenceSets().empty())
     sdd.analyzeAliases(scope);
@@ -1283,12 +1289,14 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
       std::get<std::optional<parser::Statement<parser::ProgramStmt>>>(func.t)};
   if (programStmt.has_value()) {
     beginStmt = programStmt.value();
-    auto symbol = getSymbol(beginStmt);
+    auto symbol = getSymbol(*beginStmt);
     entryPointList[0].first = symbol;
-    processSymbolTable(*symbol->scope());
+    processSymbolTable(*symbol->scope(), varList);
   } else {
-    processSymbolTable(semanticsContext.FindScope(
-        std::get<parser::Statement<parser::EndProgramStmt>>(func.t).source));
+    processSymbolTable(
+        semanticsContext.FindScope(
+            std::get<parser::Statement<parser::EndProgramStmt>>(func.t).source),
+        varList);
   }
 }
 
@@ -1299,9 +1307,9 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::FunctionStmt>(func)},
       endStmt{getFunctionStmt<parser::EndFunctionStmt>(func)} {
-  auto symbol = getSymbol(beginStmt);
+  auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
@@ -1311,9 +1319,9 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::SubroutineStmt>(func)},
       endStmt{getFunctionStmt<parser::EndSubroutineStmt>(func)} {
-  auto symbol = getSymbol(beginStmt);
+  auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
@@ -1323,21 +1331,27 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::MpSubprogramStmt>(func)},
       endStmt{getFunctionStmt<parser::EndMpSubprogramStmt>(func)} {
-  auto symbol = getSymbol(beginStmt);
+  auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
     const parser::Module &m, const lower::pft::ParentVariant &parent)
     : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::ModuleStmt>(m)},
-      endStmt{getModuleStmt<parser::EndModuleStmt>(m)} {}
+      endStmt{getModuleStmt<parser::EndModuleStmt>(m)} {
+  auto symbol = getSymbol(beginStmt);
+  processSymbolTable(*symbol->scope(), varList);
+}
 
 Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
     const parser::Submodule &m, const lower::pft::ParentVariant &parent)
     : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::SubmoduleStmt>(
                                   m)},
-      endStmt{getModuleStmt<parser::EndSubmoduleStmt>(m)} {}
+      endStmt{getModuleStmt<parser::EndSubmoduleStmt>(m)} {
+  auto symbol = getSymbol(beginStmt);
+  processSymbolTable(*symbol->scope(), varList);
+}
 
 Fortran::lower::pft::BlockDataUnit::BlockDataUnit(
     const parser::BlockData &bd, const lower::pft::ParentVariant &parent,
