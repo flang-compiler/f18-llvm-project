@@ -47,7 +47,7 @@ fir::FIROpsDialect::FIROpsDialect(mlir::MLIRContext *ctx)
            FieldType, HeapType, IntType, LenType, LogicalType, PointerType,
            RealType, RecordType, ReferenceType, SequenceType, ShapeType,
            ShapeShiftType, SliceType, TypeDescType>();
-  addAttributes<ClosedIntervalAttr, ExactTypeAttr, LowerBoundAttr,
+  addAttributes<ClosedIntervalAttr, ExactTypeAttr, LowerBoundAttr, OpaqueAttr,
                 PointIntervalAttr, RealAttr, SubclassAttr, UpperBoundAttr>();
   addOperations<
 #define GET_OP_LIST

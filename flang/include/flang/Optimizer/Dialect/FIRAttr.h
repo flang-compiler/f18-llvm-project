@@ -5,6 +5,10 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+//
+// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef OPTIMIZER_DIALECT_FIRATTR_H
 #define OPTIMIZER_DIALECT_FIRATTR_H
@@ -21,6 +25,7 @@ namespace fir {
 class FIROpsDialect;
 
 namespace detail {
+struct OpaqueAttributeStorage;
 struct RealAttributeStorage;
 struct TypeAttributeStorage;
 } // namespace detail
@@ -34,6 +39,7 @@ enum AttributeKind {
   FIR_OPENCLOSED_INTERVAL,
   FIR_CLOSEDOPEN_INTERVAL,
   FIR_REAL_ATTR,
+  FIR_OPAQUE_ATTR,
 };
 
 class ExactTypeAttr
@@ -159,6 +165,23 @@ public:
 
   static constexpr bool kindof(unsigned kind) { return kind == getId(); }
   static constexpr unsigned getId() { return AttributeKind::FIR_REAL_ATTR; }
+};
+
+/// An opaque attribute is used to provide dictionary lookups of pointers. The
+/// underlying type of the pointee object is left up to the client. Opaque
+/// attributes are always constructed as null pointers when parsing.
+class OpaqueAttr
+    : public mlir::Attribute::AttrBase<OpaqueAttr, mlir::Attribute,
+                                       detail::OpaqueAttributeStorage> {
+public:
+  using Base::Base;
+
+  static constexpr llvm::StringRef getAttrName() { return "opaque"; }
+  static OpaqueAttr get(mlir::MLIRContext *ctxt, void *pointer);
+  static constexpr bool kindof(unsigned kind) { return kind == getId(); }
+  static constexpr unsigned getId() { return AttributeKind::FIR_OPAQUE_ATTR; }
+
+  void *getPointer() const;
 };
 
 mlir::Attribute parseFirAttribute(FIROpsDialect *dialect,

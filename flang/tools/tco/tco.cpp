@@ -13,6 +13,7 @@
 
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/OptPasses.h"
+#include "flang/Optimizer/Support/FIRContext.h"
 #include "flang/Optimizer/Support/InternalNames.h"
 #include "flang/Optimizer/Support/KindMapping.h"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
@@ -28,6 +29,7 @@
 #include "llvm/Support/InitLLVM.h"
 #include "llvm/Support/MemoryBuffer.h"
 #include "llvm/Support/SourceMgr.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/ToolOutputFile.h"
 #include "llvm/Support/raw_ostream.h"
 
@@ -44,6 +46,10 @@ static cl::opt<std::string> outputFilename("o",
 static cl::opt<bool> emitFir("emit-fir",
                              cl::desc("Parse and pretty-print the input"),
                              cl::init(false));
+
+static cl::opt<std::string> targetTriple("target",
+                                         cl::desc("specify a target triple"),
+                                         cl::init("native"));
 
 static void printModuleBody(mlir::ModuleOp mod, raw_ostream &output) {
   for (auto &op : mod.getBody()->without_terminator())
@@ -80,8 +86,12 @@ static int compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
   ToolOutputFile out(outputFilename, ec, sys::fs::OF_None);
 
   // run passes
+  llvm::Triple triple(fir::determineTargetTriple(targetTriple));
   fir::NameUniquer uniquer;
   fir::KindMapping kindMap{context.get()};
+  fir::setTargetTriple(*owningRef, triple);
+  fir::setNameUniquer(*owningRef, uniquer);
+  fir::setKindMapping(*owningRef, kindMap);
   mlir::PassManager pm{context.get()};
   mlir::applyPassManagerCLOptions(pm);
   if (emitFir) {
@@ -132,7 +142,9 @@ int main(int argc, char **argv) {
   fir::registerFIR();
   fir::registerFIRPasses();
   fir::registerOptPasses();
+
   [[maybe_unused]] InitLLVM y(argc, argv);
+  llvm::InitializeAllTargets();
   mlir::registerAsmPrinterCLOptions();
   mlir::registerMLIRContextCLOptions();
   mlir::registerPassManagerCLOptions();

@@ -20,9 +20,7 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 
-def fir_Dialect : Dialect {
-  let name = "fir";
-}
+def fir_Dialect : Dialect { let name = "fir"; }
 
 // Types and predicates
 
