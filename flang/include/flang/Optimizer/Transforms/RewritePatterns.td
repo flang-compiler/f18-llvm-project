@@ -18,8 +18,7 @@ include "mlir/IR/OpBase.td"
 include "flang/Optimizer/Dialect/FIROps.td"
 
 def IdenticalTypePred : Constraint<CPred<"$0.getType() == $1.getType()">>;
-def IntegerTypePred
-    : Constraint<CPred<"$0.getType().isIntOrIndex() || $0.getType().isa<fir::IntType>()">>;
+def IntegerTypePred : Constraint<CPred<"fir::isa_integer($0.getType())">>;
 
 def SmallerWidthPred
     : Constraint<CPred<"$0.getType().getIntOrFloatBitWidth() < $1.getType().getIntOrFloatBitWidth()">>;
