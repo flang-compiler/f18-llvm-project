@@ -19,8 +19,8 @@
 #include "mlir/IR/Diagnostics.h"
 #include "mlir/IR/Function.h"
 #include "mlir/IR/Matchers.h"
-#include "mlir/IR/PatternMatch.h"
 #include "mlir/IR/Module.h"
+#include "mlir/IR/PatternMatch.h"
 #include "llvm/ADT/StringSwitch.h"
 #include "llvm/ADT/TypeSwitch.h"
 
@@ -320,9 +320,10 @@ mlir::ParseResult fir::parseCmpcOp(mlir::OpAsmParser &parser,
 // ConvertOp
 //===----------------------------------------------------------------------===//
 
-void fir::ConvertOp::getCanonicalizationPatterns(OwningRewritePatternList &results,
-                                                 MLIRContext *context){
-  results.insert<ConvertConvertOptPattern, RedundantConvertOptPattern, CombineConvertOptPattern>(context);
+void fir::ConvertOp::getCanonicalizationPatterns(
+    OwningRewritePatternList &results, MLIRContext *context) {
+  results.insert<ConvertConvertOptPattern, RedundantConvertOptPattern,
+                 CombineConvertOptPattern>(context);
 }
 
 mlir::OpFoldResult fir::ConvertOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
