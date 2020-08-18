@@ -17,24 +17,30 @@
 include "mlir/IR/OpBase.td"
 include "flang/Optimizer/Dialect/FIROps.td"
 
-def IntegerType : Constraint<CPred<"$0.getType().isa<fir::IntType>()">>;
-def SmallerWidth : Constraint<CPred<"$0.getType().getIntOrFloatBitWidth() < $1.getType().getIntOrFloatBitWidth()">>;
+def IdenticalTypePred : Constraint<CPred<"$0.getType() == $1.getType()">>;
+def IntegerTypePred
+    : Constraint<CPred<"$0.getType().isIntOrIndex() || $0.getType().isa<fir::IntType>()">>;
 
-def TypesAreIdentical : Constraint<CPred<"$0.getType() == $1.getType()">>;
+def SmallerWidthPred
+    : Constraint<CPred<"$0.getType().getIntOrFloatBitWidth() < $1.getType().getIntOrFloatBitWidth()">>;
 
-def ConvertConvertOptPattern : Pat<(fir_ConvertOp (fir_ConvertOp $arg)),
-                                   (fir_ConvertOp $arg),
-                                   [(IntegerType $arg)]>;
+def ConvertConvertOptPattern
+    : Pat<(fir_ConvertOp (fir_ConvertOp $arg)),
+          (fir_ConvertOp $arg),
+          [(IntegerTypePred $arg)]>;
 
-def RedundantConvertOptPattern : Pat<(fir_ConvertOp:$res $arg),
-                                     (replaceWithValue $arg),
-                                     [(TypesAreIdentical $res, $arg),
-                                      (IntegerType $arg)]>;
+def RedundantConvertOptPattern
+    : Pat<(fir_ConvertOp:$res $arg),
+          (replaceWithValue $arg),
+          [(IdenticalTypePred $res, $arg)
+          ,(IntegerTypePred $arg)]>;
 
-def CombineConvertOptPattern : Pat<(fir_ConvertOp:$res (fir_ConvertOp:$irm $arg)),
-                                     (replaceWithValue $arg),
-                                     [(TypesAreIdentical $res, $arg),
-                                     (IntegerType $arg), (IntegerType $irm),
-                                     (SmallerWidth $arg $irm)]>;
+def CombineConvertOptPattern
+    : Pat<(fir_ConvertOp:$res(fir_ConvertOp:$irm $arg)),
+          (replaceWithValue $arg),
+          [(IdenticalTypePred $res, $arg)
+          ,(IntegerTypePred $arg)
+          ,(IntegerTypePred $irm)
+          ,(SmallerWidthPred $arg, $irm)]>;
 
 #endif // FIR_REWRITE_PATTERNS
