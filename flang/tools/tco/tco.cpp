@@ -106,9 +106,6 @@ static int compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
     pm.addPass(mlir::createInlinerPass());
     pm.addPass(mlir::createCSEPass());
 
-    // convert fir dialect to affine
-    pm.addPass(fir::createPromoteToAffinePass());
-
     // convert control flow to CFG form
     pm.addPass(fir::createFirToCfgPass());
     pm.addPass(fir::createControlFlowLoweringPass());
