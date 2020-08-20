@@ -323,7 +323,7 @@ mlir::ParseResult fir::parseCmpcOp(mlir::OpAsmParser &parser,
 void fir::ConvertOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
   results.insert<ConvertConvertOptPattern, RedundantConvertOptPattern,
-                 CombineConvertOptPattern>(context);
+                 CombineConvertOptPattern, ForwardConstantConvertPattern>(context);
 }
 
 mlir::OpFoldResult fir::ConvertOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
