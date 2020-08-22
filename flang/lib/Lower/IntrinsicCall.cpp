@@ -183,7 +183,7 @@ struct IntrinsicLibrary {
   /// Generate FIR for call to Fortran intrinsic \p name with arguments \p arg
   /// and expected result type \p resultType.
   fir::ExtendedValue genIntrinsicCall(llvm::StringRef name,
-                                      mlir::Type resultType,
+                                      llvm::Optional<mlir::Type> resultType,
                                       llvm::ArrayRef<fir::ExtendedValue> arg);
 
   /// Search a runtime function that is associated to the generic intrinsic name
@@ -209,6 +209,7 @@ struct IntrinsicLibrary {
   mlir::Value genAnint(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genCeiling(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genConjg(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  void genDateAndTime(llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genDim(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genDprod(mlir::Type, llvm::ArrayRef<mlir::Value>);
   template <Extremum, ExtremumBehavior>
@@ -233,7 +234,9 @@ struct IntrinsicLibrary {
   /// generate the related code.
   using ElementalGenerator = decltype(&IntrinsicLibrary::genAbs);
   using ExtendedGenerator = decltype(&IntrinsicLibrary::genLenTrim);
-  using Generator = std::variant<ElementalGenerator, ExtendedGenerator>;
+  using SubroutineGenerator = decltype(&IntrinsicLibrary::genDateAndTime);
+  using Generator =
+      std::variant<ElementalGenerator, ExtendedGenerator, SubroutineGenerator>;
 
   /// All generators can be outlined. This will build a function named
   /// "fir."+ <generic name> + "." + <result type code> and generate the
@@ -269,6 +272,9 @@ struct IntrinsicLibrary {
   mlir::Value invokeGenerator(ExtendedGenerator generator,
                               mlir::Type resultType,
                               llvm::ArrayRef<mlir::Value> args);
+  mlir::Value invokeGenerator(SubroutineGenerator generator,
+                              mlir::Type resultType,
+                              llvm::ArrayRef<mlir::Value> args);
 
   /// Get pointer to unrestricted intrinsic. Generate the related unrestricted
   /// intrinsic if it is not defined yet.
@@ -292,6 +298,7 @@ struct IntrinsicHandler {
   /// more readable.
   bool outline = false;
 };
+
 using I = IntrinsicLibrary;
 static constexpr IntrinsicHandler handlers[]{
     {"abs", &I::genAbs},
@@ -302,6 +309,7 @@ static constexpr IntrinsicHandler handlers[]{
     {"ceiling", &I::genCeiling},
     {"char", &I::genConversion},
     {"conjg", &I::genConjg},
+    {"date_and_time", &I::genDateAndTime},
     {"dim", &I::genDim},
     {"dble", &I::genConversion},
     {"dprod", &I::genDprod},
@@ -761,23 +769,70 @@ IntrinsicLibrary::genElementalCall<IntrinsicLibrary::ExtendedGenerator>(
   return std::invoke(generator, *this, resultType, args);
 }
 
+static fir::ExtendedValue
+invokeHanlder(IntrinsicLibrary::ElementalGenerator generator,
+              const IntrinsicHandler &handler,
+              llvm::Optional<mlir::Type> resultType,
+              llvm::ArrayRef<fir::ExtendedValue> args, bool outline,
+              IntrinsicLibrary &lib) {
+  assert(resultType && "expect elemental intrinsic to be functions");
+  return lib.genElementalCall(generator, handler.name, *resultType, args,
+                              outline);
+}
+
+static fir::ExtendedValue
+invokeHanlder(IntrinsicLibrary::ExtendedGenerator generator,
+              const IntrinsicHandler &handler,
+              llvm::Optional<mlir::Type> resultType,
+              llvm::ArrayRef<fir::ExtendedValue> args, bool outline,
+              IntrinsicLibrary &lib) {
+  assert(resultType && "expect intrinsic function");
+  if (handler.isElemental)
+    return lib.genElementalCall(generator, handler.name, *resultType, args,
+                                outline);
+  if (outline)
+    return lib.outlineInWrapper(generator, handler.name, *resultType, args);
+  return std::invoke(generator, lib, *resultType, args);
+}
+static fir::ExtendedValue
+invokeHanlder(IntrinsicLibrary::SubroutineGenerator generator,
+              const IntrinsicHandler &handler,
+              llvm::Optional<mlir::Type> resultType,
+              llvm::ArrayRef<fir::ExtendedValue> args, bool outline,
+              IntrinsicLibrary &lib) {
+  // TODO
+  // if (outline)
+  //  return outlineInWrapper(generator, handler.name, *resultType, args);
+  std::invoke(generator, lib, args);
+  return mlir::Value{};
+}
+
+/// Many intrinsics are not yet lowered, provide a clear error message to user
+/// instead of hitting harder to understand asserts.
+static void crashOnMissingIntrinsic(mlir::Location loc, llvm::StringRef name) {
+  mlir::emitError(loc,
+                  "TODO: missing intrinsic lowering: " + llvm::Twine(name));
+  exit(1);
+}
+
 fir::ExtendedValue
-IntrinsicLibrary::genIntrinsicCall(llvm::StringRef name, mlir::Type resultType,
+IntrinsicLibrary::genIntrinsicCall(llvm::StringRef name,
+                                   llvm::Optional<mlir::Type> resultType,
                                    llvm::ArrayRef<fir::ExtendedValue> args) {
   for (auto &handler : handlers)
     if (name == handler.name) {
       bool outline = handler.outline || outlineAllIntrinsics;
-      if (const auto *elementalGenerator =
-              std::get_if<ElementalGenerator>(&handler.generator))
-        return genElementalCall(*elementalGenerator, name, resultType, args,
-                                outline);
-      const auto &generator = std::get<ExtendedGenerator>(handler.generator);
-      if (handler.isElemental)
-        return genElementalCall(generator, name, resultType, args, outline);
-      if (outline)
-        return outlineInWrapper(generator, name, resultType, args);
-      return std::invoke(generator, *this, resultType, args);
+      return std::visit(
+          [&](auto &generator) -> fir::ExtendedValue {
+            return invokeHanlder(generator, handler, resultType, args, outline,
+                                 *this);
+          },
+          handler.generator);
     }
+
+  if (!resultType)
+    // Subroutine should have a handler, they are likely missing for now.
+    crashOnMissingIntrinsic(loc, name);
 
   // Try the runtime if no special handler was defined for the
   // intrinsic being called. Maths runtime only has numerical elemental.
@@ -788,20 +843,17 @@ IntrinsicLibrary::genIntrinsicCall(llvm::StringRef name, mlir::Type resultType,
   llvm::SmallVector<mlir::Value, 2> mlirArgs;
   for (const auto &extendedVal : args) {
     auto val = toValue(extendedVal, builder, loc);
-    if (!val) {
+    if (!val)
       // If an absent optional gets there, most likely its handler has just
       // not yet been defined.
-      mlir::emitError(loc,
-                      "TODO: missing intrinsic lowering: " + llvm::Twine(name));
-      exit(1);
-    }
+      crashOnMissingIntrinsic(loc, name);
     mlirArgs.emplace_back(val);
   }
   mlir::FunctionType soughtFuncType =
-      getFunctionType(resultType, mlirArgs, builder);
+      getFunctionType(*resultType, mlirArgs, builder);
 
   auto runtimeCallGenerator = getRuntimeCallGenerator(name, soughtFuncType);
-  return genElementalCall(runtimeCallGenerator, name, resultType, args,
+  return genElementalCall(runtimeCallGenerator, name, *resultType, args,
                           /* outline */ true);
 }
 
@@ -830,14 +882,22 @@ IntrinsicLibrary::invokeGenerator(ExtendedGenerator generator,
   return toValue(extendedResult, builder, loc);
 }
 
+mlir::Value
+IntrinsicLibrary::invokeGenerator(SubroutineGenerator generator,
+                                  mlir::Type resultType,
+                                  llvm::ArrayRef<mlir::Value> args) {
+  llvm::SmallVector<fir::ExtendedValue, 2> extendedArgs;
+  for (auto arg : args)
+    extendedArgs.emplace_back(toExtendedValue(arg, builder, loc));
+  std::invoke(generator, *this, extendedArgs);
+  return mlir::Value{};
+}
+
 template <typename GeneratorType>
 mlir::FuncOp IntrinsicLibrary::getWrapper(GeneratorType generator,
                                           llvm::StringRef name,
                                           mlir::FunctionType funcType,
                                           bool loadRefArguments) {
-  assert(funcType.getNumResults() == 1 &&
-         "expect one result for intrinsic functions");
-  auto resultType = funcType.getResult(0);
   std::string wrapperName = fir::mangleIntrinsicProcedure(name, funcType);
   auto function = builder.getNamedFunction(wrapperName);
   if (!function) {
@@ -868,6 +928,9 @@ mlir::FuncOp IntrinsicLibrary::getWrapper(GeneratorType generator,
     }
 
     IntrinsicLibrary localLib{*localBuilder, localLoc};
+    mlir::Type resultType;
+    if (funcType.getNumResults() == 1)
+      resultType = funcType.getResult(0);
     auto result =
         localLib.invokeGenerator(generator, resultType, localArguments);
     localBuilder->create<mlir::ReturnOp>(localLoc, result);
@@ -1101,6 +1164,20 @@ mlir::Value IntrinsicLibrary::genConjg(mlir::Type resultType,
       cplx, negImag, /*isImagPart=*/true);
 }
 
+// DATE_AND_TIME
+void IntrinsicLibrary::genDateAndTime(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 4 && "date_and_time has 4 args");
+  llvm::Optional<fir::CharBoxValue> date;
+  if (auto *charBox = args[0].getCharBox())
+    date = *charBox;
+  for (auto i = 1; i < 4; ++i)
+    if (fir::getBase(args[i]))
+      llvm::errs() << "TODO: lowering of DATE_AND_TIME arguments other than "
+                      "DATE not yet implemented\n";
+
+  Fortran::lower::genDateAndTime(builder, loc, date);
+}
+
 // DIM
 mlir::Value IntrinsicLibrary::genDim(mlir::Type resultType,
                                      llvm::ArrayRef<mlir::Value> args) {
@@ -1153,7 +1230,7 @@ mlir::Value IntrinsicLibrary::genIAnd(mlir::Type resultType,
 mlir::Value IntrinsicLibrary::genIchar(mlir::Type resultType,
                                        llvm::ArrayRef<mlir::Value> args) {
   // There can be an optional kind in second argument.
-  assert(args.size() >= 1 && args.size() <= 2);
+  assert(args.size() == 2);
 
   auto arg = args[0];
   auto argTy = arg.getType();
@@ -1360,7 +1437,7 @@ mlir::Value IntrinsicLibrary::genExtremum(mlir::Type,
 fir::ExtendedValue
 Fortran::lower::genIntrinsicCall(Fortran::lower::FirOpBuilder &builder,
                                  mlir::Location loc, llvm::StringRef name,
-                                 mlir::Type resultType,
+                                 llvm::Optional<mlir::Type> resultType,
                                  llvm::ArrayRef<fir::ExtendedValue> args) {
   return IntrinsicLibrary{builder, loc}.genIntrinsicCall(name, resultType,
                                                          args);
