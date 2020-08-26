@@ -1167,15 +1167,17 @@ mlir::Value IntrinsicLibrary::genConjg(mlir::Type resultType,
 // DATE_AND_TIME
 void IntrinsicLibrary::genDateAndTime(llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 4 && "date_and_time has 4 args");
-  llvm::Optional<fir::CharBoxValue> date;
-  if (auto *charBox = args[0].getCharBox())
-    date = *charBox;
-  for (auto i = 1; i < 4; ++i)
-    if (fir::getBase(args[i]))
-      llvm::errs() << "TODO: lowering of DATE_AND_TIME arguments other than "
-                      "DATE not yet implemented\n";
+  llvm::SmallVector<llvm::Optional<fir::CharBoxValue>, 3> charArgs(3);
+  for (auto i = 0; i < 3; ++i)
+    if (auto *charBox = args[i].getCharBox())
+      charArgs[i] = *charBox;
+  // TODO: build descriptor for VALUES (also update runtime)
+  if (fir::getBase(args[3]))
+    mlir::emitError(loc, "TODO: lowering of DATE_AND_TIME VALUES argument not "
+                         "yet implemented\n");
 
-  Fortran::lower::genDateAndTime(builder, loc, date);
+  Fortran::lower::genDateAndTime(builder, loc, charArgs[0], charArgs[1],
+                                 charArgs[2]);
 }
 
 // DIM
