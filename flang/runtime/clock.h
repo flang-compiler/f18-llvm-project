@@ -26,8 +26,12 @@ extern "C" {
 /// - Windows implementation (currently does nothing)
 void RTNAME(DateAndTime)(char *date, char *time, char *zone,
     std::size_t dateChars, std::size_t timeChars, std::size_t zoneChars);
-}
 
-// TODO: CPU_TIME, SYSTEM_CLOCK
+/// Implement runtime for SYSTEM_CLOCK intrinsic.
+void RTNAME(SystemClock)(int *count, int *count_rate, int *count_max);
+
+} // extern C
+
+// TODO: CPU_TIME
 } // namespace Fortran::runtime
 #endif // FORTRAN_RUNTIME_CLOCK_H_

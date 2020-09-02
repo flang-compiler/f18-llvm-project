@@ -20,10 +20,10 @@
 using namespace Fortran::runtime;
 #define mkRTKey(X) mkKey(RTNAME(X))
 
-static constexpr std::tuple<mkRTKey(DateAndTime), mkRTKey(FailImageStatement),
-                            mkRTKey(PauseStatement),
-                            mkRTKey(ProgramEndStatement),
-                            mkRTKey(StopStatement), mkRTKey(StopStatementText)>
+static constexpr std::tuple<
+    mkRTKey(DateAndTime), mkRTKey(FailImageStatement), mkRTKey(PauseStatement),
+    mkRTKey(ProgramEndStatement), mkRTKey(StopStatement),
+    mkRTKey(StopStatementText), mkRTKey(SystemClock)>
     newRTTable;
 
 template <typename A>
@@ -217,5 +217,38 @@ void Fortran::lower::genDateAndTime(Fortran::lower::FirOpBuilder &builder,
   for (const auto &op : llvm::zip(args, callee.getType().getInputs()))
     operands.emplace_back(
         builder.convertWithSemantics(loc, std::get<1>(op), std::get<0>(op)));
+  builder.create<fir::CallOp>(loc, callee, operands);
+}
+
+void Fortran::lower::genSystemClock(FirOpBuilder &builder, mlir::Location loc,
+                                    llvm::Optional<mlir::Value> count,
+                                    llvm::Optional<mlir::Value> countRate,
+                                    llvm::Optional<mlir::Value> countMax) {
+  auto callee = genRuntimeFunction<mkRTKey(SystemClock)>(loc, builder);
+  mlir::Type idxTy = builder.getIndexType();
+  mlir::Value zero;
+  auto handleOptionalArgs = [&](llvm::Optional<mlir::Value> arg,
+                                mlir::Value &buffer) {
+    if (arg) {
+      buffer = *arg;
+    } else {
+      if (!zero)
+        zero = builder.createIntegerConstant(loc, idxTy, 0);
+      buffer = zero;
+    }
+  };
+  mlir::Value dateBuffer;
+  handleOptionalArgs(count, dateBuffer);
+  mlir::Value timeBuffer;
+  handleOptionalArgs(countRate, timeBuffer);
+  mlir::Value zoneBuffer;
+  handleOptionalArgs(countMax, zoneBuffer);
+
+  llvm::SmallVector<mlir::Value, 3> args{dateBuffer, timeBuffer, zoneBuffer};
+  llvm::SmallVector<mlir::Value, 3> operands;
+  for (const auto &op : llvm::zip(args, callee.getType().getInputs()))
+    operands.emplace_back(
+        builder.convertWithSemantics(loc, std::get<1>(op), std::get<0>(op)));
+
   builder.create<fir::CallOp>(loc, callee, operands);
 }

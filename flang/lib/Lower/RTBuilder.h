@@ -66,6 +66,11 @@ constexpr TypeBuilderFunc getModel<int &>() {
   };
 }
 template <>
+constexpr TypeBuilderFunc getModel<int *>() {
+  return getModel<int &>();
+}
+
+template <>
 constexpr TypeBuilderFunc getModel<Fortran::runtime::io::Iostat>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
     return mlir::IntegerType::get(8 * sizeof(Fortran::runtime::io::Iostat),

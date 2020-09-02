@@ -10,6 +10,7 @@
 
 #include "clock.h"
 #include <algorithm>
+#include <chrono>
 #include <cstdlib>
 #include <cstring>
 #include <stdio.h>
@@ -56,6 +57,26 @@ void RTNAME(DateAndTime)(char *date, char *time, char *zone,
     copyBufferAndPad(zone, zoneChars, len);
   }
 }
+
+// TODO: Will chrono help in merging implementations on Windows?
+void RTNAME(SystemClock)(int *count, int *count_rate, int *count_max) {
+  using chronoSystemClock = std::chrono::system_clock;
+  tm localTime;
+  time_t timer{chronoSystemClock::to_time_t(chronoSystemClock::now())};
+  ::localtime_r(&timer, &localTime);
+  const auto timePointInADay =
+      (localTime.tm_hour * 3600) + (localTime.tm_min * 60) + localTime.tm_sec;
+  const auto maxDayTime = std::chrono::seconds(std::chrono::hours{24}).count();
+  if (count)
+    // trip back to 0 if the value overflows of count_max.
+    *count =
+        (timePointInADay > maxDayTime) ? 0 : (timePointInADay * CLOCKS_PER_SEC);
+  if (count_rate)
+    *count_rate = CLOCKS_PER_SEC;
+  if (count_max)
+    *count_max = maxDayTime * CLOCKS_PER_SEC;
+}
+
 } // namespace Fortran::runtime
 
 #else /* Windows */

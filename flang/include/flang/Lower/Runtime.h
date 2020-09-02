@@ -27,6 +27,7 @@ class Optional;
 
 namespace mlir {
 class Location;
+class Value;
 }
 
 namespace fir {
@@ -73,6 +74,10 @@ void genDateAndTime(FirOpBuilder &, mlir::Location,
                     llvm::Optional<fir::CharBoxValue> date,
                     llvm::Optional<fir::CharBoxValue> time,
                     llvm::Optional<fir::CharBoxValue> zone);
+void genSystemClock(FirOpBuilder &, mlir::Location,
+                    llvm::Optional<mlir::Value> count,
+                    llvm::Optional<mlir::Value> countRate,
+                    llvm::Optional<mlir::Value> countMax);
 
 } // namespace lower
 } // namespace Fortran

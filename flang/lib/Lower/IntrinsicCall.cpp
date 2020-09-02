@@ -210,6 +210,7 @@ struct IntrinsicLibrary {
   mlir::Value genCeiling(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genConjg(mlir::Type, llvm::ArrayRef<mlir::Value>);
   void genDateAndTime(llvm::ArrayRef<fir::ExtendedValue>);
+  void genSystemClock(llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genDim(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genDprod(mlir::Type, llvm::ArrayRef<mlir::Value>);
   template <Extremum, ExtremumBehavior>
@@ -310,6 +311,7 @@ static constexpr IntrinsicHandler handlers[]{
     {"char", &I::genConversion},
     {"conjg", &I::genConjg},
     {"date_and_time", &I::genDateAndTime},
+    {"system_clock", &I::genSystemClock},
     {"dim", &I::genDim},
     {"dble", &I::genConversion},
     {"dprod", &I::genDprod},
@@ -1178,6 +1180,17 @@ void IntrinsicLibrary::genDateAndTime(llvm::ArrayRef<fir::ExtendedValue> args) {
 
   Fortran::lower::genDateAndTime(builder, loc, charArgs[0], charArgs[1],
                                  charArgs[2]);
+}
+
+// SYSTEM_CLOCK
+void IntrinsicLibrary::genSystemClock(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 3 && "system_clock has 3 args");
+  llvm::SmallVector<llvm::Optional<mlir::Value>, 3> mlirArgs;
+  for (auto i = 0; i < 3; i++)
+    if (auto val = toValue(args[i], builder, loc))
+      mlirArgs[i] = val;
+  Fortran::lower::genSystemClock(builder, loc, mlirArgs[0], mlirArgs[1],
+                                 mlirArgs[2]);
 }
 
 // DIM
