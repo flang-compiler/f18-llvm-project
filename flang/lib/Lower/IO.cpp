@@ -368,17 +368,17 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   const auto &control = std::get<1>(ioImpliedDo.t);
   const auto &loopSym = *control.name.thing.thing.symbol;
   auto loopVar = converter.getSymbolAddress(loopSym);
-  auto genFIRLoopIndex = [&](const Fortran::parser::ScalarIntExpr &expr) {
+  auto genControlValue = [&](const Fortran::parser::ScalarIntExpr &expr) {
     return builder.createConvert(
         loc, builder.getIndexType(),
         converter.genExprValue(*Fortran::semantics::GetExpr(expr)));
   };
-  auto lowerValue = genFIRLoopIndex(control.lower);
-  auto upperValue = genFIRLoopIndex(control.upper);
+  auto lowerValue = genControlValue(control.lower);
+  auto upperValue = genControlValue(control.upper);
   auto stepValue = control.step.has_value()
-                       ? genFIRLoopIndex(*control.step)
+                       ? genControlValue(*control.step)
                        : builder.create<mlir::ConstantIndexOp>(loc, 1);
-  auto genItemList = [&](const D &ioImpliedDo, bool inIterWhileLoop) {
+  auto genItemList = [&](const D &ioImpliedDo) {
     if constexpr (std::is_same_v<D, Fortran::parser::InputImpliedDo>)
       genInputItemList(converter, cookie, itemList, insertPt, checkResult, ok,
                        true);
@@ -395,7 +395,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                                      loopOp.getInductionVar());
     builder.create<fir::StoreOp>(loc, lcv, loopVar);
     insertPt = builder.saveInsertionPoint();
-    genItemList(ioImpliedDo, false);
+    genItemList(ioImpliedDo);
     builder.restoreInsertionPoint(parentInsertPt);
     return;
   }
@@ -411,7 +411,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   insertPt = builder.saveInsertionPoint();
   ok = iterWhileOp.getIterateVar();
   auto falseValue = builder.createIntegerConstant(loc, builder.getI1Type(), 0);
-  genItemList(ioImpliedDo, true);
+  genItemList(ioImpliedDo);
   // Unwind nested I/O call scopes, filling in true and false ResultOp's.
   for (auto *op = builder.getBlock()->getParentOp(); isa<fir::IfOp>(op);
        op = op->getBlock()->getParentOp()) {
