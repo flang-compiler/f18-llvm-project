@@ -43,7 +43,7 @@ void RTNAME(DateAndTime)(char *date, char *time, char *zone,
     copyBufferAndPad(date, dateChars, len);
   }
   if (time) {
-    auto ms{t.tv_usec / 1000};
+    long ms{t.tv_usec / 1000};
     auto len{::snprintf(buffer, buffSize, "%02d%02d%02d.%03ld",
         localTime.tm_hour, localTime.tm_min, localTime.tm_sec, ms)};
     copyBufferAndPad(time, timeChars, len);
