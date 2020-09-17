@@ -76,24 +76,24 @@ struct IncrementLoopInfo {
   const Fortran::semantics::SomeExpr *lowerExpr;
   const Fortran::semantics::SomeExpr *upperExpr;
   const Fortran::semantics::SomeExpr *stepExpr;
-  const Fortran::semantics::SomeExpr *maskExpr{};
-  bool hasRealControl{false};
-  bool isConcurrent{false};
-  bool isOutermost{true};
-  bool isInnermost{true};
-  llvm::SmallVector<const Fortran::semantics::Symbol *, 4> localInitSymList{};
-  mlir::Value loopVariable{};
-  mlir::Value stepValue{}; // possible uses in multiple blocks
+  const Fortran::semantics::SomeExpr *maskExpr = nullptr;
+  bool isUnordered = false;
+  bool isOutermost = true;
+  bool isInnermost = true;
+  llvm::SmallVector<const Fortran::semantics::Symbol *, 4> localInitSymList;
+  mlir::Value loopVariable = nullptr;
+  mlir::Value stepValue = nullptr; // possible uses in multiple blocks
 
   // Data members for structured loops.
-  fir::DoLoopOp doLoop{};
+  fir::DoLoopOp doLoop = nullptr;
 
   // Data members for unstructured loops.
-  mlir::Value tripVariable{};
-  mlir::Block *headerBlock{}; // loop entry and test block
-  mlir::Block *maskBlock{};   // concurrent loop mask block
-  mlir::Block *bodyBlock{};   // first loop body block
-  mlir::Block *exitBlock{};   // loop exit target block
+  bool hasRealControl = false;
+  mlir::Value tripVariable = nullptr;
+  mlir::Block *headerBlock = nullptr; // loop entry and test block
+  mlir::Block *maskBlock = nullptr;   // concurrent loop mask block
+  mlir::Block *bodyBlock = nullptr;   // first loop body block
+  mlir::Block *exitBlock = nullptr;   // loop exit target block
 };
 } // namespace
 
@@ -820,23 +820,28 @@ private:
     bool unstructuredContext = eval.lowerAsUnstructured();
     auto &doStmtEval = eval.getFirstNestedEvaluation();
     auto *doStmt = doStmtEval.getIf<Fortran::parser::NonLabelDoStmt>();
-    const auto &loopControl = std::get<1>(doStmt->t);
+    const auto &loopControl =
+        std::get<std::optional<Fortran::parser::LoopControl>>(doStmt->t);
     auto *preheaderBlock = doStmtEval.block;
     auto *headerBlock =
         unstructuredContext ? doStmtEval.localBlocks[0] : nullptr;
     auto *bodyBlock = doStmtEval.lexicalSuccessor->block;
     auto *exitBlock = doStmtEval.parentConstruct->constructExit->block;
     llvm::SmallVector<IncrementLoopInfo, 4> incrementLoopInfo;
-    const Fortran::parser::ScalarLogicalExpr *whileCondition{};
+    const Fortran::parser::ScalarLogicalExpr *whileCondition = nullptr;
     bool infiniteLoop = !loopControl.has_value();
     if (infiniteLoop) {
       assert(unstructuredContext && "infinite loop must be unstructured");
       startBlock(headerBlock);
-    } else if ((whileCondition = std::get_if<1>(&loopControl->u))) {
+    } else if ((whileCondition =
+                    std::get_if<Fortran::parser::ScalarLogicalExpr>(
+                        &loopControl->u))) {
       assert(unstructuredContext && "while loop must be unstructured");
       startBlock(headerBlock);
       genFIRConditionalBranch(*whileCondition, bodyBlock, exitBlock);
-    } else if (const auto *bounds = std::get_if<0>(&loopControl->u)) {
+    } else if (const auto *bounds =
+                   std::get_if<Fortran::parser::LoopControl::Bounds>(
+                       &loopControl->u)) {
       // Non-concurrent increment loop.
       incrementLoopInfo.emplace_back(*bounds->name.thing.symbol, bounds->lower,
                                      bounds->upper, bounds->step);
@@ -850,30 +855,38 @@ private:
         info.exitBlock = exitBlock;
       }
     } else {
-      const auto *concurrent = std::get_if<2>(&loopControl->u);
+      const auto *concurrent =
+          std::get_if<Fortran::parser::LoopControl::Concurrent>(
+              &loopControl->u);
       assert(concurrent && "invalid DO loop variant");
       if (unstructuredContext)
         maybeStartBlock(preheaderBlock);
-      const auto &header = std::get<0>(concurrent->t);
-      auto dims = std::get<1>(header.t).size();
+      const auto &header =
+          std::get<Fortran::parser::ConcurrentHeader>(concurrent->t);
+      auto &concurrentControlList =
+          std::get<std::list<Fortran::parser::ConcurrentControl>>(header.t);
+      auto dims = concurrentControlList.size();
       auto &endDoStmtEval = *doStmtEval.controlSuccessor;
       auto beginBlocks = doStmtEval.localBlocks.begin();
       auto endBlocks = endDoStmtEval.localBlocks.end();
       decltype(dims) d = 0;
-      for (const auto &control : std::get<1>(header.t)) {
+      for (const auto &control : concurrentControlList) {
         incrementLoopInfo.emplace_back(
             *std::get<0>(control.t).symbol, std::get<1>(control.t),
             std::get<2>(control.t), std::get<3>(control.t));
         auto &info = incrementLoopInfo.back();
-        info.isConcurrent = true;
+        info.isUnordered = true;
         info.isOutermost = ++d == 1;
         info.isInnermost = d == dims;
         if (info.isInnermost) {
-          for (const auto &x : std::get<1>(concurrent->t)) {
-            if (const auto *localInitList = std::get_if<1>(&x.u))
+          for (const auto &x :
+               std::get<std::list<Fortran::parser::LocalitySpec>>(
+                   concurrent->t)) {
+            if (const auto *localInitList =
+                    std::get_if<Fortran::parser::LocalitySpec::LocalInit>(&x.u))
               for (const auto &x : localInitList->v)
                 info.localInitSymList.push_back(x.symbol);
-            if (std::get_if<0>(&x.u))
+            if (std::get_if<Fortran::parser::LocalitySpec::Local>(&x.u))
               llvm_unreachable("do concurrent locality specs not implemented");
           }
         }
@@ -889,7 +902,9 @@ private:
         info.bodyBlock = info.isInnermost ? bodyBlock : *beginBlocks++;
         info.exitBlock = info.isOutermost ? exitBlock : *--endBlocks;
       }
-      if (auto *maskExpr = Fortran::semantics::GetExpr(std::get<2>(header.t))) {
+      if (auto *maskExpr = Fortran::semantics::GetExpr(
+              std::get<std::optional<Fortran::parser::ScalarLogicalExpr>>(
+                  header.t))) {
         auto &info = incrementLoopInfo.back();
         info.maskExpr = maskExpr;
         if (unstructuredContext) {
@@ -958,7 +973,7 @@ private:
     // Structured loop - generate fir.do_loop.
     if (info.isStructured()) {
       info.doLoop = builder->create<fir::DoLoopOp>(
-          loc, lowerValue, upperValue, info.stepValue, info.isConcurrent,
+          loc, lowerValue, upperValue, info.stepValue, info.isUnordered,
           ArrayRef<mlir::Value>{lowerValue}); // initial doLoop result value
       builder->setInsertionPointToStart(info.doLoop.getBody());
       // Update the loop variable value, as it may have non-index references.
@@ -1032,11 +1047,11 @@ private:
       // End fir.do_loop.  A concurrent loop result is illegitimate/irrelevant.
       builder->setInsertionPointToEnd(info.doLoop.getBody());
       auto result = info.doLoop.getInductionVar();
-      if (!info.isConcurrent)
+      if (!info.isUnordered)
         result = builder->create<mlir::AddIOp>(loc, result, info.doLoop.step());
       builder->create<fir::ResultOp>(loc, result);
       builder->setInsertionPointAfter(info.doLoop);
-      if (info.isConcurrent)
+      if (info.isUnordered)
         return;
       // The loop control variable may be used after loop execution.
       auto lcv = builder->createConvert(loc, genType(info.loopVariableSym),
@@ -1344,9 +1359,9 @@ private:
     if (!iostat)
       return;
 
-    mlir::Block *endBlock{};
-    mlir::Block *eorBlock{};
-    mlir::Block *errBlock{};
+    mlir::Block *endBlock = nullptr;
+    mlir::Block *eorBlock = nullptr;
+    mlir::Block *errBlock = nullptr;
     for (const auto &spec : specList) {
       std::visit(Fortran::common::visitors{
                      [&](const Fortran::parser::EndLabel &label) {
