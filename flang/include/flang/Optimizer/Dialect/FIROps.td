@@ -109,10 +109,13 @@ def AnyShapeLike : TypeConstraint<Or<[fir_ShapeType.predicate,
     fir_ShapeShiftType.predicate]>, "any legal shape type">;
 def AnyShapeType : Type<AnyShapeLike.predicate, "any legal shape type">;
 def fir_SliceType : Type<CPred<"$_self.isa<fir::SliceType>()">, "slice type">;
-def AnyEmboxLike : TypeConstraint<Or<[AnyIntegerType.predicate,
-    AnyShapeType.predicate, fir_SliceType.predicate]>,
-    "any legal embox argument type">;
-def AnyEmboxArg : Type<AnyEmboxLike.predicate, "embox argument type">;
+def AffineMapAttr : Attr<
+    CPred<"$_self.isa<mlir::AffineMapAttr>()">, "AffineMap attribute"> {
+  let storageType = "mlir::AffineMapAttr";
+  let returnType = "mlir::AffineMap";
+  let valueType = Index;
+  let constBuilderCall = "mlir::AffineMapAttr::get($0)";
+}
 
 // A type descriptor's type
 def fir_TypeDescType : Type<CPred<"$_self.isa<fir::TypeDescType>()">,
@@ -1034,9 +1037,11 @@ def fir_HasValueOp : fir_Op<"has_value", [Terminator, HasParent<"GlobalOp">]> {
   let assemblyFormat = "$resval attr-dict `:` type($resval)";
 }
 
+//===------------------------------------------------------------------------===//
 // Operations on !fir.box<T> type objects
+//===------------------------------------------------------------------------===//
 
-def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
+def fir_EmboxOp : fir_Op<"embox", [NoSideEffect, AttrSizedOperandSegments]> {
   let summary = "boxes a given reference and (optional) dimension information";
 
   let description = [{
@@ -1056,35 +1061,27 @@ def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
     information through the use of additional attributes.
   }];
 
-  let arguments = (ins AnyReferenceLike:$memref, Variadic<AnyEmboxArg>:$args);
+  let arguments = (ins
+    AnyReferenceLike:$memref,
+    Optional<AnyShapeType>:$shape,
+    Optional<fir_SliceType>:$slice,
+    Variadic<AnyIntegerType>:$lenParams,
+    OptionalAttr<AffineMapAttr>:$accessMap
+  );
 
   let results = (outs fir_BoxType);
 
-  let parser = "return parseEmboxOp(parser, result);";
+  let builders = [
+    OpBuilder<"mlir::OpBuilder &builder, mlir::OperationState &state,"
+      "llvm::ArrayRef<mlir::Type> resultTypes, mlir::Value memref,"
+      "mlir::Value shape = {}, mlir::Value slice = {},"
+      "mlir::ValueRange lenParams = {}", [{
+        return build(builder, state, resultTypes, memref, shape, slice,
+            lenParams, mlir::AffineMapAttr{}); }]>
+  ];
 
-  let printer = [{
-    p << getOperationName() << ' ';
-    p.printOperand(memref());
-    if (auto shape = getShape()) {
-      p << '(';
-      p.printOperand(shape);
-      p << ')';
-    }
-    if (auto slice = getSlice()) {
-      p << '[';
-      p.printOperand(slice);
-      p << ']';
-    }
-    if (auto map = getAttr(layoutName()))
-      p << " map " << map;
-    if (hasLenParams()) {
-      p << " typeparams ";
-      p.printOperands(getLenParams());
-    }
-    p.printOptionalAttrDict(getAttrs(), {layoutName(), lenpName(), shapeName(),
-      sliceName()});
-    p << " : ";
-    p.printFunctionalType(getOperation());
+  let assemblyFormat = [{
+    $memref (`(` $shape^ `)`)? (`[` $slice^ `]`)? (`typeparams` $lenParams^)? (`map` $accessMap^)? attr-dict `:` functional-type(operands, results)
   }];
 
   let verifier = [{
@@ -1092,15 +1089,15 @@ def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
     if (!eleTy)
       return emitOpError("must embox a memory reference type");
     if (hasLenParams()) {
-      auto lenParams = numLenParams();
+      auto lenPs = numLenParams();
       if (auto rt = eleTy.dyn_cast<fir::RecordType>()) {
-        if (lenParams != rt.getNumLenParams())
+        if (lenPs != rt.getNumLenParams())
           return emitOpError("number of LEN params does not correspond"
                              " to the !fir.type type");
       } else {
         return emitOpError("LEN parameters require !fir.type type");
       }
-      for (auto lp : getLenParams())
+      for (auto lp : lenParams())
         if (!fir::isa_integer(lp.getType()))
           return emitOpError("LEN parameters must be integral type");
     }
@@ -1118,42 +1115,10 @@ def fir_EmboxOp : fir_Op<"embox", [NoSideEffect]> {
   }];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef layoutName() { return "layout_map"; }
-    static constexpr llvm::StringRef lenpName() { return "len_param_count"; }
-    static constexpr llvm::StringRef shapeName() { return "shape"; }
-    static constexpr llvm::StringRef sliceName() { return "slice"; }
-
-    mlir::Value getShape() {
-      if (auto x = getAttrOfType<mlir::UnitAttr>(shapeName()))
-        return *std::next(operand_begin());
-      return {};
-    }
-
-    mlir::Value getSlice() {
-      if (auto x = getAttrOfType<mlir::UnitAttr>(sliceName())) {
-        auto iter = std::next(operand_begin());
-        if (getShape())
-          iter = std::next(iter);
-        return *iter;
-      }
-      return {};
-    }
-
-    bool hasLenParams() { return bool{getAttr(lenpName())}; }
-    unsigned numLenParams() {
-      if (auto x = getAttrOfType<mlir::IntegerAttr>(lenpName()))
-        return x.getInt();
-      return 0;
-    }
-
-    operand_range getLenParams() {
-      auto iter = std::next(operand_begin());
-      if (getShape())
-        iter = std::next(iter);
-      if (getSlice())
-        iter = std::next(iter);
-      return {iter, operand_end()};
-    }
+    mlir::Value getShape() { return shape(); }
+    mlir::Value getSlice() { return slice(); }
+    bool hasLenParams() { return !lenParams().empty(); }
+    unsigned numLenParams() { return lenParams().size(); }
   }];
 }
 
@@ -1576,7 +1541,9 @@ def fir_BoxTypeDescOp : fir_SimpleOneResultOp<"box_tdesc", [NoSideEffect]> {
 }
 
 // Record and array type operations
-def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegments]> {
+def fir_ArrayCoorOp : fir_Op<"array_coor",
+    [NoSideEffect, AttrSizedOperandSegments]> {
+
   let summary = "Find the coordinate of an element of an array";
 
   let description = [{
@@ -1601,14 +1568,18 @@ def fir_ArrayCoorOp : fir_Op<"array_coor", [NoSideEffect, AttrSizedOperandSegmen
     ```
   }];
 
-  let arguments = (ins AnyReferenceLike:$memref,
-                       Optional<AnyShapeType>:$shape, Optional<fir_SliceType>:$slice,
-                       Variadic<AnyCoordinateType>:$indices,
-                       Variadic<AnyIntegerType>:$lenParams);
+  let arguments = (ins
+    AnyReferenceLike:$memref,
+    Optional<AnyShapeType>:$shape,
+    Optional<fir_SliceType>:$slice,
+    Variadic<AnyCoordinateType>:$indices,
+    Variadic<AnyIntegerType>:$lenParams
+  );
 
   let results = (outs fir_ReferenceType);
+
   let assemblyFormat = [{
-    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lenParams^)? `:` functional-type(operands, results) attr-dict
+    $memref (`(`$shape^`)`)? (`[`$slice^`]`)? $indices (`typeparams` $lenParams^)? attr-dict `:` functional-type(operands, results)
   }];
 
   let verifier = [{

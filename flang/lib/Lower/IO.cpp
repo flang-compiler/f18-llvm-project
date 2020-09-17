@@ -264,9 +264,13 @@ genOutputItemList(Fortran::lower::AbstractConverter &converter,
       outputFuncArgs.push_back(parts.second);
     } else {
       if (argType.isa<fir::BoxType>()) {
+        mlir::Value shape;
+        mlir::Value slice;
+        llvm::SmallVector<mlir::Value, 8> lenParams;
         // TODO: add dynamic shape op
+        TODO();
         itemValue = builder.create<fir::EmboxOp>(
-            loc, fir::BoxType::get(itemType), itemValue);
+            loc, fir::BoxType::get(itemType), itemValue, shape, slice, lenParams);
       }
       itemValue = builder.createConvert(loc, argType, itemValue);
       outputFuncArgs.push_back(itemValue);
@@ -332,12 +336,16 @@ static void genInputItemList(Fortran::lower::AbstractConverter &converter,
     auto argType = inputFunc.getType().getInput(1);
     auto originalItemAddr = itemAddr;
     if (argType.isa<fir::BoxType>()) {
+      mlir::Value shape;
+      mlir::Value slice;
+      llvm::SmallVector<mlir::Value, 8> lenParams;
       // TODO: add dynamic shape op
+      TODO();
       itemAddr = builder.create<fir::EmboxOp>(loc, fir::BoxType::get(itemType),
-                                              itemAddr);
+                                              itemAddr, shape, slice, lenParams);
     }
     itemAddr = builder.createConvert(loc, argType, itemAddr);
-    llvm::SmallVector<mlir::Value, 3> inputFuncArgs = {cookie, itemAddr};
+    llvm::SmallVector<mlir::Value, 8> inputFuncArgs = {cookie, itemAddr};
     Fortran::lower::CharacterExprHelper helper{builder, loc};
     if (helper.isCharacter(itemType)) {
       auto len = helper.materializeCharacter(originalItemAddr).second;
@@ -814,7 +822,7 @@ genConditionHandlerCall(Fortran::lower::AbstractConverter &converter,
     return builder.create<mlir::ConstantOp>(
         loc, builder.getIntegerAttr(boolType, specifierIsPresent));
   };
-  llvm::SmallVector<mlir::Value, 6> ioArgs = {
+  llvm::SmallVector<mlir::Value, 8> ioArgs = {
       cookie,
       boolValue(csi.ioStatExpr != nullptr),
       boolValue(csi.hasErr),
@@ -1021,18 +1029,12 @@ lowerReferenceAsStringSelect(
     builder.setInsertionPointToEnd(block);
   }
 
-  // Create the unit case which should result in an error
+  // Create the unit case which should result in an error.
   auto *unitBlock = block->splitBlock(builder.getInsertionPoint());
   builder.setInsertionPointToEnd(unitBlock);
-
-  // TODO: Replace with instructions to crash the program
-  auto emptyString = fir::getBase(createStringLiteral(loc, converter, "", 0));
-  auto emptyStringRef = builder.createConvert(loc, strTy, emptyString);
-  auto zero = builder.create<mlir::ConstantIntOp>(loc, 0, builder.getI64Type());
-  llvm::SmallVector<mlir::Value, 8> args;
-  args.push_back(emptyStringRef);
-  args.push_back(zero);
-  builder.create<mlir::BranchOp>(loc, endBlock, args);
+  
+  // Crash the program.
+  builder.create<fir::UnreachableOp>(loc);
 
   // Add unit case to the select statement
   blockList.push_back(unitBlock);
