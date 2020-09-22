@@ -99,6 +99,11 @@ std::string fir::NameUniquer::doCommonBlock(llvm::StringRef name) {
   return result.append("B").append(toLower(name));
 }
 
+std::string fir::NameUniquer::doBlockData(llvm::StringRef name) {
+  std::string result = prefix();
+  return result.append("L").append(toLower(name));
+}
+
 std::string
 fir::NameUniquer::doConstant(llvm::ArrayRef<llvm::StringRef> modules,
                              llvm::Optional<llvm::StringRef> host,
@@ -238,6 +243,10 @@ fir::NameUniquer::deconstruct(llvm::StringRef uniq) {
           nk = NameKind::VARIABLE;
           name = readName(uniq, i, i + 1, end);
         }
+        break;
+      case 'L':
+        nk = NameKind::BLOCK_DATA_NAME;
+        name = readName(uniq, i, i + 1, end);
         break;
       case 'P':
         nk = NameKind::PROCEDURE;

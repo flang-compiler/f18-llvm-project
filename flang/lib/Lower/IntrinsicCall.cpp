@@ -1032,9 +1032,8 @@ IntrinsicLibrary::getRuntimeCallGenerator(llvm::StringRef name,
              Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
              llvm::ArrayRef<mlir::Value> args) {
     llvm::SmallVector<mlir::Value, 2> convertedArguments;
-    for (const auto &pair : llvm::zip(actualFuncType.getInputs(), args))
-      convertedArguments.push_back(
-          builder.createConvert(loc, std::get<0>(pair), std::get<1>(pair)));
+    for (auto [fst,snd] : llvm::zip(actualFuncType.getInputs(), args))
+      convertedArguments.push_back(builder.createConvert(loc, fst, snd));
     auto call = builder.create<fir::CallOp>(loc, funcOp, convertedArguments);
     mlir::Type soughtType = soughtFuncType.getResult(0);
     return builder.createConvert(loc, soughtType, call.getResult(0));

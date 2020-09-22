@@ -40,7 +40,8 @@ struct NameUniquer {
     INTRINSIC_TYPE_DESC,
     PROCEDURE,
     TYPE_DESC,
-    VARIABLE
+    VARIABLE,
+    BLOCK_DATA_NAME
   };
 
   /// Components of an unparsed unique name
@@ -62,6 +63,9 @@ struct NameUniquer {
 
   /// Unique a common block name
   std::string doCommonBlock(llvm::StringRef name);
+
+  /// Unique a block data unit name
+  std::string doBlockData(llvm::StringRef name);
 
   /// Unique a (global) constant name
   std::string doConstant(llvm::ArrayRef<llvm::StringRef> modules,
