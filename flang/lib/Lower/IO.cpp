@@ -435,15 +435,23 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   };
   if (!checkResult) {
     // No I/O call result checks - the loop is a fir.do_loop op.
-    auto loopOp =
-        builder.create<fir::DoLoopOp>(loc, lowerValue, upperValue, stepValue);
-    builder.setInsertionPointToStart(loopOp.getBody());
+    auto doLoopOp = builder.create<fir::DoLoopOp>(
+        loc, lowerValue, upperValue, stepValue, /*unordered*/ false,
+        ArrayRef<mlir::Value>{lowerValue}); // initial loop result value
+    builder.setInsertionPointToStart(doLoopOp.getBody());
     auto lcv = builder.createConvert(loc, converter.genType(loopSym),
-                                     loopOp.getInductionVar());
+                                     doLoopOp.getInductionVar());
     builder.create<fir::StoreOp>(loc, lcv, loopVar);
-    insertPt = builder.saveInsertionPoint();
     genItemList(ioImpliedDo);
-    builder.restoreInsertionPoint(parentInsertPt);
+    builder.setInsertionPointToEnd(doLoopOp.getBody());
+    mlir::Value result = builder.create<mlir::AddIOp>(
+        loc, doLoopOp.getInductionVar(), doLoopOp.step());
+    builder.create<fir::ResultOp>(loc, result);
+    builder.setInsertionPointAfter(doLoopOp);
+    // The loop control variable may be used after the loop.
+    lcv = builder.createConvert(loc, converter.genType(loopSym),
+                                doLoopOp.getResult(0));
+    builder.create<fir::StoreOp>(loc, lcv, loopVar);
     return;
   }
   // Check I/O call results - the loop is a fir.iterate_while op.
