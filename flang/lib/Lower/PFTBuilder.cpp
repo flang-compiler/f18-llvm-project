@@ -340,28 +340,27 @@ private:
   template <typename A>
   void analyzeIoBranches(lower::pft::Evaluation &eval, const A &stmt) {
     auto analyzeFormatSpec = [&](const parser::Format &format) {
-      if (const auto *pExpr = std::get_if<parser::Expr>(&format.u)) {
-        const auto &expr = semantics::GetExpr(*pExpr);
-        if (semantics::ExprHasTypeCategory(*expr,
+      if (const auto *expr = std::get_if<parser::Expr>(&format.u)) {
+        if (semantics::ExprHasTypeCategory(*semantics::GetExpr(*expr),
                                            common::TypeCategory::Integer))
           eval.isUnstructured = true;
       }
     };
-
     auto analyzeSpecs{[&](const auto &specList) {
       for (const auto &spec : specList) {
-        using LabelNodes =
-            std::tuple<parser::ErrLabel, parser::EorLabel, parser::EndLabel>;
-        std::visit(Fortran::common::visitors{
-                       [&](const Fortran::parser::Format &format) {
-                         analyzeFormatSpec(format);
-                       },
-                       [&](const auto &label) {
-                         using B = std::decay_t<decltype(label)>;
-                         if constexpr (common::HasMember<B, LabelNodes>)
-                           markBranchTarget(eval, label.v);
-                       }},
-                   spec.u);
+        std::visit(
+            Fortran::common::visitors{
+                [&](const Fortran::parser::Format &format) {
+                  analyzeFormatSpec(format);
+                },
+                [&](const auto &label) {
+                  using LabelNodes =
+                      std::tuple<parser::ErrLabel, parser::EorLabel,
+                                 parser::EndLabel>;
+                  if constexpr (common::HasMember<decltype(label), LabelNodes>)
+                    markBranchTarget(eval, label.v);
+                }},
+            spec.u);
       }
     }};
 
