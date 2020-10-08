@@ -1564,7 +1564,7 @@ private:
                 // Fortran 2018 10.2.1.3 p12 and p13
                 TODO("");
               }
-              TODO("unknown category");
+              llvm_unreachable("unknown category");
             },
             [&](const Fortran::evaluate::ProcedureRef &) {
               // Defined assignment: call ProcRef
@@ -1798,7 +1798,7 @@ private:
                                                    global.getSymbol());
       mapSymbolAttributes(var, storeMap, addrOf);
     } else if (sym.has<Fortran::semantics::CommonBlockDetails>()) {
-      TODO("COMMON symbol processed elsewhere");
+      llvm_unreachable("COMMON symbol processed elsewhere");
     } else {
       TODO("global"); // Procedure pointer or something else
     }
@@ -1980,8 +1980,8 @@ private:
     const auto isHostAssoc =
         Fortran::semantics::IsHostAssociated(sym, sym.owner());
     Fortran::lower::CharacterExprHelper charHelp{*builder, loc};
-    Fortran::lower::BoxAnalyzer sba;
-    sba.analyze(sym);
+    Fortran::lower::BoxAnalyzer ba;
+    ba.analyze(sym);
 
     // The origin must be \vec{1}.
     auto populateShape = [&](auto &shapes, const auto &bounds) {
@@ -2045,7 +2045,7 @@ private:
     if (isHostAssoc)
       TODO("host associated");
 
-    sba.match(
+    ba.match(
         //===--------------------------------------------------------------===//
         // Trivial case.
         //===--------------------------------------------------------------===//
@@ -2591,7 +2591,7 @@ private:
                                                      global.getSymbol());
         addSymbol(common, addrOf);
       } else {
-        TODO("must be a common symbol");
+        llvm_unreachable("must be a common symbol");
       }
     }
     mlir::Value commonAddr;
