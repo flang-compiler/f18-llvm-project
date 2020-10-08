@@ -724,7 +724,7 @@ private:
         for (const auto &x : localInitList->v)
           info.localInitSymList.push_back(x.symbol);
       if (std::get_if<Fortran::parser::LocalitySpec::Local>(&x.u))
-        llvm_unreachable("do concurrent locality specs not implemented");
+        TODO("do concurrent locality specs not implemented");
     }
     return incrementLoopNestInfo;
   }
@@ -853,7 +853,7 @@ private:
         assert(hostDetails && "missing local_init variable host variable");
         [[maybe_unused]] const Fortran::semantics::Symbol &hostSym =
             hostDetails->symbol();
-        llvm_unreachable("do concurrent locality specs not implemented");
+        TODO("do concurrent locality specs not implemented");
         // assign sym = hostSym
       }
     };
@@ -1564,7 +1564,7 @@ private:
                 // Fortran 2018 10.2.1.3 p12 and p13
                 TODO("");
               }
-              llvm_unreachable("unknown category");
+              TODO("unknown category");
             },
             [&](const Fortran::evaluate::ProcedureRef &) {
               // Defined assignment: call ProcRef
@@ -1798,7 +1798,7 @@ private:
                                                    global.getSymbol());
       mapSymbolAttributes(var, storeMap, addrOf);
     } else if (sym.has<Fortran::semantics::CommonBlockDetails>()) {
-      llvm_unreachable("COMMON symbol processed elsewhere");
+      TODO("COMMON symbol processed elsewhere");
     } else {
       TODO("global"); // Procedure pointer or something else
     }
@@ -2591,7 +2591,7 @@ private:
                                                      global.getSymbol());
         addSymbol(common, addrOf);
       } else {
-        llvm_unreachable("must be a common symbol");
+        TODO("must be a common symbol");
       }
     }
     mlir::Value commonAddr;
