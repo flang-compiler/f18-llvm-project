@@ -1980,8 +1980,8 @@ private:
     const auto isHostAssoc =
         Fortran::semantics::IsHostAssociated(sym, sym.owner());
     Fortran::lower::CharacterExprHelper charHelp{*builder, loc};
-    Fortran::lower::BoxAnalyzer ba;
-    ba.analyze(sym);
+    Fortran::lower::BoxAnalyzer sba;
+    sba.analyze(sym);
 
     // The origin must be \vec{1}.
     auto populateShape = [&](auto &shapes, const auto &bounds) {
@@ -2045,7 +2045,7 @@ private:
     if (isHostAssoc)
       TODO("host associated");
 
-    ba.match(
+    sba.match(
         //===--------------------------------------------------------------===//
         // Trivial case.
         //===--------------------------------------------------------------===//
