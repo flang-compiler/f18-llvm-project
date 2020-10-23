@@ -1200,8 +1200,11 @@ mlir::Value getIOUnit(Fortran::lower::AbstractConverter &converter,
                       mlir::Location loc, const A &stmt, mlir::Type ty) {
   if (stmt.iounit)
     return genIOUnit(converter, loc, *stmt.iounit, ty);
-  return genIOUnit(converter, loc, *getIOControl<Fortran::parser::IoUnit>(stmt),
-                   ty);
+  if (auto *iounit = getIOControl<Fortran::parser::IoUnit>(stmt))
+    return genIOUnit(converter, loc, *iounit, ty);
+  auto &builder = converter.getFirOpBuilder();
+  return builder.create<mlir::ConstantOp>(
+      loc, builder.getIntegerAttr(ty, Fortran::runtime::io::DefaultUnit));
 }
 
 //===----------------------------------------------------------------------===//
