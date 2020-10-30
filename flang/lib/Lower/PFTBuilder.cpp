@@ -218,7 +218,10 @@ private:
             addEvaluation(lower::pft::Evaluation{
                 s.statement, parentVariantStack.back(), s.source, s.label});
           },
-          [&](auto &) {},
+          [&](const auto &s) {
+            llvm_unreachable("missing end statement or unexpected begin "
+                             "statement reference");
+          },
       });
     }
     lastLexicalEvaluation = nullptr;
