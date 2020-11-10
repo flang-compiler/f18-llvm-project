@@ -391,7 +391,6 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   auto loc = converter.getCurrentLocation();
   makeNextConditionalOn(builder, loc, insertPt, checkResult, ok,
                         inIterWhileLoop);
-  auto parentInsertPt = builder.saveInsertionPoint();
   const auto &itemList = std::get<0>(ioImpliedDo.t);
   const auto &control = std::get<1>(ioImpliedDo.t);
   const auto &loopSym = *control.name.thing.thing.symbol;
@@ -418,8 +417,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     // No I/O call result checks - the loop is a fir.do_loop op.
     auto doLoopOp = builder.create<fir::DoLoopOp>(
         loc, lowerValue, upperValue, stepValue, /*unordered=*/false,
-        /*returnFinalCount=*/false,
-        ArrayRef<mlir::Value>{lowerValue}); // initial loop result value
+        /*finalCountValue=*/true);
     builder.setInsertionPointToStart(doLoopOp.getBody());
     auto lcv = builder.createConvert(loc, converter.genType(loopSym),
                                      doLoopOp.getInductionVar());
@@ -440,7 +438,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   if (!ok)
     ok = builder.createIntegerConstant(loc, builder.getI1Type(), 1);
   auto iterWhileOp = builder.create<fir::IterWhileOp>(
-      loc, lowerValue, upperValue, stepValue, ok);
+      loc, lowerValue, upperValue, stepValue, ok, /*finalCountValue*/ true);
   builder.setInsertionPointToStart(iterWhileOp.getBody());
   auto lcv = builder.createConvert(loc, converter.genType(loopSym),
                                    iterWhileOp.getInductionVar());
@@ -459,10 +457,21 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     builder.setInsertionPointToStart(&ifOp.elseRegion().front());
     builder.create<fir::ResultOp>(loc, falseValue); // known false result
   }
-  builder.restoreInsertionPoint(insertPt);
-  builder.create<fir::ResultOp>(loc, builder.getBlock()->back().getResult(0));
-  ok = iterWhileOp.getResult(0);
-  builder.restoreInsertionPoint(parentInsertPt);
+  builder.setInsertionPointToEnd(iterWhileOp.getBody());
+  auto iterateResult = builder.getBlock()->back().getResult(0);
+  auto inductionResult0 = iterWhileOp.getInductionVar();
+  auto inductionResult1 =
+      builder.create<mlir::AddIOp>(loc, inductionResult0, iterWhileOp.step());
+  auto inductionResult = builder.create<mlir::SelectOp>(
+      loc, iterateResult, inductionResult1, inductionResult0);
+  builder.create<fir::ResultOp>(loc, std::initializer_list<mlir::Value>(
+                                         {inductionResult, iterateResult}));
+  ok = iterWhileOp.getResult(1);
+  builder.setInsertionPointAfter(iterWhileOp);
+  // The loop control variable may be used after the loop.
+  lcv = builder.createConvert(loc, converter.genType(loopSym),
+                              iterWhileOp.getResult(0));
+  builder.create<fir::StoreOp>(loc, lcv, loopVar);
 }
 
 //===----------------------------------------------------------------------===//

@@ -814,7 +814,7 @@ void fir::DoLoopOp::build(mlir::OpBuilder &builder,
     result.addTypes(v.getType());
   mlir::Region *bodyRegion = result.addRegion();
   bodyRegion->push_back(new Block{});
-  if (iterArgs.empty())
+  if (iterArgs.empty() && !finalCountValue)
     DoLoopOp::ensureTerminator(*bodyRegion, builder, result.location);
   bodyRegion->front().addArgument(builder.getIndexType());
   bodyRegion->front().addArguments(iterArgs.getTypes());
