@@ -464,8 +464,8 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
       builder.create<mlir::AddIOp>(loc, inductionResult0, iterWhileOp.step());
   auto inductionResult = builder.create<mlir::SelectOp>(
       loc, iterateResult, inductionResult1, inductionResult0);
-  builder.create<fir::ResultOp>(loc, std::initializer_list<mlir::Value>(
-                                         {inductionResult, iterateResult}));
+  llvm::SmallVector<mlir::Value, 2> results = {inductionResult, iterateResult};
+  builder.create<fir::ResultOp>(loc, results);
   ok = iterWhileOp.getResult(1);
   builder.setInsertionPointAfter(iterWhileOp);
   // The loop control variable may be used after the loop.
