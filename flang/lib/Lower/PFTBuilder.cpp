@@ -130,8 +130,9 @@ public:
     // Generate a skeleton IfConstruct parse node.  Its components are never
     // referenced.  The actual components are available via the IfConstruct
     // evaluation's nested evaluationList, with the ifStmt in the position of
-    // the otherwise normal IfThenStmt.
-    enterConstructOrDirective(parser::IfConstruct{
+    // the otherwise normal IfThenStmt.  Caution: All other PFT nodes reference
+    // front end generated parse nodes; this is an exceptional case.
+    static const auto ifConstruct = parser::IfConstruct{
         parser::Statement<parser::IfThenStmt>{
             std::nullopt,
             parser::IfThenStmt{
@@ -142,12 +143,14 @@ public:
         parser::Block{}, std::list<parser::IfConstruct::ElseIfBlock>{},
         std::optional<parser::IfConstruct::ElseBlock>{},
         parser::Statement<parser::EndIfStmt>{std::nullopt,
-                                             parser::EndIfStmt{std::nullopt}}});
+                                             parser::EndIfStmt{std::nullopt}}};
+    enterConstructOrDirective(ifConstruct);
     addEvaluation(lower::pft::Evaluation{ifStmt, parentVariantStack.back(),
                                          position, label});
     Pre(std::get<parser::UnlabeledStatement<parser::ActionStmt>>(ifStmt.t));
-    addEvaluation(lower::pft::Evaluation{
-        parser::EndIfStmt{std::nullopt}, parentVariantStack.back(), {}, {}});
+    static const auto endIfStmt = parser::EndIfStmt{std::nullopt};
+    addEvaluation(
+        lower::pft::Evaluation{endIfStmt, parentVariantStack.back(), {}, {}});
     exitConstructOrDirective();
   }
 
@@ -418,17 +421,19 @@ private:
   ///         2 GotoStmt: goto L
   ///         3 EndIfStmt
   ///       <<End IfConstruct>>
-  ///       4 AssignmentStmt: ...
-  ///       5 AssignmentStmt: L ...
+  ///       4 Statement: ...
+  ///       5 Statement: ...
+  ///       6 Statement: L ...
   ///
   /// becomes:
   ///
   ///       <<IfConstruct>>
   ///         1 If[Then]Stmt [negate]: if(cond) goto L
-  ///         4 AssignmentStmt: ...
+  ///         4 Statement: ...
+  ///         5 Statement: ...
   ///         3 EndIfStmt
   ///       <<End IfConstruct>>
-  ///       5 AssignmentStmt: L ...
+  ///       6 Statement: L ...
   ///
   /// The If[Then]Stmt condition is implicitly negated.  It is not modified
   /// in the PFT.  It must be negated when generating FIR.  The GotoStmt is
@@ -471,8 +476,10 @@ private:
           auto successorIt = std::next(ifConstructIt);
           if (successorIt != it) {
             auto &ifBodyList = *ifConstructIt->evaluationList;
-            ifBodyList.erase(std::next(ifBodyList.begin())); // GotoStmt
-            auto &ifStmt = *ifBodyList.begin();              // If[Then]Stmt
+            auto gotoStmtIt = std::next(ifBodyList.begin());
+            assert(gotoStmtIt->isA<parser::GotoStmt>() && "expected GotoStmt");
+            ifBodyList.erase(gotoStmtIt);
+            auto &ifStmt = *ifBodyList.begin();
             ifStmt.negateCondition = true;
             ifStmt.lexicalSuccessor = firstStmt(&*successorIt);
             auto endIfStmtIt = std::prev(ifBodyList.end());

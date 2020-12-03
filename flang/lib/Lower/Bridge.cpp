@@ -976,10 +976,10 @@ private:
         createFIRExpr(
             loc, Fortran::semantics::GetExpr(
                      std::get<Fortran::parser::ScalarLogicalExpr>(stmt->t))));
-    if (!negate)
-      return cond;
-    return builder->create<mlir::XOrOp>(
-        loc, cond, builder->createIntegerConstant(loc, cond.getType(), 1));
+    if (negate)
+      cond = builder->create<mlir::XOrOp>(
+          loc, cond, builder->createIntegerConstant(loc, cond.getType(), 1));
+    return cond;
   }
 
   /// Generate structured or unstructured FIR for an IF construct.
@@ -992,7 +992,7 @@ private:
       fir::IfOp topIfOp, currentIfOp;
       for (auto &e : eval.getNestedEvaluations()) {
         auto genIfOp = [&](mlir::Value cond) {
-          auto ifOp = builder->create<fir::IfOp>(loc, cond, /*withElse*/ true);
+          auto ifOp = builder->create<fir::IfOp>(loc, cond, /*withElse=*/true);
           builder->setInsertionPointToStart(&ifOp.thenRegion().front());
           return ifOp;
         };
@@ -1008,7 +1008,7 @@ private:
         } else if (e.isA<Fortran::parser::EndIfStmt>()) {
           builder->setInsertionPointAfter(topIfOp);
         } else {
-          genFIR(e, /*unstructuredContext*/ false);
+          genFIR(e, /*unstructuredContext=*/false);
         }
       }
       return;
