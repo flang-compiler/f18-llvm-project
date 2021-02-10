@@ -43,9 +43,7 @@ using KindTy = unsigned;
 
 namespace detail {
 struct BoxTypeStorage;
-struct BoxCharTypeStorage;
 struct BoxProcTypeStorage;
-struct CharacterTypeStorage;
 struct ComplexTypeStorage;
 struct HeapTypeStorage;
 struct IntegerTypeStorage;
@@ -103,37 +101,6 @@ mlir::Type dyn_cast_ptrEleTy(mlir::Type t);
 mlir::Type dyn_cast_ptrOrBoxEleTy(mlir::Type t);
 
 // Intrinsic types
-
-/// Model of the Fortran CHARACTER intrinsic type, including the KIND type
-/// parameter. The model optionally includes a LEN type parameter. A
-/// CharacterType is thus the type of both a single character value and a
-/// character with a LEN parameter.
-class CharacterType
-    : public mlir::Type::TypeBase<CharacterType, mlir::Type,
-                                  detail::CharacterTypeStorage> {
-public:
-  using Base::Base;
-  using LenType = std::int64_t;
-
-  static CharacterType get(mlir::MLIRContext *ctxt, KindTy kind, LenType len);
-  /// Return unknown length CHARACTER type.
-  static CharacterType getUnknownLen(mlir::MLIRContext *ctxt, KindTy kind) {
-    return get(ctxt, kind, unknownLen());
-  }
-  /// Return length 1 CHARACTER type.
-  static CharacterType getSingleton(mlir::MLIRContext *ctxt, KindTy kind) {
-    return get(ctxt, kind, singleton());
-  }
-  KindTy getFKind() const;
-
-  /// CHARACTER is a singleton and has a LEN of 1.
-  static constexpr LenType singleton() { return 1; }
-  /// CHARACTER has an unknown LEN property.
-  static constexpr LenType unknownLen() { return -1; }
-
-  /// Access to a CHARACTER's LEN property. Defaults to 1.
-  LenType getLen() const;
-};
 
 /// Model of a Fortran COMPLEX intrinsic type, including the KIND type
 /// parameter. COMPLEX is a floating point type with a real and imaginary
@@ -197,17 +164,6 @@ public:
   static mlir::LogicalResult
   verifyConstructionInvariants(mlir::Location, mlir::Type eleTy,
                                mlir::AffineMapAttr map);
-};
-
-/// The type of a pair that describes a CHARACTER variable. Specifically, a
-/// CHARACTER consists of a reference to a buffer (the string value) and a LEN
-/// type parameter (the runtime length of the buffer).
-class BoxCharType : public mlir::Type::TypeBase<BoxCharType, mlir::Type,
-                                                detail::BoxCharTypeStorage> {
-public:
-  using Base::Base;
-  static BoxCharType get(mlir::MLIRContext *ctxt, KindTy kind);
-  CharacterType getEleTy() const;
 };
 
 /// The type of a pair that describes a PROCEDURE reference. Pointers to
