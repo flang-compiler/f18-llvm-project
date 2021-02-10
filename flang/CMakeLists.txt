@@ -219,17 +219,15 @@ if(FLANG_BUILD_NEW_DRIVER)
     include_directories(SYSTEM ${CLANG_INCLUDE_DIR})
 endif()
 
-if(LINK_WITH_FIR)
-  # tco tool and FIR lib output directories
-  if(FLANG_STANDALONE_BUILD)
-    set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
-    set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
-  endif()
-  # Always build tco tool
-  set(LLVM_BUILD_TOOLS ON)
-  set(LLVM_COMMON_COMPONENTS Support)
-  message(STATUS "Linking driver with FIR and LLVM, using LLVM components: ${LLVM_COMMON_COMPONENTS}")
+# tco tool and FIR lib output directories
+if(FLANG_STANDALONE_BUILD)
+  set(LLVM_RUNTIME_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/bin)
+  set(LLVM_LIBRARY_OUTPUT_INTDIR ${CMAKE_BINARY_DIR}/lib)
 endif()
+# Always build tco tool
+set(LLVM_BUILD_TOOLS ON)
+set(LLVM_COMMON_COMPONENTS Support)
+message(STATUS "Linking driver with FIR and LLVM, using LLVM components: ${LLVM_COMMON_COMPONENTS}")
 
 # Add Flang-centric modules to cmake path.
 include_directories(BEFORE
