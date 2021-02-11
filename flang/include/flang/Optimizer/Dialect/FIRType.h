@@ -42,7 +42,6 @@ class FIROpsDialect;
 using KindTy = unsigned;
 
 namespace detail {
-struct BoxTypeStorage;
 struct ComplexTypeStorage;
 struct HeapTypeStorage;
 struct IntegerTypeStorage;
@@ -146,23 +145,6 @@ public:
 };
 
 // FIR support types
-
-/// The type of a Fortran descriptor. Descriptors are tuples of information that
-/// describe an entity being passed from a calling context. This information
-/// might include (but is not limited to) whether the entity is an array, its
-/// size, or what type it has.
-class BoxType
-    : public mlir::Type::TypeBase<BoxType, mlir::Type, detail::BoxTypeStorage> {
-public:
-  using Base::Base;
-  static BoxType get(mlir::Type eleTy, mlir::AffineMapAttr map = {});
-  mlir::Type getEleTy() const;
-  mlir::AffineMapAttr getLayoutMap() const;
-
-  static mlir::LogicalResult
-  verifyConstructionInvariants(mlir::Location, mlir::Type eleTy,
-                               mlir::AffineMapAttr map);
-};
 
 /// Type of a vector that represents an array slice operation on an array.
 /// Fortran slices are triples of lower bound, upper bound, and stride. The rank
