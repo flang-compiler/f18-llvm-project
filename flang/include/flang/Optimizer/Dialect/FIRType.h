@@ -53,7 +53,6 @@ struct RealTypeStorage;
 struct RecordTypeStorage;
 struct ReferenceTypeStorage;
 struct SequenceTypeStorage;
-struct ShapeShiftTypeStorage;
 struct SliceTypeStorage;
 struct TypeDescTypeStorage;
 struct VectorTypeStorage;
@@ -163,19 +162,6 @@ public:
   static mlir::LogicalResult
   verifyConstructionInvariants(mlir::Location, mlir::Type eleTy,
                                mlir::AffineMapAttr map);
-};
-
-/// Type of a vector of runtime values that define the shape and the origin of a
-/// multidimensional array object. The vector is of pairs, origin offset and
-/// extent, of each array dimension. The rank of a ShapeShiftType must be at
-/// least 1.
-class ShapeShiftType
-    : public mlir::Type::TypeBase<ShapeShiftType, mlir::Type,
-                                  detail::ShapeShiftTypeStorage> {
-public:
-  using Base::Base;
-  static ShapeShiftType get(mlir::MLIRContext *ctx, unsigned rank);
-  unsigned getRank() const;
 };
 
 /// Type of a vector that represents an array slice operation on an array.

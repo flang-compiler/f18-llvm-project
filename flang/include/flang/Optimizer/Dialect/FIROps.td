@@ -64,12 +64,10 @@ def AnyAddressableLike : TypeConstraint<Or<[fir_ReferenceType.predicate,
 def AnyBoxLike : TypeConstraint<Or<[fir_BoxType.predicate,
     fir_BoxCharType.predicate, fir_BoxProcType.predicate]>, "any box">;
 
-def fir_ShapeShiftType : Type<CPred<"$_self.isa<fir::ShapeShiftType>()">,
-    "shape shift type">;
-def AnyShapeLike : TypeConstraint<Or<[ShapeType.predicate,
+def AnyShapeLike : TypeConstraint<Or<[fir_ShapeType.predicate,
     fir_ShapeShiftType.predicate]>, "any legal shape type">;
 def AnyShapeType : Type<AnyShapeLike.predicate, "any legal shape type">;
-def AnyShapeOrShiftLike : TypeConstraint<Or<[ShapeType.predicate,
+def AnyShapeOrShiftLike : TypeConstraint<Or<[fir_ShapeType.predicate,
     fir_ShapeShiftType.predicate, fir_ShiftType.predicate]>, "any legal shape or shift type">;
 def AnyShapeOrShiftType : Type<AnyShapeOrShiftLike.predicate, "any legal shape or shift type">;
 def fir_SliceType : Type<CPred<"$_self.isa<fir::SliceType>()">, "slice type">;
@@ -1970,7 +1968,7 @@ def fir_ShapeOp : fir_Op<"shape", [NoSideEffect]> {
 
   let arguments = (ins Variadic<AnyIntegerType>:$extents);
 
-  let results = (outs ShapeType);
+  let results = (outs fir_ShapeType);
 
   let assemblyFormat = [{
     operands attr-dict `:` functional-type(operands, results)
