@@ -54,19 +54,15 @@ def fir_SequenceType : Type<CPred<"$_self.isa<fir::SequenceType>()">,
 // Composable types
 def AnyCompositeLike : TypeConstraint<Or<[fir_RecordType.predicate,
     fir_SequenceType.predicate, fir_ComplexType.predicate,
-    fir_VectorType.predicate, IsTupleTypePred, CharacterType.predicate]>,
+    fir_VectorType.predicate, IsTupleTypePred, fir_CharacterType.predicate]>,
       "any composite">;
 
 // The legal types of global symbols
 def AnyAddressableLike : TypeConstraint<Or<[fir_ReferenceType.predicate,
     FunctionType.predicate]>, "any addressable">;
 
-// PROCEDURE POINTER descriptor. A pair that can capture a host closure.
-def fir_BoxProcType : Type<CPred<"$_self.isa<fir::BoxProcType>()">,
-    "box procedure type">;
-
 def AnyBoxLike : TypeConstraint<Or<[fir_BoxType.predicate,
-    BoxCharType.predicate, fir_BoxProcType.predicate]>, "any box">;
+    fir_BoxCharType.predicate, fir_BoxProcType.predicate]>, "any box">;
 
 def fir_ShapeShiftType : Type<CPred<"$_self.isa<fir::ShapeShiftType>()">,
     "shape shift type">;
@@ -1130,7 +1126,7 @@ def fir_EmboxCharOp : fir_Op<"emboxchar", [NoSideEffect]> {
 
   let arguments = (ins AnyReferenceLike:$memref, AnyIntegerLike:$len);
 
-  let results = (outs BoxCharType);
+  let results = (outs fir_BoxCharType);
 
   let assemblyFormat = [{
     $memref `,` $len attr-dict `:` functional-type(operands, results)
@@ -1274,7 +1270,7 @@ def fir_UnboxCharOp : fir_SimpleOp<"unboxchar", [NoSideEffect]> {
     ```
   }];
 
-  let arguments = (ins BoxCharType:$boxchar);
+  let arguments = (ins fir_BoxCharType:$boxchar);
 
   let results = (outs fir_ReferenceType, AnyIntegerLike);
 }
@@ -1339,7 +1335,7 @@ def fir_BoxCharLenOp : fir_SimpleOp<"boxchar_len", [NoSideEffect]> {
     ```
   }];
 
-  let arguments = (ins BoxCharType:$val);
+  let arguments = (ins fir_BoxCharType:$val);
 
   let results = (outs AnyIntegerLike);
 
@@ -2661,7 +2657,7 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
     ```
   }];
 
-  let results = (outs CharacterType);
+  let results = (outs fir_CharacterType);
 
   let parser = [{
     auto &builder = parser.getBuilder();

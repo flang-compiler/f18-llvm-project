@@ -41,6 +41,28 @@ def fir_FieldType : FIR_Type<"Field", "field"> {
   }];
 }
 
+def fir_BoxProcType : FIR_Type<"BoxProc", "boxproc"> {
+  let summary = "";
+
+  let description = [{
+    The type of a pair that describes a PROCEDURE reference. Pointers to
+    internal procedures must carry an additional reference to the host's
+    variables that are referenced.
+  }];
+
+  let parameters = (ins "mlir::Type":$eleTy);
+
+  let printer = [{
+    $_printer << "boxproc<";
+    $_printer.printType(getEleTy());
+    $_printer << '>';
+  }];
+
+  let genAccessors = 1;
+
+  let genVerifyInvariantsDecl = 1;
+}
+
 def ShapeType : FIR_Type<"Shape", "shape"> {
   let summary = "shape of a multidimensional array object";
 
@@ -68,7 +90,7 @@ def ShapeType : FIR_Type<"Shape", "shape"> {
   }];
 }
 
-def CharacterType : FIR_Type<"Character", "char"> {
+def fir_CharacterType : FIR_Type<"Character", "char"> {
   let summary = "FIR character type";
 
   let description = [{
@@ -101,7 +123,7 @@ def CharacterType : FIR_Type<"Character", "char"> {
   }];
 }
 
-def BoxCharType : FIR_Type<"BoxChar", "boxchar"> {
+def fir_BoxCharType : FIR_Type<"BoxChar", "boxchar"> {
   let summary = "CHARACTER type descriptor.";
 
   let description = [{

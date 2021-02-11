@@ -43,7 +43,6 @@ using KindTy = unsigned;
 
 namespace detail {
 struct BoxTypeStorage;
-struct BoxProcTypeStorage;
 struct ComplexTypeStorage;
 struct HeapTypeStorage;
 struct IntegerTypeStorage;
@@ -165,21 +164,6 @@ public:
   verifyConstructionInvariants(mlir::Location, mlir::Type eleTy,
                                mlir::AffineMapAttr map);
 };
-
-/// The type of a pair that describes a PROCEDURE reference. Pointers to
-/// internal procedures must carry an additional reference to the host's
-/// variables that are referenced.
-class BoxProcType : public mlir::Type::TypeBase<BoxProcType, mlir::Type,
-                                                detail::BoxProcTypeStorage> {
-public:
-  using Base::Base;
-  static BoxProcType get(mlir::Type eleTy);
-  mlir::Type getEleTy() const;
-
-  static mlir::LogicalResult verifyConstructionInvariants(mlir::Location,
-                                                          mlir::Type eleTy);
-};
-
 
 /// Type of a vector of runtime values that define the shape and the origin of a
 /// multidimensional array object. The vector is of pairs, origin offset and
