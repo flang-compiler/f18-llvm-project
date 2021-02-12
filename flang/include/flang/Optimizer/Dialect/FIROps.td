@@ -20,67 +20,6 @@ include "mlir/Interfaces/ControlFlowInterfaces.td"
 include "mlir/Interfaces/LoopLikeInterface.td"
 include "mlir/Interfaces/SideEffectInterfaces.td"
 include "flang/Optimizer/Dialect/FIRTypes.td"
-include "flang/Optimizer/TypePredicates.td"
-
-// Types and predicates
-
-def fir_Type : Type<CPred<"fir::isa_fir_or_std_type($_self)">,
-    "FIR dialect type">;
-
-// Fortran intrinsic types
-def fir_LogicalType : Type<CPred<"$_self.isa<fir::LogicalType>()">,
-    "FIR logical type">;
-def fir_RealType : Type<CPred<"$_self.isa<fir::RealType>()">,
-    "FIR real type">;
-def fir_VectorType : Type<CPred<"$_self.isa<fir::VectorType>()">,
-    "FIR vector type">;
-
-// Generalized FIR and standard dialect types representing intrinsic types
-def AnyLogicalLike : TypeConstraint<Or<[BoolLike.predicate,
-    fir_LogicalType.predicate]>, "any logical">;
-def AnyRealLike : TypeConstraint<Or<[FloatLike.predicate,
-    fir_RealType.predicate]>, "any real">;
-
-// Fortran derived (user defined) type
-def fir_RecordType : Type<CPred<"$_self.isa<fir::RecordType>()">,
-    "FIR derived type">;
-
-// Fortran array attribute
-def fir_SequenceType : Type<CPred<"$_self.isa<fir::SequenceType>()">,
-    "array type">;
-
-// Composable types
-def AnyCompositeLike : TypeConstraint<Or<[fir_RecordType.predicate,
-    fir_SequenceType.predicate, fir_ComplexType.predicate,
-    fir_VectorType.predicate, IsTupleTypePred, fir_CharacterType.predicate]>,
-      "any composite">;
-
-// The legal types of global symbols
-def AnyAddressableLike : TypeConstraint<Or<[fir_ReferenceType.predicate,
-    FunctionType.predicate]>, "any addressable">;
-
-def AnyBoxLike : TypeConstraint<Or<[fir_BoxType.predicate,
-    fir_BoxCharType.predicate, fir_BoxProcType.predicate]>, "any box">;
-
-// Reference and Box like types
-def AnyRefOrBoxLike : TypeConstraint<Or<[AnyReferenceLike.predicate, AnyBoxLike.predicate]>,
-    "any reference or box like">;
-def AnyShapeLike : TypeConstraint<Or<[fir_ShapeType.predicate,
-    fir_ShapeShiftType.predicate]>, "any legal shape type">;
-def AnyShapeType : Type<AnyShapeLike.predicate, "any legal shape type">;
-def AnyShapeOrShiftLike : TypeConstraint<Or<[fir_ShapeType.predicate,
-    fir_ShapeShiftType.predicate, fir_ShiftType.predicate]>, "any legal shape or shift type">;
-def AnyShapeOrShiftType : Type<AnyShapeOrShiftLike.predicate, "any legal shape or shift type">;
-def fir_SliceType : Type<CPred<"$_self.isa<fir::SliceType>()">, "slice type">;
-
-// A type descriptor's type
-def fir_TypeDescType : Type<CPred<"$_self.isa<fir::TypeDescType>()">,
-    "type desc type">;
-
-def AnyComponentLike : TypeConstraint<Or<[AnySignlessInteger.predicate,
-    Index.predicate, fir_IntegerType.predicate, fir_FieldType.predicate]>,
-    "any coordinate index">;
-def AnyComponentType : Type<AnyComponentLike.predicate, "coordinate type">;
 
 // Base class for FIR operations.
 // All operations automatically get a prefix of "fir.".
