@@ -125,11 +125,6 @@ SliceType parseSlice(mlir::DialectAsmParser &parser) {
   return parseRankSingleton<SliceType>(parser);
 }
 
-// `field`
-FieldType parseField(mlir::DialectAsmParser &parser) {
-  return FieldType::get(parser.getBuilder().getContext());
-}
-
 // `heap` `<` type `>`
 HeapType parseHeap(mlir::DialectAsmParser &parser, mlir::Location loc) {
   return parseTypeSingleton<HeapType>(parser, loc);
@@ -370,7 +365,7 @@ mlir::Type fir::parseFirType(FIROpsDialect *dialect,
   if (typeNameLit == "complex")
     return parseComplex(parser);
   if (typeNameLit == "field")
-    return parseField(parser);
+    return generatedTypeParser(dialect->getContext(), parser, typeNameLit);
   if (typeNameLit == "heap")
     return parseHeap(parser, loc);
   if (typeNameLit == "int")
@@ -487,25 +482,6 @@ protected:
 private:
   SliceTypeStorage() = delete;
   explicit SliceTypeStorage(unsigned rank) : rank{rank} {}
-};
-
-/// The type of a derived type part reference
-struct FieldTypeStorage : public mlir::TypeStorage {
-  using KeyTy = KindTy;
-
-  static unsigned hashKey(const KeyTy &) { return llvm::hash_combine(0); }
-
-  bool operator==(const KeyTy &) const { return true; }
-
-  static FieldTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
-                                     KindTy) {
-    auto *storage = allocator.allocate<FieldTypeStorage>();
-    return new (storage) FieldTypeStorage{0};
-  }
-
-private:
-  FieldTypeStorage() = delete;
-  explicit FieldTypeStorage(KindTy) {}
 };
 
 /// The type of a derived type LEN parameter reference
@@ -1007,12 +983,6 @@ CharacterType::LenType fir::CharacterType::getLen() const {
   return getImpl()->getLen();
 }
 
-// Field
-
-FieldType fir::FieldType::get(mlir::MLIRContext *ctxt) {
-  return Base::get(ctxt, 0);
-}
-
 // Len
 
 LenType fir::LenType::get(mlir::MLIRContext *ctxt) {
@@ -1473,10 +1443,6 @@ void fir::printFirType(FIROpsDialect *, mlir::Type ty,
     os << "slice<" << type.getRank() << '>';
     return;
   }
-  if (ty.isa<FieldType>()) {
-    os << "field";
-    return;
-  }
   if (auto type = ty.dyn_cast<HeapType>()) {
     os << "heap<";
     p.printType(type.getEleTy());
@@ -1540,6 +1506,10 @@ void fir::printFirType(FIROpsDialect *, mlir::Type ty,
     os << "vector<" << type.getLen() << ':';
     p.printType(type.getEleTy());
     os << '>';
+    return;
+  }
+
+  if (mlir::succeeded(generatedTypePrinter(ty, p))) {
     return;
   }
 }
