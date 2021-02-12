@@ -46,7 +46,6 @@ struct BoxTypeStorage;
 struct BoxCharTypeStorage;
 struct BoxProcTypeStorage;
 struct CharacterTypeStorage;
-struct ComplexTypeStorage;
 struct FieldTypeStorage;
 struct HeapTypeStorage;
 struct IntegerTypeStorage;
@@ -134,21 +133,6 @@ public:
 
   /// Access to a CHARACTER's LEN property. Defaults to 1.
   LenType getLen() const;
-};
-
-/// Model of a Fortran COMPLEX intrinsic type, including the KIND type
-/// parameter. COMPLEX is a floating point type with a real and imaginary
-/// member.
-class ComplexType : public mlir::Type::TypeBase<fir::ComplexType, mlir::Type,
-                                                detail::ComplexTypeStorage> {
-public:
-  using Base::Base;
-  static fir::ComplexType get(mlir::MLIRContext *ctxt, KindTy kind);
-
-  /// Get the corresponding fir.real<k> type.
-  mlir::Type getElementType() const;
-
-  KindTy getFKind() const;
 };
 
 /// Model of a Fortran INTEGER intrinsic type, including the KIND type

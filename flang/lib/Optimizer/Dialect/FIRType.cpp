@@ -110,11 +110,6 @@ CharacterType parseCharacter(mlir::DialectAsmParser &parser) {
   return CharacterType::get(parser.getBuilder().getContext(), kind, len);
 }
 
-// `complex` `<` kind `>`
-fir::ComplexType parseComplex(mlir::DialectAsmParser &parser) {
-  return parseKindSingleton<fir::ComplexType>(parser);
-}
-
 // `shapeshift` `<` rank `>`
 ShapeShiftType parseShapeShift(mlir::DialectAsmParser &parser) {
   return parseRankSingleton<ShapeShiftType>(parser);
@@ -368,7 +363,7 @@ mlir::Type fir::parseFirType(FIROpsDialect *dialect,
   if (typeNameLit == "char")
     return parseCharacter(parser);
   if (typeNameLit == "complex")
-    return parseComplex(parser);
+    return generatedTypeParser(dialect->getContext(), parser, typeNameLit);
   if (typeNameLit == "field")
     return parseField(parser);
   if (typeNameLit == "heap")
@@ -573,30 +568,6 @@ protected:
 private:
   IntegerTypeStorage() = delete;
   explicit IntegerTypeStorage(KindTy kind) : kind{kind} {}
-};
-
-/// `COMPLEX` storage
-struct ComplexTypeStorage : public mlir::TypeStorage {
-  using KeyTy = KindTy;
-
-  static unsigned hashKey(const KeyTy &key) { return llvm::hash_combine(key); }
-
-  bool operator==(const KeyTy &key) const { return key == getFKind(); }
-
-  static ComplexTypeStorage *construct(mlir::TypeStorageAllocator &allocator,
-                                       KindTy kind) {
-    auto *storage = allocator.allocate<ComplexTypeStorage>();
-    return new (storage) ComplexTypeStorage{kind};
-  }
-
-  KindTy getFKind() const { return kind; }
-
-protected:
-  KindTy kind;
-
-private:
-  ComplexTypeStorage() = delete;
-  explicit ComplexTypeStorage(KindTy kind) : kind{kind} {}
 };
 
 /// `REAL` storage (for reals of unsupported sizes)
@@ -1035,18 +1006,6 @@ fir::IntegerType fir::IntegerType::get(mlir::MLIRContext *ctxt, KindTy kind) {
 
 KindTy fir::IntegerType::getFKind() const { return getImpl()->getFKind(); }
 
-// COMPLEX
-
-fir::ComplexType fir::ComplexType::get(mlir::MLIRContext *ctxt, KindTy kind) {
-  return Base::get(ctxt, kind);
-}
-
-mlir::Type fir::ComplexType::getElementType() const {
-  return fir::RealType::get(getContext(), getFKind());
-}
-
-KindTy fir::ComplexType::getFKind() const { return getImpl()->getFKind(); }
-
 // REAL
 
 RealType fir::RealType::get(mlir::MLIRContext *ctxt, KindTy kind) {
@@ -1426,11 +1385,6 @@ void fir::printFirType(FIROpsDialect *, mlir::Type ty,
     os << '>';
     return;
   }
-  if (auto type = ty.dyn_cast<fir::ComplexType>()) {
-    // Fortran intrinsic type COMPLEX
-    os << "complex<" << type.getFKind() << '>';
-    return;
-  }
   if (auto type = ty.dyn_cast<RecordType>()) {
     // Fortran derived type
     os << "type<" << type.getName();
@@ -1542,6 +1496,10 @@ void fir::printFirType(FIROpsDialect *, mlir::Type ty,
     os << '>';
     return;
   }
+
+  if (mlir::succeeded(generatedTypePrinter(ty, p))) {
+    return;
+  }
 }
 
 bool fir::isa_unknown_size_box(mlir::Type t) {
@@ -1557,3 +1515,20 @@ bool fir::isa_unknown_size_box(mlir::Type t) {
   }
   return false;
 }
+
+namespace fir {
+
+//===----------------------------------------------------------------------===//
+// ComplexType
+//===----------------------------------------------------------------------===//
+
+mlir::Type ComplexType::parse(mlir::MLIRContext *context,
+                              mlir::DialectAsmParser &parser) {
+  return parseKindSingleton<fir::ComplexType>(parser);
+}
+
+mlir::Type ComplexType::getElementType() const {
+  return fir::RealType::get(getContext(), getFKind());
+}
+
+} // namespace fir
