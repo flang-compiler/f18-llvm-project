@@ -32,7 +32,6 @@ TYPE parseIntSingleton(mlir::DialectAsmParser &parser) {
   int kind = 0;
   if (parser.parseLess() || parser.parseInteger(kind) ||
       parser.parseGreater()) {
-    parser.emitError(parser.getCurrentLocation(), "kind value expected");
     return {};
   }
   return TYPE::get(parser.getBuilder().getContext(), kind);
@@ -52,7 +51,6 @@ template <typename TYPE>
 TYPE parseTypeSingleton(mlir::DialectAsmParser &parser) {
   mlir::Type ty;
   if (parser.parseLess() || parser.parseType(ty) || parser.parseGreater()) {
-    parser.emitError(parser.getCurrentLocation(), "type expected");
     return {};
   }
   return TYPE::get(ty);
@@ -277,7 +275,6 @@ mlir::Type BoxProcType::parse(mlir::MLIRContext *context,
                               mlir::DialectAsmParser &parser) {
   mlir::Type ty;
   if (parser.parseLess() || parser.parseType(ty) || parser.parseGreater()) {
-    parser.emitError(parser.getCurrentLocation(), "type expected");
     return {};
   }
   return get(context, ty);
@@ -313,7 +310,6 @@ mlir::Type fir::BoxType::parse(mlir::MLIRContext *context,
                                mlir::DialectAsmParser &parser) {
   mlir::Type ofTy;
   if (parser.parseLess() || parser.parseType(ofTy)) {
-    parser.emitError(parser.getCurrentLocation(), "expected type parameter");
     return {};
   }
 
@@ -350,13 +346,7 @@ mlir::LogicalResult fir::BoxType::verifyConstructionInvariants(mlir::Location,
 
 mlir::Type fir::BoxCharType::parse(mlir::MLIRContext *context,
                                    mlir::DialectAsmParser &parser) {
-  int kind = 0;
-  if (parser.parseLess() || parser.parseInteger(kind) ||
-      parser.parseGreater()) {
-    parser.emitError(parser.getCurrentLocation(), "kind value expected");
-    return {};
-  }
-  return get(context, kind);
+  return parseKindSingleton<fir::BoxCharType>(parser);
 }
 
 void fir::BoxCharType::print(mlir::DialectAsmPrinter &printer) const {
@@ -381,7 +371,6 @@ mlir::Type fir::CharacterType::parse(mlir::MLIRContext *context,
                                      mlir::DialectAsmParser &parser) {
   int kind = 0;
   if (parser.parseLess() || parser.parseInteger(kind)) {
-    parser.emitError(parser.getCurrentLocation(), "kind value expected");
     return {};
   }
   CharacterType::LenType len = 1;
@@ -389,7 +378,6 @@ mlir::Type fir::CharacterType::parse(mlir::MLIRContext *context,
     if (mlir::succeeded(parser.parseOptionalQuestion())) {
       len = fir::CharacterType::unknownLen();
     } else if (!mlir::succeeded(parser.parseInteger(len))) {
-      parser.emitError(parser.getCurrentLocation(), "len value expected");
       return {};
     }
   }
@@ -534,8 +522,6 @@ mlir::Type fir::RecordType::parse(mlir::MLIRContext *context,
                                   mlir::DialectAsmParser &parser) {
   llvm::StringRef name;
   if (parser.parseLess() || parser.parseKeyword(&name)) {
-    parser.emitError(parser.getNameLoc(),
-                     "expected a identifier as name of derived type");
     return {};
   }
   RecordType result = RecordType::get(parser.getBuilder().getContext(), name);
@@ -575,13 +561,11 @@ mlir::Type fir::RecordType::parse(mlir::MLIRContext *context,
         break;
     }
     if (parser.parseRBrace()) {
-      parser.emitError(parser.getNameLoc(), "expected '}'");
       return {};
     }
   }
 
   if (parser.parseGreater()) {
-    parser.emitError(parser.getNameLoc(), "expected '>' in type type");
     return {};
   }
 
@@ -695,22 +679,18 @@ fir::ReferenceType::verifyConstructionInvariants(mlir::Location loc,
 mlir::Type fir::SequenceType::parse(mlir::MLIRContext *context,
                                     mlir::DialectAsmParser &parser) {
   if (parser.parseLess()) {
-    parser.emitError(parser.getNameLoc(), "expecting '<'");
     return {};
   }
   SequenceType::Shape shape;
   if (parser.parseOptionalStar()) {
     if (parser.parseDimensionList(shape, /*allowDynamic=*/true)) {
-      parser.emitError(parser.getNameLoc(), "invalid shape");
       return {};
     }
   } else if (parser.parseColon()) {
-    parser.emitError(parser.getNameLoc(), "expected ':'");
     return {};
   }
   mlir::Type eleTy;
   if (parser.parseType(eleTy) || parser.parseGreater()) {
-    parser.emitError(parser.getNameLoc(), "expecting element type");
     return {};
   }
   mlir::AffineMapAttr map;
@@ -875,7 +855,6 @@ mlir::Type fir::VectorType::parse(mlir::MLIRContext *context,
   mlir::Type eleTy;
   if (parser.parseLess() || parser.parseInteger(len) || parser.parseColon() ||
       parser.parseType(eleTy) || parser.parseGreater()) {
-    parser.emitError(parser.getNameLoc(), "invalid vector type");
     return {};
   }
   return fir::VectorType::get(len, eleTy);
