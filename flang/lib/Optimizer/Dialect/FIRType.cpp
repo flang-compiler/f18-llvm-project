@@ -274,9 +274,8 @@ bool fir::isa_unknown_size_box(mlir::Type t) {
 mlir::Type BoxProcType::parse(mlir::MLIRContext *context,
                               mlir::DialectAsmParser &parser) {
   mlir::Type ty;
-  if (parser.parseLess() || parser.parseType(ty) || parser.parseGreater()) {
+  if (parser.parseLess() || parser.parseType(ty) || parser.parseGreater())
     return {};
-  }
   return get(context, ty);
 }
 
@@ -309,9 +308,8 @@ static bool canBePointerOrHeapElementType(mlir::Type eleTy) {
 mlir::Type fir::BoxType::parse(mlir::MLIRContext *context,
                                mlir::DialectAsmParser &parser) {
   mlir::Type ofTy;
-  if (parser.parseLess() || parser.parseType(ofTy)) {
+  if (parser.parseLess() || parser.parseType(ofTy))
     return {};
-  }
 
   mlir::AffineMapAttr map;
   if (!parser.parseOptionalComma()) {
@@ -320,9 +318,8 @@ mlir::Type fir::BoxType::parse(mlir::MLIRContext *context,
       return {};
     }
   }
-  if (parser.parseGreater()) {
+  if (parser.parseGreater())
     return {};
-  }
   return get(ofTy, map);
 }
 
@@ -370,9 +367,8 @@ CharacterType fir::BoxCharType::getEleTy() const {
 mlir::Type fir::CharacterType::parse(mlir::MLIRContext *context,
                                      mlir::DialectAsmParser &parser) {
   int kind = 0;
-  if (parser.parseLess() || parser.parseInteger(kind)) {
+  if (parser.parseLess() || parser.parseInteger(kind))
     return {};
-  }
   CharacterType::LenType len = 1;
   if (mlir::succeeded(parser.parseOptionalComma())) {
     if (mlir::succeeded(parser.parseOptionalQuestion())) {
@@ -521,9 +517,8 @@ fir::RealType::verifyConstructionInvariants(mlir::Location, KindTy fKind) {
 mlir::Type fir::RecordType::parse(mlir::MLIRContext *context,
                                   mlir::DialectAsmParser &parser) {
   llvm::StringRef name;
-  if (parser.parseLess() || parser.parseKeyword(&name)) {
+  if (parser.parseLess() || parser.parseKeyword(&name))
     return {};
-  }
   RecordType result = RecordType::get(parser.getBuilder().getContext(), name);
 
   RecordType::TypeList lenParamList;
@@ -565,9 +560,8 @@ mlir::Type fir::RecordType::parse(mlir::MLIRContext *context,
     }
   }
 
-  if (parser.parseGreater()) {
+  if (parser.parseGreater())
     return {};
-  }
 
   if (lenParamList.empty() && typeList.empty())
     return result;
@@ -678,21 +672,18 @@ fir::ReferenceType::verifyConstructionInvariants(mlir::Location loc,
 // bounds ::= `?` | int-lit
 mlir::Type fir::SequenceType::parse(mlir::MLIRContext *context,
                                     mlir::DialectAsmParser &parser) {
-  if (parser.parseLess()) {
+  if (parser.parseLess())
     return {};
-  }
   SequenceType::Shape shape;
   if (parser.parseOptionalStar()) {
-    if (parser.parseDimensionList(shape, /*allowDynamic=*/true)) {
+    if (parser.parseDimensionList(shape, /*allowDynamic=*/true))
       return {};
-    }
   } else if (parser.parseColon()) {
     return {};
   }
   mlir::Type eleTy;
-  if (parser.parseType(eleTy) || parser.parseGreater()) {
+  if (parser.parseType(eleTy) || parser.parseGreater())
     return {};
-  }
   mlir::AffineMapAttr map;
   if (!parser.parseOptionalComma())
     if (parser.parseAttribute(map)) {
@@ -854,9 +845,8 @@ mlir::Type fir::VectorType::parse(mlir::MLIRContext *context,
   int64_t len = 0;
   mlir::Type eleTy;
   if (parser.parseLess() || parser.parseInteger(len) || parser.parseColon() ||
-      parser.parseType(eleTy) || parser.parseGreater()) {
+      parser.parseType(eleTy) || parser.parseGreater())
     return {};
-  }
   return fir::VectorType::get(len, eleTy);
 }
 
