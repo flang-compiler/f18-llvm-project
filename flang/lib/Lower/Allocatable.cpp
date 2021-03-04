@@ -54,54 +54,56 @@ struct ErrorManager {
             const Fortran::lower::SomeExpr *statExpr,
             const Fortran::lower::SomeExpr *errMsgExpr) {
     Fortran::lower::StatementContext stmtCtx;
-    builder = &converter.getFirOpBuilder();
-    hasStat = builder->createBool(loc, statExpr != nullptr);
+    auto &builder = converter.getFirOpBuilder();
+    hasStat = builder.createBool(loc, statExpr != nullptr);
     statAddr = statExpr
                    ? fir::getBase(converter.genExprAddr(statExpr, stmtCtx, loc))
                    : mlir::Value{};
     if (statExpr && errMsgExpr) {
-      auto errMsgDesc = builder->createBox(
+      auto errMsgDesc = builder.createBox(
           loc, converter.genExprAddr(errMsgExpr, stmtCtx, loc));
-      errMsgAddr = builder->createTemporary(loc, errMsgDesc.getType());
-      builder->create<fir::StoreOp>(loc, errMsgDesc, errMsgAddr);
+      errMsgAddr = builder.createTemporary(loc, errMsgDesc.getType());
+      builder.create<fir::StoreOp>(loc, errMsgDesc, errMsgAddr);
     } else {
-      errMsgAddr = builder->createNullConstant(loc);
+      errMsgAddr = builder.createNullConstant(loc);
     }
-    sourceFile = Fortran::lower::locationToFilename(*builder, loc);
-    sourceLine = Fortran::lower::locationToLineNo(*builder, loc,
-                                                  builder->getIntegerType(32));
+    sourceFile = Fortran::lower::locationToFilename(builder, loc);
+    sourceLine = Fortran::lower::locationToLineNo(builder, loc,
+                                                  builder.getIntegerType(32));
   }
 
   bool hasStatSpec() const { return static_cast<bool>(statAddr); }
 
-  void genStatCheck(mlir::Value stat, mlir::Location loc) {
-    if (hasStatSpec() && stat) {
-      auto zero = builder->createIntegerConstant(
-          loc, fir::dyn_cast_ptrEleTy(statAddr.getType()), 0);
-      auto cmp = builder->create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq,
-                                               stat, zero);
-      auto ifOp = builder->create<fir::IfOp>(loc, cmp,
-                                             /*withElseRegion=*/false);
-      builder->setInsertionPointToStart(&ifOp.thenRegion().front());
+  void genStatCheck(Fortran::lower::FirOpBuilder &builder, mlir::Location loc) {
+    if (statValue) {
+      auto zero = builder.createIntegerConstant(loc, statValue.getType(), 0);
+      auto cmp = builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq,
+                                              statValue, zero);
+      auto ifOp = builder.create<fir::IfOp>(loc, cmp,
+                                            /*withElseRegion=*/false);
+      builder.setInsertionPointToStart(&ifOp.thenRegion().front());
     }
   }
 
-  void assignStat(mlir::Value stat, mlir::Location loc) {
+  void assignStat(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
+                  mlir::Value stat) {
     if (hasStatSpec()) {
       assert(stat && "missing stat value");
-      auto castStat = builder->createConvert(
+      auto castStat = builder.createConvert(
           loc, fir::dyn_cast_ptrEleTy(statAddr.getType()), stat);
-      builder->create<fir::StoreOp>(loc, castStat, statAddr);
+      builder.create<fir::StoreOp>(loc, castStat, statAddr);
+      statValue = stat;
     }
   }
 
-  Fortran::lower::FirOpBuilder *builder;
-
   mlir::Value hasStat;
-  mlir::Value statAddr;
   mlir::Value errMsgAddr;
   mlir::Value sourceFile;
   mlir::Value sourceLine;
+
+private:
+  mlir::Value statAddr;    // STAT variable address
+  mlir::Value statValue{}; // current runtime STAT value
 };
 
 //===----------------------------------------------------------------------===//
@@ -457,11 +459,10 @@ public:
     errorManager.init(converter, loc, statExpr, errMsgExpr);
     if (sourceExpr || moldExpr)
       TODO(loc, "lower MOLD/SOURCE expr in allocate");
-    mlir::Value stat;
     auto insertPt = builder.saveInsertionPoint();
     for (const auto &allocation :
          std::get<std::list<Fortran::parser::Allocation>>(stmt.t))
-      lowerAllocation(unwrapAllocation(allocation), stat);
+      lowerAllocation(unwrapAllocation(allocation));
     builder.restoreInsertionPoint(insertPt);
   }
 
@@ -519,16 +520,16 @@ private:
           allocOption.u);
   }
 
-  void lowerAllocation(const Allocation &alloc, mlir::Value &stat) {
+  void lowerAllocation(const Allocation &alloc) {
     auto boxAddr = genMutableBoxValue(converter, loc, alloc.getAllocObj());
     mlir::Value backupBox;
 
     if (sourceExpr) {
-      genSourceAllocation(alloc, boxAddr, stat);
+      genSourceAllocation(alloc, boxAddr);
     } else if (moldExpr) {
-      genMoldAllocation(alloc, boxAddr, stat);
+      genMoldAllocation(alloc, boxAddr);
     } else {
-      genSimpleAllocation(alloc, boxAddr, stat);
+      genSimpleAllocation(alloc, boxAddr);
     }
   }
 
@@ -603,7 +604,7 @@ private:
   }
 
   void genSimpleAllocation(const Allocation &alloc,
-                           const fir::MutableBoxValue &box, mlir::Value &stat) {
+                           const fir::MutableBoxValue &box) {
     if (!box.isDerived() && !errorManager.hasStatSpec() &&
         !alloc.type.IsPolymorphic() && !alloc.hasCoarraySpec() &&
         !useAllocateRuntime) {
@@ -612,7 +613,7 @@ private:
     }
     // Generate a sequence of runtime calls.
     // Sync MutableBoxValue and descriptor before and after calls.
-    errorManager.genStatCheck(stat, loc);
+    errorManager.genStatCheck(builder, loc);
     Fortran::lower::getMutableIRBox(builder, loc, box);
     if (alloc.hasCoarraySpec())
       TODO(loc, "coarray allocation");
@@ -638,9 +639,9 @@ private:
       // Runtime call
       genAllocatableSetBounds(builder, loc, addr, dimIndex, lb, ub);
     }
-    stat = genAllocatableAllocate(builder, loc, addr, errorManager);
+    auto stat = genAllocatableAllocate(builder, loc, addr, errorManager);
     Fortran::lower::syncMutableBoxFromIRBox(builder, loc, box);
-    errorManager.assignStat(stat, loc);
+    errorManager.assignStat(builder, loc, stat);
   }
 
   /// Lower the length parameters that may be specified in the optional
@@ -682,12 +683,10 @@ private:
       TODO(loc, "derived type length parameters in allocate");
   }
 
-  void genSourceAllocation(const Allocation &, const fir::MutableBoxValue &,
-                           mlir::Value &stat) {
+  void genSourceAllocation(const Allocation &, const fir::MutableBoxValue &) {
     TODO(loc, "SOURCE allocation lowering");
   }
-  void genMoldAllocation(const Allocation &, const fir::MutableBoxValue &,
-                         mlir::Value &stat) {
+  void genMoldAllocation(const Allocation &, const fir::MutableBoxValue &) {
     TODO(loc, "MOLD allocation lowering");
   }
   void genSetType(const Allocation &, const fir::MutableBoxValue &) {
@@ -733,7 +732,7 @@ void Fortran::lower::genAllocateStmt(
 // Generate deallocation of a pointer/allocatable.
 static void genDeallocate(Fortran::lower::FirOpBuilder &builder,
                           mlir::Location loc, const fir::MutableBoxValue &box,
-                          ErrorManager &errorManager, mlir::Value &stat) {
+                          ErrorManager &errorManager) {
   // Deallocate intrinsic types inline.
   if (!box.isDerived() && !errorManager.hasStatSpec() && !useAllocateRuntime) {
     auto addr = MutablePropertyReader(builder, loc, box).readBaseAddress();
@@ -743,11 +742,11 @@ static void genDeallocate(Fortran::lower::FirOpBuilder &builder,
   }
   // Use runtime calls to deallocate descriptor cases. Sync MutableBoxValue
   // with its descriptor before and after calls if needed.
-  errorManager.genStatCheck(stat, loc);
+  errorManager.genStatCheck(builder, loc);
   auto irBox = Fortran::lower::getMutableIRBox(builder, loc, box);
-  stat = genAllocatableDeallocate(builder, loc, irBox, errorManager);
+  auto stat = genAllocatableDeallocate(builder, loc, irBox, errorManager);
   Fortran::lower::syncMutableBoxFromIRBox(builder, loc, box);
-  errorManager.assignStat(stat, loc);
+  errorManager.assignStat(builder, loc, stat);
 }
 
 void Fortran::lower::genDeallocateStmt(
@@ -769,12 +768,11 @@ void Fortran::lower::genDeallocateStmt(
   ErrorManager errorManager;
   errorManager.init(converter, loc, statExpr, errMsgExpr);
   auto &builder = converter.getFirOpBuilder();
-  mlir::Value stat;
   auto insertPt = builder.saveInsertionPoint();
   for (const auto &allocateObject :
        std::get<std::list<Fortran::parser::AllocateObject>>(stmt.t)) {
     auto box = genMutableBoxValue(converter, loc, allocateObject);
-    genDeallocate(builder, loc, box, errorManager, stat);
+    genDeallocate(builder, loc, box, errorManager);
   }
   builder.restoreInsertionPoint(insertPt);
 }
