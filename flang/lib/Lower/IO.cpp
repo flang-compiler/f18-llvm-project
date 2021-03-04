@@ -81,9 +81,8 @@ namespace {
 /// IO statements may require exceptional condition handling.  A statement that
 /// encounters an exceptional condition may branch to a label given on an ERR
 /// (error), END (end-of-file), or EOR (end-of-record) specifier.  An IOSTAT
-/// specifier variable may be set to a value that indicates one of these
-/// conditions.  And an IOMSG specifier variable be set to a message describing
-/// one of these conditions.
+/// specifier variable may be set to a value that indicates some condition,
+/// and an IOMSG specifier variable may be set to a description of a condition.
 struct ConditionSpecInfo {
   const Fortran::semantics::SomeExpr *ioStatExpr{};
   const Fortran::semantics::SomeExpr *ioMsgExpr{};
@@ -111,8 +110,7 @@ template <typename D>
 static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                       mlir::Value cookie, const D &ioImpliedDo,
                       bool isFormatted, bool checkResult, mlir::Value &ok,
-                      bool inIterWhileLoop,
-                      Fortran::lower::StatementContext &stmtCtx);
+                      bool inLoop, Fortran::lower::StatementContext &stmtCtx);
 
 /// Helper function to retrieve the name of the IO function given the key `A`
 template <typename A>
@@ -184,8 +182,7 @@ static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
 /// conditionals for I/O statements with a large number of suboperations.
 static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
                                   mlir::Location loc, bool checkResult,
-                                  mlir::Value ok,
-                                  bool inIterWhileLoop = false) {
+                                  mlir::Value ok, bool inLoop = false) {
   if (!checkResult || !ok)
     // Either no I/O calls need to be checked, or this will be the first call.
     return;
@@ -194,10 +191,10 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
   // is in a fir.iterate_while loop, the result must be propagated up to the
   // loop scope as an extra ifOp result. (The propagation is done in genIoLoop.)
   mlir::TypeRange resTy;
-  if (inIterWhileLoop)
+  if (inLoop)
     resTy = builder.getI1Type();
   auto ifOp = builder.create<fir::IfOp>(loc, resTy, ok,
-                                        /*withElseRegion=*/inIterWhileLoop);
+                                        /*withElseRegion=*/inLoop);
   builder.setInsertionPointToStart(&ifOp.thenRegion().front());
 }
 
@@ -236,21 +233,22 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
 }
 
 /// Generate a sequence of output data transfer calls.
-static void genOutputItemList(
-    Fortran::lower::AbstractConverter &converter, mlir::Value cookie,
-    const std::list<Fortran::parser::OutputItem> &items, bool isFormatted,
-    bool checkResult, mlir::Value &ok, bool inIterWhileLoop,
-    Fortran::lower::StatementContext &stmtCtx) {
+static void
+genOutputItemList(Fortran::lower::AbstractConverter &converter,
+                  mlir::Value cookie,
+                  const std::list<Fortran::parser::OutputItem> &items,
+                  bool isFormatted, bool checkResult, mlir::Value &ok,
+                  bool inLoop, Fortran::lower::StatementContext &stmtCtx) {
   auto &builder = converter.getFirOpBuilder();
   for (auto &item : items) {
     if (const auto &impliedDo = std::get_if<1>(&item.u)) {
       genIoLoop(converter, cookie, impliedDo->value(), isFormatted, checkResult,
-                ok, inIterWhileLoop, stmtCtx);
+                ok, inLoop, stmtCtx);
       continue;
     }
     auto &pExpr = std::get<Fortran::parser::Expr>(item.u);
     auto loc = converter.genLocation(pExpr.source);
-    makeNextConditionalOn(builder, loc, checkResult, ok, inIterWhileLoop);
+    makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
 
     const auto *expr = Fortran::semantics::GetExpr(pExpr);
     if (!expr) {
@@ -335,18 +333,18 @@ static void genInputItemList(Fortran::lower::AbstractConverter &converter,
                              mlir::Value cookie,
                              const std::list<Fortran::parser::InputItem> &items,
                              bool isFormatted, bool checkResult,
-                             mlir::Value &ok, bool inIterWhileLoop,
+                             mlir::Value &ok, bool inLoop,
                              Fortran::lower::StatementContext &stmtCtx) {
   auto &builder = converter.getFirOpBuilder();
   for (auto &item : items) {
     if (const auto &impliedDo = std::get_if<1>(&item.u)) {
       genIoLoop(converter, cookie, impliedDo->value(), isFormatted, checkResult,
-                ok, inIterWhileLoop, stmtCtx);
+                ok, inLoop, stmtCtx);
       continue;
     }
     auto &pVar = std::get<Fortran::parser::Variable>(item.u);
     auto loc = converter.genLocation(pVar.GetSource());
-    makeNextConditionalOn(builder, loc, checkResult, ok, inIterWhileLoop);
+    makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
     Fortran::lower::CharacterExprHelper charHelper{builder, loc};
     auto itemBox =
         converter.genExprAddr(Fortran::semantics::GetExpr(pVar), stmtCtx, loc);
@@ -384,11 +382,10 @@ template <typename D>
 static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                       mlir::Value cookie, const D &ioImpliedDo,
                       bool isFormatted, bool checkResult, mlir::Value &ok,
-                      bool inIterWhileLoop,
-                      Fortran::lower::StatementContext &stmtCtx) {
+                      bool inLoop, Fortran::lower::StatementContext &stmtCtx) {
   auto &builder = converter.getFirOpBuilder();
   auto loc = converter.getCurrentLocation();
-  makeNextConditionalOn(builder, loc, checkResult, ok, inIterWhileLoop);
+  makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
   const auto &itemList = std::get<0>(ioImpliedDo.t);
   const auto &control = std::get<1>(ioImpliedDo.t);
   const auto &loopSym = *control.name.thing.thing.symbol;
@@ -406,10 +403,10 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   auto genItemList = [&](const D &ioImpliedDo) {
     if constexpr (std::is_same_v<D, Fortran::parser::InputImpliedDo>)
       genInputItemList(converter, cookie, itemList, isFormatted, checkResult,
-                       ok, /*inIterWhile=*/true, stmtCtx);
+                       ok, /*inLoop=*/true, stmtCtx);
     else
       genOutputItemList(converter, cookie, itemList, isFormatted, checkResult,
-                        ok, /*inIterWhile=*/true, stmtCtx);
+                        ok, /*inLoop=*/true, stmtCtx);
   };
   if (!checkResult) {
     // No I/O call result checks - the loop is a fir.do_loop op.
@@ -1568,16 +1565,16 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   // Generate data transfer list calls.
   if constexpr (isInput) // ReadStmt
     genInputItemList(converter, cookie, stmt.items, isFormatted,
-                     csi.hasTransferConditionSpec(), ok, /*inIterWhile=*/false,
+                     csi.hasTransferConditionSpec(), ok, /*inLoop=*/false,
                      stmtCtx);
   else if constexpr (std::is_same_v<A, Fortran::parser::PrintStmt>)
     genOutputItemList(converter, cookie, std::get<1>(stmt.t), isFormatted,
                       csi.hasTransferConditionSpec(), ok,
-                      /*inIterWhile=*/false, stmtCtx);
+                      /*inLoop=*/false, stmtCtx);
   else // WriteStmt
     genOutputItemList(converter, cookie, stmt.items, isFormatted,
                       csi.hasTransferConditionSpec(), ok,
-                      /*inIterWhile=*/false, stmtCtx);
+                      /*inLoop=*/false, stmtCtx);
 
   // Generate end statement call/s.
   builder.restoreInsertionPoint(insertPt);
