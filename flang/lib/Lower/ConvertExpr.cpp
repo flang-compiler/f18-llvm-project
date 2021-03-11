@@ -2006,23 +2006,186 @@ public:
     return x.Rank() != 0;
   }
 
-  // Generate an error message, but no code.
-  CC errorCC(llvm::StringRef msg) {
-    mlir::emitError(getLoc(), msg);
-    return [](IterSpace) { return mlir::Value{}; };
+  // Attribute for an alloca that is a trivial adaptor for converting a value to
+  // pass-by-ref semantics. The optimizer may be able to eliminate these.
+  mlir::NamedAttribute getAdaptToByRefAttr() {
+    return {mlir::Identifier::get("adapt.byref", builder.getContext()),
+            builder.getUnitAttr()};
   }
 
+  // A procedure reference to a Fortran elemental intrinsic procedure.
+  CC genIntrinsicProcRef(
+      const Fortran::evaluate::ProcedureRef &procRef,
+      llvm::Optional<mlir::Type> retTy,
+      const Fortran::evaluate::SpecificIntrinsic &intrinsic) {
+    llvm::SmallVector<CC> operands;
+    llvm::StringRef name = intrinsic.name;
+    const auto *argLowering =
+        Fortran::lower::getIntrinsicArgumentLowering(name);
+    auto loc = getLoc();
+    for (const auto &[arg, dummy] :
+         llvm::zip(procRef.arguments(),
+                   intrinsic.characteristics.value().dummyArguments)) {
+      auto *expr = Fortran::evaluate::UnwrapExpr<
+          Fortran::evaluate::Expr<Fortran::evaluate::SomeType>>(arg);
+      if (!expr) {
+        // Absent optional.
+        operands.emplace_back([=](IterSpace) { return mlir::Value{}; });
+      } else if (!argLowering) {
+        // No argument lowering instruction, lower by value.
+        auto lambda = genarr(*expr);
+        operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
+      } else {
+        // Ad-hoc argument lowering handling.
+        auto lambda = genarr(*expr);
+        switch (Fortran::lower::lowerIntrinsicArgumentAs(getLoc(), *argLowering,
+                                                         dummy.name)) {
+        case Fortran::lower::LowerIntrinsicArgAs::Value:
+          operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
+          break;
+        case Fortran::lower::LowerIntrinsicArgAs::Addr:
+          operands.emplace_back([=](IterSpace iters) {
+            auto exv = lambda(iters);
+            auto base = fir::getBase(exv);
+            auto temp = builder.createTemporary(
+                loc, base.getType(),
+                llvm::ArrayRef<mlir::NamedAttribute>{getAdaptToByRefAttr()});
+            builder.create<fir::StoreOp>(loc, base, temp);
+            return temp;
+          });
+          break;
+        case Fortran::lower::LowerIntrinsicArgAs::Inquired:
+          TODO(loc, "intrinsic function with inquired argument");
+          break;
+        }
+      }
+    }
+
+    // Let the intrinsic library lower the intrinsic procedure call
+    return [=](IterSpace iters) {
+      llvm::SmallVector<fir::ExtendedValue> args;
+      for (const auto &cc : operands)
+        args.push_back(cc(iters));
+      return Fortran::lower::genIntrinsicCall(builder, loc, name, retTy, args,
+                                              stmtCtx);
+    };
+  }
+
+  // A procedure reference to a user-defined elemental procedure.
+  CC genUDProcRef(const Fortran::evaluate::ProcedureRef &procRef,
+                  llvm::Optional<mlir::Type> retTy) {
+    using PassBy = Fortran::lower::CallerInterface::PassEntityBy;
+
+    Fortran::lower::CallerInterface caller(procRef, converter);
+    llvm::SmallVector<CC> operands(caller.getNumFIRArguments());
+    auto loc = getLoc();
+    auto callSiteType = caller.genFunctionType();
+    for (const auto &arg : caller.getPassedArguments()) {
+      const auto *actual = arg.entity;
+      auto argTy = callSiteType.getInput(arg.firArgument);
+      if (!actual) {
+        // Optional dummy argument for which there is no actual argument.
+        auto absent = builder.create<fir::AbsentOp>(loc, argTy);
+        operands[arg.firArgument] = [=](IterSpace) { return absent; };
+        continue;
+      }
+      const auto *expr = actual->UnwrapExpr();
+      if (!expr)
+        TODO(loc, "assumed type actual argument lowering");
+
+      if (arg.passBy == PassBy::Value) {
+        auto lambda = genarr(*expr);
+        operands[arg.firArgument] = [=](IterSpace iters) {
+          return lambda(iters);
+        };
+        continue;
+      }
+
+      if (arg.passBy == PassBy::MutableBox) {
+        TODO(loc, "mutable box arg");
+        continue;
+      }
+
+      auto lambda = genarr(*expr);
+      switch (arg.passBy) {
+      case PassBy::BaseAddress:
+        operands[arg.firArgument] = [=](IterSpace iters) {
+          auto exv = lambda(iters);
+          auto base = fir::getBase(exv);
+          auto temp = builder.createTemporary(
+              loc, base.getType(),
+              llvm::ArrayRef<mlir::NamedAttribute>{getAdaptToByRefAttr()});
+          builder.create<fir::StoreOp>(loc, base, temp);
+          return temp;
+        };
+        break;
+      case PassBy::BoxChar:
+        operands[arg.firArgument] = [=](IterSpace iters) -> ExtValue {
+          auto helper = Fortran::lower::CharacterExprHelper{builder, loc};
+          return lambda(iters).match(
+              [&](const fir::CharBoxValue &x) -> ExtValue {
+                return helper.createEmbox(x);
+              },
+              [&](const fir::CharArrayBoxValue &x) -> ExtValue {
+                return helper.createEmbox(x);
+              },
+              [&](const auto &) -> ExtValue {
+                fir::emitFatalError(
+                    loc, "internal error: actual argument is not a character");
+              });
+        };
+        break;
+      case PassBy::Box:
+        TODO(loc, "box argument");
+        break;
+      case PassBy::AddressAndLength:
+        TODO(loc, "address and length argument");
+        break;
+      default:
+        llvm_unreachable("pass by value not handled here");
+        break;
+      }
+    }
+
+    if (caller.getIfIndirectCallSymbol())
+      TODO(loc, "indirect call");
+    auto funcSym = builder.getSymbolRefAttr(caller.getMangledName());
+    auto resTys = caller.getFuncOp().getType().getResults();
+    if (caller.getFuncOp().getType().getResults() !=
+        caller.genFunctionType().getResults())
+      TODO(loc, "type adaption");
+    return [=](IterSpace iters) -> ExtValue {
+      llvm::SmallVector<mlir::Value> args;
+      for (const auto &cc : operands)
+        args.push_back(fir::getBase(cc(iters)));
+      auto call = builder.create<fir::CallOp>(loc, resTys, funcSym, args);
+      return call.getResult(0);
+    };
+  }
+
+  // A procedure reference.
   CC genProcRef(const Fortran::evaluate::ProcedureRef &procRef,
                 llvm::Optional<mlir::Type> retTy) {
     auto loc = getLoc();
     if (procRef.IsElemental()) {
       if (const auto *intrin = procRef.proc().GetSpecificIntrinsic()) {
-        (void)intrin; // NB: LLVM_ATTRIBUTE_UNUSED doesn't suppress warning
-        TODO(loc, "elemental intrinsic");
+        // Elemental intrinsic call.
+        // The intrinsic procedure is called once per element of the array.
+        return genIntrinsicProcRef(procRef, retTy, *intrin);
       }
       if (ScalarExprLowering::isStatementFunctionCall(procRef))
-        TODO(loc, "elemental statement function");
-      TODO(loc, "elemental procedure ref");
+        fir::emitFatalError(loc, "statement function cannot be elemental");
+
+      // Elemental call.
+      // The procedure is called once per element of the array argument(s).
+      return genUDProcRef(procRef, retTy);
+    }
+
+    // Transformational call.
+    // Call the procedure is called once and produces a value of rank > 0.
+    if (const auto *intrin = procRef.proc().GetSpecificIntrinsic()) {
+      (void)intrin;
+      TODO(loc, "non-elemental intrinsic ref");
     }
     TODO(loc, "non-elemental procedure ref");
   }
@@ -2032,7 +2195,8 @@ public:
   }
   CC genarr(const Fortran::evaluate::ProcedureRef &x) {
     if (x.hasAlternateReturns())
-      return errorCC("array procedure reference with alt-return");
+      fir::emitFatalError(getLoc(),
+                          "array procedure reference with alt-return");
     return genProcRef(x, llvm::None);
   }
   template <typename A, typename = std::enable_if_t<Fortran::common::HasMember<
@@ -2055,9 +2219,9 @@ public:
                                              TC2> &x) {
     assert(isArray(x));
     auto loc = getLoc();
-    auto lf = genarr(x.left());
+    auto lambda = genarr(x.left());
     return [=](IterSpace iters) -> ExtValue {
-      auto val = fir::getBase(lf(iters));
+      auto val = fir::getBase(lambda(iters));
       auto ty = converter.genType(TC1, KIND);
       return builder.createConvert(loc, ty, val);
     };
@@ -2065,10 +2229,10 @@ public:
   template <int KIND>
   CC genarr(const Fortran::evaluate::ComplexComponent<KIND> &x) {
     auto loc = getLoc();
-    auto lf = genarr(x.left());
+    auto lambda = genarr(x.left());
     auto isImagPart = x.isImaginaryPart;
     return [=](IterSpace iters) -> ExtValue {
-      auto lhs = fir::getBase(lf(iters));
+      auto lhs = fir::getBase(lambda(iters));
       return Fortran::lower::ComplexExprHelper{builder, loc}.extractComplexPart(
           lhs, isImagPart);
     };
@@ -2125,10 +2289,10 @@ public:
   template <typename OP, typename A>
   CC createBinaryOp(const A &evEx) {
     auto loc = getLoc();
-    auto lf = genarr(evEx.left());
+    auto lambda = genarr(evEx.left());
     auto rf = genarr(evEx.right());
     return [=](IterSpace iters) -> ExtValue {
-      auto left = fir::getBase(lf(iters));
+      auto left = fir::getBase(lambda(iters));
       auto right = fir::getBase(rf(iters));
       return builder.create<OP>(loc, left, right);
     };
@@ -2406,8 +2570,8 @@ public:
               }},
           sub.value().u);
     }
-    auto lf = genSlice(x.base(), trips);
-    return [=](IterSpace iters) { return lf(pc(iters)); };
+    auto lambda = genSlice(x.base(), trips);
+    return [=](IterSpace iters) { return lambda(pc(iters)); };
   }
   CC genarr(const Fortran::evaluate::NamedEntity &entity) {
     if (entity.IsSymbol())
@@ -2505,8 +2669,8 @@ public:
     const auto &sym = x.GetFirstSymbol();
     auto recTy = converter.genType(sym);
     buildComponentsPath(components, recTy, x.base());
-    auto lf = genPathSlice(sym, components);
-    return [=](IterSpace iters) { return lf(iters); };
+    auto lambda = genPathSlice(sym, components);
+    return [=](IterSpace iters) { return lambda(iters); };
   }
 
   /// The `Ev::Component` structure is tailmost down to head, so the expression
@@ -2546,8 +2710,8 @@ public:
     auto offset = builder.createIntegerConstant(
         loc, i32Ty,
         x.part() == Fortran::evaluate::ComplexPart::Part::RE ? 0 : 1);
-    auto lf = genPathSlice(x.complex(), {offset});
-    return [=](IterSpace iters) { return lf(iters); };
+    auto lambda = genPathSlice(x.complex(), {offset});
+    return [=](IterSpace iters) { return lambda(iters); };
   }
 
   template <typename A>
@@ -2619,10 +2783,10 @@ public:
   CC genarr(const Fortran::evaluate::Not<KIND> &x) {
     auto loc = getLoc();
     auto i1Ty = builder.getI1Type();
-    auto lf = genarr(x.left());
+    auto lambda = genarr(x.left());
     auto truth = builder.createBool(loc, true);
     return [=](IterSpace iters) -> ExtValue {
-      auto logical = fir::getBase(lf(iters));
+      auto logical = fir::getBase(lambda(iters));
       auto val = builder.createConvert(loc, i1Ty, logical);
       return builder.create<mlir::XOrOp>(loc, val, truth);
     };

@@ -245,4 +245,45 @@ subroutine test13(a,b,c,d,n,m,i)
   ! CHECK: fir.array_merge_store %[[A]], %[[A_result]] to %arg0
 end subroutine test13
 
+! Test elemental call to function f
+! CHECK-LABEL: func @_QPtest14(
+! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
+! CHECK-SAME: %[[b:.*]]: !fir.ref<!fir.array<100xf32>>)
+subroutine test14(a,b)
+  ! CHECK-DAG: %[[tmp:.*]] = fir.alloca f32 {adapt.byref}
+  ! CHECK-DAG: %[[barr:.*]] = fir.array_load %[[b]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
+  ! CHECK-DAG: %[[aarr:.*]] = fir.array_load %[[a]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
+  interface
+     real elemental function f(i)
+       real, intent(in) :: i
+     end function f
+  end interface
+  real :: a(100), b(100)
+  ! CHECK: %[[loop:.*]] = fir.do_loop %[[i:.*]] = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[bth:.*]] = %[[barr]]) -> (!fir.array<100xf32>) {
+  ! CHECK: %[[val:.*]] = fir.array_fetch %[[aarr]], %[[i]] : (!fir.array<100xf32>, index) -> f32
+  ! CHECK: fir.store %[[val]] to %[[tmp]] : !fir.ref<f32>
+  ! CHECK: %[[fres:.*]] = fir.call @_QPf(%[[tmp]]) : (!fir.ref<f32>) -> f32
+  ! CHECK: %[[res:.*]] = fir.array_update %[[bth]], %[[fres]], %[[i]] : (!fir.array<100xf32>, f32, index) -> !fir.array<100xf32>
+  ! CHECK: fir.result %[[res]] : !fir.array<100xf32>
+  ! CHECK: fir.array_merge_store %[[barr]], %[[loop]] to %[[b]]
+  b = f(a)
+end subroutine test14
+
+! Test elemental intrinsic function (abs)
+! CHECK-LABEL: func @_QPtest15(
+! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
+! CHECK-SAME: %[[b:.*]]: !fir.ref<!fir.array<100xf32>>)
+subroutine test15(a,b)
+  ! CHECK-DAG: %[[barr:.*]] = fir.array_load %[[b]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
+  ! CHECK-DAG: %[[aarr:.*]] = fir.array_load %[[a]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
+  real :: a(100), b(100)
+  ! CHECK: %[[loop:.*]] = fir.do_loop %[[i:.*]] = %{{.*}} to %{{.*}} step %{{.*}} iter_args(%[[bth:.*]] = %[[barr]]) -> (!fir.array<100xf32>) {
+  ! CHECK: %[[val:.*]] = fir.array_fetch %[[aarr]], %[[i]] : (!fir.array<100xf32>, index) -> f32
+  ! CHECK: %[[fres:.*]] = fir.call @llvm.fabs.f32(%[[val]]) : (f32) -> f32
+  ! CHECK: %[[res:.*]] = fir.array_update %[[bth]], %[[fres]], %[[i]] : (!fir.array<100xf32>, f32, index) -> !fir.array<100xf32>
+  ! CHECK: fir.result %[[res]] : !fir.array<100xf32>
+  ! CHECK: fir.array_merge_store %[[barr]], %[[loop]] to %[[b]]
+  b = abs(a)
+end subroutine test15
+
 ! CHECK: func private @_QPbar(
