@@ -18,7 +18,11 @@
 #define FORTRAN_LOWER_CONVERTEXPR_H
 
 #include "flang/Evaluate/shape.h"
+#include "flang/Lower/FIRBuilder.h"
 #include "flang/Lower/Support/BoxValue.h"
+#include "flang/Optimizer/Support/InternalNames.h"
+#include "llvm/ADT/ArrayRef.h"
+#include "llvm/Support/MD5.h"
 
 namespace mlir {
 class Location;
@@ -98,6 +102,67 @@ fir::ExtendedValue
 createSomeArrayBox(AbstractConverter &converter,
                    const evaluate::Expr<evaluate::SomeType> &expr,
                    SymMap &symMap, StatementContext &stmtCtx);
+
+/// Generate a unique name for a typed literal constant value.
+class LiteralNameHelper {
+public:
+  template <int KIND>
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::Type<
+          Fortran::common::TypeCategory::Character, KIND>> &x) {
+    typeTag = "c";
+    kind = std::to_string(KIND);
+    const auto values = x.GetScalarValue();
+    if (values) {
+      address = (const uint8_t *)values->data();
+      size = sizeof(values->data());
+    }
+  }
+  template <Fortran::common::TypeCategory TC, int KIND>
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>> &x) {
+    if constexpr (TC == Fortran::common::TypeCategory::Integer)
+      typeTag = "i";
+    else if constexpr (TC == Fortran::common::TypeCategory::Real)
+      typeTag = "r";
+    else if constexpr (TC == Fortran::common::TypeCategory::Complex)
+      typeTag = "x";
+    else if constexpr (TC == Fortran::common::TypeCategory::Logical)
+      typeTag = "b";
+    else
+      llvm_unreachable("invalid type category");
+    kind = std::to_string(KIND);
+    const auto &values = x.values();
+    address = (const uint8_t *)values.data();
+    size = values.size() * sizeof(values[0]);
+  }
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::SomeDerived> &x) {
+    typeTag = "d";
+    // FIXME: Set "kind" to the (fully qualified) type name?
+    const auto &values = x.values();
+    address = (const uint8_t *)values.data();
+    size = values.size() * sizeof(values[0]);
+  }
+  std::string getName(Fortran::lower::FirOpBuilder &builder) {
+    auto name = fir::NameUniquer::doGenerated("ro."s + typeTag + kind + "."s);
+    if (!size)
+      return name + "null"s;
+    llvm::MD5 hashValue{};
+    hashValue.update(ArrayRef<uint8_t>{address, size});
+    llvm::MD5::MD5Result hashResult;
+    hashValue.final(hashResult);
+    llvm::SmallString<32> hashString;
+    llvm::MD5::stringifyResult(hashResult, hashString);
+    return name + hashString.c_str();
+  }
+
+private:
+  std::string typeTag{};
+  std::string kind{};
+  const uint8_t *address{nullptr};
+  size_t size{};
+};
 
 } // namespace Fortran::lower
 

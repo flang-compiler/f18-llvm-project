@@ -2568,18 +2568,41 @@ public:
 
   template <typename A>
   CC genarr(const Fortran::evaluate::Constant<A> &x) {
-    // TODO: Constants get expanded out as inline array values. We want to
-    // reconsider that an outline array constants in expressions.
     auto loc = getLoc();
-    LLVM_DEBUG(mlir::emitWarning(loc, "array constant should be outlined"));
-    auto exv = Fortran::lower::createSomeInitializerExpression(
-        loc, converter, toEvExpr(x), symMap, stmtCtx);
-    auto val = fir::getBase(exv);
-    auto *bldr = &converter.getFirOpBuilder();
-    mlir::Value mem = bldr->create<fir::AllocMemOp>(loc, val.getType());
-    stmtCtx.attachCleanup([=]() { bldr->create<fir::FreeMemOp>(loc, mem); });
-    bldr->create<fir::StoreOp>(loc, val, mem);
-    auto lambda = genarr(fir::substBase(exv, mem));
+    auto idxTy = builder.getIndexType();
+    auto arrTy = converter.genType(toEvExpr(x));
+    auto globalName = Fortran::lower::LiteralNameHelper{x}.getName(builder);
+    auto global = builder.getNamedGlobal(globalName);
+    if (!global) {
+      global = builder.createGlobalConstant(
+          loc, arrTy, globalName,
+          [&](Fortran::lower::FirOpBuilder &builder) {
+            Fortran::lower::StatementContext stmtCtx;
+            auto result = Fortran::lower::createSomeInitializerExpression(
+                loc, converter, toEvExpr(x), symMap, stmtCtx);
+            auto castTo =
+                builder.createConvert(loc, arrTy, fir::getBase(result));
+            builder.create<fir::HasValueOp>(loc, castTo);
+          },
+          builder.createInternalLinkage());
+    }
+    auto seqTy = global.getType().cast<fir::SequenceType>();
+    mlir::Value addr = builder.create<fir::AddrOfOp>(
+        loc, builder.getRefType(seqTy), global.getSymbol());
+    auto arrShape = seqTy.getShape();
+    auto shapeTy = fir::ShapeType::get(builder.getContext(), arrShape.size());
+    llvm::SmallVector<mlir::Value> exprShape;
+    for (auto s : seqTy.getShape())
+      exprShape.push_back(builder.createIntegerConstant(loc, idxTy, s));
+    auto shape = builder.create<fir::ShapeOp>(loc, shapeTy, exprShape);
+    mlir::Value slice;
+    mlir::Value arrLd = builder.create<fir::ArrayLoadOp>(
+        loc, arrTy, addr, shape, slice, llvm::None);
+    auto lambda = [=](IterSpace iters) -> ExtValue {
+      auto arrFetch = builder.create<fir::ArrayFetchOp>(loc, seqTy.getEleTy(),
+                                                        arrLd, iters.iterVec());
+      return arrayElementToExtendedValue(builder, loc, addr, arrFetch);
+    };
     return [=](IterSpace iters) { return lambda(iters); };
   }
 
