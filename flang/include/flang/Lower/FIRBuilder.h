@@ -17,6 +17,7 @@
 #define FORTRAN_LOWER_FIRBUILDER_H
 
 #include "flang/Common/reference.h"
+#include "flang/Evaluate/expression.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
 #include "flang/Optimizer/Support/KindMapping.h"
@@ -301,6 +302,57 @@ fir::ExtendedValue createStringLiteral(FirOpBuilder &, mlir::Location,
 /// Unique a compiler generated identifier. A short prefix should be provided
 /// to hint at the origin of the identifier.
 std::string uniqueCGIdent(llvm::StringRef prefix, llvm::StringRef name);
+
+/// Generate a unique name for a typed literal constant value.
+class LiteralNameHelper {
+public:
+  template <int KIND>
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::Type<
+          Fortran::common::TypeCategory::Character, KIND>> &x) {
+    typeTag = "c";
+    kind = std::to_string(KIND);
+    const auto values = x.GetScalarValue();
+    if (values) {
+      address = (const uint8_t *)values->data();
+      size = sizeof(values->data());
+    }
+  }
+  template <Fortran::common::TypeCategory TC, int KIND>
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>> &x) {
+    if constexpr (TC == Fortran::common::TypeCategory::Integer)
+      typeTag = "i";
+    else if constexpr (TC == Fortran::common::TypeCategory::Real)
+      typeTag = "r";
+    else if constexpr (TC == Fortran::common::TypeCategory::Complex)
+      typeTag = "z";
+    else if constexpr (TC == Fortran::common::TypeCategory::Logical)
+      typeTag = "l";
+    else
+      llvm_unreachable("invalid type category");
+    kind = std::to_string(KIND);
+    const auto &values = x.values();
+    address = (const uint8_t *)values.data();
+    size = values.size() * sizeof(values[0]);
+  }
+  explicit LiteralNameHelper(
+      const Fortran::evaluate::Constant<Fortran::evaluate::SomeDerived> &x) {
+    typeTag = "d";
+    // FIXME: Set "kind" to the (fully qualified) type name?
+    const auto &values = x.values();
+    address = (const uint8_t *)values.data();
+    size = values.size() * sizeof(values[0]);
+  }
+
+  std::string getName(Fortran::lower::FirOpBuilder &builder);
+
+private:
+  std::string typeTag{};
+  std::string kind{};
+  const uint8_t *address{nullptr};
+  size_t size{};
+};
 
 //===--------------------------------------------------------------------===//
 // Location helpers
