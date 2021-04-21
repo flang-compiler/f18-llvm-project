@@ -2016,8 +2016,6 @@ private:
         continue;
       }
       const Fortran::semantics::Symbol &sym = var.getSymbol();
-      if (sym.attrs().test(Fortran::semantics::Attr::PARAMETER))
-        continue; // Constants are processed as values; not as named objects.
       if (!sym.IsFuncResult() || !funit.primaryResult) {
         instantiateVar(var, storeMap);
       } else if (&sym == funit.primaryResult) {
