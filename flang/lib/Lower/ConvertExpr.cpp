@@ -2586,23 +2586,21 @@ public:
           },
           builder.createInternalLinkage());
     }
+    auto addr = builder.create<fir::AddrOfOp>(getLoc(), global.resultType(),
+                                              global.getSymbol());
     auto seqTy = global.getType().cast<fir::SequenceType>();
-    mlir::Value addr = builder.create<fir::AddrOfOp>(
-        loc, builder.getRefType(seqTy), global.getSymbol());
-    auto arrShape = seqTy.getShape();
-    auto shapeTy = fir::ShapeType::get(builder.getContext(), arrShape.size());
-    llvm::SmallVector<mlir::Value> exprShape;
-    for (auto s : seqTy.getShape())
-      exprShape.push_back(builder.createIntegerConstant(loc, idxTy, s));
-    auto shape = builder.create<fir::ShapeOp>(loc, shapeTy, exprShape);
-    mlir::Value slice;
-    mlir::Value arrLd = builder.create<fir::ArrayLoadOp>(
-        loc, arrTy, addr, shape, slice, llvm::None);
-    auto lambda = [=](IterSpace iters) -> ExtValue {
-      auto arrFetch = builder.create<fir::ArrayFetchOp>(loc, seqTy.getEleTy(),
-                                                        arrLd, iters.iterVec());
-      return arrayElementToExtendedValue(builder, loc, addr, arrFetch);
+    llvm::SmallVector<mlir::Value> extents;
+    for (auto extent : seqTy.getShape())
+      extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
+    auto getArrayBox = [&]() {
+      if constexpr (A::category == Fortran::common::TypeCategory::Character) {
+        auto len = builder.createIntegerConstant(loc, idxTy, x.LEN());
+        return fir::CharArrayBoxValue{addr, len, extents};
+      } else {
+        return fir::ArrayBoxValue{addr, extents};
+      }
     };
+    auto lambda = genarr(getArrayBox());
     return [=](IterSpace iters) { return lambda(iters); };
   }
 

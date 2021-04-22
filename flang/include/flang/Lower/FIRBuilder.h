@@ -312,11 +312,9 @@ public:
           Fortran::common::TypeCategory::Character, KIND>> &x) {
     typeTag = "c";
     kind = std::to_string(KIND);
-    const auto values = x.GetScalarValue();
-    if (values) {
-      address = (const uint8_t *)values->data();
-      size = sizeof(values->data());
-    }
+    const auto &values = x.values();
+    address = (const uint8_t *)values.data();
+    size = values.size() * sizeof(values[0]);
   }
   template <Fortran::common::TypeCategory TC, int KIND>
   explicit LiteralNameHelper(
