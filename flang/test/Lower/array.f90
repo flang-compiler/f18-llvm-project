@@ -89,7 +89,7 @@ subroutine range()
 end subroutine range
 
 ! a0 array constructor
-! CHECK: fir.global internal @_QQro.i4.{{.*}} constant : !fir.array<10xi32> {
+! CHECK: fir.global internal @_QQro.10xi4.{{.*}} constant : !fir.array<10xi32> {
   ! CHECK-DAG: %[[c1_i32:.*]] = constant 1 : i32
   ! CHECK-DAG: %[[c2_i32:.*]] = constant 2 : i32
   ! CHECK-DAG: %[[c3_i32:.*]] = constant 3 : i32
@@ -102,7 +102,7 @@ end subroutine range
   ! CHECK: %[[r3:.*]] = fir.insert_on_range %[[r2]], %[[c3_i32]], %[[c2]], %[[c9]] :
 
 ! a1 array constructor
-! CHECK: fir.global internal @_QQro.r4.{{.*}} constant : !fir.array<2x3xf32> {
+! CHECK: fir.global internal @_QQro.2x3xr4.{{.*}} constant : !fir.array<2x3xf32> {
   ! CHECK-DAG: %cst = constant {{.*}} : f32
   ! CHECK-DAG: %[[c0:.*]] = constant 0 : index
   ! CHECK-DAG: %[[c1:.*]] = constant 1 : index
@@ -110,7 +110,7 @@ end subroutine range
   ! CHECK: %{{.*}} = fir.insert_on_range %{{[0-9]+}}, %cst, %[[c0]], %[[c1]], %[[c0]], %[[c2]] :
 
 ! a2 array constructor
-! CHECK: fir.global internal @_QQro.i4.{{.*}} constant : !fir.array<3x4xi32> {
+! CHECK: fir.global internal @_QQro.3x4xi4.{{.*}} constant : !fir.array<3x4xi32> {
   ! CHECK-DAG: %[[c1_i32:.*]] = constant 1 : i32
   ! CHECK-DAG: %[[c3_i32:.*]] = constant 3 : i32
   ! CHECK-DAG: %[[c5_i32:.*]] = constant 5 : i32

@@ -494,16 +494,16 @@ std::string Fortran::lower::uniqueCGIdent(llvm::StringRef prefix,
 
 std::string Fortran::lower::LiteralNameHelper::getName(
     Fortran::lower::FirOpBuilder &builder) {
-  auto name = fir::NameUniquer::doGenerated("ro."s + typeTag + kind + "."s);
+  auto name = fir::NameUniquer::doGenerated("ro."s.append(typeId).append("."));
   if (!size)
-    return name + "null"s;
+    return name += "null";
   llvm::MD5 hashValue{};
   hashValue.update(ArrayRef<uint8_t>{address, size});
   llvm::MD5::MD5Result hashResult;
   hashValue.final(hashResult);
   llvm::SmallString<32> hashString;
   llvm::MD5::stringifyResult(hashResult, hashString);
-  return name + hashString.c_str();
+  return name += hashString.c_str();
 }
 
 mlir::Value

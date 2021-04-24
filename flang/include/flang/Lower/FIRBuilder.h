@@ -310,8 +310,7 @@ public:
   explicit LiteralNameHelper(
       const Fortran::evaluate::Constant<Fortran::evaluate::Type<
           Fortran::common::TypeCategory::Character, KIND>> &x) {
-    typeTag = "c";
-    kind = std::to_string(KIND);
+    setTypeId(x.shape(), "c", std::to_string(KIND), x.LEN());
     const auto &values = x.values();
     address = (const uint8_t *)values.data();
     size = values.size() * sizeof(values[0]);
@@ -320,24 +319,23 @@ public:
   explicit LiteralNameHelper(
       const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>> &x) {
     if constexpr (TC == Fortran::common::TypeCategory::Integer)
-      typeTag = "i";
+      setTypeId(x.shape(), "i", std::to_string(KIND));
     else if constexpr (TC == Fortran::common::TypeCategory::Real)
-      typeTag = "r";
+      setTypeId(x.shape(), "r", std::to_string(KIND));
     else if constexpr (TC == Fortran::common::TypeCategory::Complex)
-      typeTag = "z";
+      setTypeId(x.shape(), "z", std::to_string(KIND));
     else if constexpr (TC == Fortran::common::TypeCategory::Logical)
-      typeTag = "l";
+      setTypeId(x.shape(), "l", std::to_string(KIND));
     else
       llvm_unreachable("invalid type category");
-    kind = std::to_string(KIND);
     const auto &values = x.values();
     address = (const uint8_t *)values.data();
     size = values.size() * sizeof(values[0]);
   }
   explicit LiteralNameHelper(
       const Fortran::evaluate::Constant<Fortran::evaluate::SomeDerived> &x) {
-    typeTag = "d";
-    // FIXME: Set "kind" to the (fully qualified) type name?
+    // FIXME: Replace "DT" with the (fully qualified) type name.
+    setTypeId(x.shape(), "dt", ".DT");
     const auto &values = x.values();
     address = (const uint8_t *)values.data();
     size = values.size() * sizeof(values[0]);
@@ -346,10 +344,19 @@ public:
   std::string getName(Fortran::lower::FirOpBuilder &builder);
 
 private:
-  std::string typeTag{};
-  std::string kind{};
-  const uint8_t *address{nullptr};
-  size_t size{};
+  void setTypeId(const Fortran::evaluate::ConstantSubscripts &shape,
+                 const std::string &tag, const std::string &kind,
+                 Fortran::common::ConstantSubscript charLen = -1) {
+    for (auto extent : shape)
+      typeId.append(std::to_string(extent)).append("x");
+    if (charLen >= 0)
+      typeId.append(std::to_string(charLen)).append("x");
+    typeId.append(tag).append(kind);
+  }
+
+  std::string typeId{};
+  const uint8_t *address;
+  size_t size;
 };
 
 //===--------------------------------------------------------------------===//
