@@ -2682,16 +2682,13 @@ public:
     llvm::SmallVector<mlir::Value> extents;
     for (auto extent : seqTy.getShape())
       extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
-    CC lambda;
-    if (fir::isa_char(seqTy.getEleTy())) {
-      auto charTy = seqTy.getEleTy().cast<fir::CharacterType>();
+    if (auto charTy = seqTy.getEleTy().dyn_cast<fir::CharacterType>()) {
       auto len = builder.createIntegerConstant(loc, builder.getI64Type(),
                                                charTy.getLen());
-      lambda = genarr(fir::CharArrayBoxValue{addr, len, extents});
+      return genarr(fir::CharArrayBoxValue{addr, len, extents});
     } else {
-      lambda = genarr(fir::ArrayBoxValue{addr, extents});
+      return genarr(fir::ArrayBoxValue{addr, extents});
     }
-    return [=](IterSpace iters) { return lambda(iters); };
   }
 
   // A vector subscript expression may be wrapped with a cast to INTEGER*8.
