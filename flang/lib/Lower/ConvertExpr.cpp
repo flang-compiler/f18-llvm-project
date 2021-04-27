@@ -2686,9 +2686,8 @@ public:
       auto len = builder.createIntegerConstant(loc, builder.getI64Type(),
                                                charTy.getLen());
       return genarr(fir::CharArrayBoxValue{addr, len, extents});
-    } else {
-      return genarr(fir::ArrayBoxValue{addr, extents});
     }
+    return genarr(fir::ArrayBoxValue{addr, extents});
   }
 
   // A vector subscript expression may be wrapped with a cast to INTEGER*8.
