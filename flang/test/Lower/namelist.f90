@@ -8,33 +8,44 @@ program p
   namelist /nnn/ jjj, ccc
   jjj = 17
   ccc = ["aa ", "bb ", "cc ", "dd "]
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: [[nnn:%[0-9]+]] = fir.address_of(@_QNGnnn) : !fir.ref<tuple<!fir.ptr<i8>, i64, !fir.ptr<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>>>
-  ! CHECK: [[nnnlist:%[0-9]+]] = fir.address_of(@_QNGnnn.list) : !fir.ref<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>
+  ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListOutput
+  ! CHECK: fir.alloca !fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>
+  ! CHECK: fir.load
+  ! CHECK: fir.address_of
+  ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[jjj]]
-  ! CHECK: fir.coordinate_of [[nnnlist]]
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.address_of
+  ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[ccc]]
-  ! CHECK: fir.coordinate_of [[nnnlist]]
-  ! CHECK: fir.convert [[nnn]] : (!fir.ref<tuple<!fir.ptr<i8>, i64, !fir.ptr<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>>>) -> !fir.ref<tuple<>>
-  ! CHECK: fir.call @_FortranAioOutputNamelist
-  ! CHECK: fir.call @_FortranAioEndIoStatement
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.alloca tuple<!fir.ref<i8>, i64, !fir.ref<!fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>>>
+  ! CHECK: fir.address_of
+  ! CHECK-COUNT-3: fir.insert_value
+  ! CHECK: fir.call @_FortranAioOutputNamelist([[cookie]]
+  ! CHECK: fir.call @_FortranAioEndIoStatement([[cookie]]
   write(*, nnn)
   jjj = 27
+  ! CHECK: fir.coordinate_of
   ccc(4) = "zz "
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: [[nnn:%[0-9]+]] = fir.address_of(@_QNGnnn) : !fir.ref<tuple<!fir.ptr<i8>, i64, !fir.ptr<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>>>
-  ! CHECK: [[nnnlist:%[0-9]+]] = fir.address_of(@_QNGnnn.list) : !fir.ref<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>
+  ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListOutput
+  ! CHECK: fir.alloca !fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>
+  ! CHECK: fir.load
+  ! CHECK: fir.address_of
+  ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[jjj]]
-  ! CHECK: fir.coordinate_of [[nnnlist]]
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.address_of
+  ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[ccc]]
-  ! CHECK: fir.coordinate_of [[nnnlist]]
-  ! CHECK: fir.convert [[nnn]] : (!fir.ref<tuple<!fir.ptr<i8>, i64, !fir.ptr<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>>>) -> !fir.ref<tuple<>>
-  ! CHECK: fir.call @_FortranAioOutputNamelist
-  ! CHECK: fir.call @_FortranAioEndIoStatement
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.alloca tuple<!fir.ref<i8>, i64, !fir.ref<!fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>>>
+  ! CHECK: fir.address_of
+  ! CHECK-COUNT-3: fir.insert_value
+  ! CHECK: fir.call @_FortranAioOutputNamelist([[cookie]]
+  ! CHECK: fir.call @_FortranAioEndIoStatement([[cookie]]
   write(*, nnn)
 end
-  ! CHECK: fir.global linkonce @_QQcl.6E6E6E00 constant : !fir.char<1,4>
-  ! CHECK: fir.global linkonce @_QQcl.6A6A6A00 constant : !fir.char<1,4>
-  ! CHECK: fir.global linkonce @_QQcl.63636300 constant : !fir.char<1,4>
-  ! CHECK: fir.global linkonce @_QNGnnn.list : !fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>
-  ! CHECK: fir.global linkonce @_QNGnnn constant : tuple<!fir.ptr<i8>, i64, !fir.ptr<!fir.array<2xtuple<!fir.ptr<i8>, !fir.ptr<!fir.box<none>>>>>>
+  ! CHECK-DAG: fir.global linkonce @_QQcl.6A6A6A00 constant : !fir.char<1,4>
+  ! CHECK-DAG: fir.global linkonce @_QQcl.63636300 constant : !fir.char<1,4>
+  ! CHECK-DAG: fir.global linkonce @_QQcl.6E6E6E00 constant : !fir.char<1,4>

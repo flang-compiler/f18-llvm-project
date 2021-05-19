@@ -196,10 +196,8 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
   builder.setInsertionPointToStart(&ifOp.thenRegion().front());
 }
 
-/// Retrieve or generate (the constant parts of) information for NAMELIST
-/// group `symbol`.  Group object descriptor addresses are inserted at
-/// runtime.  The data structure containing the information is defined in
-/// runtime header file namelist.h as:
+/// Generate a namelist I/O call.  The data structure containing the namelist
+/// group information is defined in runtime header file namelist.h as:
 ///
 ///     class NamelistGroup {
 ///     public:
@@ -211,82 +209,6 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
 ///       std::size_t items;
 ///       const Item *item; // in original declaration order
 ///     };
-///
-/// Return the Item array and the NamelistGroup data structure.
-static std::pair<fir::GlobalOp, fir::GlobalOp>
-getNamelistGroup(Fortran::lower::AbstractConverter &converter,
-                 const Fortran::semantics::Symbol &symbol) {
-  auto &builder = converter.getFirOpBuilder();
-  auto mangledGroupName = converter.mangleName(symbol);
-  auto listName = mangledGroupName + ".list";
-  if (auto group = builder.getNamedGlobal(mangledGroupName)) {
-    auto list = builder.getNamedGlobal(listName);
-    assert(list && "missing namelist group list");
-    return {list, group};
-  }
-  const auto &details = symbol.get<Fortran::semantics::NamelistDetails>();
-  auto loc = converter.getCurrentLocation();
-  auto *context = builder.getContext();
-  auto linkOnce = builder.createLinkOnceLinkage();
-  auto idxTy = builder.getIndexType();
-  auto sizeTy = builder.getIntegerType(8 * sizeof(std::size_t));
-  auto charPtrTy = fir::PointerType::get(builder.getIntegerType(8));
-  auto descPtrTy =
-      fir::PointerType::get(fir::BoxType::get(mlir::NoneType::get(context)));
-  auto listTy = fir::SequenceType::get(
-      details.objects().size(),
-      mlir::TupleType::get(context, {charPtrTy, descPtrTy}));
-  auto groupTy = mlir::TupleType::get(
-      context, {charPtrTy, sizeTy, fir::PointerType::get(listTy)});
-  auto stringAddress = [&](const Fortran::semantics::Symbol &symbol,
-                           bool wantResult = false) {
-    auto global =
-        createStringLiteral(builder, loc, symbol.name().ToString() + '\0');
-    return wantResult
-               ? builder.createConvert(loc, charPtrTy, fir::getBase(global))
-               : mlir::Value{};
-  };
-  stringAddress(symbol);
-  for (const Fortran::semantics::Symbol &s : details.objects())
-    stringAddress(s);
-  size_t n;
-  auto nextIdx = [&]() {
-    return builder.createIntegerConstant(loc, idxTy, n++);
-  };
-  auto listFunc = [&](Fortran::lower::FirOpBuilder &builder) {
-    mlir::Value list = builder.create<fir::UndefOp>(loc, listTy);
-    auto zero = builder.createIntegerConstant(loc, idxTy, 0);
-    n = 0;
-    for (const Fortran::semantics::Symbol &s : details.objects()) {
-      llvm::SmallVector<mlir::Value, 2> idx = {nextIdx(), zero};
-      auto name = stringAddress(s, true);
-      list = builder.create<fir::InsertValueOp>(loc, listTy, list, name, idx);
-    }
-    builder.create<fir::HasValueOp>(loc, list);
-  };
-  auto list =
-      builder.createGlobal(loc, listTy, listName, false, listFunc, linkOnce);
-  auto groupFunc = [&](Fortran::lower::FirOpBuilder &builder) {
-    mlir::Value group = builder.create<fir::UndefOp>(loc, groupTy);
-    n = 0;
-    auto groupName = stringAddress(symbol, true);
-    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, groupName,
-                                               nextIdx());
-    auto itemCount =
-        builder.createIntegerConstant(loc, sizeTy, details.objects().size());
-    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, itemCount,
-                                               nextIdx());
-    auto listAddr =
-        builder.create<fir::AddrOfOp>(loc, list.resultType(), list.getSymbol());
-    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, listAddr,
-                                               nextIdx());
-    builder.create<fir::HasValueOp>(loc, group);
-  };
-  auto group = builder.createGlobalConstant(loc, groupTy, mangledGroupName,
-                                            groupFunc, linkOnce);
-  return {list, group};
-}
-
 static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
                           mlir::Value cookie, mlir::FuncOp funcOp,
                           Fortran::semantics::Symbol &symbol, bool checkResult,
@@ -297,22 +219,32 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
   auto loc = converter.getCurrentLocation();
   auto *context = builder.getContext();
   auto idxTy = builder.getIndexType();
-  auto int32Ty = builder.getIntegerType(32);
-  auto descPtrTy =
-      fir::PointerType::get(fir::BoxType::get(mlir::NoneType::get(context)));
-  auto descPtrRefTy = fir::ReferenceType::get(descPtrTy);
+  auto sizeTy = builder.getIntegerType(8 * sizeof(std::size_t));
+  auto charRefTy = fir::ReferenceType::get(builder.getIntegerType(8));
+  auto descRefTy =
+      fir::ReferenceType::get(fir::BoxType::get(mlir::NoneType::get(context)));
+  auto listTy = fir::SequenceType::get(
+      details.objects().size(),
+      mlir::TupleType::get(context, {charRefTy, descRefTy}));
+  auto groupTy = mlir::TupleType::get(
+      context, {charRefTy, sizeTy, fir::ReferenceType::get(listTy)});
+  auto stringAddress = [&](const Fortran::semantics::Symbol &symbol) {
+    auto global =
+        createStringLiteral(builder, loc, symbol.name().ToString() + '\0');
+    return builder.createConvert(loc, charRefTy, fir::getBase(global));
+  };
   makeNextConditionalOn(builder, loc, checkResult, ok);
-  auto [namelistList, namelistGroup] = getNamelistGroup(converter, symbol);
-  mlir::Value groupAddr = builder.create<fir::AddrOfOp>(
-      loc, namelistGroup.resultType(), namelistGroup.getSymbol());
-  mlir::Value list = builder.create<fir::AddrOfOp>(
-      loc, namelistList.resultType(), namelistList.getSymbol());
-  auto one = builder.createIntegerConstant(loc, int32Ty, 1);
+  auto zero = builder.createIntegerConstant(loc, idxTy, 0);
+  auto one = builder.createIntegerConstant(loc, idxTy, 1);
+  auto two = builder.createIntegerConstant(loc, idxTy, 2);
+  auto listAddr = builder.create<fir::AllocaOp>(loc, listTy);
+  mlir::Value list = builder.create<fir::LoadOp>(loc, listAddr);
   int n = 0;
   for (const Fortran::semantics::Symbol &s : details.objects()) {
-    auto nextIdx = builder.createIntegerConstant(loc, idxTy, n++);
-    llvm::SmallVector<mlir::Value, 2> idx = {nextIdx, one};
-    // const std::optional<Fortran::evaluate::Expr<Fortran::evaluate::SomeType>>
+    llvm::SmallVector<mlir::Value, 2> idx = {
+        builder.createIntegerConstant(loc, idxTy, n++), zero};
+    list = builder.create<fir::InsertValueOp>(loc, list.getType(), list,
+                                              stringAddress(s), idx);
     const auto expr =
         Fortran::evaluate::TypedWrapper<Fortran::evaluate::Designator,
                                         Fortran::evaluate::DataRef>(
@@ -322,15 +254,26 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
     auto box = builder.createBox(loc, exv);
     auto boxTemp = builder.createTemporary(loc, box.getType());
     builder.create<fir::StoreOp>(loc, box, boxTemp);
-    auto genericBox = builder.createConvert(loc, descPtrTy, boxTemp);
-    auto slot = builder.create<fir::CoordinateOp>(loc, descPtrRefTy, list, idx);
-    builder.create<fir::StoreOp>(loc, genericBox, slot);
-    builder.create<fir::InsertValueOp>(loc, list.getType(), list, genericBox,
-                                       idx);
+    auto genericBox = builder.createConvert(loc, descRefTy, boxTemp);
+    idx[1] = one;
+    list = builder.create<fir::InsertValueOp>(loc, list.getType(), list,
+                                              genericBox, idx);
   }
+  builder.create<fir::StoreOp>(loc, list, listAddr);
+  auto groupAddr = builder.create<fir::AllocaOp>(loc, groupTy);
+  mlir::Value group = builder.create<fir::LoadOp>(loc, groupAddr);
+  group = builder.create<fir::InsertValueOp>(loc, group.getType(), group,
+                                             stringAddress(symbol), zero);
+  auto itemCount =
+      builder.createIntegerConstant(loc, sizeTy, details.objects().size());
+  group = builder.create<fir::InsertValueOp>(loc, group.getType(), group,
+                                             itemCount, one);
+  group =
+      builder.create<fir::InsertValueOp>(loc, groupTy, group, listAddr, two);
+  builder.create<fir::StoreOp>(loc, group, groupAddr);
   auto argType = funcOp.getType().getInput(1);
-  groupAddr = builder.createConvert(loc, argType, groupAddr);
-  llvm::SmallVector<mlir::Value> args = {cookie, groupAddr};
+  auto genericGroupAddr = builder.createConvert(loc, argType, groupAddr);
+  llvm::SmallVector<mlir::Value> args = {cookie, genericGroupAddr};
   ok = builder.create<fir::CallOp>(loc, funcOp, args).getResult(0);
 }
 
@@ -1659,20 +1602,22 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   // Generate data transfer list calls.
   if constexpr (isInput) { // ReadStmt
     if (isNml)
-      genNamelistIO(converter, cookie,
-                    getIORuntimeFunc<mkIOKey(InputNamelist)>(loc, builder),
-                    *getIOControl<Fortran::parser::Name>(stmt)->symbol,
-                    csi.hasTransferConditionSpec(), ok, stmtCtx);
+      genNamelistIO(
+          converter, cookie,
+          getIORuntimeFunc<mkIOKey(InputNamelist)>(loc, builder),
+          getIOControl<Fortran::parser::Name>(stmt)->symbol->GetUltimate(),
+          csi.hasTransferConditionSpec(), ok, stmtCtx);
     else
       genInputItemList(converter, cookie, stmt.items, isFormatted,
                        csi.hasTransferConditionSpec(), ok, /*inLoop=*/false,
                        stmtCtx);
   } else if constexpr (std::is_same_v<A, Fortran::parser::WriteStmt>) {
     if (isNml)
-      genNamelistIO(converter, cookie,
-                    getIORuntimeFunc<mkIOKey(OutputNamelist)>(loc, builder),
-                    *getIOControl<Fortran::parser::Name>(stmt)->symbol,
-                    csi.hasTransferConditionSpec(), ok, stmtCtx);
+      genNamelistIO(
+          converter, cookie,
+          getIORuntimeFunc<mkIOKey(OutputNamelist)>(loc, builder),
+          getIOControl<Fortran::parser::Name>(stmt)->symbol->GetUltimate(),
+          csi.hasTransferConditionSpec(), ok, stmtCtx);
     else
       genOutputItemList(converter, cookie, stmt.items, isFormatted,
                         csi.hasTransferConditionSpec(), ok,
