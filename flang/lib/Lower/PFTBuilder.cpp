@@ -1313,6 +1313,13 @@ struct SymbolDependenceDepth {
       return 0;
     }
     auto ultimate = sym.GetUltimate();
+    if (const auto *details =
+            ultimate.detailsIf<semantics::NamelistDetails>()) {
+      // handle namelist group symbols
+      for (const auto &s : details->objects())
+        analyze(s);
+      return 0;
+    }
     if (!ultimate.has<semantics::ObjectEntityDetails>() &&
         !ultimate.has<semantics::ProcEntityDetails>())
       return 0;

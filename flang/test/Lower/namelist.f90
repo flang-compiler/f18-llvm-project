@@ -10,7 +10,7 @@ program p
   ccc = ["aa ", "bb ", "cc ", "dd "]
   ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListOutput
   ! CHECK: fir.alloca !fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>
-  ! CHECK: fir.load
+  ! CHECK: fir.undefined
   ! CHECK: fir.address_of
   ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[jjj]]
@@ -30,7 +30,7 @@ program p
   ccc(4) = "zz "
   ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListOutput
   ! CHECK: fir.alloca !fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>
-  ! CHECK: fir.load
+  ! CHECK: fir.undefined
   ! CHECK: fir.address_of
   ! CHECK: fir.insert_value
   ! CHECK: fir.embox [[jjj]]

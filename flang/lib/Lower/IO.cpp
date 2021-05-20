@@ -214,7 +214,8 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
                           Fortran::semantics::Symbol &symbol, bool checkResult,
                           mlir::Value &ok,
                           Fortran::lower::StatementContext &stmtCtx) {
-  const auto &details = symbol.get<Fortran::semantics::NamelistDetails>();
+  const auto &details =
+      symbol.GetUltimate().get<Fortran::semantics::NamelistDetails>();
   auto &builder = converter.getFirOpBuilder();
   auto loc = converter.getCurrentLocation();
   auto *context = builder.getContext();
@@ -238,7 +239,7 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
   auto one = builder.createIntegerConstant(loc, idxTy, 1);
   auto two = builder.createIntegerConstant(loc, idxTy, 2);
   auto listAddr = builder.create<fir::AllocaOp>(loc, listTy);
-  mlir::Value list = builder.create<fir::LoadOp>(loc, listAddr);
+  mlir::Value list = builder.create<fir::UndefOp>(loc, listTy);
   int n = 0;
   for (const Fortran::semantics::Symbol &s : details.objects()) {
     llvm::SmallVector<mlir::Value, 2> idx = {
@@ -261,7 +262,7 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
   }
   builder.create<fir::StoreOp>(loc, list, listAddr);
   auto groupAddr = builder.create<fir::AllocaOp>(loc, groupTy);
-  mlir::Value group = builder.create<fir::LoadOp>(loc, groupAddr);
+  mlir::Value group = builder.create<fir::UndefOp>(loc, groupTy);
   group = builder.create<fir::InsertValueOp>(loc, group.getType(), group,
                                              stringAddress(symbol), zero);
   auto itemCount =
@@ -1605,7 +1606,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
       genNamelistIO(
           converter, cookie,
           getIORuntimeFunc<mkIOKey(InputNamelist)>(loc, builder),
-          getIOControl<Fortran::parser::Name>(stmt)->symbol->GetUltimate(),
+          *getIOControl<Fortran::parser::Name>(stmt)->symbol,
           csi.hasTransferConditionSpec(), ok, stmtCtx);
     else
       genInputItemList(converter, cookie, stmt.items, isFormatted,
@@ -1616,7 +1617,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
       genNamelistIO(
           converter, cookie,
           getIORuntimeFunc<mkIOKey(OutputNamelist)>(loc, builder),
-          getIOControl<Fortran::parser::Name>(stmt)->symbol->GetUltimate(),
+          *getIOControl<Fortran::parser::Name>(stmt)->symbol,
           csi.hasTransferConditionSpec(), ok, stmtCtx);
     else
       genOutputItemList(converter, cookie, stmt.items, isFormatted,
