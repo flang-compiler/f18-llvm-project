@@ -335,14 +335,6 @@ static void instantiateGlobal(Fortran::lower::AbstractConverter &converter,
                                               global.getSymbol());
   Fortran::lower::StatementContext stmtCtx;
   mapSymbolAttributes(converter, var, symMap, stmtCtx, addrOf);
-  if (sym.test(Fortran::semantics::Symbol::Flag::InNamelist)) {
-    const auto &ultimate = sym.GetUltimate();
-    if (ultimate != sym) {
-      // Also map the value to a module instance of the symbol.
-      Fortran::lower::pft::Variable alias{ultimate, true};
-      mapSymbolAttributes(converter, alias, symMap, stmtCtx, addrOf);
-    }
-  }
 }
 
 //===----------------------------------------------------------------===//
