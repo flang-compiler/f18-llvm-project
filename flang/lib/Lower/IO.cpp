@@ -265,7 +265,7 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
           Fortran::lower::genInitialDataTarget(converter, loc, boxTy, *expr);
       b.create<fir::HasValueOp>(loc, box);
     };
-    builder.createGlobal(loc, boxTy, mangleName, true, descFunc, linkOnce);
+    builder.createGlobalConstant(loc, boxTy, mangleName, descFunc, linkOnce);
   }
 
   // Define the list of Items.
@@ -315,7 +315,8 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
   if (groupIsLocal)
     listFunc(builder);
   else
-    builder.createGlobal(loc, listTy, listMangleName, true, listFunc, linkOnce);
+    builder.createGlobalConstant(loc, listTy, listMangleName, listFunc,
+                                 linkOnce);
 
   // Define the group.
   mlir::Value groupAddr = groupIsLocal
