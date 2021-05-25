@@ -198,19 +198,7 @@ static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
 }
 
 /// Retrieve or generate a runtime description of NAMELIST group `symbol`.
-/// The form of the description is defined in runtime header file namelist.h:
-///
-///     class NamelistGroup {
-///     public:
-///       struct Item {
-///         const char *name; // NUL-terminated lower-case
-///         const Descriptor &descriptor;
-///       };
-///       const char *groupName; // NUL-terminated lower-case
-///       std::size_t items;
-///       const Item *item; // in original declaration order
-///     };
-///
+/// The form of the description is defined in runtime header file namelist.h.
 /// Static descriptors are generated for global objects; local descriptors for
 /// local objects.  If all descriptors are static, the NamelistGroup is static.
 static mlir::Value

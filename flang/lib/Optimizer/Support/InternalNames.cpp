@@ -210,7 +210,7 @@ fir::NameUniquer::doNamelistGroup(llvm::ArrayRef<llvm::StringRef> modules,
                                   llvm::Optional<llvm::StringRef> host,
                                   llvm::StringRef name) {
   std::string result = prefix();
-  result.append(doModulesHost(modules, host)).append("NG");
+  result.append(doModulesHost(modules, host)).append("G");
   return result.append(toLower(name));
 }
 
