@@ -1995,7 +1995,7 @@ private:
     if (unstructuredContext) {
       // When transitioning from unstructured to structured code,
       // the structured code could be a target that starts a new block.
-      maybeStartBlock(eval.isConstruct() && eval.lowerAsStructured()
+      maybeStartBlock(eval.hasNestedEvaluations() && eval.lowerAsStructured()
                           ? eval.getFirstNestedEvaluation().block
                           : eval.block);
     }
