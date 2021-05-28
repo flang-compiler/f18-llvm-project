@@ -403,8 +403,8 @@ struct IntrinsicLibrary {
   mlir::Value genCeiling(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genChar(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   template <mlir::CmpIPredicate pred>
-  fir::ExtendedValue genCharCompare(mlir::Type,
-                                    llvm::ArrayRef<fir::ExtendedValue>);
+  fir::ExtendedValue genCharacterCompare(mlir::Type,
+                                         llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genConjg(mlir::Type, llvm::ArrayRef<mlir::Value>);
   void genDateAndTime(llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genDim(mlir::Type, llvm::ArrayRef<mlir::Value>);
@@ -587,10 +587,10 @@ static constexpr IntrinsicHandler handlers[]{
     {"ior", &I::genIOr},
     {"len", &I::genLen},
     {"len_trim", &I::genLenTrim},
-    {"lge", &I::genCharCompare<mlir::CmpIPredicate::sge>},
-    {"lgt", &I::genCharCompare<mlir::CmpIPredicate::sgt>},
-    {"lle", &I::genCharCompare<mlir::CmpIPredicate::sle>},
-    {"llt", &I::genCharCompare<mlir::CmpIPredicate::slt>},
+    {"lge", &I::genCharacterCompare<mlir::CmpIPredicate::sge>},
+    {"lgt", &I::genCharacterCompare<mlir::CmpIPredicate::sgt>},
+    {"lle", &I::genCharacterCompare<mlir::CmpIPredicate::sle>},
+    {"llt", &I::genCharacterCompare<mlir::CmpIPredicate::slt>},
     {"max", &I::genExtremum<Extremum::Max, ExtremumBehavior::MinMaxss>},
     {"maxloc",
      &I::genMaxloc,
@@ -654,19 +654,13 @@ static constexpr IntrinsicHandler handlers[]{
 };
 
 static const IntrinsicHandler *findIntrinsicHandler(llvm::StringRef name) {
-  int lb = 0;
-  int ub = sizeof(handlers) / sizeof(IntrinsicHandler) - 1;
-  do {
-    int k = (lb + ub) / 2;
-    auto cmp = name.compare(handlers[k].name);
-    if (cmp > 0)
-      lb = k + 1;
-    else if (cmp < 0)
-      ub = k - 1;
-    else
-      return handlers + k;
-  } while (lb <= ub);
-  return nullptr;
+  auto compare = [](const IntrinsicHandler &handler, llvm::StringRef name) {
+    return name.compare(handler.name) > 0;
+  };
+  auto result =
+      std::lower_bound(std::begin(handlers), std::end(handlers), name, compare);
+  return result != std::end(handlers) && result->name == name ? result
+                                                              : nullptr;
 }
 
 /// To make fir output more readable for debug, one can outline all intrinsic
@@ -1195,7 +1189,7 @@ fir::ExtendedValue
 IntrinsicLibrary::genIntrinsicCall(llvm::StringRef name,
                                    llvm::Optional<mlir::Type> resultType,
                                    llvm::ArrayRef<fir::ExtendedValue> args) {
-  if (auto *handler = findIntrinsicHandler(name)) {
+  if (const auto &handler = findIntrinsicHandler(name)) {
     bool outline = handler->outline || outlineAllIntrinsics;
     return std::visit(
         [&](auto &generator) -> fir::ExtendedValue {
@@ -1417,7 +1411,7 @@ mlir::SymbolRefAttr IntrinsicLibrary::getUnrestrictedIntrinsicSymbolRefAttr(
   // this before calling the code generators.
   bool loadRefArguments = true;
   mlir::FuncOp funcOp;
-  if (auto *handler = findIntrinsicHandler(name))
+  if (const auto &handler = findIntrinsicHandler(name))
     funcOp = std::visit(
         [&](auto generator) {
           return getWrapper(generator, name, signature, loadRefArguments);
@@ -1681,10 +1675,10 @@ IntrinsicLibrary::genChar(mlir::Type type,
 /// LGE, LGT, LLE, LLT
 template <mlir::CmpIPredicate pred>
 fir::ExtendedValue
-IntrinsicLibrary::genCharCompare(mlir::Type type,
-                                 llvm::ArrayRef<fir::ExtendedValue> args) {
+IntrinsicLibrary::genCharacterCompare(mlir::Type type,
+                                      llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 2);
-  return Fortran::lower::genRawCharCompare(
+  return Fortran::lower::genCharCompare(
       builder, loc, pred, fir::getBase(args[0]), fir::getLen(args[0]),
       fir::getBase(args[1]), fir::getLen(args[1]));
 }
@@ -2367,7 +2361,7 @@ mlir::Value IntrinsicLibrary::genExtremum(mlir::Type,
 
 const Fortran::lower::IntrinsicArgumentLoweringRules *
 Fortran::lower::getIntrinsicArgumentLowering(llvm::StringRef intrinsicName) {
-  if (auto *handler = findIntrinsicHandler(intrinsicName))
+  if (const auto &handler = findIntrinsicHandler(intrinsicName))
     if (!handler->argLoweringRules.hasDefaultRules())
       return &handler->argLoweringRules;
   return nullptr;
