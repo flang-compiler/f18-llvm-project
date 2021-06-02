@@ -46,6 +46,28 @@ program p
   ! CHECK: fir.call @_FortranAioEndIoStatement([[cookie]]
   write(*, nnn)
 end
+
+! CHECK-LABEL: sss
+subroutine sss
+  integer xxx(11:13)
+  namelist /rrr/ xxx
+  ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListInput
+  ! CHECK: alloca
+  ! CHECK: undefined
+  ! CHECK: fir.address_of
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.shape_shift
+  ! CHECK: fir.embox
+  ! CHECK: fir.insert_value
+  ! CHECK: fir.alloca
+  ! CHECK: fir.undefined
+  ! CHECK: fir.address_of
+  ! CHECK-COUNT-3: fir.insert_value
+  ! CHECK: fir.call @_FortranAioInputNamelist([[cookie]]
+  ! CHECK: fir.call @_FortranAioEndIoStatement([[cookie]]
+  read(*, rrr)
+end
+
   ! CHECK-DAG: fir.global linkonce @_QQcl.6A6A6A00 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.63636300 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.6E6E6E00 constant : !fir.char<1,4>
