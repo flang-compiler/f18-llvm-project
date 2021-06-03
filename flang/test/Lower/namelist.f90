@@ -51,17 +51,18 @@ end
 subroutine sss
   integer xxx(11:13)
   namelist /rrr/ xxx
+  ! CHECK: [[xxx:%[0-9]+]] = fir.alloca {{.*}} = "xxx"
   ! CHECK: [[cookie:%[0-9]+]] = fir.call @_FortranAioBeginExternalListInput
   ! CHECK: alloca
   ! CHECK: undefined
-  ! CHECK: fir.address_of
+  ! CHECK: fir.address_of{{.*}}787878
   ! CHECK: fir.insert_value
-  ! CHECK: fir.shape_shift
-  ! CHECK: fir.embox
+  ! CHECK: fir.shape_shift %c11
+  ! CHECK: fir.embox [[xxx]]
   ! CHECK: fir.insert_value
   ! CHECK: fir.alloca
   ! CHECK: fir.undefined
-  ! CHECK: fir.address_of
+  ! CHECK: fir.address_of{{.*}}727272
   ! CHECK-COUNT-3: fir.insert_value
   ! CHECK: fir.call @_FortranAioInputNamelist([[cookie]]
   ! CHECK: fir.call @_FortranAioEndIoStatement([[cookie]]
