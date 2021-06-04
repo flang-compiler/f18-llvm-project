@@ -88,7 +88,7 @@ end subroutine loop_test
 ! CHECK-LABEL: print_nothing
 subroutine print_nothing(k1, k2)
   if (k1 > 0) then
-    ! CHECK: br [[header:\^bb2]]
+    ! CHECK: br [[header:\^bb[0-9]+]]
     ! CHECK: [[header]]
     do while (k1 > k2)
       print*, k1, k2 ! no output
