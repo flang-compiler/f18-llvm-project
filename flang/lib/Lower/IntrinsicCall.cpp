@@ -102,10 +102,13 @@ fir::ExtendedValue Fortran::lower::getAbsentIntrinsicArgument() {
   return fir::UnboxedValue{};
 }
 
-/// Helper to test if an intrinsic argument is absent.
+/// Test if an ExtendedValue is absent.
 static bool isAbsent(const fir::ExtendedValue &exv) {
   return !fir::getBase(exv);
 }
+
+/// Test if an ExtendedValue is present.
+static bool isPresent(const fir::ExtendedValue &exv) { return !isAbsent(exv); }
 
 /// Process calls to Maxval, Minval, Product, Sum intrinsic functions that
 /// take a DIM argument.
@@ -439,6 +442,9 @@ struct IntrinsicLibrary {
   mlir::Value genNint(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genPresent(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genProduct(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
+  void genRandomInit(llvm::ArrayRef<fir::ExtendedValue>);
+  void genRandomNumber(llvm::ArrayRef<fir::ExtendedValue>);
+  void genRandomSeed(llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genRepeat(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genRRSpacing(mlir::Type resultType,
                            llvm::ArrayRef<mlir::Value> args);
@@ -645,6 +651,18 @@ static constexpr IntrinsicHandler handlers[]{
     {"product",
      &I::genProduct,
      {{{"array", asAddr}, {"dim", asValue}, {"mask", asAddr}}},
+     /*isElemental=*/false},
+    {"random_init",
+     &I::genRandomInit,
+     {{{"repeatable", asValue}, {"image_distinct", asValue}}},
+     /*isElemental=*/false},
+    {"random_number",
+     &I::genRandomNumber,
+     {{{"harvest", asAddr}}},
+     /*isElemental=*/false},
+    {"random_seed",
+     &I::genRandomSeed,
+     {{{"size", asAddr}, {"put", asValue}, {"get", asAddr}}},
      /*isElemental=*/false},
     {"repeat",
      &I::genRepeat,
@@ -2084,6 +2102,36 @@ IntrinsicLibrary::genProduct(mlir::Type resultType,
   return genProdOrSum(Fortran::lower::genProduct, Fortran::lower::genProductDim,
                       resultType, builder, loc, stmtCtx,
                       "unexpected result for Product", args);
+}
+
+// RANDOM_INIT
+void IntrinsicLibrary::genRandomInit(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 2);
+  Fortran::lower::genRandomInit(builder, loc, *args[0].getUnboxed(),
+                                *args[1].getUnboxed());
+}
+
+// RANDOM_NUMBER
+void IntrinsicLibrary::genRandomNumber(
+    llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 1);
+  auto harvest = builder.createBox(loc, args[0]);
+  Fortran::lower::genRandomNumber(builder, loc, harvest);
+}
+
+// RANDOM_SEED
+void IntrinsicLibrary::genRandomSeed(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 3);
+  for (int i = 0; i < 3; ++i)
+    if (isPresent(args[i])) {
+      Fortran::lower::genRandomSeed(builder, loc, i,
+                                    builder.createBox(loc, args[i]));
+      for (++i; i < 3; ++i)
+        if (isPresent(args[i]))
+          fir::emitFatalError(loc, "multiple RANDOM_SEED intrinsic arguments");
+      return;
+    }
+  Fortran::lower::genRandomSeed(builder, loc, -1, mlir::Value{});
 }
 
 // REPEAT
