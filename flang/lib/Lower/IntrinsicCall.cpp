@@ -545,9 +545,10 @@ struct IntrinsicHandler {
   bool outline = false;
 };
 
-constexpr auto asInquired = Fortran::lower::LowerIntrinsicArgAs::Inquired;
-constexpr auto asAddr = Fortran::lower::LowerIntrinsicArgAs::Addr;
 constexpr auto asValue = Fortran::lower::LowerIntrinsicArgAs::Value;
+constexpr auto asAddr = Fortran::lower::LowerIntrinsicArgAs::Addr;
+constexpr auto asBox = Fortran::lower::LowerIntrinsicArgAs::Box;
+constexpr auto asInquired = Fortran::lower::LowerIntrinsicArgAs::Inquired;
 using I = IntrinsicLibrary;
 
 /// Table that drives the fir generation depending on the intrinsic.
@@ -658,11 +659,11 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"random_number",
      &I::genRandomNumber,
-     {{{"harvest", asAddr}}},
+     {{{"harvest", asBox}}},
      /*isElemental=*/false},
     {"random_seed",
      &I::genRandomSeed,
-     {{{"size", asAddr}, {"put", asValue}, {"get", asAddr}}},
+     {{{"size", asBox}, {"put", asBox}, {"get", asBox}}},
      /*isElemental=*/false},
     {"repeat",
      &I::genRepeat,
@@ -2115,8 +2116,7 @@ void IntrinsicLibrary::genRandomInit(llvm::ArrayRef<fir::ExtendedValue> args) {
 void IntrinsicLibrary::genRandomNumber(
     llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 1);
-  auto harvest = builder.createBox(loc, args[0]);
-  Fortran::lower::genRandomNumber(builder, loc, harvest);
+  Fortran::lower::genRandomNumber(builder, loc, *args[0].getUnboxed());
 }
 
 // RANDOM_SEED
@@ -2124,11 +2124,7 @@ void IntrinsicLibrary::genRandomSeed(llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 3);
   for (int i = 0; i < 3; ++i)
     if (isPresent(args[i])) {
-      Fortran::lower::genRandomSeed(builder, loc, i,
-                                    builder.createBox(loc, args[i]));
-      for (++i; i < 3; ++i)
-        if (isPresent(args[i]))
-          fir::emitFatalError(loc, "multiple RANDOM_SEED intrinsic arguments");
+      Fortran::lower::genRandomSeed(builder, loc, i, *args[i].getUnboxed());
       return;
     }
   Fortran::lower::genRandomSeed(builder, loc, -1, mlir::Value{});

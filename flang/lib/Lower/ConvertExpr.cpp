@@ -1582,6 +1582,9 @@ public:
       case Fortran::lower::LowerIntrinsicArgAs::Addr:
         operands.emplace_back(gen(*expr));
         continue;
+      case Fortran::lower::LowerIntrinsicArgAs::Box:
+        operands.emplace_back(builder.createBox(getLoc(), genBoxArg(*expr)));
+        continue;
       case Fortran::lower::LowerIntrinsicArgAs::Inquired:
         operands.emplace_back(lowerIntrinsicArgumentAsInquired(*expr));
         continue;
@@ -2763,6 +2766,11 @@ public:
         } break;
         case Fortran::lower::LowerIntrinsicArgAs::Addr: {
           // Note: assume does not have Fortran VALUE attribute semantics.
+          PushSemantics(ConstituentSemantics::RefOpaque);
+          auto lambda = genarr(*expr);
+          operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
+        } break;
+        case Fortran::lower::LowerIntrinsicArgAs::Box: {
           PushSemantics(ConstituentSemantics::RefOpaque);
           auto lambda = genarr(*expr);
           operands.emplace_back([=](IterSpace iters) { return lambda(iters); });

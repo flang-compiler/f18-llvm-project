@@ -785,44 +785,40 @@ end
 
 ! CHECK-LABEL: func @_QPrandom_test
 subroutine random_test
+  ! CHECK-DAG: [[ss:%[0-9]+]] = fir.alloca {{.*}}random_testEss
+  ! CHECK-DAG: [[vv:%[0-9]+]] = fir.alloca {{.*}}random_testEvv
   integer ss, vv(40)
+  ! CHECK-DAG: [[rr:%[0-9]+]] = fir.alloca {{.*}}random_testErr
+  ! CHECK-DAG: [[aa:%[0-9]+]] = fir.alloca {{.*}}random_testEaa
   real rr, aa(5)
   ! CHECK: fir.call @_FortranARandomInit(%true{{.*}}, %false{{.*}}) : (i1, i1) -> none
   call random_init(.true., .false.)
-  ! CHECK: fir.call @_FortranARandomSeedSize(%{{[0-9]+}}, %{{[0-9]+}}, %c{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
+  ! CHECK: [[box:%[0-9]+]] = fir.embox [[ss]]
+  ! CHECK: [[argbox:%[0-9]+]] = fir.convert [[box]]
+  ! CHECK: fir.call @_FortranARandomSeedSize([[argbox]]
   call random_seed(size=ss)
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: fir.call @_FortranAioOutputAscii
-  ! CHECK: fir.call @_FortranAioOutputInteger64
-  ! CHECK: fir.call @_FortranAioEndIoStatement
   print*, 'size: ', ss
   ! CHECK: fir.call @_FortranARandomSeedDefaultPut() : () -> none
   call random_seed()
-  ! CHECK: fir.call @_FortranARandomNumber(%{{[0-9]+}}, %{{[0-9]+}}, %c{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
+  ! CHECK: [[box:%[0-9]+]] = fir.embox [[rr]]
+  ! CHECK: [[argbox:%[0-9]+]] = fir.convert [[box]]
+  ! CHECK: fir.call @_FortranARandomNumber([[argbox]]
   call random_number(rr)
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: fir.call @_FortranAioOutputReal32
-  ! CHECK: fir.call @_FortranAioEndIoStatement
   print*, rr
-  ! CHECK: fir.call @_FortranARandomSeedGet(%{{[0-9]+}}, %{{[0-9]+}}, %c{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
+  ! CHECK: [[box:%[0-9]+]] = fir.embox [[vv]]
+  ! CHECK: [[argbox:%[0-9]+]] = fir.convert [[box]]
+  ! CHECK: fir.call @_FortranARandomSeedGet([[argbox]]
   call random_seed(get=vv)
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: fir.call @_FortranAioOutputAscii
-  ! CHECK: fir.call @_FortranAioOutputDescriptor
-  ! CHECK: fir.call @_FortranAioEndIoStatement
-  print*, 'get:  ', vv(1:ss)
-  ! CHECK: fir.call @_FortranARandomSeedPut(%{{[0-9]+}}, %{{[0-9]+}}, %c{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
+! print*, 'get:  ', vv(1:ss)
+  ! CHECK: [[box:%[0-9]+]] = fir.embox [[vv]]
+  ! CHECK: [[argbox:%[0-9]+]] = fir.convert [[box]]
+  ! CHECK: fir.call @_FortranARandomSeedPut([[argbox]]
   call random_seed(put=vv)
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: fir.call @_FortranAioOutputAscii
-  ! CHECK: fir.call @_FortranAioOutputDescriptor
-  ! CHECK: fir.call @_FortranAioEndIoStatement
   print*, 'put:  ', vv(1:ss)
-  ! CHECK: fir.call @_FortranARandomNumber(%{{[0-9]+}}, %{{[0-9]+}}, %c{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
+  ! CHECK: [[box:%[0-9]+]] = fir.embox [[aa]]
+  ! CHECK: [[argbox:%[0-9]+]] = fir.convert [[box]]
+  ! CHECK: fir.call @_FortranARandomNumber([[argbox]]
   call random_number(aa)
-  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
-  ! CHECK: fir.call @_FortranAioOutputDescriptor
-  ! CHECK: fir.call @_FortranAioEndIoStatement
   print*, aa
 end
 
