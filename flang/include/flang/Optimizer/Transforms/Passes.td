@@ -37,7 +37,7 @@ def AffineDialectPromotion : FunctionPass<"promote-to-affine"> {
   }];
   let constructor = "::fir::createPromoteToAffinePass()";
   let dependentDialects = [
-    "fir::FIROpsDialect", "mlir::StandardOpsDialect", "mlir::AffineDialect"    
+    "fir::FIROpsDialect", "mlir::StandardOpsDialect", "mlir::AffineDialect"
   ];
 }
 
@@ -177,6 +177,16 @@ def CharacterConversion : Pass<"character-conversion"> {
            "Generate runtime calls to a named set of conversion routines. "
            "By default, the conversions may produce unexpected results.">
   ];
+}
+
+def OpenACCFirDataConversion : Pass<"openacc-data-conversion", "mlir::ModuleOp"> {
+  let summary = "Convert OpenACC data operand to DataDescriptor";
+  let description = [{
+    Convert OpenACC data operand to a DataDescriptor suited for runtime calls.
+  }];
+  let constructor = "::fir::createOpenACCDataOperandConversionPass()";
+  let dependentDialects = [ "fir::FIROpsDialect", "mlir::LLVM::LLVMDialect" ];
+
 }
 
 #endif // FORTRAN_OPTIMIZER_TRANSFORMS_FIR_PASSES

@@ -624,7 +624,7 @@ func @test_shift(%arg0: !fir.box<!fir.array<?xf32>>) -> !fir.ref<f32> {
   %0 = fir.shift %c4 : (index) -> !fir.shift<1>
   %1 = fir.array_coor %arg0(%0) %c100 : (!fir.box<!fir.array<?xf32>>, !fir.shift<1>, index) -> !fir.ref<f32>
   return %1 : !fir.ref<f32>
-} 
+}
 
 func private @bar_rebox_test(!fir.box<!fir.array<?x?xf32>>)
 // CHECK-LABEL: @test_rebox(
@@ -665,5 +665,12 @@ func @char_convert() {
   %3 = fir.undefined !fir.ref<!fir.array<?x!fir.char<2,?>>>
   // CHECK: fir.char_convert %{{.*}} for %{{.*}} to %{{.*}} : !fir.ref<!fir.char<1>>, i32, !fir.ref<!fir.array<?x!fir.char<2,?>>>
   fir.char_convert %2 for %1 to %3 : !fir.ref<!fir.char<1>>, i32, !fir.ref<!fir.array<?x!fir.char<2,?>>>
+  return
+}
+
+func @cast_test() {
+  %0 = fir.address_of(@_QEa) : !fir.ref<!fir.array<10xf32>>
+  %2 = fir.cast %0 : !fir.ref<!fir.array<10xf32>> to !llvm.ptr<array<10 x f32>>
+  // CHECK: %{{.*}} = fir.cast %{{.*}} : !fir.ref<!fir.array<10xf32>> to !llvm.ptr<array<10 x f32>>
   return
 }

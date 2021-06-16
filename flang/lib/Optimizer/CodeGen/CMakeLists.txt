@@ -5,6 +5,7 @@ add_flang_library(FIRCodeGen
   PreCGRewrite.cpp
   Target.cpp
   TargetRewrite.cpp
+  TypeConverter.cpp
 
   DEPENDS
   FIRDialect

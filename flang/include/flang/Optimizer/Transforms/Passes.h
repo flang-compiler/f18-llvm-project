@@ -36,6 +36,9 @@ std::unique_ptr<mlir::Pass> createArrayValueCopyPass();
 std::unique_ptr<mlir::Pass> createAbstractResultOptPass();
 std::unique_ptr<mlir::Pass> createCharacterConversionPass();
 
+/// OpenACC/FIR passes
+std::unique_ptr<mlir::Pass> createOpenACCDataOperandConversionPass();
+
 /// A pass to convert the FIR dialect from "Mem-SSA" form to "Reg-SSA" form.
 /// This pass is a port of LLVM's mem2reg pass, but modified for the FIR dialect
 /// as well as the restructuring of MLIR's representation to present PHI nodes

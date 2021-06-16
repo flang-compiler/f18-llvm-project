@@ -404,13 +404,13 @@ def fir_SaveResultOp : fir_Op<"save_result", [AttrSizedOperandSegments]> {
     allows associating such abstract result to a storage. In later lowering of
     the function interfaces, this storage might be used to pass the result in
     memory.
-    
+
     For arrays, result, it is required to provide the shape of the result. For
     character arrays and derived types with length parameters, the length
     parameter values must be provided.
 
     The fir.save_result associated to a function call must immediately follow
-    the call and be in the same block.  
+    the call and be in the same block.
 
     ```mlir
       %buffer = fir.alloca fir.array<?xf32>, %c100
@@ -418,7 +418,7 @@ def fir_SaveResultOp : fir_Op<"save_result", [AttrSizedOperandSegments]> {
       %array_result = fir.call @foo() : () -> fir.array<?xf32>
       fir.save_result %array_result to %buffer(%shape)
       %coor = fir.array_coor %buffer%(%shape), %c5
-      %fifth_element = fir.load %coor : f32 
+      %fifth_element = fir.load %coor : f32
     ```
 
     The above fir.save_result allows saving a fir.array function result into
@@ -3435,6 +3435,18 @@ def fir_IsPresentOp : fir_SimpleOp<"is_present", [NoSideEffect]> {
   let arguments = (ins AnyRefOrBoxLike:$val);
 
   let results = (outs BoolLike);
+}
+
+def fir_CastOp : fir_SimpleOneResultOp<"cast", [NoSideEffect]> {
+  let summary = "Type cast between FIR dialect and LLVM";
+  let description = [{
+    cast op casts between FIR and LLVM dialects. It only chnages the dialect,
+    but doesn not change compile-time or runtime semantics.
+  }];
+  let arguments = (ins fir_Type:$in);
+  let results = (outs AnyType:$res);
+  let assemblyFormat = "$in attr-dict `:` type($in) `to` type($res)";
+  let verifier = "return ::verify(*this);";
 }
 
 #endif

@@ -16,6 +16,7 @@
 #include "flang/Optimizer/Dialect/FIRType.h"
 #include "flang/Optimizer/Support/Utils.h"
 #include "mlir/Dialect/CommonFolders.h"
+#include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinOps.h"
 #include "mlir/IR/Diagnostics.h"
@@ -2413,6 +2414,13 @@ mlir::Type fir::applyPathToType(mlir::Type rootTy, mlir::ValueRange path) {
             .Default([&](auto) -> mlir::Type { return {}; });
   }
   return eleTy;
+}
+
+static LogicalResult verify(CastOp op) {
+  if (!llvm::isa<mlir::LLVM::LLVMDialect>(op.res().getType().getDialect()))
+    return op.emitOpError()
+           << "Result type of fir.cast op must be an LLVMDialect type";
+  return success();
 }
 
 // Tablegen operators

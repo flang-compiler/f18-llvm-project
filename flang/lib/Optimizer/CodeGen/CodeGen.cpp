@@ -12,7 +12,6 @@
 
 #include "flang/Optimizer/CodeGen/CodeGen.h"
 #include "CGOps.h"
-#include "DescriptorModel.h"
 #include "PassDetail.h"
 #include "Target.h"
 #include "flang/Lower/Todo.h" // remove when TODO's are done
@@ -28,6 +27,7 @@
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVM.h"
 #include "mlir/Conversion/StandardToLLVM/ConvertStandardToLLVMPass.h"
 #include "mlir/Dialect/Affine/IR/AffineOps.h"
+#include "mlir/Dialect/OpenACC/OpenACC.h"
 #include "mlir/Dialect/SCF/SCF.h"
 #include "mlir/Dialect/StandardOps/IR/Ops.h"
 #include "mlir/IR/BuiltinTypes.h"
@@ -903,6 +903,21 @@ struct DispatchOpConversion : public FIROpConversion<fir::DispatchOp> {
     rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(dispatch, ty, operands,
                                                     None);
     TODO(dispatch.getLoc(), "fir.dispatch codegen");
+    return success();
+  }
+};
+
+struct CastOpConversion : public FIROpConversion<fir::CastOp> {
+  using FIROpConversion::FIROpConversion;
+
+  mlir::LogicalResult
+  matchAndRewrite(fir::CastOp castOp, OperandTy operands,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    fir::CastOp::Adaptor transformed(operands);
+    if (transformed.in().getType() != convertType(castOp.getType())) {
+      return failure();
+    }
+    rewriter.replaceOp(castOp, transformed.in());
     return success();
   }
 };
@@ -3027,23 +3042,23 @@ public:
         BoxCharLenOpConversion, BoxDimsOpConversion, BoxEleSizeOpConversion,
         BoxIsAllocOpConversion, BoxIsArrayOpConversion, BoxIsPtrOpConversion,
         BoxProcHostOpConversion, BoxRankOpConversion, BoxTypeDescOpConversion,
-        CallOpConversion, CmpcOpConversion, ConstcOpConversion,
-        ConvertOpConversion, CoordinateOpConversion, DispatchOpConversion,
-        DispatchTableOpConversion, DivcOpConversion, DTEntryOpConversion,
-        EmboxOpConversion, EmboxCharOpConversion, EmboxProcOpConversion,
-        FieldIndexOpConversion, FirEndOpConversion, ExtractValueOpConversion,
-        IsPresentOpConversion, FreeMemOpConversion, GenTypeDescOpConversion,
-        GlobalLenOpConversion, GlobalOpConversion, HasValueOpConversion,
-        InsertOnRangeOpConversion, InsertValueOpConversion,
-        LenParamIndexOpConversion, LoadOpConversion, MulcOpConversion,
-        NegcOpConversion, NoReassocOpConversion, SelectCaseOpConversion,
-        SelectOpConversion, SelectRankOpConversion, SelectTypeOpConversion,
-        ShapeOpConversion, ShapeShiftOpConversion, ShiftOpConversion,
-        SliceOpConversion, StoreOpConversion, StringLitOpConversion,
-        SubcOpConversion, UnboxCharOpConversion, UnboxOpConversion,
-        UnboxProcOpConversion, UndefOpConversion, UnreachableOpConversion,
-        XArrayCoorOpConversion, XEmboxOpConversion, XReboxOpConversion,
-        ZeroOpConversion>(context, typeConverter);
+        CastOpConversion, CallOpConversion, CmpcOpConversion,
+        ConstcOpConversion, ConvertOpConversion, CoordinateOpConversion,
+        DispatchOpConversion, DispatchTableOpConversion, DivcOpConversion,
+        DTEntryOpConversion, EmboxOpConversion, EmboxCharOpConversion,
+        EmboxProcOpConversion, FieldIndexOpConversion, FirEndOpConversion,
+        ExtractValueOpConversion, IsPresentOpConversion, FreeMemOpConversion,
+        GenTypeDescOpConversion, GlobalLenOpConversion, GlobalOpConversion,
+        HasValueOpConversion, InsertOnRangeOpConversion,
+        InsertValueOpConversion, LenParamIndexOpConversion, LoadOpConversion,
+        MulcOpConversion, NegcOpConversion, NoReassocOpConversion,
+        SelectCaseOpConversion, SelectOpConversion, SelectRankOpConversion,
+        SelectTypeOpConversion, ShapeOpConversion, ShapeShiftOpConversion,
+        ShiftOpConversion, SliceOpConversion, StoreOpConversion,
+        StringLitOpConversion, SubcOpConversion, UnboxCharOpConversion,
+        UnboxOpConversion, UnboxProcOpConversion, UndefOpConversion,
+        UnreachableOpConversion, XArrayCoorOpConversion, XEmboxOpConversion,
+        XReboxOpConversion, ZeroOpConversion>(context, typeConverter);
     mlir::populateStdToLLVMConversionPatterns(typeConverter, pattern);
     mlir::populateOpenMPToLLVMConversionPatterns(typeConverter, pattern);
     mlir::ConversionTarget target{*context};
@@ -3056,6 +3071,7 @@ public:
       return typeConverter.isLegal(&op->getRegion(0));
     });
     target.addLegalDialect<mlir::omp::OpenMPDialect>();
+    target.addLegalDialect<mlir::acc::OpenACCDialect>();
 
     // required NOPs for applying a full conversion
     target.addLegalOp<mlir::ModuleOp>();

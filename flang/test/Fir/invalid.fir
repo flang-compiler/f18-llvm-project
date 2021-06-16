@@ -498,3 +498,12 @@ func @ugly_char_convert() {
   fir.char_convert %2 for %2 to %3 : !fir.ref<!fir.char<1>>, !fir.ref<!fir.char<1>>, !fir.ref<!fir.array<?x!fir.char<2,?>>>
   return
 }
+
+// -----
+
+func @cast_test() {
+  %1 = fir.alloca i32 {bindc_name = "i", uniq_name = "_QEi"}
+  // expected-error@+1 {{'fir.cast' op Result type of fir.cast op must be an LLVMDialect type}}
+  %3 = fir.cast %1 : !fir.ref<i32> to index
+  return
+}
