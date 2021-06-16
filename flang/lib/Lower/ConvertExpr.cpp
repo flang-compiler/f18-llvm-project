@@ -2773,7 +2773,9 @@ public:
         case Fortran::lower::LowerIntrinsicArgAs::Box: {
           PushSemantics(ConstituentSemantics::RefOpaque);
           auto lambda = genarr(*expr);
-          operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
+          operands.emplace_back([=](IterSpace iters) {
+            return builder.createBox(loc, lambda(iters));
+          });
         } break;
         case Fortran::lower::LowerIntrinsicArgAs::Inquired:
           TODO(loc, "intrinsic function with inquired argument");
