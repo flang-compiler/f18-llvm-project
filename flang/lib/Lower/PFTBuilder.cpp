@@ -575,9 +575,18 @@ private:
     if (targetConstruct) {
       while (sourceConstruct && sourceConstruct != targetConstruct)
         sourceConstruct = sourceConstruct->parentConstruct;
-      if (sourceConstruct != targetConstruct)
-        for (auto *eval = &targetEvaluation; eval; eval = eval->parentConstruct)
+      if (sourceConstruct != targetConstruct) // branch into a construct body
+        for (auto *eval = &targetEvaluation; eval;
+             eval = eval->parentConstruct) {
           eval->isUnstructured = true;
+          // If the branch is a backward branch into an already analyzed
+          // DO or IF construct, mark the construct exit as a new block.
+          // For a forward branch, the isUnstructured flag will cause this
+          // to be done when the construct is analyzed.
+          if (eval->constructExit && (eval->isA<parser::DoConstruct>() ||
+                                      eval->isA<parser::IfConstruct>()))
+            eval->constructExit->isNewBlock = true;
+        }
     }
   }
   void markBranchTarget(lower::pft::Evaluation &sourceEvaluation,
