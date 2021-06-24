@@ -152,6 +152,23 @@ subroutine associated_test(scalar, array)
   print *, associated(array)
 end subroutine
 
+! BTEST
+! CHECK-LABEL: btest_test
+function btest_test(i, j)
+  logical btest_test
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca !fir.logical<4> {bindc_name = "btest_test"
+  ! CHECK: %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_5:.*]] = shift_right_unsigned %[[VAL_1]], %[[VAL_3]] : i32
+  ! CHECK: %[[VAL_6:.*]] = constant 1 : i32
+  ! CHECK: %[[VAL_7:.*]] = and %[[VAL_5]], %[[VAL_6]] : i32
+  ! CHECK: %[[VAL_8:.*]] = fir.convert %[[VAL_7]] : (i32) -> !fir.logical<4>
+  ! CHECK: fir.store %[[VAL_8]] to %[[VAL_0]] : !fir.ref<!fir.logical<4>>
+  ! CHECK: %[[VAL_9:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.logical<4>>
+  ! CHECK: return %[[VAL_9]] : !fir.logical<4>
+  btest_test = btest(i, j)
+end
+
 ! DBLE
 ! CHECK-LABEL: dble_test
 subroutine dble_test(a)
@@ -230,9 +247,9 @@ subroutine conjg_test(z1, z2)
 end subroutine
 
 ! COUNT
-! CHECK-LABEL: test_count1
+! CHECK-LABEL: count_test1
 ! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>)
-subroutine test_count1(rslt, mask)
+subroutine count_test1(rslt, mask)
   integer :: rslt
   logical :: mask(:)
 ! CHECK-DAG:  %[[c1:.*]] = constant 0 : index
@@ -243,9 +260,9 @@ subroutine test_count1(rslt, mask)
 end subroutine
 
 ! COUNT
-! CHECK-LABEL: test_count2
+! CHECK-LABEL: count_test2
 ! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg1:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>) 
-subroutine test_count2(rslt, mask)
+subroutine count_test2(rslt, mask)
   integer :: rslt(:)
   logical :: mask(:,:)
 ! CHECK-DAG:  %[[c1_i32:.*]] = constant 1 : i32
@@ -262,9 +279,9 @@ subroutine test_count2(rslt, mask)
 end subroutine
 
 ! COUNT
-! CHECK-LABEL: test_count3
+! CHECK-LABEL: count_test3
 ! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>) 
-subroutine test_count3(rslt, mask)
+subroutine count_test3(rslt, mask)
   integer :: rslt
   logical :: mask(:)
 ! CHECK-DAG:  %[[c0:.*]] = constant 0 : index
@@ -322,6 +339,60 @@ subroutine iand_test(a, b)
   print *, iand(a, b)
   ! CHECK: %{{[0-9]+}} = and %{{[0-9]+}}, %{{[0-9]+}} : i{{(8|16|32|64|128)}}
 end subroutine iand_test
+
+! IBCLR
+! CHECK-LABEL: ibclr_test
+function ibclr_test(i, j)
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "ibclr_test"
+  ! CHECK: %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_5:.*]] = constant 1 : i32
+  ! CHECK: %[[VAL_6:.*]] = constant -1 : i32
+  ! CHECK: %[[VAL_7:.*]] = shift_left %[[VAL_5]], %[[VAL_3]] : i32
+  ! CHECK: %[[VAL_8:.*]] = xor %[[VAL_6]], %[[VAL_7]] : i32
+  ! CHECK: %[[VAL_9:.*]] = and %[[VAL_1]], %[[VAL_8]] : i32
+  ! CHECK: fir.store %[[VAL_9]] to %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_10:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: return %[[VAL_10]] : i32
+  ibclr_test = ibclr(i, j)
+end
+
+! IBITS
+! CHECK-LABEL: ibits_test
+function ibits_test(i, j, k)
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "ibits_test"
+  ! CHECK: %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_5:.*]] = fir.load %[[VAL_6:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_7:.*]] = constant 32 : i32
+  ! CHECK: %[[VAL_8:.*]] = subi %[[VAL_7]], %[[VAL_5]] : i32
+  ! CHECK: %[[VAL_9:.*]] = constant 0 : i32
+  ! CHECK: %[[VAL_10:.*]] = constant -1 : i32
+  ! CHECK: %[[VAL_11:.*]] = shift_right_unsigned %[[VAL_10]], %[[VAL_8]] : i32
+  ! CHECK: %[[VAL_12:.*]] = shift_right_signed %[[VAL_1]], %[[VAL_3]] : i32
+  ! CHECK: %[[VAL_13:.*]] = and %[[VAL_12]], %[[VAL_11]] : i32
+  ! CHECK: %[[VAL_14:.*]] = cmpi eq, %[[VAL_5]], %[[VAL_9]] : i32
+  ! CHECK: %[[VAL_15:.*]] = select %[[VAL_14]], %[[VAL_9]], %[[VAL_13]] : i32
+  ! CHECK: fir.store %[[VAL_15]] to %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_16:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: return %[[VAL_16]] : i32
+  ibits_test = ibits(i, j, k)
+end
+
+! IBSET
+! CHECK-LABEL: ibset_test
+function ibset_test(i, j)
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "ibset_test"
+  ! CHECK: %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_5:.*]] = constant 1 : i32
+  ! CHECK: %[[VAL_6:.*]] = shift_left %[[VAL_5]], %[[VAL_3]] : i32
+  ! CHECK: %[[VAL_7:.*]] = or %[[VAL_1]], %[[VAL_6]] : i32
+  ! CHECK: fir.store %[[VAL_7]] to %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_8:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: return %[[VAL_8]] : i32
+  ibset_test = ibset(i, j)
+end
 
 ! ICHAR
 ! CHECK-LABEL: ichar_test
@@ -413,6 +484,72 @@ subroutine ior_test(a, b)
   print *, ior(a, b)
   ! CHECK: %{{[0-9]+}} = or %{{[0-9]+}}, %{{[0-9]+}} : i{{(8|16|32|64|128)}}
 end subroutine ior_test
+
+! ISHFT
+! CHECK-LABEL: ishft_test
+function ishft_test(i, j)
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "ishft_test"
+  ! CHECK:  %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK:  %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK:  %[[VAL_5:.*]] = constant 32 : i32
+  ! CHECK:  %[[VAL_6:.*]] = constant 0 : i32
+  ! CHECK:  %[[VAL_7:.*]] = constant 31 : i32
+  ! CHECK:  %[[VAL_8:.*]] = shift_right_signed %[[VAL_3]], %[[VAL_7]] : i32
+  ! CHECK:  %[[VAL_9:.*]] = xor %[[VAL_3]], %[[VAL_8]] : i32
+  ! CHECK:  %[[VAL_10:.*]] = subi %[[VAL_9]], %[[VAL_8]] : i32
+  ! CHECK:  %[[VAL_11:.*]] = shift_left %[[VAL_1]], %[[VAL_10]] : i32
+  ! CHECK:  %[[VAL_12:.*]] = shift_right_unsigned %[[VAL_1]], %[[VAL_10]] : i32
+  ! CHECK:  %[[VAL_13:.*]] = cmpi sge, %[[VAL_10]], %[[VAL_5]] : i32
+  ! CHECK:  %[[VAL_14:.*]] = cmpi slt, %[[VAL_3]], %[[VAL_6]] : i32
+  ! CHECK:  %[[VAL_15:.*]] = select %[[VAL_14]], %[[VAL_12]], %[[VAL_11]] : i32
+  ! CHECK:  %[[VAL_16:.*]] = select %[[VAL_13]], %[[VAL_6]], %[[VAL_15]] : i32
+  ! CHECK:  fir.store %[[VAL_16]] to %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK:  %[[VAL_17:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK:  return %[[VAL_17]] : i32
+  ishft_test = ishft(i, j)
+end
+
+! ISHFTC
+! CHECK-LABEL: ishftc_test
+function ishftc_test(i, j, k)
+  ! CHECK: %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "ishftc_test"
+  ! CHECK: %[[VAL_1:.*]] = fir.load %[[VAL_2:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_5:.*]] = fir.load %[[VAL_6:.*]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_7:.*]] = constant 32 : i32
+  ! CHECK: %[[VAL_8:.*]] = constant 0 : i32
+  ! CHECK: %[[VAL_9:.*]] = constant -1 : i32
+  ! CHECK: %[[VAL_10:.*]] = constant 31 : i32
+  ! CHECK: %[[VAL_11:.*]] = shift_right_signed %[[VAL_3]], %[[VAL_10]] : i32
+  ! CHECK: %[[VAL_12:.*]] = xor %[[VAL_3]], %[[VAL_11]] : i32
+  ! CHECK: %[[VAL_13:.*]] = subi %[[VAL_12]], %[[VAL_11]] : i32
+  ! CHECK: %[[VAL_14:.*]] = subi %[[VAL_5]], %[[VAL_13]] : i32
+  ! CHECK: %[[VAL_15:.*]] = cmpi eq, %[[VAL_3]], %[[VAL_8]] : i32
+  ! CHECK: %[[VAL_16:.*]] = cmpi eq, %[[VAL_13]], %[[VAL_5]] : i32
+  ! CHECK: %[[VAL_17:.*]] = or %[[VAL_15]], %[[VAL_16]] : i1
+  ! CHECK: %[[VAL_18:.*]] = cmpi sgt, %[[VAL_3]], %[[VAL_8]] : i32
+  ! CHECK: %[[VAL_19:.*]] = select %[[VAL_18]], %[[VAL_13]], %[[VAL_14]] : i32
+  ! CHECK: %[[VAL_20:.*]] = select %[[VAL_18]], %[[VAL_14]], %[[VAL_13]] : i32
+  ! CHECK: %[[VAL_21:.*]] = cmpi ne, %[[VAL_5]], %[[VAL_7]] : i32
+  ! CHECK: %[[VAL_22:.*]] = shift_right_unsigned %[[VAL_1]], %[[VAL_5]] : i32
+  ! CHECK: %[[VAL_23:.*]] = shift_left %[[VAL_22]], %[[VAL_5]] : i32
+  ! CHECK: %[[VAL_24:.*]] = select %[[VAL_21]], %[[VAL_23]], %[[VAL_8]] : i32
+  ! CHECK: %[[VAL_25:.*]] = subi %[[VAL_7]], %[[VAL_19]] : i32
+  ! CHECK: %[[VAL_26:.*]] = shift_right_unsigned %[[VAL_9]], %[[VAL_25]] : i32
+  ! CHECK: %[[VAL_27:.*]] = shift_right_unsigned %[[VAL_1]], %[[VAL_20]] : i32
+  ! CHECK: %[[VAL_28:.*]] = and %[[VAL_27]], %[[VAL_26]] : i32
+  ! CHECK: %[[VAL_29:.*]] = subi %[[VAL_7]], %[[VAL_20]] : i32
+  ! CHECK: %[[VAL_30:.*]] = shift_right_unsigned %[[VAL_9]], %[[VAL_29]] : i32
+  ! CHECK: %[[VAL_31:.*]] = and %[[VAL_1]], %[[VAL_30]] : i32
+  ! CHECK: %[[VAL_32:.*]] = shift_left %[[VAL_31]], %[[VAL_19]] : i32
+  ! CHECK: %[[VAL_33:.*]] = or %[[VAL_24]], %[[VAL_28]] : i32
+  ! CHECK: %[[VAL_34:.*]] = or %[[VAL_33]], %[[VAL_32]] : i32
+  ! CHECK: %[[VAL_35:.*]] = select %[[VAL_17]], %[[VAL_1]], %[[VAL_34]] : i32
+  ! CHECK: fir.store %[[VAL_35]] to %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_36:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+  ! CHECK: return %[[VAL_36]] : i32
+  ishftc_test = ishftc(i, j, k)
+end
 
 ! LEN
 ! CHECK-LABEL: len_test

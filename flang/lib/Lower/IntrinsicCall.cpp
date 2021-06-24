@@ -412,6 +412,7 @@ struct IntrinsicLibrary {
   fir::ExtendedValue genAny(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genAssociated(mlir::Type,
                                    llvm::ArrayRef<fir::ExtendedValue>);
+  mlir::Value genBtest(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genCeiling(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genChar(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   template <mlir::CmpIPredicate pred>
@@ -425,11 +426,16 @@ struct IntrinsicLibrary {
   template <Extremum, ExtremumBehavior>
   mlir::Value genExtremum(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genFloor(mlir::Type, llvm::ArrayRef<mlir::Value>);
-  mlir::Value genIAnd(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIand(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIbclr(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIbits(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIbset(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genIchar(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genIEOr(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genIndex(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genIOr(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIshft(mlir::Type, llvm::ArrayRef<mlir::Value>);
+  mlir::Value genIshftc(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genLen(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genLenTrim(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genMaxloc(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
@@ -581,6 +587,7 @@ static constexpr IntrinsicHandler handlers[]{
      &I::genAssociated,
      {{{"pointer", asInquired}, {"target", asInquired}}},
      /*isElemental=*/false},
+    {"btest", &I::genBtest},
     {"ceiling", &I::genCeiling},
     {"char", &I::genChar},
     {"conjg", &I::genConjg},
@@ -600,7 +607,10 @@ static constexpr IntrinsicHandler handlers[]{
     {"dprod", &I::genDprod},
     {"floor", &I::genFloor},
     {"iachar", &I::genIchar},
-    {"iand", &I::genIAnd},
+    {"iand", &I::genIand},
+    {"ibclr", &I::genIbclr},
+    {"ibits", &I::genIbits},
+    {"ibset", &I::genIbset},
     {"ichar", &I::genIchar},
     {"ieor", &I::genIEOr},
     {"index",
@@ -610,6 +620,8 @@ static constexpr IntrinsicHandler handlers[]{
        {"back", asValue},
        {"kind", asValue}}}},
     {"ior", &I::genIOr},
+    {"ishft", &I::genIshft},
+    {"ishftc", &I::genIshftc},
     {"len", &I::genLen},
     {"len_trim", &I::genLenTrim},
     {"lge", &I::genCharacterCompare<mlir::CmpIPredicate::sge>},
@@ -1688,6 +1700,22 @@ mlir::Value IntrinsicLibrary::genAint(mlir::Type resultType,
   return genRuntimeCall("aint", resultType, {args[0]});
 }
 
+// BTEST
+mlir::Value IntrinsicLibrary::genBtest(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  // A conformant BTEST(I,POS) call satisfies:
+  //     POS >= 0
+  //     POS < BIT_SIZE(I)
+  // Return:  (I >> POS) & 1
+  assert(args.size() == 2);
+  auto argType = args[0].getType();
+  auto pos = builder.createConvert(loc, argType, args[1]);
+  auto shift = builder.create<mlir::UnsignedShiftRightOp>(loc, args[0], pos);
+  auto one = builder.createIntegerConstant(loc, argType, 1);
+  auto res = builder.create<mlir::AndOp>(loc, shift, one);
+  return builder.createConvert(loc, resultType, res);
+}
+
 // CEILING
 mlir::Value IntrinsicLibrary::genCeiling(mlir::Type resultType,
                                          llvm::ArrayRef<mlir::Value> args) {
@@ -1862,10 +1890,67 @@ mlir::Value IntrinsicLibrary::genFloor(mlir::Type resultType,
 }
 
 // IAND
-mlir::Value IntrinsicLibrary::genIAnd(mlir::Type resultType,
+mlir::Value IntrinsicLibrary::genIand(mlir::Type resultType,
                                       llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2);
   return builder.create<mlir::AndOp>(loc, args[0], args[1]);
+}
+
+// IBCLR
+mlir::Value IntrinsicLibrary::genIbclr(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  // A conformant IBCLR(I,POS) call satisfies:
+  //     POS >= 0
+  //     POS < BIT_SIZE(I)
+  // Return:  I & (!(1 << POS))
+  assert(args.size() == 2);
+  auto pos = builder.createConvert(loc, resultType, args[1]);
+  auto one = builder.createIntegerConstant(loc, resultType, 1);
+  auto ones = builder.createIntegerConstant(loc, resultType, -1);
+  auto mask = builder.create<mlir::ShiftLeftOp>(loc, one, pos);
+  auto res = builder.create<mlir::XOrOp>(loc, ones, mask);
+  return builder.create<mlir::AndOp>(loc, args[0], res);
+}
+
+// IBITS
+mlir::Value IntrinsicLibrary::genIbits(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  // A conformant IBITS(I,POS,LEN) call satisfies:
+  //     POS >= 0
+  //     LEN >= 0
+  //     POS + LEN <= BIT_SIZE(I)
+  // Return:  LEN == 0 ? 0 : (I >> POS) & (-1 >> (BIT_SIZE(I) - LEN))
+  // For a conformant call, implementing (I >> POS) with a signed or an
+  // unsigned shift produces the same result.  For a nonconformant call,
+  // the two choices may produce different results.
+  assert(args.size() == 3);
+  auto pos = builder.createConvert(loc, resultType, args[1]);
+  auto len = builder.createConvert(loc, resultType, args[2]);
+  auto bitSize = builder.createIntegerConstant(
+      loc, resultType, resultType.cast<mlir::IntegerType>().getWidth());
+  auto shiftCount = builder.create<mlir::SubIOp>(loc, bitSize, len);
+  auto zero = builder.createIntegerConstant(loc, resultType, 0);
+  auto ones = builder.createIntegerConstant(loc, resultType, -1);
+  auto mask = builder.create<mlir::UnsignedShiftRightOp>(loc, ones, shiftCount);
+  auto res1 = builder.create<mlir::SignedShiftRightOp>(loc, args[0], pos);
+  auto res2 = builder.create<mlir::AndOp>(loc, res1, mask);
+  auto lenIsZero =
+      builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq, len, zero);
+  return builder.create<mlir::SelectOp>(loc, lenIsZero, zero, res2);
+}
+
+// IBSET
+mlir::Value IntrinsicLibrary::genIbset(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  // A conformant IBSET(I,POS) call satisfies:
+  //     POS >= 0
+  //     POS < BIT_SIZE(I)
+  // Return:  I | (1 << POS)
+  assert(args.size() == 2);
+  auto pos = builder.createConvert(loc, resultType, args[1]);
+  auto one = builder.createIntegerConstant(loc, resultType, 1);
+  auto mask = builder.create<mlir::ShiftLeftOp>(loc, one, pos);
+  return builder.create<mlir::OrOp>(loc, args[0], mask);
 }
 
 // ICHAR
@@ -1978,6 +2063,97 @@ mlir::Value IntrinsicLibrary::genIOr(mlir::Type resultType,
                                      llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2);
   return builder.create<mlir::OrOp>(loc, args[0], args[1]);
+}
+
+// ISHFT
+mlir::Value IntrinsicLibrary::genIshft(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  // A conformant ISHFT(I,SHIFT) call satisfies:
+  //     abs(SHIFT) <= BIT_SIZE(I)
+  // Return:  abs(SHIFT) >= BIT_SIZE(I)
+  //              ? 0
+  //              : SHIFT < 0
+  //                    ? I >> abs(SHIFT)
+  //                    : I << abs(SHIFT)
+  assert(args.size() == 2);
+  auto bitSize = builder.createIntegerConstant(
+      loc, resultType, resultType.cast<mlir::IntegerType>().getWidth());
+  auto zero = builder.createIntegerConstant(loc, resultType, 0);
+  auto shift = builder.createConvert(loc, resultType, args[1]);
+  auto absShift = genAbs(resultType, {shift});
+  auto left = builder.create<mlir::ShiftLeftOp>(loc, args[0], absShift);
+  auto right =
+      builder.create<mlir::UnsignedShiftRightOp>(loc, args[0], absShift);
+  auto shiftIsLarge = builder.create<mlir::CmpIOp>(
+      loc, mlir::CmpIPredicate::sge, absShift, bitSize);
+  auto shiftIsNegative =
+      builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::slt, shift, zero);
+  auto sel = builder.create<mlir::SelectOp>(loc, shiftIsNegative, right, left);
+  return builder.create<mlir::SelectOp>(loc, shiftIsLarge, zero, sel);
+}
+
+// ISHFTC
+mlir::Value IntrinsicLibrary::genIshftc(mlir::Type resultType,
+                                        llvm::ArrayRef<mlir::Value> args) {
+  // A conformant ISHFTC(I,SHIFT,SIZE) call satisfies:
+  //     SIZE > 0
+  //     SIZE <= BIT_SIZE(I)
+  //     abs(SHIFT) <= SIZE
+  // if SHIFT > 0
+  //     leftSize = abs(SHIFT)
+  //     rightSize = SIZE - abs(SHIFT)
+  // else [if SHIFT < 0]
+  //     leftSize = SIZE - abs(SHIFT)
+  //     rightSize = abs(SHIFT)
+  // unchanged = SIZE == BIT_SIZE(I) ? 0 : (I >> SIZE) << SIZE
+  // leftMaskShift = BIT_SIZE(I) - leftSize
+  // rightMaskShift = BIT_SIZE(I) - rightSize
+  // left = (I >> rightSize) & (-1 >> leftMaskShift)
+  // right = (I & (-1 >> rightMaskShift)) << leftSize
+  // Return:  SHIFT == 0 || SIZE == abs(SHIFT) ? I : (unchanged | left | right)
+  assert(args.size() == 3);
+  auto bitSize = builder.createIntegerConstant(
+      loc, resultType, resultType.cast<mlir::IntegerType>().getWidth());
+  auto I = args[0];
+  auto shift = builder.createConvert(loc, resultType, args[1]);
+  auto size =
+      args[2] ? builder.createConvert(loc, resultType, args[2]) : bitSize;
+  auto zero = builder.createIntegerConstant(loc, resultType, 0);
+  auto ones = builder.createIntegerConstant(loc, resultType, -1);
+  auto absShift = genAbs(resultType, {shift});
+  auto elseSize = builder.create<mlir::SubIOp>(loc, size, absShift);
+  auto shiftIsZero =
+      builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::eq, shift, zero);
+  auto shiftEqualsSize = builder.create<mlir::CmpIOp>(
+      loc, mlir::CmpIPredicate::eq, absShift, size);
+  auto shiftIsNop =
+      builder.create<mlir::OrOp>(loc, shiftIsZero, shiftEqualsSize);
+  auto shiftIsPositive =
+      builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::sgt, shift, zero);
+  auto leftSize =
+      builder.create<mlir::SelectOp>(loc, shiftIsPositive, absShift, elseSize);
+  auto rightSize =
+      builder.create<mlir::SelectOp>(loc, shiftIsPositive, elseSize, absShift);
+  auto hasUnchanged =
+      builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ne, size, bitSize);
+  auto unchangedTmp1 = builder.create<mlir::UnsignedShiftRightOp>(loc, I, size);
+  auto unchangedTmp2 =
+      builder.create<mlir::ShiftLeftOp>(loc, unchangedTmp1, size);
+  auto unchanged =
+      builder.create<mlir::SelectOp>(loc, hasUnchanged, unchangedTmp2, zero);
+  auto leftMaskShift = builder.create<mlir::SubIOp>(loc, bitSize, leftSize);
+  auto leftMask =
+      builder.create<mlir::UnsignedShiftRightOp>(loc, ones, leftMaskShift);
+  auto leftTmp = builder.create<mlir::UnsignedShiftRightOp>(loc, I, rightSize);
+  auto left = builder.create<mlir::AndOp>(loc, leftTmp, leftMask);
+  auto rightMaskShift = builder.create<mlir::SubIOp>(loc, bitSize, rightSize);
+  auto rightMask =
+      builder.create<mlir::UnsignedShiftRightOp>(loc, ones, rightMaskShift);
+  auto rightTmp = builder.create<mlir::AndOp>(loc, I, rightMask);
+  auto right = builder.create<mlir::ShiftLeftOp>(loc, rightTmp, leftSize);
+  auto resTmp = builder.create<mlir::OrOp>(loc, unchanged, left);
+  auto res = builder.create<mlir::OrOp>(loc, resTmp, right);
+  return builder.create<mlir::SelectOp>(loc, shiftIsNop, I, res);
 }
 
 // LEN
@@ -2094,7 +2270,7 @@ mlir::Value IntrinsicLibrary::genNot(mlir::Type resultType,
                                      llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 1);
   auto allOnes = builder.createIntegerConstant(loc, resultType, -1);
-  return builder.create<mlir::XOrOp>(loc, args[0],allOnes);
+  return builder.create<mlir::XOrOp>(loc, args[0], allOnes);
 }
 
 // PRESENT
