@@ -497,8 +497,8 @@ private:
     }
   }
 
-  /// Mark I/O statement ERR, EOR, and END specifier branch targets.
-  /// Mark an I/O statement with an assigned format as unstructured.
+  /// Mark IO statement ERR, EOR, and END specifier branch targets.
+  /// Mark an IO statement with an assigned format as unstructured.
   template <typename A>
   void analyzeIoBranches(lower::pft::Evaluation &eval, const A &stmt) {
     auto analyzeFormatSpec = [&](const parser::Format &format) {
@@ -657,7 +657,7 @@ private:
     lower::pft::Evaluation *lastConstructStmtEvaluation{};
     for (auto &eval : evaluationList) {
       eval.visit(common::visitors{
-          // Action statements (except I/O statements)
+          // Action statements (except IO statements)
           [&](const parser::CallStmt &s) {
             // Look for alternate return specifiers.
             const auto &args =
@@ -870,7 +870,7 @@ private:
             eval.isUnstructured = true;
           },
 
-          // Default - Common analysis for I/O statements; otherwise nop.
+          // Default - Common analysis for IO statements; otherwise nop.
           [&](const auto &stmt) {
             using A = std::decay_t<decltype(stmt)>;
             using IoStmts = std::tuple<

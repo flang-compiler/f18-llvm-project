@@ -66,6 +66,20 @@
   inquire (iolength=length) a
 end
 
+! CHECK-LABEL: internalnamelistio
+subroutine internalNamelistIO()
+  ! CHECK: %[[internal:[0-9]+]] = fir.alloca !fir.char<1,12> {bindc_name = "internal"
+  character(12) :: internal
+  integer :: x = 123
+  namelist /nml/x
+  ! CHECK: %[[internal_:[0-9]+]] = fir.convert %[[internal]] : (!fir.ref<!fir.char<1,12>>) -> !fir.ref<i8>
+  ! CHECK: %[[cookie:[0-9]+]] = fir.call @_FortranAioBeginInternalListOutput(%[[internal_]]
+  ! CHECK: fir.call @_FortranAioOutputNamelist(%[[cookie]]
+  ! CHECK: fir.call @_FortranAioEndIoStatement(%[[cookie]]
+  write(internal,nml=nml)
+! print*, x
+end
+
 ! Tests the 4 basic inquire formats
 ! CHECK-LABEL: func @_QPinquire_test
 subroutine inquire_test(ch, i, b)

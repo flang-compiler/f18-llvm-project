@@ -1,4 +1,4 @@
-//===-- IO.cpp -- I/O statement lowering ----------------------------------===//
+//===-- IO.cpp -- IO statement lowering -----------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -177,17 +177,17 @@ static mlir::Value genEndIO(Fortran::lower::AbstractConverter &converter,
 }
 
 /// Make the next call in the IO statement conditional on runtime result `ok`.
-/// If a call returns `ok==false`, further suboperation calls for an I/O
+/// If a call returns `ok==false`, further suboperation calls for an IO
 /// statement will be skipped.  This may generate branch heavy, deeply nested
-/// conditionals for I/O statements with a large number of suboperations.
+/// conditionals for IO statements with a large number of suboperations.
 static void makeNextConditionalOn(Fortran::lower::FirOpBuilder &builder,
                                   mlir::Location loc, bool checkResult,
                                   mlir::Value ok, bool inLoop = false) {
   if (!checkResult || !ok)
-    // Either no I/O calls need to be checked, or this will be the first call.
+    // Either no IO calls need to be checked, or this will be the first call.
     return;
 
-  // A previous I/O call for a statement returned the bool `ok`.  If this call
+  // A previous IO call for a statement returned the bool `ok`.  If this call
   // is in a fir.iterate_while loop, the result must be propagated up to the
   // loop scope as an extra ifOp result. (The propagation is done in genIoLoop.)
   mlir::TypeRange resTy;
@@ -344,7 +344,7 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
   return groupAddr;
 }
 
-/// Generate a namelist I/O call.
+/// Generate a namelist IO call.
 static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
                           mlir::Value cookie, mlir::FuncOp funcOp,
                           Fortran::semantics::Symbol &symbol, bool checkResult,
@@ -360,7 +360,7 @@ static void genNamelistIO(Fortran::lower::AbstractConverter &converter,
   ok = builder.create<fir::CallOp>(loc, funcOp, args).getResult(0);
 }
 
-/// Get the OutputXyz routine to output a value of the given type.
+/// Get the output function to call for a value of the given type.
 static mlir::FuncOp getOutputFunc(mlir::Location loc,
                                   Fortran::lower::FirOpBuilder &builder,
                                   mlir::Type type, bool isFormatted) {
@@ -451,7 +451,7 @@ genOutputItemList(Fortran::lower::AbstractConverter &converter,
   }
 }
 
-/// Get the InputXyz routine to input a value of the given type.
+/// Get the input function to call for a value of the given type.
 static mlir::FuncOp getInputFunc(mlir::Location loc,
                                  Fortran::lower::FirOpBuilder &builder,
                                  mlir::Type type, bool isFormatted) {
@@ -559,7 +559,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                         ok, /*inLoop=*/true, loopCtx);
   };
   if (!checkResult) {
-    // No I/O call result checks - the loop is a fir.do_loop op.
+    // No IO call result checks - the loop is a fir.do_loop op.
     auto doLoopOp = builder.create<fir::DoLoopOp>(
         loc, lowerValue, upperValue, stepValue, /*unordered=*/false,
         /*finalCountValue=*/true);
@@ -579,7 +579,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     builder.create<fir::StoreOp>(loc, lcv, loopVar);
     return;
   }
-  // Check I/O call results - the loop is a fir.iterate_while op.
+  // Check IO call results - the loop is a fir.iterate_while op.
   if (!ok)
     ok = builder.createIntegerConstant(loc, builder.getI1Type(), 1);
   auto iterWhileOp = builder.create<fir::IterWhileOp>(
@@ -591,7 +591,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   ok = iterWhileOp.getIterateVar();
   auto falseValue = builder.createIntegerConstant(loc, builder.getI1Type(), 0);
   genItemList(ioImpliedDo);
-  // Unwind nested I/O call scopes, filling in true and false ResultOp's.
+  // Unwind nested IO call scopes, filling in true and false ResultOp's.
   for (auto *op = builder.getBlock()->getParentOp(); isa<fir::IfOp>(op);
        op = op->getBlock()->getParentOp()) {
     auto ifOp = dyn_cast<fir::IfOp>(op);
@@ -721,7 +721,7 @@ lowerSourceTextAsStringLit(Fortran::lower::AbstractConverter &converter,
 }
 
 //===----------------------------------------------------------------------===//
-// Handle I/O statement specifiers.
+// Handle IO statement specifiers.
 // These are threaded together for a single statement via the passed cookie.
 //===----------------------------------------------------------------------===//
 
@@ -932,7 +932,7 @@ mlir::Value genIOOption<Fortran::parser::IoControlSpec::Rec>(
 }
 
 //===----------------------------------------------------------------------===//
-// Gather I/O statement condition specifier information (if any).
+// Gather IO statement condition specifier information (if any).
 //===----------------------------------------------------------------------===//
 
 template <typename SEEK, typename A>
@@ -973,7 +973,7 @@ static void threadSpecs(Fortran::lower::AbstractConverter &converter,
   }
 }
 
-/// Most I/O statements allow one or more of five optional exception condition
+/// Most IO statements allow one or more of five optional exception condition
 /// handling specifiers: ERR, EOR, END, IOSTAT, and IOMSG. The first three
 /// cause control flow to transfer to another statement. The final two return
 /// information from the runtime, via a variable, about the nature of the
@@ -1122,9 +1122,9 @@ static llvm::Optional<fir::ExtendedValue> getVariableBufferRequiredDescriptor(
 
 template <typename A>
 static llvm::Optional<fir::ExtendedValue>
-getIfDataTransferInternalRequiresDescriptor(
-    Fortran::lower::AbstractConverter &converter, const A &stmt,
-    Fortran::lower::StatementContext &stmtCtx) {
+maybeGetInternalIODescriptor(Fortran::lower::AbstractConverter &converter,
+                             const A &stmt,
+                             Fortran::lower::StatementContext &stmtCtx) {
   if (stmt.iounit.has_value())
     if (auto *var = std::get_if<Fortran::parser::Variable>(&stmt.iounit->u))
       return getVariableBufferRequiredDescriptor(converter, *var, stmtCtx);
@@ -1135,7 +1135,7 @@ getIfDataTransferInternalRequiresDescriptor(
 }
 template <>
 inline llvm::Optional<fir::ExtendedValue>
-getIfDataTransferInternalRequiresDescriptor<Fortran::parser::PrintStmt>(
+maybeGetInternalIODescriptor<Fortran::parser::PrintStmt>(
     Fortran::lower::AbstractConverter &, const Fortran::parser::PrintStmt &,
     Fortran::lower::StatementContext &) {
   return llvm::None;
@@ -1353,7 +1353,7 @@ mlir::Value getIOUnit(Fortran::lower::AbstractConverter &converter,
 }
 
 //===----------------------------------------------------------------------===//
-// Generators for each I/O statement type.
+// Generators for each IO statement type.
 //===----------------------------------------------------------------------===//
 
 template <typename K, typename S>
@@ -1483,23 +1483,24 @@ Fortran::lower::genWaitStatement(Fortran::lower::AbstractConverter &converter,
 // statements that need to be considered.
 //
 //   - input (READ) vs. output (WRITE, PRINT)
-//   - formatted vs. list vs. unformatted vs. namelist
+//   - unformatted vs. formatted vs. list vs. namelist
 //   - synchronous vs. asynchronous
-//   - external vs. internal + default KIND vs. internal + other KIND
+//   - external vs. internal
 //===----------------------------------------------------------------------===//
 
-// Determine the correct BeginXyz{In|Out}put api to invoke.
+// Get the begin data transfer IO function to call for the given values.
 template <bool isInput>
-mlir::FuncOp
-getBeginDataTransfer(mlir::Location loc, Fortran::lower::FirOpBuilder &builder,
-                     bool isFormatted, bool isListOrNml, bool isIntern,
-                     bool isOtherIntern, bool isAsynch) {
+mlir::FuncOp getBeginDataTransferFunc(mlir::Location loc,
+                                      Fortran::lower::FirOpBuilder &builder,
+                                      bool isFormatted, bool isListOrNml,
+                                      bool isInternal, bool isInternalWithDesc,
+                                      bool isAsync) {
   if constexpr (isInput) {
-    if (isAsynch)
+    if (isAsync)
       return getIORuntimeFunc<mkIOKey(BeginAsynchronousInput)>(loc, builder);
     if (isFormatted || isListOrNml) {
-      if (isIntern) {
-        if (isOtherIntern) {
+      if (isInternal) {
+        if (isInternalWithDesc) {
           if (isListOrNml)
             return getIORuntimeFunc<mkIOKey(BeginInternalArrayListInput)>(
                 loc, builder);
@@ -1519,11 +1520,11 @@ getBeginDataTransfer(mlir::Location loc, Fortran::lower::FirOpBuilder &builder,
     }
     return getIORuntimeFunc<mkIOKey(BeginUnformattedInput)>(loc, builder);
   } else {
-    if (isAsynch)
+    if (isAsync)
       return getIORuntimeFunc<mkIOKey(BeginAsynchronousOutput)>(loc, builder);
     if (isFormatted || isListOrNml) {
-      if (isIntern) {
-        if (isOtherIntern) {
+      if (isInternal) {
+        if (isInternalWithDesc) {
           if (isListOrNml)
             return getIORuntimeFunc<mkIOKey(BeginInternalArrayListOutput)>(
                 loc, builder);
@@ -1545,94 +1546,65 @@ getBeginDataTransfer(mlir::Location loc, Fortran::lower::FirOpBuilder &builder,
   }
 }
 
-/// Generate the arguments of a BeginXyz call.
+/// Generate the arguments of a begin data transfer statement call.
 template <bool hasIOCtrl, typename A>
-void genBeginCallArguments(llvm::SmallVectorImpl<mlir::Value> &ioArgs,
-                           Fortran::lower::AbstractConverter &converter,
-                           mlir::Location loc, const A &stmt,
-                           mlir::FunctionType ioFuncTy, bool isFormatted,
-                           bool isListOrNml, bool isIntern,
-                           [[maybe_unused]] bool isOtherIntern, bool isAsynch,
-                           const llvm::Optional<fir::ExtendedValue> &descRef,
-                           Fortran::lower::StatementContext &stmtCtx) {
+void genBeginDataTransferCallArgs(
+    llvm::SmallVectorImpl<mlir::Value> &ioArgs,
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    const A &stmt, mlir::FunctionType ioFuncTy, bool isFormatted,
+    bool isListOrNml, [[maybe_unused]] bool isInternal,
+    [[maybe_unused]] bool isAsync,
+    const llvm::Optional<fir::ExtendedValue> &descRef,
+    Fortran::lower::StatementContext &stmtCtx) {
   auto &builder = converter.getFirOpBuilder();
-  if constexpr (hasIOCtrl) {
-    // READ/WRITE cases have a wide variety of argument permutations
-    if (isAsynch || !isFormatted) {
-      // unit (always first), ...
+  auto maybeGetFormatArgs = [&]() {
+    if (!isFormatted || isListOrNml)
+      return;
+    auto pair =
+        getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
+                  ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
+    ioArgs.push_back(std::get<0>(pair)); // format character string
+    ioArgs.push_back(std::get<1>(pair)); // format length
+  };
+  if constexpr (hasIOCtrl) { // READ or WRITE
+    if (isInternal) {
+      // descriptor or scalar variable; maybe explicit format; scratch area
+      if (descRef.hasValue()) {
+        auto desc = builder.createBox(loc, *descRef);
+        ioArgs.push_back(
+            builder.createConvert(loc, ioFuncTy.getInput(ioArgs.size()), desc));
+      } else {
+        auto pair =
+            getBuffer(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
+                      ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
+        ioArgs.push_back(std::get<0>(pair)); // scalar character variable
+        ioArgs.push_back(std::get<1>(pair)); // character length
+      }
+      maybeGetFormatArgs();
+      ioArgs.push_back( // internal scratch area buffer
+          getDefaultScratch(builder, loc, ioFuncTy.getInput(ioArgs.size())));
+      ioArgs.push_back( // buffer length
+          getDefaultScratchLen(builder, loc, ioFuncTy.getInput(ioArgs.size())));
+    } else if (isAsync) { // unit; REC; buffer and length
       ioArgs.push_back(getIOUnit(converter, loc, stmt,
                                  ioFuncTy.getInput(ioArgs.size()), stmtCtx));
-      if (isAsynch) {
-        // unknown-thingy, [buff, LEN]
-        TODO(loc, "asynchrous");
-      }
-      return;
-    }
-    assert(isFormatted && "formatted data transfer");
-    if (!isIntern) {
-      if (!isListOrNml) {
-        // | [format, LEN], ...
-        auto pair =
-            getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
-        ioArgs.push_back(std::get<0>(pair));
-        ioArgs.push_back(std::get<1>(pair));
-      }
-      // unit (always last)
+      TODO(loc, "asynchronous");
+    } else { // external IO - maybe explicit format; unit
+      maybeGetFormatArgs();
       ioArgs.push_back(getIOUnit(converter, loc, stmt,
                                  ioFuncTy.getInput(ioArgs.size()), stmtCtx));
-      return;
     }
-    assert(isIntern && "internal data transfer");
-    if (isOtherIntern) {
-      // descriptor, ...
-      assert(descRef.hasValue() && "descriptor value required");
-      auto desc = builder.createBox(loc, *descRef);
-      ioArgs.push_back(
-          builder.createConvert(loc, ioFuncTy.getInput(ioArgs.size()), desc));
-      if (!isListOrNml) {
-        // | [format, LEN], ...
-        auto pair =
-            getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
-        ioArgs.push_back(std::get<0>(pair));
-        ioArgs.push_back(std::get<1>(pair));
-      }
-    } else {
-      // | [buff, LEN], ...
-      auto pair =
-          getBuffer(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                    ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
-      ioArgs.push_back(std::get<0>(pair));
-      ioArgs.push_back(std::get<1>(pair));
-      if (!isListOrNml) {
-        // [format, LEN], ...
-        auto pair =
-            getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                      ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
-        ioArgs.push_back(std::get<0>(pair));
-        ioArgs.push_back(std::get<1>(pair));
-      }
-    }
-    // [scratch, LEN] (always last)
-    ioArgs.push_back(
-        getDefaultScratch(builder, loc, ioFuncTy.getInput(ioArgs.size())));
-    ioArgs.push_back(
-        getDefaultScratchLen(builder, loc, ioFuncTy.getInput(ioArgs.size())));
-  } else {
-    if (!isListOrNml) {
-      // [format, LEN], ...
-      auto pair =
-          getFormat(converter, loc, stmt, ioFuncTy.getInput(ioArgs.size()),
-                    ioFuncTy.getInput(ioArgs.size() + 1), stmtCtx);
-      ioArgs.push_back(std::get<0>(pair));
-      ioArgs.push_back(std::get<1>(pair));
-    }
-    // unit (always last)
+  } else { // PRINT - maybe explicit format; default unit
+    maybeGetFormatArgs();
     ioArgs.push_back(builder.create<mlir::ConstantOp>(
         loc, builder.getIntegerAttr(ioFuncTy.getInput(ioArgs.size()),
                                     Fortran::runtime::io::DefaultUnit)));
   }
+  // File name and line number are always the last two arguments.
+  ioArgs.push_back(
+      locToFilename(converter, loc, ioFuncTy.getInput(ioArgs.size())));
+  ioArgs.push_back(
+      locToLineNo(converter, loc, ioFuncTy.getInput(ioArgs.size())));
 }
 
 template <bool isInput, bool hasIOCtrl = true, typename A>
@@ -1644,32 +1616,22 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   auto loc = converter.getCurrentLocation();
   const bool isFormatted = isDataTransferFormatted(stmt);
   const bool isList = isFormatted ? isDataTransferList(stmt) : false;
-  const bool isIntern = isDataTransferInternal(stmt);
+  const bool isInternal = isDataTransferInternal(stmt);
   llvm::Optional<fir::ExtendedValue> descRef =
-      isIntern ? getIfDataTransferInternalRequiresDescriptor(converter, stmt,
-                                                             stmtCtx)
-               : llvm::None;
-  const bool isOtherIntern = descRef.hasValue();
-  const bool isAsynch = isDataTransferAsynchronous(stmt);
+      isInternal ? maybeGetInternalIODescriptor(converter, stmt, stmtCtx)
+                 : llvm::None;
+  const bool isInternalWithDesc = descRef.hasValue();
+  const bool isAsync = isDataTransferAsynchronous(stmt);
   const bool isNml = isDataTransferNamelist(stmt);
 
-  // Determine which BeginXyz call to make.
-  mlir::FuncOp ioFunc =
-      getBeginDataTransfer<isInput>(loc, builder, isFormatted, isList || isNml,
-                                    isIntern, isOtherIntern, isAsynch);
-  mlir::FunctionType ioFuncTy = ioFunc.getType();
-
-  // Append BeginXyz call arguments.  File name and line number are always last.
+  // Generate the begin data transfer function call.
+  mlir::FuncOp ioFunc = getBeginDataTransferFunc<isInput>(
+      loc, builder, isFormatted, isList || isNml, isInternal,
+      isInternalWithDesc, isAsync);
   llvm::SmallVector<mlir::Value> ioArgs;
-  genBeginCallArguments<hasIOCtrl>(ioArgs, converter, loc, stmt, ioFuncTy,
-                                   isFormatted, isList || isNml, isIntern,
-                                   isOtherIntern, isAsynch, descRef, stmtCtx);
-  ioArgs.push_back(
-      locToFilename(converter, loc, ioFuncTy.getInput(ioArgs.size())));
-  ioArgs.push_back(
-      locToLineNo(converter, loc, ioFuncTy.getInput(ioArgs.size())));
-
-  // Arguments are done; call the BeginXyz function.
+  genBeginDataTransferCallArgs<hasIOCtrl>(
+      ioArgs, converter, loc, stmt, ioFunc.getType(), isFormatted,
+      isList || isNml, isInternal, isAsync, descRef, stmtCtx);
   mlir::Value cookie =
       builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 
@@ -1684,7 +1646,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   }
 
   // Generate data transfer list calls.
-  if constexpr (isInput) { // ReadStmt
+  if constexpr (isInput) { // READ
     if (isNml)
       genNamelistIO(converter, cookie,
                     getIORuntimeFunc<mkIOKey(InputNamelist)>(loc, builder),
@@ -1704,7 +1666,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
       genOutputItemList(converter, cookie, stmt.items, isFormatted,
                         csi.hasTransferConditionSpec(), ok,
                         /*inLoop=*/false, stmtCtx);
-  } else { // PrintStmt
+  } else { // PRINT
     genOutputItemList(converter, cookie, std::get<1>(stmt.t), isFormatted,
                       csi.hasTransferConditionSpec(), ok,
                       /*inLoop=*/false, stmtCtx);
