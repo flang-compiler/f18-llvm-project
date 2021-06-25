@@ -25,6 +25,7 @@ add_flang_library(FortranLower
   ReductionRuntime.cpp
   Runtime.cpp
   SymbolMap.cpp
+  TransformationalRuntime.cpp
 
   DEPENDS
   FIRDialect

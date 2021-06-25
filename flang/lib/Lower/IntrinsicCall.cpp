@@ -29,6 +29,7 @@
 #include "flang/Lower/ReductionRuntime.h"
 #include "flang/Lower/Runtime.h"
 #include "flang/Lower/Todo.h"
+#include "flang/Lower/TransformationalRuntime.h"
 #include "flang/Optimizer/Support/FatalError.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/Debug.h"
@@ -440,6 +441,7 @@ struct IntrinsicLibrary {
   fir::ExtendedValue genPresent(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genProduct(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genRepeat(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
+  fir::ExtendedValue genReshape(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   mlir::Value genRRSpacing(mlir::Type resultType,
                            llvm::ArrayRef<mlir::Value> args);
   fir::ExtendedValue genScan(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
@@ -649,6 +651,13 @@ static constexpr IntrinsicHandler handlers[]{
     {"repeat",
      &I::genRepeat,
      {{{"string", asAddr}, {"ncopies", asValue}}},
+     /*isElemental=*/false},
+    {"reshape",
+     &I::genReshape,
+     {{{"source", asAddr},
+       {"shape", asAddr},
+       {"pad", asAddr},
+       {"order", asAddr}}},
      /*isElemental=*/false},
     {"rrspacing", &I::genRRSpacing},
     {"scan",
@@ -2110,6 +2119,63 @@ IntrinsicLibrary::genRepeat(mlir::Type resultType,
       },
       [&](const auto &) -> fir::ExtendedValue {
         fir::emitFatalError(loc, "result of REPEAT is not a scalar character");
+      });
+}
+
+// RESHAPE
+fir::ExtendedValue
+IntrinsicLibrary::genReshape(mlir::Type resultType,
+                             llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 4);
+
+  // Handle source argument
+  auto source = builder.createBox(loc, args[0]);
+
+  // Handle shape argument
+  auto shape = builder.createBox(loc, args[1]);
+  fir::BoxValue shapeTmp = shape;
+  auto shapeRank = shapeTmp.rank();
+  assert(shapeRank == 1);
+  auto shapeTy = shape.getType();
+  auto shapeArrTy = fir::dyn_cast_ptrOrBoxEleTy(shapeTy);
+  auto shapeSeqTy = shapeArrTy.cast<fir::SequenceType>();
+  auto shapeEleTy = shapeSeqTy.getEleTy();
+  assert(fir::isa_integer(shapeEleTy));
+  auto resultRank = shapeSeqTy.getShape();
+
+  // Handle optional pad argument
+  auto pad = isAbsent(args[2])
+                 ? builder.create<fir::AbsentOp>(
+                       loc, fir::BoxType::get(builder.getI1Type()))
+                 : builder.createBox(loc, args[2]);
+
+  // Handle optional order argument
+  auto order = isAbsent(args[3])
+                   ? builder.create<fir::AbsentOp>(
+                         loc, fir::BoxType::get(builder.getI1Type()))
+                   : builder.createBox(loc, args[3]);
+
+  // Create mutable fir.box to be passed to the runtime for the result.
+  auto type = builder.getVarLenSeqTy(resultType, resultRank[0]);
+  auto resultMutableBox =
+      Fortran::lower::createTempMutableBox(builder, loc, type);
+
+  auto resultIrBox =
+      Fortran::lower::getMutableIRBox(builder, loc, resultMutableBox);
+
+  Fortran::lower::genReshape(builder, loc, resultIrBox, source, shape, pad,
+                             order);
+
+  // Handle cleanup of allocatable result descriptor and return
+  auto res = Fortran::lower::genMutableBoxRead(builder, loc, resultMutableBox);
+  return res.match(
+      [&](const fir::ArrayBoxValue &box) -> fir::ExtendedValue {
+        // Add cleanup code
+        addCleanUpForTemp(loc, box.getAddr());
+        return box;
+      },
+      [&](const auto &) -> fir::ExtendedValue {
+        fir::emitFatalError(loc, "unexpected result for RESHAPE");
       });
 }
 
