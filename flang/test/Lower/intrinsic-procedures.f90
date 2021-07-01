@@ -171,12 +171,11 @@ end
 
 ! CPU_TIME
 ! CHECK-LABEL: cpu_time_test
-subroutine cpu_time_test
-  ! CHECK: %[[t:[0-9]+]] = fir.alloca f32 {bindc_name = "t"
+subroutine cpu_time_test(t)
   real :: t
   ! CHECK: %[[result64:[0-9]+]] = fir.call @_FortranACpuTime() : () -> f64
   ! CHECK: %[[result32:[0-9]+]] = fir.convert %[[result64]] : (f64) -> f32
-  ! CHECK: fir.store %[[result32]] to %[[t]] : !fir.ref<f32>
+  ! CHECK: fir.store %[[result32]] to %arg0 : !fir.ref<f32>
   call cpu_time(t)
 end subroutine
 

@@ -1841,6 +1841,7 @@ IntrinsicLibrary::genCount(mlir::Type resultType,
 void IntrinsicLibrary::genCpuTime(llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 1);
   auto arg = args[0].getUnboxed();
+  assert(arg && "nonscalar cpu_time argument");
   auto res1 = Fortran::lower::genCpuTime(builder, loc);
   auto res2 =
       builder.createConvert(loc, fir::dyn_cast_ptrEleTy(arg->getType()), res1);
