@@ -70,6 +70,7 @@ void genSyncTeamStatement(AbstractConverter &, const parser::SyncTeamStmt &);
 void genUnlockStatement(AbstractConverter &, const parser::UnlockStmt &);
 void genPauseStatement(AbstractConverter &, const parser::PauseStmt &);
 
+mlir::Value genCpuTime(FirOpBuilder &, mlir::Location);
 void genDateAndTime(FirOpBuilder &, mlir::Location,
                     llvm::Optional<fir::CharBoxValue> date,
                     llvm::Optional<fir::CharBoxValue> time,

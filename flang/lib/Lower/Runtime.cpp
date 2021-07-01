@@ -11,6 +11,7 @@
 #include "../runtime/clock.h"
 #include "../runtime/random.h"
 #include "../runtime/stop.h"
+#include "../runtime/time-intrinsic.h"
 #include "RTBuilder.h"
 #include "StatementContext.h"
 #include "flang/Lower/Bridge.h"
@@ -183,6 +184,12 @@ void Fortran::lower::genPauseStatement(
   auto loc = converter.getCurrentLocation();
   auto callee = getRuntimeFunc<mkRTKey(PauseStatement)>(loc, builder);
   builder.create<fir::CallOp>(loc, callee, llvm::None);
+}
+
+mlir::Value Fortran::lower::genCpuTime(Fortran::lower::FirOpBuilder &builder,
+                                       mlir::Location loc) {
+  auto func = getRuntimeFunc<mkRTKey(CpuTime)>(loc, builder);
+  return builder.create<fir::CallOp>(loc, func, llvm::None).getResult(0);
 }
 
 void Fortran::lower::genDateAndTime(Fortran::lower::FirOpBuilder &builder,
