@@ -329,6 +329,7 @@ public:
   bool createHostAssociateVarClone(
       const Fortran::semantics::Symbol &sym) override final {
     auto loc = genLocation(sym.name());
+    mlir::Type symType = genType(sym);
     const auto *details = sym.detailsIf<Fortran::semantics::HostAssocDetails>();
     assert(details != nullptr && "No host-association found");
     const Fortran::semantics::Symbol &hsym = details->symbol();
@@ -336,23 +337,15 @@ public:
 
     auto allocate = [&](llvm::ArrayRef<mlir::Value> shape,
                         llvm::ArrayRef<mlir::Value> typeParams) -> mlir::Value {
-      mlir::Type symType = genType(sym);
-      return builder->allocateLocal(
+      auto allocVal = builder->allocateLocal(
           loc, symType, mangleName(sym), toStringRef(sym.GetUltimate().name()),
           /*pinned=*/true, shape, typeParams,
           sym.GetUltimate().attrs().test(Fortran::semantics::Attr::TARGET));
-    };
-
-    auto getExtendedValue = [&](Fortran::lower::SymbolBox sb) {
-      return sb.match(
-          [&](const Fortran::lower::SymbolBox::PointerOrAllocatable &box) {
-            return fir::factory::genMutableBoxRead(*builder, loc, box);
-          },
-          [&sb](auto &) { return sb.toExtendedValue(); });
+      return allocVal;
     };
 
     fir::ExtendedValue hexv = getExtendedValue(hsb);
-    auto exval = hexv.match(
+    auto exv = hexv.match(
         [&](const fir::BoxValue &box) -> fir::ExtendedValue {
           const auto *type = sym.GetType();
           if (type && type->IsPolymorphic())
@@ -380,7 +373,33 @@ public:
                                fir::getTypeParams(hexv));
           return fir::substBase(hexv, temp);
         });
-    return bindSymbol(sym, exval);
+
+    return bindSymbol(sym, exv);
+  }
+
+  void
+  copyHostAssociateVar(const Fortran::semantics::Symbol &sym) override final {
+    Fortran::lower::SymbolBox sb = lookupSymbol(sym);
+    fir::ExtendedValue exv = getExtendedValue(sb);
+
+    const auto *details = sym.detailsIf<Fortran::semantics::HostAssocDetails>();
+    assert(details != nullptr && "No host-association found");
+    const Fortran::semantics::Symbol &hsym = details->symbol();
+    Fortran::lower::SymbolBox hsb = lookupSymbol(hsym);
+    fir::ExtendedValue hexv = getExtendedValue(hsb);
+
+    auto loc = genLocation(sym.name());
+    mlir::Type symType = genType(sym);
+    if (auto seqTy = symType.dyn_cast<fir::SequenceType>()) {
+      Fortran::lower::StatementContext stmtCtx;
+      createSomeArrayAssignment(*this, exv, hexv, localSymbols, stmtCtx);
+      stmtCtx.finalize();
+    } else if (hsb.toExtendedValue().getBoxOf<fir::MutableBoxValue>()) {
+      TODO(loc, "firstprivatisation of allocatable variables");
+    } else {
+      auto loadVal = builder->create<fir::LoadOp>(loc, getSymbolAddress(hsym));
+      builder->create<fir::StoreOp>(loc, loadVal, getSymbolAddress(sym));
+    }
   }
 
   mlir::Location getCurrentLocation() override final { return toLocation(); }
@@ -469,6 +488,15 @@ private:
     // cast if needed.
     localSymbols.addCharSymbol(sym, val, len, forced);
     return true;
+  }
+
+  fir::ExtendedValue getExtendedValue(Fortran::lower::SymbolBox sb) {
+    return sb.match(
+        [&](const Fortran::lower::SymbolBox::PointerOrAllocatable &box) {
+          return fir::factory::genMutableBoxRead(*builder,
+                                                   getCurrentLocation(), box);
+        },
+        [&sb](auto &) { return sb.toExtendedValue(); });
   }
 
   mlir::Value createTemp(mlir::Location loc,

@@ -29,35 +29,48 @@ getDesignatorNameIfDataRef(const Fortran::parser::Designator &designator) {
   return dataRef ? std::get_if<Fortran::parser::Name>(&dataRef->u) : nullptr;
 }
 
+template <typename T>
+static void createPrivateVarSyms(Fortran::lower::AbstractConverter &converter,
+                                 const T *clause) {
+  Fortran::semantics::Symbol *sym = nullptr;
+  const Fortran::parser::OmpObjectList &ompObjectList = clause->v;
+  for (const auto &ompObject : ompObjectList.v) {
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::Designator &designator) {
+              if (const auto *name = getDesignatorNameIfDataRef(designator)) {
+                sym = name->symbol;
+              }
+            },
+            [&](const Fortran::parser::Name &name) { sym = name.symbol; }},
+        ompObject.u);
+
+    // Privatization for symbols which are pre-determined (like loop index
+    // variables) happen separately, for everything else privatize here
+    if (!sym->test(Fortran::semantics::Symbol::Flag::OmpPreDetermined)) {
+      [[maybe_unused]] bool success = converter.createHostAssociateVarClone(*sym);
+      assert(success && "Privatization failed due to existing binding");
+      constexpr bool init =
+          std::is_same_v<T, Fortran::parser::OmpClause::Firstprivate>;
+      if (init)
+        converter.copyHostAssociateVar(*sym);
+    }
+  }
+}
+
 static void privatizeVars(Fortran::lower::AbstractConverter &converter,
                           const Fortran::parser::OmpClauseList &opClauseList) {
   auto &firOpBuilder = converter.getFirOpBuilder();
-  Fortran::semantics::Symbol *sym = nullptr;
   auto insPt = firOpBuilder.saveInsertionPoint();
   firOpBuilder.setInsertionPointToStart(firOpBuilder.getAllocaBlock());
   for (const auto &clause : opClauseList.v) {
     if (const auto &privateClause =
             std::get_if<Fortran::parser::OmpClause::Private>(&clause.u)) {
-      const Fortran::parser::OmpObjectList &ompObjectList = privateClause->v;
-      for (const auto &ompObject : ompObjectList.v) {
-        std::visit(
-            Fortran::common::visitors{
-                [&](const Fortran::parser::Designator &designator) {
-                  if (const auto *name =
-                          getDesignatorNameIfDataRef(designator)) {
-                    sym = name->symbol;
-                  }
-                },
-                [&](const Fortran::parser::Name &name) { sym = name.symbol; }},
-            ompObject.u);
-        // Privatization for symbols which are pre-determined (like loop index
-        // variables) happen separately, for everything else privatize here
-        if (!sym->test(Fortran::semantics::Symbol::Flag::OmpPreDetermined)) {
-          [[maybe_unused]] bool success =
-              converter.createHostAssociateVarClone(*sym);
-          assert(success && "Privatization failed due to existing binding");
-        }
-      }
+      createPrivateVarSyms(converter, privateClause);
+    } else if (const auto &firstPrivateClause =
+                   std::get_if<Fortran::parser::OmpClause::Firstprivate>(
+                       &clause.u)) {
+      createPrivateVarSyms(converter, firstPrivateClause);
     }
   }
   firOpBuilder.restoreInsertionPoint(insPt);
@@ -229,12 +242,6 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
                        &clause.u)) {
       numThreadsClauseOperand = fir::getBase(converter.genExprValue(
           *Fortran::semantics::GetExpr(numThreadsClause->v), stmtCtx));
-    } else if (const auto &firstprivateClause =
-                   std::get_if<Fortran::parser::OmpClause::Firstprivate>(
-                       &clause.u)) {
-      const Fortran::parser::OmpObjectList &ompObjectList =
-          firstprivateClause->v;
-      genObjectList(ompObjectList, converter, firstprivateClauseOperands);
     } else if (const auto &sharedClause =
                    std::get_if<Fortran::parser::OmpClause::Shared>(&clause.u)) {
       const Fortran::parser::OmpObjectList &ompObjectList = sharedClause->v;
@@ -446,16 +453,6 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     createParallelOp<Fortran::parser::OmpBeginLoopDirective, true>(
         converter, eval,
         std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t));
-  } else {
-    for (const auto &clause : wsLoopOpClauseList.v) {
-      if (const auto &firstPrivateClause =
-              std::get_if<Fortran::parser::OmpClause::Firstprivate>(
-                  &clause.u)) {
-        const Fortran::parser::OmpObjectList &ompObjectList =
-            firstPrivateClause->v;
-        genObjectList(ompObjectList, converter, firstPrivateClauseOperands);
-      }
-    }
   }
   for (const auto &clause : wsLoopOpClauseList.v) {
     if (const auto &lastPrivateClause =

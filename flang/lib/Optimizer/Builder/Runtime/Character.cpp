@@ -112,7 +112,7 @@ mlir::Value fir::runtime::genCharCompare(fir::FirOpBuilder &builder,
   auto allocateIfNotInMemory = [&](mlir::Value base) -> mlir::Value {
     if (fir::isa_ref_type(base.getType()))
       return base;
-    auto mem = builder.create<fir::AllocaOp>(loc, base.getType());
+    auto mem = builder.create<fir::AllocaOp>(loc, base.getType(), /*pinned=*/false);
     builder.create<fir::StoreOp>(loc, base, mem);
     return mem;
   };
