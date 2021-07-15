@@ -2051,9 +2051,9 @@ public:
         // some compilers are not complaining about it.  The front end is not
         // protecting lowering from this currently. Support this with a
         // discouraging warning.
-        mlir::emitWarning(loc,
-                          "return type mismatches were never standard"
-                          " compliant and may lead to undefined behavior.");
+        LLVM_DEBUG(mlir::emitWarning(
+            loc, "a return type mismatch is not standard compliant and may "
+                 "lead to undefined behavior."));
         // Cast the actual function to the current caller implicit type because
         // that is the behavior we would get if we could not see the definition.
         funcPointer =
