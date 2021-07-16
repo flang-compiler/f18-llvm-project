@@ -2404,7 +2404,7 @@ void IntrinsicLibrary::genMvbits(llvm::ArrayRef<fir::ExtendedValue> args) {
   //     TOPOS >= 0
   //     FROMPOS + LEN <= BIT_SIZE(FROM)
   //     TOPOS + LEN <= BIT_SIZE(TO)
-  // MASK = -1 >> (BIT_SIZE(I) - LEN)
+  // MASK = -1 >> (BIT_SIZE(FROM) - LEN)
   // TO = LEN == 0 ? TO : ((!(MASK << TOPOS)) & TO) |
   //                      (((FROM >> FROMPOS) & MASK) << TOPOS)
   assert(args.size() == 5);
