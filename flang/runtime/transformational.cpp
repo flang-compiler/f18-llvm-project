@@ -521,9 +521,10 @@ void RTNAME(Unpack)(Descriptor &result, const Descriptor &vector,
     }
     result.IncrementSubscripts(resultAt);
     mask.IncrementSubscripts(maskAt);
-    field.IncrementSubscripts(fieldAt);
+    if (field.rank() != 0) { // scalar "field" argument
+      field.IncrementSubscripts(fieldAt);
+    }
   }
 }
-
 } // extern "C"
 } // namespace Fortran::runtime

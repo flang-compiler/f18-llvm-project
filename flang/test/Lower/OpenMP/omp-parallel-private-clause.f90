@@ -3,39 +3,41 @@
 
 ! RUN: bbc -fopenmp -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
-! RUN: bbc -fopenmp %s -o - | \
-! RUN:   tco --disable-llvm --print-ir-after=fir-to-llvm-ir 2>&1 | \
-! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
 
-!FIRDialect: func @_QPprivate_clause(%[[ARG1:.*]]: !fir.ref<i32>, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>) {
-!FIRDialect-DAG: %[[ALPHA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Ealpha"}
-!FIRDialect-DAG: %[[BETA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Ebeta"}
-!FIRDialect-DAG: %[[GAMA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Egama"}
-!FIRDialect-DAG: %[[ALPHA_ARRAY:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}uniq_name = "{{.*}}Ealpha_array"}
-!FIRDialect-DAG:  omp.parallel private(%[[ALPHA]] : !fir.ref<i32>, %[[BETA]] : !fir.ref<i32>, %[[GAMA]] : !fir.ref<i32>,
-!%[[ALPHA_ARRAY]] : !fir.ref<!fir.array<10xi32>>, %[[ARG1]] : !fir.ref<i32>, %[[ARG2]] : !fir.ref<!fir.array<10xi32>>)) {
+!FIRDialect: func @_QPprivate_clause(%[[ARG1:.*]]: !fir.ref<i32>, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>, %[[ARG3:.*]]: !fir.boxchar<1>, %[[ARG4:.*]]: !fir.boxchar<1>) {
+!FIRDialect-DAG: %[[ALPHA:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"}
+!FIRDialect-DAG: %[[ALPHA_ARRAY:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Ealpha_array"}
+!FIRDialect-DAG: %[[BETA:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Ebeta"}
+!FIRDialect-DAG: %[[BETA_ARRAY:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Ebeta_array"}
+
+!FIRDialect-DAG:  omp.parallel {
+!FIRDialect-DAG: %[[ALPHA_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"}
+!FIRDialect-DAG: %[[ALPHA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Ealpha_array"}
+!FIRDialect-DAG: %[[BETA_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Ebeta"}
+!FIRDialect-DAG: %[[BETA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Ebeta_array"}
+!FIRDialect-DAG: %[[ARG1_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Earg1"}
+!FIRDialect-DAG: %[[ARG2_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Earg2"}
+!FIRDialect-DAG: %[[ARG3_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Earg3"}
+!FIRDialect-DAG: %[[ARG4_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Earg4"}
 !FIRDialect:    omp.terminator
 !FIRDialect:  }
 
-!LLVMDialect: llvm.func @_QPprivate_clause(%[[ARG1:.*]]: !llvm.ptr<i32>, %[[ARG2:.*]]: !llvm.ptr<array<10 x i32>>) {
-!LLVMIRDialect-DAG: %[[ALPHA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"} : (i64) -> !llvm.ptr<i32>
-!LLVMIRDialect-DAG: %[[BETA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Ebeta"} : (i64) -> !llvm.ptr<i32>
-!LLVMIRDialect-DAG: %[[GAMA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Egama"} : (i64) -> !llvm.ptr<i32>
-!LLVMIRDialect-DAG: %[[ALPHA_ARRAY:.*]] = llvm.alloca %{{.*}} x !llvm.array<10 x i32> {{{.*}}, uniq_name = "{{.*}}Ealpha_array"} : (i64) -> !llvm.ptr<array<10 x i32>>
-!LLVMIRDialect:  omp.parallel private(%[[ALPHA]] : !llvm.ptr<i32>, %[[BETA]] : !llvm.ptr<i32>, %[[GAMA]] : !llvm.ptr<i32>,
-!%[[ALPHA_ARRAY]] : !llvm.ptr<array<10 x i32>>, %[[ARG1]] : !llvm.ptr<i32>, %[[ARG2]] : !llvm.ptr<array<10 x i32>>) {
-!LLVMIRDialect:    omp.terminator
-!LLVMIRDialect:  }
-
-subroutine private_clause(arg1, arg2)
+subroutine private_clause(arg1, arg2, arg3, arg4)
 
         integer :: arg1, arg2(10)
-        integer :: alpha, beta, gama
-        integer :: alpha_array(10)
+        integer :: alpha, alpha_array(10)
+        character(5) :: arg3, arg4(10)
+        character(5) :: beta, beta_array(10)
 
-!$OMP PARALLEL PRIVATE(alpha, beta, gama, alpha_array, arg1, arg2)
-        print*, "PRIVATE"
-        print*, alpha, beta, gama
+!$OMP PARALLEL PRIVATE(alpha, alpha_array, beta, beta_array, arg1, arg2, arg3, arg4)
+        alpha = 1
+        alpha_array = 4
+        beta = "hi"
+        beta_array = "hi"
+        arg1 = 2
+        arg2 = 3
+        arg3 = "world"
+        arg4 = "world"
 !$OMP END PARALLEL
 
 end subroutine

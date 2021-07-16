@@ -29,12 +29,41 @@ getDesignatorNameIfDataRef(const Fortran::parser::Designator &designator) {
   return dataRef ? std::get_if<Fortran::parser::Name>(&dataRef->u) : nullptr;
 }
 
+static void privatiseVars(Fortran::lower::AbstractConverter &converter,
+                          const Fortran::parser::OmpClauseList &opClauseList) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  Fortran::semantics::Symbol *sym = nullptr;
+  auto insPt = firOpBuilder.saveInsertionPoint();
+  firOpBuilder.setInsertionPointToStart(firOpBuilder.getAllocaBlock());
+  for (const auto &clause : opClauseList.v) {
+    if (const auto &privateClause =
+            std::get_if<Fortran::parser::OmpClause::Private>(&clause.u)) {
+      const Fortran::parser::OmpObjectList &ompObjectList = privateClause->v;
+      for (const auto &ompObject : ompObjectList.v) {
+        std::visit(
+            Fortran::common::visitors{
+                [&](const Fortran::parser::Designator &designator) {
+                  if (const auto *name =
+                          getDesignatorNameIfDataRef(designator)) {
+                    sym = name->symbol;
+                  }
+                },
+                [&](const Fortran::parser::Name &name) { sym = name.symbol; }},
+            ompObject.u);
+        [[maybe_unused]] bool success =
+            converter.createHostAssociateVarClone(*sym);
+        assert(success && "Privatisation failed due to existing binding");
+      }
+    }
+  }
+  firOpBuilder.restoreInsertionPoint(insPt);
+}
+
 static void genObjectList(const Fortran::parser::OmpObjectList &objectList,
                           Fortran::lower::AbstractConverter &converter,
                           SmallVectorImpl<Value> &operands) {
   auto addOperands = [&](Fortran::lower::SymbolRef sym) {
     const auto variable = converter.getSymbolAddress(sym);
-    // TODO: Might need revisiting to handle for non-shared clauses
     if (variable) {
       operands.push_back(variable);
     } else {
@@ -61,9 +90,11 @@ static void genObjectList(const Fortran::parser::OmpObjectList &objectList,
 }
 
 template <typename Op>
-static void createBodyOfOp(Op &op, Fortran::lower::AbstractConverter &converter,
-                           mlir::Location &loc,
-                           const Fortran::semantics::Symbol *arg = nullptr) {
+static void
+createBodyOfOp(Op &op, Fortran::lower::AbstractConverter &converter,
+               mlir::Location &loc,
+               const Fortran::parser::OmpClauseList *clauses = nullptr,
+               const Fortran::semantics::Symbol *arg = nullptr) {
   auto &firOpBuilder = converter.getFirOpBuilder();
   // If an argument for the region is provided then create the block with that
   // argument. Also update the symbol's address with the mlir argument value.
@@ -71,8 +102,8 @@ static void createBodyOfOp(Op &op, Fortran::lower::AbstractConverter &converter,
   // uses of the induction variable should use this mlir value.
   if (arg) {
     firOpBuilder.createBlock(&op.getRegion(), {}, {converter.genType(*arg)});
-    [[maybe_unused]] bool success =
-        converter.bindSymbol(*arg, op.getRegion().front().getArgument(0));
+    fir::ExtendedValue exval = op.getRegion().front().getArgument(0);
+    [[maybe_unused]] bool success = converter.bindSymbol(*arg, exval);
     assert(
         success &&
         "Existing binding prevents setting MLIR value for the index variable");
@@ -90,6 +121,8 @@ static void createBodyOfOp(Op &op, Fortran::lower::AbstractConverter &converter,
   }
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
+  if (clauses)
+    privatiseVars(converter, *clauses);
 }
 
 static void genOMP(Fortran::lower::AbstractConverter &converter,
@@ -186,11 +219,6 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
                        &clause.u)) {
       numThreadsClauseOperand = fir::getBase(converter.genExprValue(
           *Fortran::semantics::GetExpr(numThreadsClause->v), stmtCtx));
-    } else if (const auto &privateClause =
-                   std::get_if<Fortran::parser::OmpClause::Private>(
-                       &clause.u)) {
-      const Fortran::parser::OmpObjectList &ompObjectList = privateClause->v;
-      genObjectList(ompObjectList, converter, privateClauseOperands);
     } else if (const auto &firstprivateClause =
                    std::get_if<Fortran::parser::OmpClause::Firstprivate>(
                        &clause.u)) {
@@ -282,7 +310,9 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
       }
     }
   }
-  createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation);
+
+  createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation,
+                                  &opClauseList);
 }
 
 static void
@@ -329,13 +359,9 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
         std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t));
   } else {
     for (const auto &clause : wsLoopOpClauseList.v) {
-      if (const auto &privateClause =
-              std::get_if<Fortran::parser::OmpClause::Private>(&clause.u)) {
-        const Fortran::parser::OmpObjectList &ompObjectList = privateClause->v;
-        genObjectList(ompObjectList, converter, privateClauseOperands);
-      } else if (const auto &firstPrivateClause =
-                     std::get_if<Fortran::parser::OmpClause::Firstprivate>(
-                         &clause.u)) {
+      if (const auto &firstPrivateClause =
+              std::get_if<Fortran::parser::OmpClause::Firstprivate>(
+                  &clause.u)) {
         const Fortran::parser::OmpObjectList &ompObjectList =
             firstPrivateClause->v;
         genObjectList(ompObjectList, converter, firstPrivateClauseOperands);
@@ -470,7 +496,8 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
         wsLoopOp.nowaitAttr(firOpBuilder.getUnitAttr());
   }
 
-  createBodyOfOp<omp::WsLoopOp>(wsLoopOp, converter, currentLocation, iv);
+  createBodyOfOp<omp::WsLoopOp>(wsLoopOp, converter, currentLocation,
+                                &wsLoopOpClauseList, iv);
 }
 
 void Fortran::lower::genOpenMPConstruct(

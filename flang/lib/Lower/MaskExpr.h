@@ -61,9 +61,11 @@ public:
     return maskList;
   }
 
+  /// Hold the address and shapeOp of lowered mask expressions.
+  using MaskAddrAndShape = std::pair<mlir::Value, mlir::Value>;
   // Map each mask expression back to the temporary holding the initial
   // evaluation results.
-  llvm::DenseMap<FrontEndMaskExpr, mlir::Value> vmap;
+  llvm::DenseMap<FrontEndMaskExpr, MaskAddrAndShape> vmap;
 
   // Inflate the statement context for the entire WHERE construct. We have to
   // cache the mask expression results across the entire construct.

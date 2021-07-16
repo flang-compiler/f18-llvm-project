@@ -75,16 +75,21 @@ public:
   /// Copy the binding of src to target symbol.
   virtual void copySymbolBinding(SymbolRef src, SymbolRef target) = 0;
 
-  /// Binds the symbol to an mlir value and returns true if the symbol has no
-  /// existing binding. If there is an existing binding this function does
-  /// nothing and returns false.
-  virtual bool bindSymbol(const SymbolRef sym, mlir::Value val) = 0;
+  /// Binds the symbol to an fir extended value and returns true if the symbol
+  /// has no existing binding. If there is an existing binding this function
+  /// does nothing and returns false.
+  virtual bool bindSymbol(const SymbolRef sym,
+                          const fir::ExtendedValue &exval) = 0;
 
   /// Get the label set associated with a symbol.
   virtual bool lookupLabelSet(SymbolRef sym, pft::LabelSet &labelSet) = 0;
 
   /// Get the code defined by a label
   virtual pft::Evaluation *lookupLabel(pft::Label label) = 0;
+
+  /// For a give symbol which is host-associated, create a clone using parameters from
+  /// the host-associated symbol.
+  virtual bool createHostAssociateVarClone(const Fortran::semantics::Symbol &sym) = 0;
 
   //===--------------------------------------------------------------------===//
   // Expressions

@@ -257,10 +257,10 @@ public:
   }
 
   bool bindSymbol(Fortran::lower::SymbolRef sym,
-                  mlir::Value val) override final {
+                  const fir::ExtendedValue &exval) override final {
     if (lookupSymbol(sym))
       return false;
-    addSymbol(sym, val);
+    localSymbols.addSymbol(sym, exval);
     return true;
   }
 
@@ -338,6 +338,64 @@ public:
     return Fortran::lower::getFIRType(
         &getMLIRContext(), tc, bridge.getDefaultKinds().GetDefaultKind(tc),
         llvm::None);
+  }
+
+  bool createHostAssociateVarClone(
+      const Fortran::semantics::Symbol &sym) override final {
+    auto loc = genLocation(sym.name());
+    const auto *details = sym.detailsIf<Fortran::semantics::HostAssocDetails>();
+    assert(details != nullptr && "No host-association found");
+    const Fortran::semantics::Symbol &hsym = details->symbol();
+    Fortran::lower::SymbolBox hsb = lookupSymbol(hsym);
+
+    auto allocate = [&](llvm::ArrayRef<mlir::Value> shape,
+                        llvm::ArrayRef<mlir::Value> typeParams) -> mlir::Value {
+      mlir::Type symType = genType(sym);
+      return builder->allocateLocal(
+          loc, symType, mangleName(sym), toStringRef(sym.GetUltimate().name()),
+          shape, typeParams,
+          sym.GetUltimate().attrs().test(Fortran::semantics::Attr::TARGET));
+    };
+
+    auto getExtendedValue = [&](Fortran::lower::SymbolBox sb) {
+      return sb.match(
+          [&](const Fortran::lower::SymbolBox::PointerOrAllocatable &box) {
+            return Fortran::lower::genMutableBoxRead(*builder, loc, box)
+                .toExtendedValue();
+          },
+          [&sb](auto &) { return sb.toExtendedValue(); });
+    };
+
+    fir::ExtendedValue hexv = getExtendedValue(hsb);
+    auto exval = hexv.match(
+        [&](const fir::BoxValue &box) -> fir::ExtendedValue {
+          const auto *type = sym.GetType();
+          if (type && type->IsPolymorphic())
+            TODO(loc, "create polymorphic host associated copy");
+          // Create a contiguous temp with the same shape and length as
+          // the original variable described by a fir.box.
+          auto extents = Fortran::lower::getExtents(*builder, loc, hexv);
+          if (box.isDerivedWithLengthParameters())
+            TODO(loc, "get length parameters from derived type BoxValue");
+          if (box.isCharacter()) {
+            auto len = Fortran::lower::readCharLen(*builder, loc, box);
+            auto temp = allocate(extents, {len});
+            return fir::CharArrayBoxValue{temp, len, extents};
+          }
+          return fir::ArrayBoxValue{allocate(extents, {}), extents};
+        },
+        [&](const fir::MutableBoxValue &box) -> fir::ExtendedValue {
+          // Allocate storage for a pointer/allocatble descriptor.
+          // No shape/lengths to be passed to the alloca.
+          return fir::MutableBoxValue(allocate({}, {}),
+                                      box.nonDeferredLenParams(), {});
+        },
+        [&](const auto &) -> fir::ExtendedValue {
+          auto temp = allocate(Fortran::lower::getExtents(*builder, loc, hexv),
+                               fir::getTypeParams(hexv));
+          return fir::substBase(hexv, temp);
+        });
+    return bindSymbol(sym, exval);
   }
 
   mlir::Location getCurrentLocation() override final { return toLocation(); }

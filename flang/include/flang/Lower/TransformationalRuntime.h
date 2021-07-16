@@ -23,8 +23,16 @@ void genReshape(FirOpBuilder &builder, mlir::Location loc,
                 mlir::Value resultBox, mlir::Value sourceBox,
                 mlir::Value shapeBox, mlir::Value padBox, mlir::Value orderBox);
 
+void genSpread(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
+               mlir::Value resultBox, mlir::Value sourceBox, mlir::Value dim,
+               mlir::Value ncopies);
+
 void genTranspose(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
                   mlir::Value resultBox, mlir::Value sourceBox);
+
+void genUnpack(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
+               mlir::Value resultBox, mlir::Value vectorBox,
+               mlir::Value maskBox, mlir::Value fieldBox);
 
 } // namespace Fortran::lower
 

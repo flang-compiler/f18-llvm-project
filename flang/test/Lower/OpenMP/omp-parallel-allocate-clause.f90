@@ -1,6 +1,6 @@
 ! This test checks lowering of OpenMP parallel Directive with
 ! `PRIVATE` clause present.
-
+! XFAIL: *
 ! RUN: %bbc -fopenmp -emit-fir %s -o  - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 

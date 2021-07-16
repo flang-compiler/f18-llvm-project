@@ -107,6 +107,10 @@ fir::ExtendedValue Fortran::lower::getAbsentIntrinsicArgument() {
 static bool isAbsent(const fir::ExtendedValue &exv) {
   return !fir::getBase(exv);
 }
+static bool isAbsent(llvm::ArrayRef<fir::ExtendedValue> args,
+                     unsigned argIndex) {
+  return args.size() <= argIndex || isAbsent(args[argIndex]);
+}
 
 /// Test if an ExtendedValue is present.
 static bool isPresent(const fir::ExtendedValue &exv) { return !isAbsent(exv); }
@@ -404,6 +408,12 @@ struct IntrinsicLibrary {
                           mlir::FunctionType soughtFuncType);
 
   mlir::Value genAbs(mlir::Type, llvm::ArrayRef<mlir::Value>);
+
+  template <void (*CallRuntime)(Fortran::lower::FirOpBuilder &,
+                                mlir::Location loc, mlir::Value, mlir::Value)>
+     fir::ExtendedValue genAdjustRtCall(mlir::Type,
+                                 llvm::ArrayRef<fir::ExtendedValue>);
+
   mlir::Value genAimag(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genAint(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genAll(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
@@ -464,12 +474,14 @@ struct IntrinsicLibrary {
   mlir::Value genSign(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genSpacing(mlir::Type resultType,
                          llvm::ArrayRef<mlir::Value> args);
+  fir::ExtendedValue genSpread(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genSum(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genTransfer(mlir::Type,
                                  llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genTranspose(mlir::Type,
                                   llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genTrim(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
+  fir::ExtendedValue genUnpack(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genVerify(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   /// Implement all conversion functions like DBLE, the first argument is
   /// the value to convert. There may be an additional KIND arguments that
@@ -579,6 +591,12 @@ using I = IntrinsicLibrary;
 static constexpr IntrinsicHandler handlers[]{
     {"abs", &I::genAbs},
     {"achar", &I::genChar},
+    {"adjustl", &I::genAdjustRtCall<Fortran::lower::genAdjustL>,
+      {{{"string", asAddr}}},   
+      /*isElemental=*/true},
+    {"adjustr", &I::genAdjustRtCall<Fortran::lower::genAdjustR>,
+      {{{"string", asAddr}}},   
+      /*isElemental=*/true},
     {"aimag", &I::genAimag},
     {"aint", &I::genAint},
     {"all",
@@ -723,6 +741,10 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/true},
     {"sign", &I::genSign},
     {"spacing", &I::genSpacing},
+    {"spread",
+     &I::genSpread,
+     {{{"source", asAddr}, {"dim", asValue}, {"ncopies", asValue}}},
+     /*isElemental=*/false},
     {"sum",
      &I::genSum,
      {{{"array", asAddr}, {"dim", asValue}, {"mask", asAddr}}},
@@ -736,6 +758,10 @@ static constexpr IntrinsicHandler handlers[]{
      {{{"matrix", asAddr}}},
      /*isElemental=*/false},
     {"trim", &I::genTrim, {{{"string", asAddr}}}, /*isElemental=*/false},
+    {"unpack",
+     &I::genUnpack,
+     {{{"vector", asAddr}, {"mask", asAddr}, {"field", asAddr}}},
+     /*isElemental=*/false},
     {"verify",
      &I::genVerify,
      {{{"string", asAddr},
@@ -1621,6 +1647,37 @@ mlir::Value IntrinsicLibrary::genAbs(mlir::Type resultType,
   llvm_unreachable("unexpected type in ABS argument");
 }
 
+// ADJUSTL & ADJUSTR
+template<void (*CallRuntime)(Fortran::lower::FirOpBuilder &, 
+                             mlir::Location loc, 
+                             mlir::Value, mlir::Value)>
+fir::ExtendedValue IntrinsicLibrary::genAdjustRtCall(mlir::Type resultType,
+                          llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 1);
+  auto string = builder.createBox(loc, args[0]);
+  // Create a mutable fir.box to be passed to the runtime for the result.
+  auto resultMutableBox =
+      Fortran::lower::createTempMutableBox(builder, loc, resultType);
+  auto resultIrBox =
+      Fortran::lower::getMutableIRBox(builder, loc, resultMutableBox);
+
+  // Call the runtime -- the runtime will allocate the result.
+  CallRuntime(builder, loc, resultIrBox, string);
+
+ // Read result from mutable fir.box and add it to the list of temps to be
+  // finalized by the StatementContext.
+  auto res = Fortran::lower::genMutableBoxRead(builder, loc, resultMutableBox);
+  return res.match(
+    [&](const fir::CharBoxValue &box) -> fir::ExtendedValue {
+      addCleanUpForTemp(loc, fir::getBase(box));
+      return box;
+    },
+    [&](const auto &) -> fir::ExtendedValue {
+      fir::emitFatalError(loc, "result of ADJUSTL is not a scalar character");
+    });
+
+}
+
 // AIMAG
 mlir::Value IntrinsicLibrary::genAimag(mlir::Type resultType,
                                        llvm::ArrayRef<mlir::Value> args) {
@@ -1693,7 +1750,7 @@ IntrinsicLibrary::genAllocated(mlir::Type resultType,
 // ANINT
 mlir::Value IntrinsicLibrary::genAnint(mlir::Type resultType,
                                        llvm::ArrayRef<mlir::Value> args) {
-  assert(args.size() >= 1);
+  assert(args.size() >= 1 && args.size() <= 2);
   // Skip optional kind argument to search the runtime; it is already reflected
   // in result type.
   return genRuntimeCall("anint", resultType, {args[0]});
@@ -1767,7 +1824,7 @@ IntrinsicLibrary::genAssociated(mlir::Type resultType,
 // AINT
 mlir::Value IntrinsicLibrary::genAint(mlir::Type resultType,
                                       llvm::ArrayRef<mlir::Value> args) {
-  assert(args.size() >= 1);
+  assert(args.size() >= 1 && args.size() <= 2);
   // Skip optional kind argument to search the runtime; it is already reflected
   // in result type.
   return genRuntimeCall("aint", resultType, {args[0]});
@@ -1817,17 +1874,6 @@ IntrinsicLibrary::genChar(mlir::Type type,
   auto len =
       builder.createIntegerConstant(loc, builder.getCharacterLengthType(), 1);
   return fir::CharBoxValue{cast, len};
-}
-
-/// LGE, LGT, LLE, LLT
-template <mlir::CmpIPredicate pred>
-fir::ExtendedValue
-IntrinsicLibrary::genCharacterCompare(mlir::Type type,
-                                      llvm::ArrayRef<fir::ExtendedValue> args) {
-  assert(args.size() == 2);
-  return Fortran::lower::genCharCompare(
-      builder, loc, pred, fir::getBase(args[0]), fir::getLen(args[0]),
-      fir::getBase(args[1]), fir::getLen(args[1]));
 }
 
 // CONJG
@@ -2084,7 +2130,7 @@ mlir::Value IntrinsicLibrary::genIeor(mlir::Type resultType,
 fir::ExtendedValue
 IntrinsicLibrary::genIndex(mlir::Type resultType,
                            llvm::ArrayRef<fir::ExtendedValue> args) {
-  assert(args.size() == 4);
+  assert(args.size() >= 2 && args.size() <= 4);
 
   auto stringBase = fir::getBase(args[0]);
   auto kind =
@@ -2094,10 +2140,10 @@ IntrinsicLibrary::genIndex(mlir::Type resultType,
   auto substringBase = fir::getBase(args[1]);
   auto substringLen = fir::getLen(args[1]);
   mlir::Value back =
-      isAbsent(args[2])
+      isAbsent(args, 2)
           ? builder.createIntegerConstant(loc, builder.getI1Type(), 0)
           : fir::getBase(args[2]);
-  if (isAbsent(args[3]))
+  if (isAbsent(args, 3))
     return builder.createConvert(
         loc, resultType,
         Fortran::lower::genIndex(builder, loc, kind, stringBase, stringLen,
@@ -2114,11 +2160,11 @@ IntrinsicLibrary::genIndex(mlir::Type resultType,
     builder.create<fir::StoreOp>(loc, castb, temp);
     return builder.createBox(loc, temp);
   };
-  auto backOpt = isAbsent(args[2])
+  auto backOpt = isAbsent(args, 2)
                      ? builder.create<fir::AbsentOp>(
                            loc, fir::BoxType::get(builder.getI1Type()))
                      : makeRefThenEmbox(fir::getBase(args[2]));
-  auto kindVal = isAbsent(args[3])
+  auto kindVal = isAbsent(args, 3)
                      ? builder.createIntegerConstant(
                            loc, builder.getIndexType(),
                            builder.getKindMap().defaultIntegerKind())
@@ -2241,14 +2287,13 @@ mlir::Value IntrinsicLibrary::genIshftc(mlir::Type resultType,
 }
 
 // LEN
-// Note that this is only used for unrestricted intrinsic.
-// Usage of LEN are otherwise rewritten as descriptor inquiries by the
-// front-end.
+// Note that this is only used for an unrestricted intrinsic LEN call.
+// Other uses of LEN are rewritten as descriptor inquiries by the front-end.
 fir::ExtendedValue
 IntrinsicLibrary::genLen(mlir::Type resultType,
                          llvm::ArrayRef<fir::ExtendedValue> args) {
   // Optional KIND argument reflected in result type.
-  assert(args.size() >= 1);
+  assert(args.size() == 1); // args.size() != 2
   mlir::Value len;
   if (const auto *charBox = args[0].getCharBox()) {
     len = charBox->getLen();
@@ -2274,6 +2319,17 @@ IntrinsicLibrary::genLenTrim(mlir::Type resultType,
     TODO(loc, "character array len_trim");
   auto len = helper.createLenTrim(*charBox);
   return builder.createConvert(loc, resultType, len);
+}
+
+// LGE, LGT, LLE, LLT
+template <mlir::CmpIPredicate pred>
+fir::ExtendedValue
+IntrinsicLibrary::genCharacterCompare(mlir::Type type,
+                                      llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 2);
+  return Fortran::lower::genCharCompare(
+      builder, loc, pred, fir::getBase(args[0]), fir::getLen(args[0]),
+      fir::getBase(args[1]), fir::getLen(args[1]));
 }
 
 // MERGE
@@ -2664,6 +2720,37 @@ mlir::Value IntrinsicLibrary::genSpacing(mlir::Type resultType,
       Fortran::lower::genSpacing(builder, loc, fir::getBase(args[0])));
 }
 
+// SPREAD
+fir::ExtendedValue
+IntrinsicLibrary::genSpread(mlir::Type resultType,
+                            llvm::ArrayRef<fir::ExtendedValue> args) {
+
+  assert(args.size() == 3);
+
+  // Handle source argument
+  auto source = builder.createBox(loc, args[0]);
+  fir::BoxValue sourceTmp = source;
+  auto sourceRank = sourceTmp.rank();
+
+  // Handle Dim argument
+  auto dim = fir::getBase(args[1]);
+
+  // Handle ncopies argument
+  auto ncopies = fir::getBase(args[2]);
+
+  // Generate result descriptor
+  auto resultArrayType = builder.getVarLenSeqTy(resultType, sourceRank + 1);
+  auto resultMutableBox =
+      Fortran::lower::createTempMutableBox(builder, loc, resultArrayType);
+  auto resultIrBox =
+      Fortran::lower::getMutableIRBox(builder, loc, resultMutableBox);
+
+  Fortran::lower::genSpread(builder, loc, resultIrBox, source, dim, ncopies);
+
+  return readAndAddCleanUp(resultMutableBox, resultType,
+                           "unexpected result for SPREAD");
+}
+
 // SUM
 fir::ExtendedValue
 IntrinsicLibrary::genSum(mlir::Type resultType,
@@ -2852,6 +2939,37 @@ static mlir::Value createExtremumCompare(mlir::Location loc,
   }
   assert(result && "result must be defined");
   return result;
+}
+
+// UNPACK
+fir::ExtendedValue
+IntrinsicLibrary::genUnpack(mlir::Type resultType,
+                            llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 3);
+
+  // Handle required vector argument
+  auto vector = builder.createBox(loc, args[0]);
+  fir::BoxValue vectorTmp = builder.createBox(loc, args[0]);
+
+  // Handle required mask argument
+  auto mask = builder.createBox(loc, args[1]);
+  fir::BoxValue maskTmp = builder.createBox(loc, args[1]);
+  auto maskRank = maskTmp.rank();
+
+  // Handle required field argument
+  auto field = builder.createBox(loc, args[2]);
+
+  // Create mutable fir.box to be passed to the runtime for the result.
+  auto resultArrayType = builder.getVarLenSeqTy(resultType, maskRank);
+  auto resultMutableBox =
+      Fortran::lower::createTempMutableBox(builder, loc, resultArrayType);
+  auto resultIrBox =
+      Fortran::lower::getMutableIRBox(builder, loc, resultMutableBox);
+
+  Fortran::lower::genUnpack(builder, loc, resultIrBox, vector, mask, field);
+
+  return readAndAddCleanUp(resultMutableBox, resultType,
+                           "unexpected result for UNPACK");
 }
 
 // VERIFY

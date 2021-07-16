@@ -109,34 +109,6 @@ mlir::Value Fortran::lower::FirOpBuilder::createRealConstant(
   llvm_unreachable("should use builtin floating-point type");
 }
 
-/// Allocate a local variable.
-/// A local variable ought to have a name in the source code.
-mlir::Value Fortran::lower::FirOpBuilder::allocateLocal(
-    mlir::Location loc, mlir::Type ty, llvm::StringRef uniqName,
-    llvm::StringRef name, llvm::ArrayRef<mlir::Value> shape,
-    llvm::ArrayRef<mlir::Value> lenParams, bool asTarget) {
-  // Convert the shape extents to `index`, as needed.
-  llvm::SmallVector<mlir::Value> indices;
-  auto idxTy = getIndexType();
-  llvm::for_each(shape, [&](mlir::Value sh) {
-    indices.push_back(createConvert(loc, idxTy, sh));
-  });
-  // Add a target attribute, if needed.
-  llvm::SmallVector<mlir::NamedAttribute> attrs;
-  if (asTarget)
-    attrs.emplace_back(
-        mlir::Identifier::get(fir::getTargetAttrName(), getContext()),
-        getUnitAttr());
-  // Create the local variable.
-  if (name.empty()) {
-    if (uniqName.empty())
-      return create<fir::AllocaOp>(loc, ty, lenParams, indices, attrs);
-    return create<fir::AllocaOp>(loc, ty, uniqName, lenParams, indices, attrs);
-  }
-  return create<fir::AllocaOp>(loc, ty, uniqName, name, lenParams, indices,
-                               attrs);
-}
-
 static llvm::SmallVector<mlir::Value>
 elideExtentsAlreadyInType(mlir::Type type, mlir::ValueRange shape) {
   auto arrTy = type.dyn_cast<fir::SequenceType>();
@@ -161,6 +133,39 @@ elideLengthsAlreadyInType(mlir::Type type, mlir::ValueRange lenParams) {
   if (fir::hasDynamicSize(type))
     return lenParams;
   return {};
+}
+
+/// Allocate a local variable.
+/// A local variable ought to have a name in the source code.
+mlir::Value Fortran::lower::FirOpBuilder::allocateLocal(
+    mlir::Location loc, mlir::Type ty, llvm::StringRef uniqName,
+    llvm::StringRef name, llvm::ArrayRef<mlir::Value> shape,
+    llvm::ArrayRef<mlir::Value> lenParams, bool asTarget) {
+  // Convert the shape extents to `index`, as needed.
+  llvm::SmallVector<mlir::Value> indices;
+  llvm::SmallVector<mlir::Value> elidedShape =
+      elideExtentsAlreadyInType(ty, shape);
+  llvm::SmallVector<mlir::Value> elidedLenParams =
+      elideLengthsAlreadyInType(ty, lenParams);
+  auto idxTy = getIndexType();
+  llvm::for_each(elidedShape, [&](mlir::Value sh) {
+    indices.push_back(createConvert(loc, idxTy, sh));
+  });
+  // Add a target attribute, if needed.
+  llvm::SmallVector<mlir::NamedAttribute> attrs;
+  if (asTarget)
+    attrs.emplace_back(
+        mlir::Identifier::get(fir::getTargetAttrName(), getContext()),
+        getUnitAttr());
+  // Create the local variable.
+  if (name.empty()) {
+    if (uniqName.empty())
+      return create<fir::AllocaOp>(loc, ty, elidedLenParams, indices, attrs);
+    return create<fir::AllocaOp>(loc, ty, uniqName, elidedLenParams, indices,
+                                 attrs);
+  }
+  return create<fir::AllocaOp>(loc, ty, uniqName, name, elidedLenParams,
+                               indices, attrs);
 }
 
 /// Get the block for adding Allocas.

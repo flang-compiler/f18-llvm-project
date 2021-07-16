@@ -15,7 +15,7 @@
    ! CHECK: cmpf ogt, %{{.*}}, %[[four]]
    ! CHECK: fir.array_merge_store %{{.*}}, %{{.*}} to %[[tvec]]
    ! CHECK: fir.do_loop
-   ! CHECK: fir.coordinate_of %[[tvec]]
+   ! CHECK: fir.array_coor %[[tvec]]
    ! CHECK: fir.if
    ! CHECK: fir.array_fetch
    ! CHECK: negf
@@ -38,7 +38,7 @@
      ! CHECK: cmpf ogt, %{{.*}}, %[[cst]]
      ! CHECK: fir.array_merge_store %{{.*}}, %{{.*}} to %[[tvec]]
      ! CHECK: fir.do_loop
-     ! CHECK: fir.coordinate_of %[[tvec]]
+     ! CHECK: fir.array_coor %[[tvec]]
      ! CHECK: fir.if
      ! CHECK: fir.array_fetch
      ! CHECK: mulf
@@ -58,10 +58,10 @@
      ! CHECK: cmpf ogt, %{{.*}}, %[[cst50]]
      ! CHECK: fir.array_merge_store %{{.*}}, %{{.*}} to %[[uvec]]
      ! CHECK: fir.do_loop
-     ! CHECK: fir.coordinate_of %[[tvec]]
+     ! CHECK: fir.array_coor %[[tvec]]
      ! CHECK: fir.if
      ! CHECK: } else {
-     ! CHECK: fir.coordinate_of %[[uvec]]
+     ! CHECK: fir.array_coor %[[uvec]]
      ! CHECK: fir.if
      ! CHECK: fir.array_fetch
      ! CHECK: addf
@@ -73,10 +73,10 @@
      b = 3.0 + a
    ! Use cached conditions
      ! CHECK: fir.do_loop
-     ! CHECK: fir.coordinate_of %[[tvec]]
+     ! CHECK: fir.array_coor %[[tvec]]
      ! CHECK: fir.if
      ! CHECK: } else {
-     ! CHECK: fir.coordinate_of %[[uvec]]
+     ! CHECK: fir.array_coor %[[uvec]]
      ! CHECK: fir.if
      ! CHECK: fir.array_fetch
      ! CHECK: subf
@@ -89,10 +89,10 @@
    elsewhere
    ! Use cached conditions, always false
      ! CHECK: fir.do_loop
-     ! CHECK: fir.coordinate_of %[[tvec]]
+     ! CHECK: fir.array_coor %[[tvec]]
      ! CHECK: fir.if
      ! CHECK: } else {
-     ! CHECK: fir.coordinate_of %[[uvec]]
+     ! CHECK: fir.array_coor %[[uvec]]
      ! CHECK: fir.if
      ! CHECK: } else {
      ! CHECK: fir.array_fetch
