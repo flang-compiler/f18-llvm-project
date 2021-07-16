@@ -1234,7 +1234,7 @@ fir::ExtendedValue IntrinsicLibrary::genElementalCall(
     if (arg.getUnboxed() || arg.getCharBox())
       scalarArgs.emplace_back(fir::getBase(arg));
     else
-      mlir::emitError(loc, "nonscalar intrinsic argument");
+      fir::emitFatalError(loc, "nonscalar intrinsic argument");
   if (outline)
     return outlineInWrapper(generator, name, resultType, scalarArgs);
   return invokeGenerator(generator, resultType, scalarArgs);
@@ -1247,7 +1247,7 @@ IntrinsicLibrary::genElementalCall<IntrinsicLibrary::ExtendedGenerator>(
     llvm::ArrayRef<fir::ExtendedValue> args, bool outline) {
   for (const auto &arg : args)
     if (!arg.getUnboxed() && !arg.getCharBox())
-      mlir::emitError(loc, "nonscalar intrinsic argument");
+      fir::emitFatalError(loc, "nonscalar intrinsic argument");
   if (outline)
     return outlineInExtendedWrapper(generator, name, resultType, args);
   return std::invoke(generator, *this, resultType, args);
@@ -1260,7 +1260,7 @@ IntrinsicLibrary::genElementalCall<IntrinsicLibrary::SubroutineGenerator>(
     llvm::ArrayRef<fir::ExtendedValue> args, bool outline) {
   for (const auto &arg : args)
     if (!arg.getUnboxed() && !arg.getCharBox())
-      // mlir::emitError(loc, "nonscalar intrinsic argument");
+      // fir::emitFatalError(loc, "nonscalar intrinsic argument");
       crashOnMissingIntrinsic(loc, name);
   if (outline)
     return outlineInExtendedWrapper(generator, name, resultType, args);
