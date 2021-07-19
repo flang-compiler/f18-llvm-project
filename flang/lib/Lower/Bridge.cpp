@@ -2378,8 +2378,10 @@ private:
     builder = new Fortran::lower::FirOpBuilder(func, bridge.getKindMap());
     Fortran::lower::AggregateStoreMap fakeMap;
     for (const auto &[_, sym] : bdunit.symTab) {
-      Fortran::lower::pft::Variable var(*sym, true);
-      instantiateVar(var, fakeMap);
+      if (sym->has<Fortran::semantics::ObjectEntityDetails>()) {
+        Fortran::lower::pft::Variable var(*sym, true);
+        instantiateVar(var, fakeMap);
+      }
     }
 
     if (auto *region = func.getCallableRegion())

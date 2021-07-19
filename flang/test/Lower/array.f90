@@ -148,7 +148,7 @@ block data
    ! CHECK: %[[VAL_239:.*]] = fir.insert_on_range %[[VAL_238]], %[[VAL_225]], [4 : index, 4 : index, 3 : index, 4 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
    ! CHECK: %[[VAL_240:.*]] = fir.insert_value %[[VAL_226]], %[[VAL_239]], [0 : index] : (tuple<!fir.array<5x5xf32>>, !fir.array<5x5xf32>) -> tuple<!fir.array<5x5xf32>>
    ! CHECK: fir.has_value %[[VAL_240]] : tuple<!fir.array<5x5xf32>>
-  real :: x(5,5)
+  real(selected_real_kind(6)) :: x(5,5)
   common /block/ x
   data x(1,1), x(2,1), x(3,1) / 1, 1, 0 /
   data x(1,2), x(2,2), x(4,2) / 1, 1, 2.4 /
