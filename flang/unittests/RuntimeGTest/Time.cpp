@@ -31,5 +31,5 @@ TEST(TimeIntrinsics, CpuTime) {
 
   ASSERT_GE(start, 0.0);
   ASSERT_GT(end, 0.0);
-  ASSERT_GT(end, start);
+  ASSERT_GE(end, start);
 }
