@@ -9,6 +9,7 @@
 #include "flang/Lower/Runtime.h"
 #include "../../runtime/misc-intrinsic.h"
 #include "../runtime/clock.h"
+#include "../runtime/pointer.h"
 #include "../runtime/random.h"
 #include "../runtime/stop.h"
 #include "../runtime/time-intrinsic.h"
@@ -184,6 +185,16 @@ void Fortran::lower::genPauseStatement(
   auto loc = converter.getCurrentLocation();
   auto callee = getRuntimeFunc<mkRTKey(PauseStatement)>(loc, builder);
   builder.create<fir::CallOp>(loc, callee, llvm::None);
+}
+
+mlir::Value Fortran::lower::genAssociated(Fortran::lower::FirOpBuilder &builder,
+                                          mlir::Location loc,
+                                          mlir::Value pointer,
+                                          mlir::Value target) {
+  auto func = getRuntimeFunc<mkRTKey(PointerIsAssociatedWith)>(loc, builder);
+  auto args = Fortran::lower::createArguments(builder, loc, func.getType(),
+                                              pointer, target);
+  return builder.create<fir::CallOp>(loc, func, args).getResult(0);
 }
 
 mlir::Value Fortran::lower::genCpuTime(Fortran::lower::FirOpBuilder &builder,

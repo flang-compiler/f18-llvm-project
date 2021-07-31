@@ -649,7 +649,7 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"associated",
      &I::genAssociated,
-     {{{"pointer", asInquired}, {"target", asInquired}}},
+     {{{"pointer", asInquired}, {"target", asBox}}},
      /*isElemental=*/false},
     {"btest", &I::genBtest},
     {"ceiling", &I::genCeiling},
@@ -1860,18 +1860,18 @@ fir::ExtendedValue
 IntrinsicLibrary::genAssociated(mlir::Type resultType,
                                 llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 2);
-  // TODO: Runtime would be better to deal with all the cases with TARGET
-  // arguments.
-  if (!isAbsent(args[1]))
-    TODO(loc, "ASSOCIATED intrinsic with TARGET argument");
-  return args[0].match(
-      [&](const fir::MutableBoxValue &x) -> fir::ExtendedValue {
-        return Fortran::lower::genIsAllocatedOrAssociatedTest(builder, loc, x);
-      },
-      [&](const auto &) -> fir::ExtendedValue {
-        fir::emitFatalError(loc,
-                            "associated arg not lowered to MutableBoxValue");
-      });
+  auto *pointer =
+      args[0].match([&](const fir::MutableBoxValue &x) { return &x; },
+                    [&](const auto &) -> const fir::MutableBoxValue * {
+                      fir::emitFatalError(loc, "pointer not a MutableBoxValue");
+                    });
+  if (isAbsent(args[1]))
+    return Fortran::lower::genIsAllocatedOrAssociatedTest(builder, loc,
+                                                          *pointer);
+  auto pointerBox = builder.createBox(
+      loc, genMutableBoxRead(builder, loc, *pointer).getAddr());
+  return Fortran::lower::genAssociated(builder, loc, pointerBox,
+                                       *args[1].getUnboxed());
 }
 
 // AINT
