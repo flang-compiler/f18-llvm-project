@@ -17,12 +17,10 @@ subroutine associated_test(scalar, array)
   ! CHECK: %[[addrToInt1:.*]] = fir.convert %[[addr1]]
   ! CHECK: cmpi ne, %[[addrToInt1]], %c0{{.*}}
   print *, associated(array)
-  ! CHECK: %[[zbox:.*]] = fir.embox %[[ziel]] : (!fir.ref<f32>) -> !fir.box<f32>
+  ! CHECK: %[[zbox0:.*]] = fir.embox %[[ziel]] : (!fir.ref<f32>) -> !fir.box<f32>
   ! CHECK: %[[scalar:.*]] = fir.load %[[arg0]] : !fir.ref<!fir.box<!fir.ptr<f32>>>
-  ! CHECK: %[[addr2:.*]] = fir.box_addr %[[scalar]] : (!fir.box<!fir.ptr<f32>>) -> !fir.ptr<f32>
-  ! CHECK: %[[sbox:.*]] = fir.embox %[[addr2]] : (!fir.ptr<f32>) -> !fir.box<f32>
-  ! CHECK: %[[sbox1:.*]] = fir.convert %[[sbox]] : (!fir.box<f32>) -> !fir.box<none>
-  ! CHECK: %[[zbox1:.*]] = fir.convert %[[zbox]] : (!fir.box<f32>) -> !fir.box<none>
-  ! CHECK: fir.call @_FortranAPointerIsAssociatedWith(%[[sbox1]], %[[zbox1]]) : (!fir.box<none>, !fir.box<none>) -> i1
+  ! CHECK: %[[sbox:.*]] = fir.convert %[[scalar]] : (!fir.box<!fir.ptr<f32>>) -> !fir.box<none>
+  ! CHECK: %[[zbox:.*]] = fir.convert %[[zbox0]] : (!fir.box<f32>) -> !fir.box<none>
+  ! CHECK: fir.call @_FortranAPointerIsAssociatedWith(%[[sbox]], %[[zbox]]) : (!fir.box<none>, !fir.box<none>) -> i1
   print *, associated(scalar, ziel)
 end subroutine

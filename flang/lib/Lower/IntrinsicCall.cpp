@@ -1868,8 +1868,8 @@ IntrinsicLibrary::genAssociated(mlir::Type resultType,
   if (isAbsent(args[1]))
     return Fortran::lower::genIsAllocatedOrAssociatedTest(builder, loc,
                                                           *pointer);
-  auto pointerBox = builder.createBox(
-      loc, genMutableBoxRead(builder, loc, *pointer).getAddr());
+  auto pointerBoxRef = Fortran::lower::getMutableIRBox(builder, loc, *pointer);
+  auto pointerBox = builder.create<fir::LoadOp>(loc, pointerBoxRef);
   return Fortran::lower::genAssociated(builder, loc, pointerBox,
                                        *args[1].getUnboxed());
 }
