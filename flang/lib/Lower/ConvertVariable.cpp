@@ -777,9 +777,12 @@ defineCommonBlock(Fortran::lower::AbstractConverter &converter,
   auto idxTy = builder.getIndexType();
   auto linkage = builder.createCommonLinkage();
   if (!common.name().size() || !commonBlockHasInit(cmnBlkMems)) {
-    const auto sz = static_cast<fir::SequenceType::Extent>(common.size());
-    // anonymous COMMON must always be initialized to zero
-    // a named COMMON sans initializers is also initialized to zero
+    // A blank (anonymous) COMMON block must always be initialized to zero.
+    // A named COMMON block sans initializers is also initialized to zero.
+    // mlir::Vector types must have a strictly positive size, so at least
+    // temporarily, force a zero size COMMON block to have one byte.
+    const auto sz = static_cast<fir::SequenceType::Extent>(
+        common.size() > 0 ? common.size() : 1);
     fir::SequenceType::Shape shape = {sz};
     auto i8Ty = builder.getIntegerType(8);
     auto commonTy = fir::SequenceType::get(shape, i8Ty);
