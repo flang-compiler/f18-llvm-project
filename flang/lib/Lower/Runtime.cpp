@@ -327,3 +327,21 @@ void Fortran::lower::genTransferSize(Fortran::lower::FirOpBuilder &builder,
                                       moldBox, sourceFile, sourceLine, size);
   builder.create<fir::CallOp>(loc, func, args);
 }
+
+void Fortran::lower::genSystemClock(Fortran::lower::FirOpBuilder &builder,
+                                    mlir::Location loc, mlir::Value count,
+                                    mlir::Value rate, mlir::Value max) {
+  auto makeCall = [&](mlir::FuncOp func, mlir::Value arg) {
+    mlir::Value res = builder.create<fir::CallOp>(loc, func).getResult(0);
+    mlir::Value castRes = builder.createConvert(
+        loc, fir::dyn_cast_ptrEleTy(arg.getType()), res);
+    builder.create<fir::StoreOp>(loc, castRes, arg);
+  };
+  using Fortran::lower::getRuntimeFunc;
+  if (count)
+    makeCall(getRuntimeFunc<mkRTKey(SystemClockCount)>(loc, builder), count);
+  if (rate)
+    makeCall(getRuntimeFunc<mkRTKey(SystemClockCountRate)>(loc, builder), rate);
+  if (max)
+    makeCall(getRuntimeFunc<mkRTKey(SystemClockCountMax)>(loc, builder), max);
+}

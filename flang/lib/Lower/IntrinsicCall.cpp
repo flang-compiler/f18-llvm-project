@@ -510,6 +510,7 @@ struct IntrinsicLibrary {
                          llvm::ArrayRef<mlir::Value> args);
   fir::ExtendedValue genSpread(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genSum(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
+  void genSystemClock(llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genTransfer(mlir::Type,
                                  llvm::ArrayRef<fir::ExtendedValue>);
   fir::ExtendedValue genTranspose(mlir::Type,
@@ -800,6 +801,10 @@ static constexpr IntrinsicHandler handlers[]{
     {"sum",
      &I::genSum,
      {{{"array", asAddr}, {"dim", asValue}, {"mask", asAddr}}},
+     /*isElemental=*/false},
+    {"system_clock",
+     &I::genSystemClock,
+     {{{"count", asAddr}, {"count_rate", asAddr}, {"count_max", asAddr}}},
      /*isElemental=*/false},
     {"transfer",
      &I::genTransfer,
@@ -2923,6 +2928,13 @@ IntrinsicLibrary::genSum(mlir::Type resultType,
   return genProdOrSum(Fortran::lower::genSum, Fortran::lower::genSumDim,
                       resultType, builder, loc, stmtCtx,
                       "unexpected result for Sum", args);
+}
+
+// SYSTEM_CLOCK
+void IntrinsicLibrary::genSystemClock(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 3);
+  Fortran::lower::genSystemClock(builder, loc, *args[0].getUnboxed(),
+                                 *args[1].getUnboxed(), *args[2].getUnboxed());
 }
 
 // TRANSFER

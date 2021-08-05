@@ -95,6 +95,9 @@ void genTransferSize(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
                      mlir::Value resultBox, mlir::Value sourceBox,
                      mlir::Value moldBox, mlir::Value size);
 
+void genSystemClock(FirOpBuilder &, mlir::Location, mlir::Value count,
+                    mlir::Value rate, mlir::Value max);
+
 } // namespace lower
 } // namespace Fortran
 
