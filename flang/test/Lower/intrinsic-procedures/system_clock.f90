@@ -18,5 +18,10 @@ subroutine system_clock_test()
   ! CHECK: fir.store %[[Max]] to %[[m]] : !fir.ref<i64>
   call system_clock(c, r, m)
 ! print*, c, r, m
+  ! CHECK-NOT: fir.call
+  ! CHECK: %[[Rate:.*]] = fir.call @_FortranASystemClockCountRate() : () -> i64
+  ! CHECK: fir.store %[[Rate]] to %[[m]] : !fir.ref<i64>
+  call system_clock(count_rate=m)
+  ! CHECK-NOT: fir.call
+! print*, m
 end subroutine
-

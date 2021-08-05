@@ -95,6 +95,8 @@ void genTransferSize(Fortran::lower::FirOpBuilder &builder, mlir::Location loc,
                      mlir::Value resultBox, mlir::Value sourceBox,
                      mlir::Value moldBox, mlir::Value size);
 
+/// generate system_clock runtime call/s
+/// all intrinsic arguments are optional and may appear here as mlir::Value{}
 void genSystemClock(FirOpBuilder &, mlir::Location, mlir::Value count,
                     mlir::Value rate, mlir::Value max);
 
