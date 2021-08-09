@@ -545,7 +545,7 @@ omp.critical.declare @mutex
 
 // CHECK-LABEL: @omp_critical
 llvm.func @omp_critical(%x : !llvm.ptr<i32>, %xval : i32) -> () {
-  // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_.var{{.*}}, i32 0)
+  // CHECK: call void @__kmpc_critical({{.*}}critical_user_.var{{.*}})
   // CHECK: br label %omp.critical.region
   // CHECK: omp.critical.region
   omp.critical {

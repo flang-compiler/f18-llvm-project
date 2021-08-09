@@ -305,8 +305,6 @@ convertOmpCritical(Operation &opInst, llvm::IRBuilderBase &builder,
     hint =
         llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext),
                                static_cast<int>(criticalOp.hint().getValue()));
-  } else {
-    hint = llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext), 0);
   }
   builder.restoreIP(moduleTranslation.getOpenMPBuilder()->createCritical(
       ompLoc, bodyGenCB, finiCB, criticalOp.name().getValueOr(""), hint));

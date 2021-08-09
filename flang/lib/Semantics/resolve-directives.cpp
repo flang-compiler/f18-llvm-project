@@ -308,7 +308,7 @@ public:
   bool Pre(const parser::OpenMPSectionsConstruct &);
   void Post(const parser::OpenMPSectionsConstruct &) { PopContext(); }
 
-  bool Pre(const parser::OpenMPCriticalConstruct &);
+  bool Pre(const parser::OpenMPCriticalConstruct &x);
   void Post(const parser::OpenMPCriticalConstruct &) { PopContext(); }
 
   bool Pre(const parser::OpenMPDeclareSimdConstruct &x) {
@@ -1332,8 +1332,18 @@ bool OmpAttributeVisitor::Pre(const parser::OpenMPSectionsConstruct &x) {
 }
 
 bool OmpAttributeVisitor::Pre(const parser::OpenMPCriticalConstruct &x) {
-  const auto &criticalDir{std::get<parser::OmpCriticalDirective>(x.t)};
-  PushContext(criticalDir.source, llvm::omp::Directive::OMPD_critical);
+  const auto &beginCriticalDir{std::get<parser::OmpCriticalDirective>(x.t)};
+  const auto &endCriticalDir{std::get<parser::OmpEndCriticalDirective>(x.t)};
+  PushContext(beginCriticalDir.source, llvm::omp::Directive::OMPD_critical);
+
+  if (const auto &criticalName{
+          std::get<std::optional<parser::Name>>(beginCriticalDir.t)}) {
+    ResolveOmpName(*criticalName, Symbol::Flag::OmpCriticalLock);
+  }
+  if (const auto &endCriticalName{
+          std::get<std::optional<parser::Name>>(endCriticalDir.t)}) {
+    ResolveOmpName(*endCriticalName, Symbol::Flag::OmpCriticalLock);
+  }
   return true;
 }
 
@@ -1454,6 +1464,12 @@ void OmpAttributeVisitor::ResolveOmpName(
         AddToContextObjectWithDSA(*resolvedSymbol, ompFlag);
       }
     }
+  } else if (ompFlag == Symbol::Flag::OmpCriticalLock) {
+    // Create a new symbol.
+    const auto pair{GetContext().scope.try_emplace(
+        name.source, Attrs{}, UnknownDetails{})};
+    CHECK(pair.second);
+    name.symbol = &pair.first->second.get();
   }
 }
 
