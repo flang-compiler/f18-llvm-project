@@ -629,7 +629,6 @@ void Fortran::lower::genOpenMPConstruct(
                   &criticalConstruct) {
             auto &firOpBuilder = converter.getFirOpBuilder();
             auto currentLocation = converter.getCurrentLocation();
-            mlir::omp::CriticalOp criticalOp;
             std::string name;
             const Fortran::parser::OmpCriticalDirective &cd =
                 std::get<Fortran::parser::OmpCriticalDirective>(
@@ -653,20 +652,24 @@ void Fortran::lower::genOpenMPConstruct(
                 hint = mlir::omp::SyncHintKindAttr::get(
                     firOpBuilder.getContext(),
                     mlir::omp::symbolizeSyncHintKind(*hintValue).getValue());
+                break;
               }
-            if (name.empty()) {
-              criticalOp = firOpBuilder.create<mlir::omp::CriticalOp>(
-                  currentLocation, FlatSymbolRefAttr(), hint);
-            } else {
-              auto type = fir::CharacterType::get(firOpBuilder.getContext(), 1,
-                                                  name.size());
-              auto global = firOpBuilder.getNamedGlobal(name);
-              if (!global)
-                global = firOpBuilder.createGlobalConstant(currentLocation,
-                                                           type, name);
-              criticalOp = firOpBuilder.create<mlir::omp::CriticalOp>(
-                  currentLocation, global.getSymbol(), hint);
-            }
+
+            mlir::omp::CriticalOp criticalOp = [&]() -> mlir::omp::CriticalOp {
+              if (name.empty()) {
+                return firOpBuilder.create<mlir::omp::CriticalOp>(
+                    currentLocation, FlatSymbolRefAttr(), hint);
+              } else {
+                auto type = fir::CharacterType::get(firOpBuilder.getContext(),
+                                                    1, name.size());
+                auto global = firOpBuilder.getNamedGlobal(name);
+                if (!global)
+                  global = firOpBuilder.createGlobalConstant(currentLocation,
+                                                             type, name);
+                return firOpBuilder.create<mlir::omp::CriticalOp>(
+                    currentLocation, global.getSymbol(), hint);
+              }
+            }();
             createBodyOfOp<omp::CriticalOp>(criticalOp, converter,
                                             currentLocation);
           },

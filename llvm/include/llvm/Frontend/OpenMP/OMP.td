@@ -452,7 +452,7 @@ def OMP_Single : Directive<"single"> {
 }
 def OMP_Master : Directive<"master"> {}
 def OMP_Critical : Directive<"critical"> {
-  let allowedClauses = [
+  let allowedOnceClauses = [
     VersionedClause<OMPC_Hint>
   ];
 }
