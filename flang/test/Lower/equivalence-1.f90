@@ -31,3 +31,31 @@ SUBROUTINE s2
   ! CHECK: = fir.load %[[fld]] : !fir.ref<f32>
   PRINT *, r(3)
 END SUBROUTINE s2
+
+! CHECK-LABEL: func @_QPs3
+SUBROUTINE s3
+  REAL r(10)
+  TYPE t
+    SEQUENCE
+    REAL r(10)
+  END TYPE t
+  TYPE(t) x
+  ! CHECK: %[[group:.*]] = fir.alloca !fir.array<40xi8>
+  EQUIVALENCE (r,x)
+  ! CHECK: %[[coor:.*]] = fir.coordinate_of %[[group]], %c0 : (!fir.ref<!fir.array<40xi8>>, index) -> !fir.ref<i8>
+  ! CHECK: %[[rloc:.*]] = fir.convert %[[coor]] : (!fir.ref<i8>) -> !fir.ref<!fir.array<10xf32>>
+  ! CHECK: %[[xloc:.*]] = fir.convert %[[coor]] : (!fir.ref<i8>) -> !fir.ref<!fir.type<_QFs3Tt{r:!fir.array<10xf32>}>>
+  ! CHECK: %[[fidx:.*]] = fir.field_index r, !fir.type<_QFs3Tt{r:!fir.array<10xf32>}>
+  ! CHECK: %[[xrloc:.*]] = fir.coordinate_of %[[xloc]], %[[fidx]] :
+  ! CHECK: %[[v1loc:.*]] = fir.coordinate_of %[[xrloc]], %c8_i64 : (!fir.ref<!fir.array<10xf32>>, i64) -> !fir.ref<f32>
+  ! CHECK: fir.store %{{.*}} to %[[v1loc]] : !fir.ref<f32>
+  x%r(9) = 9.0
+  ! CHECK: %[[v2loc:.*]] = fir.coordinate_of %[[rloc]], %c8_i64 : (!fir.ref<!fir.array<10xf32>>, i64) -> !fir.ref<f32>
+  ! CHECK: %{{.*}} = fir.load %[[v2loc]] : !fir.ref<f32>
+  PRINT *, r(9)
+END SUBROUTINE s3
+
+  CALL s1
+  CALL s2
+  CALL s3
+END

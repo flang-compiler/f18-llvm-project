@@ -1449,8 +1449,11 @@ struct SymbolDependenceDepth {
 private:
   /// Skip symbol in alias analysis.
   bool skipSymbol(const semantics::Symbol &sym) {
+    // Common block equivalences are largely managed by the front end.
+    // Compiler generated symbols ('.' names) cannot be equivalenced.
+    // FIXME: Equivalence code generation may need to be revisited.
     return !sym.has<semantics::ObjectEntityDetails>() ||
-           lower::definedInCommonBlock(sym);
+           lower::definedInCommonBlock(sym) || sym.name()[0] == '.';
   }
 
   // Make sure the table is of appropriate size.
