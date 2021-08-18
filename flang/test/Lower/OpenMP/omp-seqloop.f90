@@ -9,7 +9,7 @@ program wsloop
 
 !FIRDialect:  omp.parallel {
         !$OMP PARALLEL
-!FIRDialect:    %[[PRIVATE_INDX:.*]] = fir.alloca i32 {{{.*}}bindc_name = "i"}
+!FIRDialect:    %[[PRIVATE_INDX:.*]] = fir.alloca i32 {bindc_name = "i", pinned}
 !FIRDialect:    %[[FINAL_INDX:.*]] = fir.do_loop %[[INDX:.*]] = {{.*}} {
         do i=1, 9
         print*, i
@@ -28,7 +28,7 @@ subroutine sub1
   integer :: i
   integer :: arr(10)
 !FIRDialect:   omp.parallel {
-!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i"}
+!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i", pinned}
   !$OMP PARALLEL
   do i=1, 10
     arr(i) = i
@@ -44,7 +44,7 @@ subroutine sub2
   integer :: i
   integer :: arr(10)
 !FIRDialect:   omp.parallel {
-!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i"}
+!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i", pinned}
   !$OMP PARALLEL
 !FIRDialect:     omp.master  {
   !$OMP MASTER
@@ -67,7 +67,7 @@ subroutine sub3
   integer :: i,j
   integer :: arr(10)
 !FIRDialect:   omp.parallel {
-!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i"}
+!FIRDialect:     {{.*}} = fir.alloca i32 {bindc_name = "i", pinned}
   !$OMP PARALLEL
   do i=1, 10
     arr(i) = i
@@ -75,7 +75,7 @@ subroutine sub3
 !FIRDialect:     omp.master  {
   !$OMP MASTER
 !FIRDialect:       omp.parallel {
-!FIRDialect:         {{.*}} = fir.alloca i32 {bindc_name = "j"}
+!FIRDialect:         {{.*}} = fir.alloca i32 {bindc_name = "j", pinned}
   !$OMP PARALLEL
   do j=1, 10
     arr(j) = j

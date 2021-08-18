@@ -11,14 +11,14 @@
 !FIRDialect-DAG: %[[BETA_ARRAY:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Ebeta_array"}
 
 !FIRDialect-DAG:  omp.parallel {
-!FIRDialect-DAG: %[[ALPHA_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"}
-!FIRDialect-DAG: %[[ALPHA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Ealpha_array"}
-!FIRDialect-DAG: %[[BETA_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Ebeta"}
-!FIRDialect-DAG: %[[BETA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Ebeta_array"}
-!FIRDialect-DAG: %[[ARG1_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Earg1"}
-!FIRDialect-DAG: %[[ARG2_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Earg2"}
-!FIRDialect-DAG: %[[ARG3_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Earg3"}
-!FIRDialect-DAG: %[[ARG4_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, uniq_name = "{{.*}}Earg4"}
+!FIRDialect-DAG: %[[ALPHA_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, pinned, uniq_name = "{{.*}}Ealpha"}
+!FIRDialect-DAG: %[[ALPHA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, pinned, uniq_name = "{{.*}}Ealpha_array"}
+!FIRDialect-DAG: %[[BETA_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, pinned, uniq_name = "{{.*}}Ebeta"}
+!FIRDialect-DAG: %[[BETA_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, pinned, uniq_name = "{{.*}}Ebeta_array"}
+!FIRDialect-DAG: %[[ARG1_PRIVATE:.*]] = fir.alloca i32 {{{.*}}, pinned, uniq_name = "{{.*}}Earg1"}
+!FIRDialect-DAG: %[[ARG2_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, pinned, uniq_name = "{{.*}}Earg2"}
+!FIRDialect-DAG: %[[ARG3_PRIVATE:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, pinned, uniq_name = "{{.*}}Earg3"}
+!FIRDialect-DAG: %[[ARG4_ARRAY_PRIVATE:.*]] = fir.alloca !fir.array<10x!fir.char<1,5>> {{{.*}}, pinned, uniq_name = "{{.*}}Earg4"}
 !FIRDialect:    omp.terminator
 !FIRDialect:  }
 

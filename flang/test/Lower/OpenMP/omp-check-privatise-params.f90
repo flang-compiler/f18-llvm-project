@@ -8,7 +8,7 @@
 !FIRDialect-DAG:  %[[N_CVT1:.*]] = fir.convert %[[N]] : (i32) -> i64
 !FIRDialect-DAG:  %[[N_CVT2:.*]] = fir.convert %[[N_CVT1]] : (i64) -> index
 !FIRDialect-DAG:  omp.parallel {
-!FIRDialect-DAG:  {{.*}} = fir.alloca !fir.array<?xi32>, %[[N_CVT2]] {{{.*}}, uniq_name = "_QFarrayEx"}
+!FIRDialect-DAG:  {{.*}} = fir.alloca !fir.array<?xi32>, %[[N_CVT2]] {{{.*}}, pinned, uniq_name = "_QFarrayEx"}
 !FIRDialect:    omp.terminator
 
 subroutine array(x,n)

@@ -153,7 +153,7 @@ elideLengthsAlreadyInType(mlir::Type type, mlir::ValueRange lenParams) {
 /// A local variable ought to have a name in the source code.
 mlir::Value fir::FirOpBuilder::allocateLocal(
     mlir::Location loc, mlir::Type ty, llvm::StringRef uniqName,
-    llvm::StringRef name, llvm::ArrayRef<mlir::Value> shape,
+    llvm::StringRef name, bool pinned, llvm::ArrayRef<mlir::Value> shape,
     llvm::ArrayRef<mlir::Value> lenParams, bool asTarget) {
   // Convert the shape extents to `index`, as needed.
   llvm::SmallVector<mlir::Value> indices;
@@ -174,12 +174,21 @@ mlir::Value fir::FirOpBuilder::allocateLocal(
   // Create the local variable.
   if (name.empty()) {
     if (uniqName.empty())
-      return create<fir::AllocaOp>(loc, ty, elidedLenParams, indices, attrs);
-    return create<fir::AllocaOp>(loc, ty, uniqName, elidedLenParams, indices,
-                                 attrs);
+      return create<fir::AllocaOp>(loc, ty, pinned, elidedLenParams, indices,
+                                   attrs);
+    return create<fir::AllocaOp>(loc, ty, uniqName, pinned, elidedLenParams,
+                                 indices, attrs);
   }
-  return create<fir::AllocaOp>(loc, ty, uniqName, name, elidedLenParams,
+  return create<fir::AllocaOp>(loc, ty, uniqName, name, pinned, elidedLenParams,
                                indices, attrs);
+}
+
+mlir::Value fir::FirOpBuilder::allocateLocal(
+    mlir::Location loc, mlir::Type ty, llvm::StringRef uniqName,
+    llvm::StringRef name, llvm::ArrayRef<mlir::Value> shape,
+    llvm::ArrayRef<mlir::Value> lenParams, bool asTarget) {
+  return allocateLocal(loc, ty, uniqName, name, /*pinned=*/false, shape,
+                       lenParams, asTarget);
 }
 
 /// Get the block for adding Allocas.
@@ -207,9 +216,13 @@ fir::FirOpBuilder::createTemporary(mlir::Location loc, mlir::Type type,
     setInsertionPointToStart(getAllocaBlock());
   }
 
+  // If the alloca is inside an OpenMP Op which will be outlined then pin the
+  // alloca here.
+  const bool pinned =
+      getRegion().getParentOfType<mlir::omp::OutlineableOpenMPOpInterface>();
   assert(!type.isa<fir::ReferenceType>() && "cannot be a reference");
   auto ae = create<fir::AllocaOp>(loc, type, /*unique_name=*/llvm::StringRef{},
-                                  name, dynamicLength, dynamicShape, attrs);
+                                  name, pinned, dynamicLength, dynamicShape, attrs);
   if (hoistAlloc)
     restoreInsertionPoint(insPt);
   return ae;

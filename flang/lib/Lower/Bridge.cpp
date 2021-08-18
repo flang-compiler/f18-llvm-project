@@ -334,7 +334,7 @@ public:
       mlir::Type symType = genType(sym);
       return builder->allocateLocal(
           loc, symType, mangleName(sym), toStringRef(sym.GetUltimate().name()),
-          shape, typeParams,
+          /*pinned=*/true, shape, typeParams,
           sym.GetUltimate().attrs().test(Fortran::semantics::Attr::TARGET));
     };
 

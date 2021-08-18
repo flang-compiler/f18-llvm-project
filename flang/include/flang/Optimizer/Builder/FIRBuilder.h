@@ -116,7 +116,12 @@ public:
   }
 
   /// Create a slot for a local on the stack. Besides the variable's type and
-  /// shape, it may be given name or target attributes.
+  /// shape, it may be given name, pinned, or target attributes.
+  mlir::Value allocateLocal(mlir::Location loc, mlir::Type ty,
+                            llvm::StringRef uniqName, llvm::StringRef name,
+                            bool pinned, llvm::ArrayRef<mlir::Value> shape,
+                            llvm::ArrayRef<mlir::Value> lenParams,
+                            bool asTarget = false);
   mlir::Value allocateLocal(mlir::Location loc, mlir::Type ty,
                             llvm::StringRef uniqName, llvm::StringRef name,
                             llvm::ArrayRef<mlir::Value> shape,
