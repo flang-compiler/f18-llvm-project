@@ -79,7 +79,7 @@ mangleArrayLiteral(const Fortran::evaluate::Constant<Fortran::evaluate::Type<
                        Fortran::common::TypeCategory::Character, KIND>> &x) {
   return mangleArrayLiteral(
       reinterpret_cast<const uint8_t *>(x.values().data()),
-      x.values().size() * sizeof(x.values()[0]) * x.LEN(), x.shape(),
+      x.values().size() * sizeof(x.values()[0]), x.shape(),
       Fortran::common::TypeCategory::Character, KIND, x.LEN());
 }
 

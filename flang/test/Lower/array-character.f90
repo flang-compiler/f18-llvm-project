@@ -30,11 +30,29 @@ subroutine issue(c1, c2)
   c1 = c2
 end subroutine
 
+! CHECK-LABEL: func @_QQmain
 program p
   character(4) :: c1(3)
   character(4) :: c2(3) = ["abcd", "    ", "    "]
   print *, c2
   call issue(c1, c2)
   print *, c1
+  call charlit
 end program p
 
+! CHECK-LABEL: func @_QPcharlit
+subroutine charlit
+  ! CHECK: fir.address_of(@_QQro.4x3xc1.1636b396a657de68ffb870a885ac44b4) : !fir.ref<!fir.array<4x!fir.char<1,3>>>
+  print*, ['AA ', 'MM ', 'MM ', 'ZZ ']
+  print*, ['AA ', 'MM ', 'MM ', 'ZZ ']
+  print*, ['AA ', 'MM ', 'MM ', 'ZZ ']
+end
+
+! CHECK: fir.global internal @_QQro.4x3xc1.1636b396a657de68ffb870a885ac44b4 constant : !fir.array<4x!fir.char<1,3>>
+! CHECK: AA
+! CHECK: MM
+! CHECK: ZZ
+! CHECK-NOT: fir.global internal @_QQro.4x3xc1
+! CHECK-NOT: AA
+! CHECK-NOT: MM
+! CHECK-NOT: ZZ
