@@ -1033,109 +1033,78 @@ public:
   ExtValue genArrayLit(
       const Fortran::evaluate::Constant<Fortran::evaluate::Type<TC, KIND>>
           &con) {
+    auto loc = getLoc();
+    auto idxTy = builder.getIndexType();
+    auto size = Fortran::evaluate::GetSize(con.shape());
+    fir::SequenceType::Shape shape(con.shape().begin(), con.shape().end());
+    mlir::Type eleTy;
+    if constexpr (TC == Fortran::common::TypeCategory::Character)
+      eleTy = converter.genType(TC, KIND, {con.LEN()});
+    else
+      eleTy = converter.genType(TC, KIND);
+    auto arrayTy = fir::SequenceType::get(shape, eleTy);
+    mlir::Value array = builder.create<fir::UndefOp>(loc, arrayTy);
+    if (size == 0) {
+      if constexpr (TC == Fortran::common::TypeCategory::Character) {
+        auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
+        return fir::CharArrayBoxValue{array, len, {}, {}};
+      } else {
+        return fir::ArrayBoxValue{array, {}, {}};
+      }
+    }
     llvm::SmallVector<mlir::Value> lbounds;
     llvm::SmallVector<mlir::Value> extents;
-    auto idxTy = builder.getIndexType();
-    for (auto [lb, extent] : llvm::zip(con.lbounds(), con.shape())) {
-      lbounds.push_back(builder.createIntegerConstant(getLoc(), idxTy, lb - 1));
-      extents.push_back(builder.createIntegerConstant(getLoc(), idxTy, extent));
+    for (auto [lb, extent] : llvm::zip(con.lbounds(), shape)) {
+      lbounds.push_back(builder.createIntegerConstant(loc, idxTy, lb - 1));
+      extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
     }
+    Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
+    auto createIdx = [&]() {
+      llvm::SmallVector<mlir::Value> idx;
+      for (size_t i = 0; i < subscripts.size(); ++i)
+        idx.push_back(builder.createIntegerConstant(
+            getLoc(), idxTy, subscripts[i] - con.lbounds()[i]));
+      return idx;
+    };
     if constexpr (TC == Fortran::common::TypeCategory::Character) {
-      fir::SequenceType::Shape shape;
-      shape.append(con.shape().begin(), con.shape().end());
-      auto chTy = converter.genType(TC, KIND, {con.LEN()});
-      auto arrayTy = fir::SequenceType::get(shape, chTy);
-      mlir::Value array = builder.create<fir::UndefOp>(getLoc(), arrayTy);
-      Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
       do {
-        auto charVal =
+        auto insertVal =
             fir::getBase(genScalarLit<KIND>(con.At(subscripts), con.LEN()));
-        llvm::SmallVector<mlir::Value> idx;
-        for (auto [dim, lb] : llvm::zip(subscripts, con.lbounds()))
-          idx.push_back(
-              builder.createIntegerConstant(getLoc(), idxTy, dim - lb));
-        array = builder.create<fir::InsertValueOp>(getLoc(), arrayTy, array,
-                                                   charVal, idx);
+        array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
+                                                   insertVal, createIdx());
       } while (con.IncrementSubscripts(subscripts));
-      auto len = builder.createIntegerConstant(getLoc(), idxTy, con.LEN());
+      auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
       return fir::CharArrayBoxValue{array, len, extents, lbounds};
     } else {
-      // Convert Ev::ConstantSubs to SequenceType::Shape
-      fir::SequenceType::Shape shape(con.shape().begin(), con.shape().end());
-      auto eleTy = converter.genType(TC, KIND);
-      auto arrayTy = fir::SequenceType::get(shape, eleTy);
-      mlir::Value array = builder.create<fir::UndefOp>(getLoc(), arrayTy);
-      Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
-      bool foundRange = false;
-      mlir::Value rangeValue;
       llvm::SmallVector<mlir::Value> rangeStartIdx;
-      Fortran::evaluate::ConstantSubscripts rangeStartSubscripts;
-      uint64_t elemsInRange = 0;
-      const uint64_t minRangeSize = 2;
-
+      uint64_t rangeSize = 0;
       do {
-        auto constant =
-            fir::getBase(genScalarLit<TC, KIND>(con.At(subscripts)));
-        auto createIndexes = [&](Fortran::evaluate::ConstantSubscripts subs) {
-          llvm::SmallVector<mlir::Value> idx;
-          for (auto [dim, lb] : llvm::zip(subs, con.lbounds()))
-            // Add normalized upper bound index to idx.
-            idx.push_back(
-                builder.createIntegerConstant(getLoc(), idxTy, dim - lb));
-
-          return idx;
+        auto insertVal = [&]() {
+          return builder.createConvert(
+              loc, eleTy,
+              fir::getBase(genScalarLit<TC, KIND>(con.At(subscripts))));
         };
-
-        auto idx = createIndexes(subscripts);
-        auto insVal = builder.createConvert(getLoc(), eleTy, constant);
-        auto nextSubs = subscripts;
-
-        // Check to see if the next value is the same as the current value
-        bool nextIsSame = con.IncrementSubscripts(nextSubs) &&
-                          con.At(subscripts) == con.At(nextSubs);
-        bool newRange = (nextIsSame != foundRange) && !foundRange;
-        bool endOfRange = (nextIsSame != foundRange) && foundRange;
-        bool continueRange = nextIsSame && foundRange;
-
-        if (newRange) {
-          // Mark the start of the range
-          rangeStartIdx = idx;
-          rangeStartSubscripts = subscripts;
-          rangeValue = insVal;
-          foundRange = true;
-          elemsInRange = 1;
-        } else if (endOfRange) {
-          ++elemsInRange;
-          if (elemsInRange >= minRangeSize) {
-            // Zip together the upper and lower bounds of the range for each
-            // index in the form [lb0, up0, lb1, up1, ... , lbn, upn] to pass
-            // to the InserOnEangeOp.
-            llvm::SmallVector<mlir::Value> zippedRange;
-            for (size_t i = 0; i < idx.size(); ++i) {
-              zippedRange.push_back(rangeStartIdx[i]);
-              zippedRange.push_back(idx[i]);
-            }
-            array = builder.create<fir::InsertOnRangeOp>(
-                getLoc(), arrayTy, array, rangeValue, zippedRange);
-          } else {
-            while (true) {
-              idx = createIndexes(rangeStartSubscripts);
-              array = builder.create<fir::InsertValueOp>(
-                  getLoc(), arrayTy, array, rangeValue, idx);
-              if (rangeStartSubscripts == subscripts)
-                break;
-              con.IncrementSubscripts(rangeStartSubscripts);
-            }
+        auto nextSubscripts = subscripts;
+        bool nextIsSame = con.IncrementSubscripts(nextSubscripts) &&
+                          con.At(subscripts) == con.At(nextSubscripts);
+        if (!rangeSize && !nextIsSame) { // single (non-range) value
+          array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
+                                                     insertVal(), createIdx());
+        } else if (!rangeSize) { // start a range
+          rangeStartIdx = createIdx();
+          rangeSize = 1;
+        } else if (nextIsSame) { // expand a range
+          ++rangeSize;
+        } else { // end a range
+          llvm::SmallVector<mlir::Value> rangeBounds;
+          auto idx = createIdx();
+          for (size_t i = 0; i < idx.size(); ++i) {
+            rangeBounds.push_back(rangeStartIdx[i]);
+            rangeBounds.push_back(idx[i]);
           }
-          foundRange = false;
-        } else if (continueRange) {
-          // Loop until the end of the range is found.
-          ++elemsInRange;
-          continue;
-        } else /* no range */ {
-          // If a range has not been found then insert the current value.
-          array = builder.create<fir::InsertValueOp>(getLoc(), arrayTy, array,
-                                                     insVal, idx);
+          array = builder.create<fir::InsertOnRangeOp>(
+              loc, arrayTy, array, insertVal(), rangeBounds);
+          rangeSize = 0;
         }
       } while (con.IncrementSubscripts(subscripts));
       return fir::ArrayBoxValue{array, extents, lbounds};

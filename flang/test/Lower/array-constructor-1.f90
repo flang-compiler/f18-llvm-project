@@ -26,9 +26,24 @@ subroutine check_units
   enddo
 end
 
+! CHECK-LABEL: _QPzero
+subroutine zero
+  complex, parameter :: a(0) = [(((k,k=1,10),j=-2,2,-1),i=2,-2,-2)]
+  complex, parameter :: b(0) = [(7,i=3,-3)]
+  ! CHECK: fir.address_of(@_QQro.0xz4.null) : !fir.ref<!fir.array<0x!fir.complex<4>>>
+  ! CHECK-NOT: _QQro
+  print*, '>', a, '<'
+  print*, '>', b, '<'
+end
+
 ! CHECK-LABEL: _QQmain
 program prog
   call check_units
+  call zero
 end
 
 ! CHECK: fir.global linkonce [[units_value]] constant : !fir.array<3xi32>
+
+! CHECK: fir.global internal @_QFzeroECa constant : !fir.array<0x!fir.complex<4>>
+! CHECK:   %0 = fir.undefined !fir.array<0x!fir.complex<4>>
+! CHECK:   fir.has_value %0 : !fir.array<0x!fir.complex<4>>
