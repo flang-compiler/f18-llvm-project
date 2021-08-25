@@ -1068,10 +1068,10 @@ public:
     };
     if constexpr (TC == Fortran::common::TypeCategory::Character) {
       do {
-        auto insertVal =
+        auto elementVal =
             fir::getBase(genScalarLit<KIND>(con.At(subscripts), con.LEN()));
         array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
-                                                   insertVal, createIdx());
+                                                   elementVal, createIdx());
       } while (con.IncrementSubscripts(subscripts));
       auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
       return fir::CharArrayBoxValue{array, len, extents, lbounds};
@@ -1079,7 +1079,7 @@ public:
       llvm::SmallVector<mlir::Value> rangeStartIdx;
       uint64_t rangeSize = 0;
       do {
-        auto insertVal = [&]() {
+        auto getElementVal = [&]() {
           return builder.createConvert(
               loc, eleTy,
               fir::getBase(genScalarLit<TC, KIND>(con.At(subscripts))));
@@ -1088,8 +1088,8 @@ public:
         bool nextIsSame = con.IncrementSubscripts(nextSubscripts) &&
                           con.At(subscripts) == con.At(nextSubscripts);
         if (!rangeSize && !nextIsSame) { // single (non-range) value
-          array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
-                                                     insertVal(), createIdx());
+          array = builder.create<fir::InsertValueOp>(
+              loc, arrayTy, array, getElementVal(), createIdx());
         } else if (!rangeSize) { // start a range
           rangeStartIdx = createIdx();
           rangeSize = 1;
@@ -1103,7 +1103,7 @@ public:
             rangeBounds.push_back(idx[i]);
           }
           array = builder.create<fir::InsertOnRangeOp>(
-              loc, arrayTy, array, insertVal(), rangeBounds);
+              loc, arrayTy, array, getElementVal(), rangeBounds);
           rangeSize = 0;
         }
       } while (con.IncrementSubscripts(subscripts));
