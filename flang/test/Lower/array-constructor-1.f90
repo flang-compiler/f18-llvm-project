@@ -5,8 +5,7 @@ module units
 contains
   ! CHECK-LABEL: _QMunitsPis_preconnected_unit
   logical function is_preconnected_unit(u)
-  ! CHECK: [[units_ssa:%[0-9]+]] = fir.address_of([[units_value:.*]]) :
-  ! !fir.ref<!fir.array<3xi32>>
+  ! CHECK: [[units_ssa:%[0-9]+]] = fir.address_of([[units_value:.*]]) : !fir.ref<!fir.array<3xi32>>
     integer :: u
     integer :: i
     is_preconnected_unit = .true.

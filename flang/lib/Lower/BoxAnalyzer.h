@@ -393,7 +393,8 @@ public:
             lbounds.push_back(*lb); // origin for this dim
             if (auto high = subs.ubound().GetExplicit()) {
               if (auto ub = Fortran::evaluate::ToInt64(*high)) {
-                shapes.push_back(*ub - *lb + 1); // extent for this dim
+                auto extent = *ub - *lb + 1;
+                shapes.push_back(extent < 0 ? 0 : extent);
                 continue;
               }
             } else if (subs.ubound().isAssumed()) {
