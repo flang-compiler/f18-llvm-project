@@ -12,6 +12,8 @@
 program mn
         use omp_lib
         integer :: x, y
+!FIRDialect: omp.critical.declare @help
+!LLVMDialect: omp.critical.declare @help
 !FIRDialect: omp.critical(@help) hint(contended)
 !LLVMIRDialect: omp.critical(@help) hint(contended)
 !LLVMIR: call void @__kmpc_critical_with_hint({{.*}}, {{.*}}, {{.*}} @{{.*}}help.var, i32 2)
@@ -37,6 +39,3 @@ program mn
 !LLVMIR: call void @__kmpc_end_critical({{.*}}, {{.*}}, {{.*}} @{{.*}}_.var)
 !$OMP END CRITICAL
 end program
-
-!FIRDialect: fir.global @help constant : !fir.char<1,4>
-!LLVMIRDialect: llvm.mlir.global external constant @help() : !llvm.array<4 x i8>

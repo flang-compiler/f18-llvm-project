@@ -660,14 +660,13 @@ void Fortran::lower::genOpenMPConstruct(
                 return firOpBuilder.create<mlir::omp::CriticalOp>(
                     currentLocation, FlatSymbolRefAttr(), hint);
               } else {
-                auto type = fir::CharacterType::get(firOpBuilder.getContext(),
-                                                    1, name.size());
-                auto global = firOpBuilder.getNamedGlobal(name);
+		auto module = firOpBuilder.getModule();
+		mlir::OpBuilder modBuilder(module.getBodyRegion());
+		auto global = module.lookupSymbol<mlir::omp::CriticalDeclareOp>(name);
                 if (!global)
-                  global = firOpBuilder.createGlobalConstant(currentLocation,
-                                                             type, name);
+                  global = modBuilder.create<mlir::omp::CriticalDeclareOp>(currentLocation, name);
                 return firOpBuilder.create<mlir::omp::CriticalOp>(
-                    currentLocation, global.getSymbol(), hint);
+                    currentLocation, firOpBuilder.getSymbolRefAttr(global.sym_name()), hint);
               }
             }();
             createBodyOfOp<omp::CriticalOp>(criticalOp, converter,
