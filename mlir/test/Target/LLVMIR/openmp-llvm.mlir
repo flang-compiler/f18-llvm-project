@@ -564,6 +564,16 @@ llvm.func @omp_critical(%x : !llvm.ptr<i32>, %xval : i32) -> () {
     omp.terminator
   }
   // CHECK: call void @__kmpc_end_critical({{.*}}critical_user_mutex.var{{.*}})
+
+  // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_mutex.var{{.*}}, i32 0)
+  // CHECK: br label %omp.critical.region
+  // CHECK: omp.critical.region
+  omp.critical(@mutex) hint(none) {
+  // CHECK: store
+    llvm.store %xval, %x : !llvm.ptr<i32>
+    omp.terminator
+  }
+  // CHECK: call void @__kmpc_end_critical({{.*}}critical_user_mutex.var{{.*}})
   llvm.return
 }
 

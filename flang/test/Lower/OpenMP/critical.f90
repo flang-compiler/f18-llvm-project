@@ -24,9 +24,16 @@ program mn
 !LLVMIR: call void @__kmpc_end_critical({{.*}}, {{.*}}, {{.*}} @{{.*}}help.var)
 !$OMP END CRITICAL(help)
 
-! Just to test that the same name can be used again
-!$OMP CRITICAL(help) HINT(omp_lock_hint_contended)
+! Test that the same name can be used again
+! Also test with the zero hint expression
+!FIRDialect: omp.critical(@help) hint(none)
+!LLVMIRDialect: omp.critical(@help) hint(none)
+!LLVMIR: call void @__kmpc_critical_with_hint({{.*}}, {{.*}}, {{.*}} @{{.*}}help.var, i32 0)
+!$OMP CRITICAL(help) HINT(omp_lock_hint_none)
         x = x - y
+!FIRDialect: omp.terminator
+!LLVMIRDialect: omp.terminator
+!LLVMIR: call void @__kmpc_end_critical({{.*}}, {{.*}}, {{.*}} @{{.*}}help.var)
 !$OMP END CRITICAL(help)
 
 !FIRDialect: omp.critical
