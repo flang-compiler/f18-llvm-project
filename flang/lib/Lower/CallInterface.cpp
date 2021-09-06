@@ -567,6 +567,7 @@ public:
       addFirResult(mlir::IndexType::get(&mlirContext),
                    FirPlaceHolder::resultEntityPosition, Property::Value);
     }
+    bool isBindC = procedure.IsBindC();
     // Handle arguments
     const auto &argumentEntities =
         getEntityContainer(interface.side().getCallDescription());
@@ -581,7 +582,8 @@ public:
                 if (dummy.CanBePassedViaImplicitInterface())
                   handleImplicitDummy(&argCharacteristics, dummy, entity);
                 else
-                  handleExplicitDummy(&argCharacteristics, dummy, entity);
+                  handleExplicitDummy(&argCharacteristics, dummy, entity,
+                                      isBindC);
               },
               [&](const Fortran::evaluate::characteristics::DummyProcedure
                       &dummy) {
@@ -778,7 +780,7 @@ private:
   void handleExplicitDummy(
       const DummyCharacteristics *characteristics,
       const Fortran::evaluate::characteristics::DummyDataObject &obj,
-      const FortranEntity &entity) {
+      const FortranEntity &entity, bool isBindC) {
     using Attrs = Fortran::evaluate::characteristics::DummyDataObject::Attr;
 
     bool isValueAttr = false;
@@ -847,13 +849,21 @@ private:
                                : PassEntityBy::BoxChar,
                    entity, characteristics);
     } else {
-      // Pass as fir.ref
-      mlir::Type refType = fir::ReferenceType::get(type);
-      addFirOperand(refType, nextPassedArgPosition(), Property::BaseAddress,
-                    attrs);
-      addPassedArg(isValueAttr ? PassEntityBy::BaseAddressValueAttribute
-                               : PassEntityBy::BaseAddress,
-                   entity, characteristics);
+      // Pass as fir.ref unless it's by VALUE and BIND(C)
+      mlir::Type passType = fir::ReferenceType::get(type);
+      PassEntityBy passBy = PassEntityBy::BaseAddress;
+      Property prop = Property::BaseAddress;
+      if (isValueAttr) {
+        if (isBindC) {
+          passBy = PassEntityBy::Value;
+          prop = Property::Value;
+          passType = type;
+        } else {
+          passBy = PassEntityBy::BaseAddressValueAttribute;
+        }
+      }
+      addFirOperand(passType, nextPassedArgPosition(), prop, attrs);
+      addPassedArg(passBy, entity, characteristics);
     }
   }
 
