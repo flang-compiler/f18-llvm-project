@@ -221,7 +221,7 @@ bool GreedyPatternRewriteDriver::simplify(MutableArrayRef<Region> regions) {
     // After applying patterns, make sure that the CFG of each of the regions
     // is kept up to date.
     if (config.enableRegionSimplification)
-      changed |= succeeded(simplifyRegions(*this, regions));
+      changed |= succeeded(simplifyRegions(*this, regions, config.simplifyRegionsConfig));
   } while (changed && ++iteration < config.maxIterations);
 
   // Whether the rewrite converges, i.e. wasn't changed in the last iteration.

@@ -706,11 +706,18 @@ static LogicalResult mergeIdenticalBlocks(RewriterBase &rewriter,
 /// elimination, as well as some other DCE. This function returns success if any
 /// of the regions were simplified, failure otherwise.
 LogicalResult mlir::simplifyRegions(RewriterBase &rewriter,
-                                    MutableArrayRef<Region> regions) {
-  bool eliminatedBlocks = succeeded(eraseUnreachableBlocks(rewriter, regions));
-  bool eliminatedOpsOrArgs = succeeded(runRegionDCE(rewriter, regions));
-  bool mergedIdenticalBlocks =
-      succeeded(mergeIdenticalBlocks(rewriter, regions));
+                                    MutableArrayRef<Region> regions,
+                                    const SimplifyRegionsConfig &config) {
+  bool eliminatedBlocks = true;
+  bool eliminatedOpsOrArgs = true;
+  bool mergedIdenticalBlocks = true;
+
+  if (config.eraseUnreachableBlocks)
+    eliminatedBlocks = succeeded(eraseUnreachableBlocks(rewriter, regions));
+  if (config.eliminateDeadOpsOrArgs)
+    eliminatedOpsOrArgs = succeeded(runRegionDCE(rewriter, regions));
+  if (config.mergeIdenticalBlocks)
+    mergedIdenticalBlocks = succeeded(mergeIdenticalBlocks(rewriter, regions));
   return success(eliminatedBlocks || eliminatedOpsOrArgs ||
                  mergedIdenticalBlocks);
 }

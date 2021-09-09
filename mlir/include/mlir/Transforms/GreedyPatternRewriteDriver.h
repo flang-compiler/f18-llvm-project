@@ -15,8 +15,10 @@
 #define MLIR_TRANSFORMS_GREEDYPATTERNREWRITEDRIVER_H_
 
 #include "mlir/Rewrite/FrozenRewritePatternSet.h"
+#include "mlir/Transforms/RegionUtils.h"
 
 namespace mlir {
+class SimplifyRegionsConfig;
 
 /// This class allows control over how the GreedyPatternRewriteDriver works.
 class GreedyRewriteConfig {
@@ -31,6 +33,9 @@ public:
   // Perform control flow optimizations to the region tree after applying all
   // patterns.
   bool enableRegionSimplification = true;
+
+  /// Finer control on the regions simplification.
+  SimplifyRegionsConfig simplifyRegionsConfig;
 
   /// This specifies the maximum number of times the rewriter will iterate
   /// between applying patterns and simplifying regions.

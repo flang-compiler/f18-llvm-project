@@ -17,6 +17,19 @@
 namespace mlir {
 class RewriterBase;
 
+/// This class allows control over how the simplyRegions works.
+class SimplifyRegionsConfig {
+public:
+  /// Erase the unreachable blocks within the provided regions.
+  bool eraseUnreachableBlocks = true;
+  /// Performs a simple dead code elimination algorithm over the
+  /// given regions.
+  bool eliminateDeadOpsOrArgs = true;
+  /// Identify identical blocks within the given region and merge them, 
+  /// inserting new block arguments as necessary.
+  bool mergeIdenticalBlocks = true;
+};
+
 /// Check if all values in the provided range are defined above the `limit`
 /// region.  That is, if they are defined in a region that is a proper ancestor
 /// of `limit`.
@@ -57,7 +70,8 @@ void getUsedValuesDefinedAbove(MutableArrayRef<Region> regions,
 /// of the regions were simplified, failure otherwise. The provided rewriter is
 /// used to notify callers of operation and block deletion.
 LogicalResult simplifyRegions(RewriterBase &rewriter,
-                              MutableArrayRef<Region> regions);
+                              MutableArrayRef<Region> regions,
+                              const SimplifyRegionsConfig &config);
 
 } // namespace mlir
 
