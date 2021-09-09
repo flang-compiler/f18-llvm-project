@@ -797,7 +797,7 @@ mlir::createInlinerPass(llvm::StringMap<OpPassManager> opPipelines) {
                                        std::move(opPipelines));
 }
 std::unique_ptr<Pass>
-createInlinerPass(llvm::StringMap<OpPassManager> opPipelines,
+mlir::createInlinerPass(llvm::StringMap<OpPassManager> opPipelines,
                   std::function<void(OpPassManager &)> defaultPipelineBuilder) {
   return std::make_unique<InlinerPass>(std::move(defaultPipelineBuilder),
                                        std::move(opPipelines));
