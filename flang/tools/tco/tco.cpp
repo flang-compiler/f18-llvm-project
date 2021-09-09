@@ -24,6 +24,7 @@
 #include "mlir/Parser.h"
 #include "mlir/Pass/Pass.h"
 #include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/GreedyPatternRewriteDriver.h"
 #include "mlir/Transforms/Passes.h"
 #include "llvm/Support/CommandLine.h"
 #include "llvm/Support/ErrorOr.h"
@@ -59,6 +60,12 @@ static cl::opt<std::string> targetTriple("target",
 static void printModuleBody(mlir::ModuleOp mod, raw_ostream &output) {
   for (auto &op : *mod.getBody())
     output << op << '\n';
+}
+
+static void defaultFlangInlinerOptPipeline(mlir::OpPassManager &pm) {
+  mlir::GreedyRewriteConfig config;
+  config.simplifyRegionsConfig.mergeIdenticalBlocks = false;
+  pm.addPass(createCanonicalizerPass(config));
 }
 
 // compile a .fir file
@@ -113,11 +120,17 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
     });
   } else {
     // simplify the IR
+    mlir::GreedyRewriteConfig config;
+    config.simplifyRegionsConfig.mergeIdenticalBlocks = false;
     pm.addNestedPass<mlir::FuncOp>(fir::createArrayValueCopyPass());
     pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
-    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::createCanonicalizerPass(config));
     fir::addCSE(pm);
-    pm.addPass(mlir::createInlinerPass());
+    // The default inliner pass adds the canonicalizer pass with the default
+    // configuration. Create the inliner pass with tco config.
+    llvm::StringMap<mlir::OpPassManager> pipelines;
+    pm.addPass(
+        mlir::createInlinerPass(pipelines, defaultFlangInlinerOptPipeline));
     pm.addPass(mlir::createCSEPass());
 
     // convert control flow to CFG form
@@ -125,7 +138,7 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
     pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
     pm.addPass(mlir::createLowerToCFGPass());
 
-    pm.addPass(mlir::createCanonicalizerPass());
+    pm.addPass(mlir::createCanonicalizerPass(config));
     fir::addCSE(pm);
 
     pm.addNestedPass<mlir::FuncOp>(fir::createAbstractResultOptPass());

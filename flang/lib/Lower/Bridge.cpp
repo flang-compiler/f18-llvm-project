@@ -32,10 +32,10 @@
 #include "flang/Optimizer/Builder/BoxValue.h"
 #include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
+#include "flang/Optimizer/Builder/Runtime/Character.h"
 #include "flang/Optimizer/Dialect/FIRAttr.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
-#include "flang/Optimizer/Builder/Runtime/Character.h"
 #include "flang/Optimizer/Support/FIRContext.h"
 #include "flang/Optimizer/Support/FatalError.h"
 #include "flang/Optimizer/Support/InternalNames.h"
@@ -2419,8 +2419,10 @@ private:
                             << *builder->getFunction() << '\n');
     // FIXME: Simplification should happen in a normal pass, not here.
     mlir::IRRewriter rewriter(*builder);
-    (void)mlir::simplifyRegions(rewriter,
-                                {builder->getRegion()}); // remove dead code
+    SimplifyRegionsConfig config;
+    config.mergeIdenticalBlocks = false;
+    (void)mlir::simplifyRegions(rewriter, {builder->getRegion()},
+                                config); // remove dead code
     delete builder;
     builder = nullptr;
     hostAssocTuple = mlir::Value{};
