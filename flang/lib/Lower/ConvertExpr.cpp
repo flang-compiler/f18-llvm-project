@@ -1100,19 +1100,19 @@ public:
       eleTy = converter.genType(TC, KIND);
     auto arrayTy = fir::SequenceType::get(shape, eleTy);
     mlir::Value array = builder.create<fir::UndefOp>(loc, arrayTy);
-    if (size == 0) {
-      if constexpr (TC == Fortran::common::TypeCategory::Character) {
-        auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
-        return fir::CharArrayBoxValue{array, len, {}, {}};
-      } else {
-        return fir::ArrayBoxValue{array, {}, {}};
-      }
-    }
     llvm::SmallVector<mlir::Value> lbounds;
     llvm::SmallVector<mlir::Value> extents;
     for (auto [lb, extent] : llvm::zip(con.lbounds(), shape)) {
       lbounds.push_back(builder.createIntegerConstant(loc, idxTy, lb - 1));
       extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
+    }
+    if (size == 0) {
+      if constexpr (TC == Fortran::common::TypeCategory::Character) {
+        auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
+        return fir::CharArrayBoxValue{array, len, extents, lbounds};
+      } else {
+        return fir::ArrayBoxValue{array, extents, lbounds};
+      }
     }
     Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
     auto createIdx = [&]() {
@@ -1176,14 +1176,14 @@ public:
     auto eleTy = converter.genType(con.GetType().GetDerivedTypeSpec());
     auto arrayTy = fir::SequenceType::get(shape, eleTy);
     mlir::Value array = builder.create<fir::UndefOp>(loc, arrayTy);
-    if (size == 0)
-      return fir::ArrayBoxValue{array, {}, {}};
     llvm::SmallVector<mlir::Value> lbounds;
     llvm::SmallVector<mlir::Value> extents;
     for (auto [lb, extent] : llvm::zip(con.lbounds(), con.shape())) {
       lbounds.push_back(builder.createIntegerConstant(loc, idxTy, lb - 1));
       extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
     }
+    if (size == 0)
+      return fir::ArrayBoxValue{array, extents, lbounds};
     Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
     do {
       auto derivedVal = fir::getBase(genval(con.At(subscripts)));
