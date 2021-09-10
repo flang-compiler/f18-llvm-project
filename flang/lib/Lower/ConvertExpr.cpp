@@ -1169,25 +1169,28 @@ public:
 
   fir::ExtendedValue genArrayLit(
       const Fortran::evaluate::Constant<Fortran::evaluate::SomeDerived> &con) {
+    auto loc = getLoc();
+    auto idxTy = builder.getIndexType();
+    auto size = Fortran::evaluate::GetSize(con.shape());
+    fir::SequenceType::Shape shape(con.shape().begin(), con.shape().end());
+    auto eleTy = converter.genType(con.GetType().GetDerivedTypeSpec());
+    auto arrayTy = fir::SequenceType::get(shape, eleTy);
+    mlir::Value array = builder.create<fir::UndefOp>(loc, arrayTy);
+    if (size == 0)
+      return fir::ArrayBoxValue{array, {}, {}};
     llvm::SmallVector<mlir::Value> lbounds;
     llvm::SmallVector<mlir::Value> extents;
-    auto idxTy = builder.getIndexType();
     for (auto [lb, extent] : llvm::zip(con.lbounds(), con.shape())) {
-      lbounds.push_back(builder.createIntegerConstant(getLoc(), idxTy, lb - 1));
-      extents.push_back(builder.createIntegerConstant(getLoc(), idxTy, extent));
+      lbounds.push_back(builder.createIntegerConstant(loc, idxTy, lb - 1));
+      extents.push_back(builder.createIntegerConstant(loc, idxTy, extent));
     }
-    fir::SequenceType::Shape shape;
-    shape.append(con.shape().begin(), con.shape().end());
-    auto recTy = converter.genType(con.GetType().GetDerivedTypeSpec());
-    auto arrayTy = fir::SequenceType::get(shape, recTy);
-    mlir::Value array = builder.create<fir::UndefOp>(getLoc(), arrayTy);
     Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
     do {
       auto derivedVal = fir::getBase(genval(con.At(subscripts)));
       llvm::SmallVector<mlir::Value> idx;
       for (auto [dim, lb] : llvm::zip(subscripts, con.lbounds()))
-        idx.push_back(builder.createIntegerConstant(getLoc(), idxTy, dim - lb));
-      array = builder.create<fir::InsertValueOp>(getLoc(), arrayTy, array,
+        idx.push_back(builder.createIntegerConstant(loc, idxTy, dim - lb));
+      array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
                                                  derivedVal, idx);
     } while (con.IncrementSubscripts(subscripts));
     return fir::ArrayBoxValue{array, extents, lbounds};

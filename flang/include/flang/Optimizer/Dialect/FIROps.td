@@ -2238,6 +2238,8 @@ def fir_InsertOnRangeOp : fir_OneResultOp<"insert_on_range", [NoSideEffect]> {
     OpBuilder<(ins "mlir::Type":$rty, "mlir::Value":$adt, "mlir::Value":$val,
       "llvm::ArrayRef<mlir::Value>":$vcoor)>
   ];
+
+  let verifier = [{ return ::verify(*this); }];
 }
 
 def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {

@@ -87,9 +87,9 @@ static mlir::Value genScalarValue(Fortran::lower::AbstractConverter &converter,
       loc, converter, expr, symMap, context));
 }
 
-/// Does this variable has a default initialization ?
+/// Does this variable have a default initialization?
 static bool hasDefaultInitialization(const Fortran::semantics::Symbol &sym) {
-  if (sym.has<Fortran::semantics::ObjectEntityDetails>())
+  if (sym.has<Fortran::semantics::ObjectEntityDetails>() && sym.size())
     if (!Fortran::semantics::IsAllocatableOrPointer(sym))
       if (const auto *declTypeSpec = sym.GetType())
         if (const auto *derivedTypeSpec = declTypeSpec->AsDerived())

@@ -991,6 +991,23 @@ void fir::InsertOnRangeOp::build(mlir::OpBuilder &builder,
   build(builder, result, resTy, aggVal, eleVal, aa);
 }
 
+/// Range bounds must be nonnegative, and the range must not be empty.
+static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
+  bool rangeIsKnownToBeNonempty = false;
+  for (auto i = op.coor().end(), b = op.coor().begin(); i != b;) {
+    int64_t ub = (*--i).cast<IntegerAttr>().getInt();
+    int64_t lb = (*--i).cast<IntegerAttr>().getInt();
+    if (lb < 0 || ub < 0)
+      return op.emitOpError("negative range bound");
+    if (rangeIsKnownToBeNonempty)
+      continue;
+    if (lb > ub)
+      return op.emitOpError("empty range");
+    rangeIsKnownToBeNonempty = lb < ub;
+  }
+  return mlir::success();
+}
+
 //===----------------------------------------------------------------------===//
 // InsertValueOp
 //===----------------------------------------------------------------------===//
