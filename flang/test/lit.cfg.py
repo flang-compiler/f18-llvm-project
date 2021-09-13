@@ -43,6 +43,11 @@ config.substitutions.append(('%pluginext', config.llvm_plugin_ext))
 
 llvm_config.use_default_substitutions()
 
+# Targets
+config.targets = frozenset(config.targets_to_build.split())
+for arch in config.targets_to_build.split():
+    config.available_features.add(arch.lower() + '-registered-target')
+
 # excludes: A list of directories to exclude from the testsuite. The 'Inputs'
 # subdirectories contain auxiliary inputs for various tests in their parent
 # directories.

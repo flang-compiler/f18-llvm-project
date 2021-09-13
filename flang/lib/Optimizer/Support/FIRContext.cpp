@@ -16,7 +16,7 @@
 #include "mlir/IR/BuiltinOps.h"
 #include "llvm/Support/Host.h"
 
-static constexpr const char *tripleName = "fir.triple";
+static constexpr const char *tripleName = "llvm.target_triple";
 
 void fir::setTargetTriple(mlir::ModuleOp mod, llvm::StringRef triple) {
   auto target = fir::determineTargetTriple(triple);

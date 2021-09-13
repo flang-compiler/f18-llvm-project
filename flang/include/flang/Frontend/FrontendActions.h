@@ -11,6 +11,7 @@
 
 #include "flang/Frontend/FrontendAction.h"
 #include "flang/Semantics/semantics.h"
+#include "llvm/IR/Module.h"
 #include <memory>
 
 namespace Fortran::frontend {
@@ -31,10 +32,6 @@ struct MeasurementVisitor {
 //===----------------------------------------------------------------------===//
 
 class InputOutputTestAction : public FrontendAction {
-  void ExecuteAction() override;
-};
-
-class EmitObjAction : public FrontendAction {
   void ExecuteAction() override;
 };
 
@@ -153,6 +150,14 @@ class CodeGenAction : public FrontendAction {
 
   void ExecuteAction() override = 0;
   bool BeginSourceFileAction() override;
+
+protected:
+  /// @name LLVM IR
+  std::unique_ptr<llvm::LLVMContext> llvmCtx_;
+  std::unique_ptr<llvm::Module> llvmModule_;
+  /// }
+
+  void GenerateLLVMIR();
 };
 
 class EmitMLIRAction : public CodeGenAction {
@@ -160,6 +165,10 @@ class EmitMLIRAction : public CodeGenAction {
 };
 
 class EmitLLVMAction : public CodeGenAction {
+  void ExecuteAction() override;
+};
+
+class EmitObjAction : public CodeGenAction {
   void ExecuteAction() override;
 };
 

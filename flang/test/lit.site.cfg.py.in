@@ -21,6 +21,7 @@ config.cc = "@CMAKE_C_COMPILER@"
 config.cplusplus_executable = "@CMAKE_CXX_COMPILER@"
 config.macos_sysroot = "@CMAKE_OSX_SYSROOT@"
 config.flang_standalone_build = "@FLANG_STANDALONE_BUILD@"
+config.targets_to_build = "@TARGETS_TO_BUILD@"
 
 # Support substitution of the tools_dir with user parameters. This is
 # used when we can't determine the tool dir at configuration time.

@@ -20,10 +20,10 @@
 #include "flang/Lower/Support/Verifier.h"
 #include "flang/Optimizer/CodeGen/CodeGen.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
-#include "flang/Optimizer/Support//Utils.h"
 #include "flang/Optimizer/Support/FIRContext.h"
 #include "flang/Optimizer/Support/InitFIR.h"
 #include "flang/Optimizer/Support/KindMapping.h"
+#include "flang/Optimizer/Support/Utils.h"
 #include "flang/Optimizer/Transforms/Passes.h"
 #include "flang/Parser/dump-parse-tree.h"
 #include "flang/Parser/parsing.h"
@@ -34,11 +34,18 @@
 #include "flang/Semantics/semantics.h"
 #include "flang/Semantics/unparse-with-symbols.h"
 #include "llvm/ADT/StringRef.h"
+#include "llvm/Analysis/TargetLibraryInfo.h"
+#include "llvm/Analysis/TargetTransformInfo.h"
+#include "llvm/IR/LegacyPassManager.h"
+#include "llvm/Support/CodeGen.h"
 #include "llvm/Support/ErrorHandling.h"
+#include "llvm/MC/TargetRegistry.h"
 #include "llvm/Support/raw_ostream.h"
+#include "llvm/Target/TargetMachine.h"
 #include <clang/Basic/Diagnostic.h>
 
 using namespace Fortran::frontend;
+using namespace llvm;
 
 //===----------------------------------------------------------------------===//
 // Custom BeginSourceFileAction
@@ -436,7 +443,8 @@ void EmitMLIRAction::ExecuteAction() {
 
 #include "flang/Tools/CLOptions.inc"
 
-void EmitLLVMAction::ExecuteAction() {
+// Lower the previously generated MLIR module into an LLVM IR module
+void CodeGenAction::GenerateLLVMIR() {
   CompilerInstance &ci = this->instance();
   auto mlirMod = ci.mlirModule();
 
@@ -444,7 +452,7 @@ void EmitLLVMAction::ExecuteAction() {
   fir::support::loadDialects(ctx);
   fir::support::registerLLVMTranslation(ctx);
 
-  // Set-up the pass manager
+  // Set-up the MLIR pass manager
   fir::setTargetTriple(mlirMod, "native");
   auto &defKinds = ci.invocation().semanticsContext().defaultKinds();
   fir::KindMapping kindMap(&ci.mlirCtx(),
@@ -468,16 +476,21 @@ void EmitLLVMAction::ExecuteAction() {
 
   // Translate to LLVM IR
   auto optName = mlirMod.getName();
-  llvm::LLVMContext llvmCtx;
-  auto llvmModule = (mlir::translateModuleToLLVMIR(
-      mlirMod, llvmCtx, optName ? *optName : "FIRModule"));
+  llvmCtx_ = std::make_unique<llvm::LLVMContext>();
+  llvmModule_ = mlir::translateModuleToLLVMIR(
+      mlirMod, *llvmCtx_, optName ? *optName : "FIRModule");
 
-  if (!llvmModule) {
+  if (!llvmModule_) {
     unsigned diagID = ci.diagnostics().getCustomDiagID(
         clang::DiagnosticsEngine::Error, "failed to create the LLVM module");
     ci.diagnostics().Report(diagID);
     return;
   }
+}
+
+void EmitLLVMAction::ExecuteAction() {
+  CompilerInstance &ci = this->instance();
+  GenerateLLVMIR();
 
   // Print the generated LLVM IR. If there is no pre-defined output stream to
   // print to, create an output file.
@@ -495,10 +508,10 @@ void EmitLLVMAction::ExecuteAction() {
   }
 
   if (!ci.IsOutputStreamNull()) {
-    llvmModule->print(
+    llvmModule_->print(
         ci.GetOutputStream(), /*AssemblyAnnotationWriter=*/nullptr);
   } else {
-    llvmModule->print(*os, /*AssemblyAnnotationWriter=*/nullptr);
+    llvmModule_->print(*os, /*AssemblyAnnotationWriter=*/nullptr);
   }
 
   return;
@@ -506,9 +519,58 @@ void EmitLLVMAction::ExecuteAction() {
 
 void EmitObjAction::ExecuteAction() {
   CompilerInstance &ci = this->instance();
-  unsigned DiagID = ci.diagnostics().getCustomDiagID(
-      clang::DiagnosticsEngine::Error, "code-generation is not available yet");
-  ci.diagnostics().Report(DiagID);
+  GenerateLLVMIR();
+
+  // Create `Target`
+  std::string error;
+  std::string theTriple = llvmModule_->getTargetTriple();
+  const llvm::Target *theTarget =
+      TargetRegistry::lookupTarget(theTriple, error);
+  assert(theTarget && "Failed to create Target");
+
+  // Create `TargetMachine`
+  std::unique_ptr<TargetMachine> TM;
+  TM.reset(theTarget->createTargetMachine(
+      theTriple, /*CPU=*/"", /*Features=*/"", llvm::TargetOptions(), None));
+  llvmModule_->setDataLayout(TM->createDataLayout());
+  assert(TM && "Failed to create TargetMachine");
+
+  // Create an LLVM code-gen pass pipeline. Currently only the legacy pass
+  // manager is supported.
+  // TODO: Switch to the new PM once it's available in the backend.
+  legacy::PassManager CodeGenPasses;
+  CodeGenPasses.add(createTargetTransformInfoWrapperPass(TargetIRAnalysis()));
+  Triple triple(llvmModule_->getTargetTriple());
+  std::unique_ptr<llvm::TargetLibraryInfoImpl> TLII =
+      std::make_unique<llvm::TargetLibraryInfoImpl>(triple);
+  CodeGenPasses.add(new TargetLibraryInfoWrapperPass(*TLII));
+
+  // Get the output buffer/file
+  std::unique_ptr<llvm::raw_pwrite_stream> os{ci.CreateDefaultOutputFile(
+      /*Binary=*/true, /*InFile=*/GetCurrentFileOrBufferName(), "o")};
+  if (!os) {
+    unsigned diagID = ci.diagnostics().getCustomDiagID(
+        clang::DiagnosticsEngine::Error, "failed to create the output file");
+    ci.diagnostics().Report(diagID);
+    return;
+  }
+
+  if (TM->addPassesToEmitFile(CodeGenPasses, *os, nullptr,
+          /*CodeGenFileType*/ llvm::CodeGenFileType::CGFT_ObjectFile))
+    assert(false && "Something went wrong");
+  // The output stream, `os`, is a smart pointer that will be destroyed at the
+  // end of this method. However, it won't be written to until `CodeGenPasses`
+  // is destroyed. Hence, we need to release `as` here as otherwise it will be
+  // destroyed before it is written to. This pointer is later wrapped into a
+  // smart pointer inside `LLVMTargetMachine::createMCStreamer`, so no
+  // resources are leaked.
+  // TODO: Implement a safer way to pass `os` around.
+  os.release();
+
+  // Run the code-gen passes
+  CodeGenPasses.run(*llvmModule_);
+
+  return;
 }
 
 void InitOnlyAction::ExecuteAction() {

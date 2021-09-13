@@ -4,6 +4,8 @@
 // RUN: %CC %t print_complex.o
 // RUN: ./a.out | FileCheck %s --check-prefix=EXECHECK
 
+// REQUIRES: x86-registered-target
+
 // EXECHECK: <0.935893, 2.252526>
 
 // LLVMIR-LABEL: define <2 x float> @foo(<2 x float> %

@@ -74,7 +74,6 @@ class CompilerInstance {
   std::unique_ptr<llvm::raw_pwrite_stream> outputStream_;
 
   std::unique_ptr<mlir::MLIRContext> mlirCtx_;
-
   std::unique_ptr<mlir::ModuleOp> mlirModule_;
 
 public:
