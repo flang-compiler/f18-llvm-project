@@ -10,6 +10,7 @@
 #include "mlir/IR/Dialect.h"
 #include "mlir/Pass/PassManager.h"
 #include "mlir/Support/LogicalResult.h"
+#include "mlir/Target/LLVMIR/ModuleTranslation.h"
 #include "flang/Common/default-kinds.h"
 #include "flang/Frontend/CompilerInstance.h"
 #include "flang/Frontend/FrontendOptions.h"
@@ -17,9 +18,13 @@
 #include "flang/Lower/Bridge.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/Support/Verifier.h"
+#include "flang/Optimizer/CodeGen/CodeGen.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
+#include "flang/Optimizer/Support//Utils.h"
+#include "flang/Optimizer/Support/FIRContext.h"
 #include "flang/Optimizer/Support/InitFIR.h"
 #include "flang/Optimizer/Support/KindMapping.h"
+#include "flang/Optimizer/Transforms/Passes.h"
 #include "flang/Parser/dump-parse-tree.h"
 #include "flang/Parser/parsing.h"
 #include "flang/Parser/provenance.h"
@@ -32,7 +37,6 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
 #include <clang/Basic/Diagnostic.h>
-#include <memory>
 
 using namespace Fortran::frontend;
 
@@ -55,7 +59,45 @@ bool PrescanAndSemaDebugAction::BeginSourceFileAction() {
 }
 
 bool CodeGenAction::BeginSourceFileAction() {
-  return RunPrescan() & RunParse() && RunSemanticChecks();
+  bool res = RunPrescan() && RunParse() && RunSemanticChecks();
+  if (!res)
+    return res;
+
+  CompilerInstance &ci = this->instance();
+
+  // Load the MLIR dialects required by Flang
+  mlir::DialectRegistry registry;
+  ci.setMlirCtx(std::make_unique<mlir::MLIRContext>(registry));
+  fir::support::registerNonCodegenDialects(registry);
+  fir::support::loadNonCodegenDialects(ci.mlirCtx());
+
+  // Create a LoweringBridge
+  auto &defKinds = ci.invocation().semanticsContext().defaultKinds();
+  fir::KindMapping kindMap(&ci.mlirCtx(),
+      llvm::ArrayRef<fir::KindTy>{fir::fromDefaultKinds(defKinds)});
+  auto lb = Fortran::lower::LoweringBridge::create(ci.mlirCtx(), defKinds,
+      ci.invocation().semanticsContext().intrinsics(), ci.parsing().allCooked(),
+      "", kindMap);
+
+  // Create a parse tree and lower it to FIR
+  auto &parseTree{*ci.parsing().parseTree()};
+  lb.lower(parseTree, ci.invocation().semanticsContext());
+  ci.setMlirModule(std::make_unique<mlir::ModuleOp>(lb.getModule()));
+
+  // Run the default passes.
+  mlir::PassManager pm(&ci.mlirCtx(), mlir::OpPassManager::Nesting::Implicit);
+  pm.enableVerifier(/*verifyPasses=*/true);
+  pm.addPass(std::make_unique<Fortran::lower::VerifierPass>());
+
+  if (mlir::failed(pm.run(ci.mlirModule()))) {
+    unsigned diagID =
+        ci.diagnostics().getCustomDiagID(clang::DiagnosticsEngine::Error,
+            "verification of lowering to FIR failed");
+    ci.diagnostics().Report(diagID);
+    return false;
+  }
+
+  return true;
 }
 
 //===----------------------------------------------------------------------===//
@@ -369,61 +411,13 @@ void GetSymbolsSourcesAction::ExecuteAction() {
   ci.semantics().DumpSymbolsSources(llvm::outs());
 }
 
-// Translate front-end KINDs for use in the IR and code gen. Extracted from
-// bbc.cpp.
-static std::vector<fir::KindTy>
-fromDefaultKinds(const Fortran::common::IntrinsicTypeDefaultKinds &defKinds) {
-  return {static_cast<fir::KindTy>(defKinds.GetDefaultKind(
-              Fortran::common::TypeCategory::Character)),
-          static_cast<fir::KindTy>(
-              defKinds.GetDefaultKind(Fortran::common::TypeCategory::Complex)),
-          static_cast<fir::KindTy>(defKinds.doublePrecisionKind()),
-          static_cast<fir::KindTy>(
-              defKinds.GetDefaultKind(Fortran::common::TypeCategory::Integer)),
-          static_cast<fir::KindTy>(
-              defKinds.GetDefaultKind(Fortran::common::TypeCategory::Logical)),
-          static_cast<fir::KindTy>(
-              defKinds.GetDefaultKind(Fortran::common::TypeCategory::Real))};
-}
-
 void EmitMLIRAction::ExecuteAction() {
   CompilerInstance &ci = this->instance();
-
-  // Load the MLIR dialects required by Flang
-  mlir::DialectRegistry registry;
-  mlir::MLIRContext ctx(registry);
-  fir::support::registerNonCodegenDialects(registry);
-  fir::support::loadNonCodegenDialects(ctx);
-
-  // Create a LoweringBridge
-  auto &defKinds = ci.invocation().semanticsContext().defaultKinds();
-  fir::KindMapping kindMap(
-      &ctx, llvm::ArrayRef<fir::KindTy>{fromDefaultKinds(defKinds)});
-  auto lb = Fortran::lower::LoweringBridge::create(ctx, defKinds,
-      ci.invocation().semanticsContext().intrinsics(), ci.parsing().allCooked(),
-      "", kindMap);
-
-  // Create a parse tree and lower it to FIR
-  auto &parseTree{*ci.parsing().parseTree()};
-  lb.lower(parseTree, ci.invocation().semanticsContext());
-
-  // Run the default passes.
-  mlir::PassManager pm(&ctx, mlir::OpPassManager::Nesting::Implicit);
-  pm.enableVerifier(/*verifyPasses=*/true);
-  pm.addPass(std::make_unique<Fortran::lower::VerifierPass>());
-  mlir::ModuleOp mlirModule = lb.getModule();
-  if (mlir::failed(pm.run(mlirModule))) {
-    unsigned diagID =
-        ci.diagnostics().getCustomDiagID(clang::DiagnosticsEngine::Error,
-            "verification of lowering to FIR failed");
-    ci.diagnostics().Report(diagID);
-    return;
-  }
 
   // Print the output. If a pre-defined output stream exists, dump the MLIR
   // content there.
   if (!ci.IsOutputStreamNull()) {
-    mlirModule.print(ci.GetOutputStream());
+    ci.mlirModule().print(ci.GetOutputStream());
     return;
   }
 
@@ -437,7 +431,77 @@ void EmitMLIRAction::ExecuteAction() {
     return;
   }
 
-  mlirModule.print(*os);
+  ci.mlirModule().print(*os);
+}
+
+#include "flang/Tools/CLOptions.inc"
+
+void EmitLLVMAction::ExecuteAction() {
+  CompilerInstance &ci = this->instance();
+  auto mlirMod = ci.mlirModule();
+
+  auto &ctx = ci.mlirCtx();
+  fir::support::loadDialects(ctx);
+  fir::support::registerLLVMTranslation(ctx);
+
+  // Set-up the pass manager
+  fir::setTargetTriple(mlirMod, "native");
+  auto &defKinds = ci.invocation().semanticsContext().defaultKinds();
+  fir::KindMapping kindMap(&ci.mlirCtx(),
+      llvm::ArrayRef<fir::KindTy>{fir::fromDefaultKinds(defKinds)});
+  fir::setKindMapping(mlirMod, kindMap);
+  mlir::PassManager pm(&ci.mlirCtx(), mlir::OpPassManager::Nesting::Implicit);
+
+  pm.addPass(std::make_unique<Fortran::lower::VerifierPass>());
+  pm.enableVerifier(/*verifyPasses=*/true);
+  mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
+
+  // Create the pass pipeline
+  fir::createMLIRToLLVMPassPipeline(pm);
+
+  // Run the pass manager
+  if (!mlir::succeeded(pm.run(mlirMod))) {
+    unsigned diagID = ci.diagnostics().getCustomDiagID(
+        clang::DiagnosticsEngine::Error, "Lowering to LLVM IR failed");
+    ci.diagnostics().Report(diagID);
+  }
+
+  // Translate to LLVM IR
+  auto optName = mlirMod.getName();
+  llvm::LLVMContext llvmCtx;
+  auto llvmModule = (mlir::translateModuleToLLVMIR(
+      mlirMod, llvmCtx, optName ? *optName : "FIRModule"));
+
+  if (!llvmModule) {
+    unsigned diagID = ci.diagnostics().getCustomDiagID(
+        clang::DiagnosticsEngine::Error, "failed to create the LLVM module");
+    ci.diagnostics().Report(diagID);
+    return;
+  }
+
+  // Print the generated LLVM IR. If there is no pre-defined output stream to
+  // print to, create an output file.
+  std::unique_ptr<llvm::raw_ostream> os;
+  if (ci.IsOutputStreamNull()) {
+    // Lower from the LLVM dialect to LLVM IR
+    os = ci.CreateDefaultOutputFile(
+        /*Binary=*/true, /*InFile=*/GetCurrentFileOrBufferName(), "ll");
+    if (!os) {
+      unsigned diagID = ci.diagnostics().getCustomDiagID(
+          clang::DiagnosticsEngine::Error, "failed to create the output file");
+      ci.diagnostics().Report(diagID);
+      return;
+    }
+  }
+
+  if (!ci.IsOutputStreamNull()) {
+    llvmModule->print(
+        ci.GetOutputStream(), /*AssemblyAnnotationWriter=*/nullptr);
+  } else {
+    llvmModule->print(*os, /*AssemblyAnnotationWriter=*/nullptr);
+  }
+
+  return;
 }
 
 void EmitObjAction::ExecuteAction() {

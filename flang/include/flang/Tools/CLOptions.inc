@@ -9,6 +9,13 @@
 // This file defines some shared command-line options that can be used when
 // debugging the test tools. This file must be included into the tool.
 
+#include "flang/Optimizer/CodeGen/CodeGen.h"
+#include "flang/Optimizer/Transforms/Passes.h"
+#include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
+#include "mlir/Pass/PassManager.h"
+#include "mlir/Transforms/Passes.h"
+#include "llvm/Support/CommandLine.h"
+
 #define DisableOption(DOName, DOOption, DODescription) \
   static llvm::cl::opt<bool> disable##DOName("disable-" DOOption, \
       llvm::cl::desc("disable " DODescription " pass"), llvm::cl::init(false), \
@@ -77,6 +84,35 @@ inline void addLLVMDialectToLLVMPass(
   addPassConditionally(pm, disableLlvmIrToLlvm,
       [&]() { return fir::createLLVMDialectToLLVMPass(output); });
 }
+
+/// Create a pass pipeline for lowering from MLIR to LLVM IR
+///
+/// \param pm - MLIR pass manager that will hold the pipeline definition
+inline void createMLIRToLLVMPassPipeline(mlir::PassManager &pm)
+{
+  // simplify the IR
+  fir::addCSE(pm);
+  pm.addNestedPass<mlir::FuncOp>(fir::createArrayValueCopyPass());
+  pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  fir::addCSE(pm);
+  pm.addPass(mlir::createInlinerPass());
+  pm.addPass(mlir::createCSEPass());
+
+  // convert control flow to CFG form
+  fir::addCfgConversionPass(pm);
+  pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
+  pm.addPass(mlir::createLowerToCFGPass());
+
+  pm.addPass(mlir::createCanonicalizerPass());
+  fir::addCSE(pm);
+
+  pm.addNestedPass<mlir::FuncOp>(fir::createAbstractResultOptPass());
+  fir::addCodeGenRewritePass(pm);
+  fir::addTargetRewritePass(pm);
+  fir::addFIRToLLVMPass(pm);
+}
+
 #undef FLANG_EXCLUDE_CODEGEN
 #endif
 

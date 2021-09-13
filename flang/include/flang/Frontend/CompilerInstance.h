@@ -8,6 +8,7 @@
 #ifndef LLVM_FLANG_FRONTEND_COMPILERINSTANCE_H
 #define LLVM_FLANG_FRONTEND_COMPILERINSTANCE_H
 
+#include "mlir/IR/BuiltinOps.h"
 #include "flang/Frontend/CompilerInvocation.h"
 #include "flang/Frontend/FrontendAction.h"
 #include "flang/Frontend/PreprocessorOptions.h"
@@ -72,6 +73,10 @@ class CompilerInstance {
   /// facilitate this. It is optional and will normally be just a nullptr.
   std::unique_ptr<llvm::raw_pwrite_stream> outputStream_;
 
+  std::unique_ptr<mlir::MLIRContext> mlirCtx_;
+
+  std::unique_ptr<mlir::ModuleOp> mlirModule_;
+
 public:
   explicit CompilerInstance();
 
@@ -127,6 +132,22 @@ public:
 
   void setSemantics(std::unique_ptr<Fortran::semantics::Semantics> semantics) {
     semantics_ = std::move(semantics);
+  }
+
+  /// }
+  /// @name MLIR
+  mlir::MLIRContext &mlirCtx() { return *mlirCtx_; }
+  const mlir::MLIRContext &mlirCtx() const { return *mlirCtx_; }
+
+  void setMlirCtx(std::unique_ptr<mlir::MLIRContext> mlirCtx) {
+    mlirCtx_ = std::move(mlirCtx);
+  }
+
+  mlir::ModuleOp &mlirModule() { return *mlirModule_; }
+  const mlir::ModuleOp &mlirModule() const { return *mlirModule_; }
+
+  void setMlirModule(std::unique_ptr<mlir::ModuleOp> module) {
+    mlirModule_ = std::move(module);
   }
 
   /// }

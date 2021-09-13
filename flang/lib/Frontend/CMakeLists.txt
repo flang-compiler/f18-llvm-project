@@ -29,6 +29,11 @@ add_flang_library(flangFrontend
   FIRAnalysis
   FIRSupport
   FIRBuilder
+  FIRCodeGen
+  FIRTransforms
+  MLIRTransforms
+  MLIRLLVMToLLVMIRTranslation
+  MLIRSCFToStandard
   ${dialect_libs}
 
   LINK_COMPONENTS

@@ -112,28 +112,7 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
       return mlir::failure();
     });
   } else {
-    // simplify the IR
-    fir::addCSE(pm);
-    pm.addNestedPass<mlir::FuncOp>(fir::createArrayValueCopyPass());
-    pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
-    pm.addPass(mlir::createCanonicalizerPass());
-    fir::addCSE(pm);
-    pm.addPass(mlir::createInlinerPass());
-    pm.addPass(mlir::createCSEPass());
-
-    // convert control flow to CFG form
-    fir::addCfgConversionPass(pm);
-    pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
-    pm.addPass(mlir::createLowerToCFGPass());
-
-    pm.addPass(mlir::createCanonicalizerPass());
-    fir::addCSE(pm);
-
-    pm.addNestedPass<mlir::FuncOp>(fir::createAbstractResultOptPass());
-    // pm.addPass(fir::createMemToRegPass());
-    fir::addCodeGenRewritePass(pm);
-    fir::addTargetRewritePass(pm);
-    fir::addFIRToLLVMPass(pm);
+    fir::createMLIRToLLVMPassPipeline(pm);
     fir::addLLVMDialectToLLVMPass(pm, out.os());
   }
 

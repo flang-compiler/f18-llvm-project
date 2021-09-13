@@ -34,6 +34,9 @@ enum ActionKind {
   /// Emit a .mlir file
   EmitMLIR,
 
+  /// Emit a .llvm file
+  EmitLLVM,
+
   /// Emit a .o file.
   EmitObj,
 
