@@ -7,6 +7,7 @@ add_flang_library(FIRTransforms
   CharacterConversion.cpp
   ControlFlowConverter.cpp
   CSE.cpp
+  ExternalNameConversion.cpp
   FirLoopResultOpt.cpp
   MemDataFlowOpt.cpp
   MemToReg.cpp
