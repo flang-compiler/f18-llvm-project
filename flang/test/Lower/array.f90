@@ -76,6 +76,26 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   
 end subroutine s
 
+! CHECK: %[[VAL_1:.*]] = constant 1.000000e+00 : f32
+! CHECK: %[[VAL_2:.*]] = constant 2.400000e+00 : f32
+! CHECK: %[[VAL_3:.*]] = constant 0.000000e+00 : f32
+! CHECK: %[[VAL_4:.*]] = fir.undefined tuple<!fir.array<5x5xf32>>
+! CHECK: %[[VAL_5:.*]] = fir.undefined !fir.array<5x5xf32>
+! CHECK: %[[VAL_6:.*]] = fir.insert_on_range %[[VAL_5]], %[[VAL_1]], [0 : index, 1 : index, 0 : index, 0 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_7:.*]] = fir.insert_on_range %[[VAL_6]], %[[VAL_3]], [2 : index, 4 : index, 0 : index, 0 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_8:.*]] = fir.insert_on_range %[[VAL_7]], %[[VAL_1]], [0 : index, 1 : index, 1 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_9:.*]] = fir.insert_value %[[VAL_8]], %[[VAL_3]], [2 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_10:.*]] = fir.insert_value %[[VAL_9]], %[[VAL_2]], [3 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_11:.*]] = fir.insert_value %[[VAL_10]], %[[VAL_3]], [4 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_12:.*]] = fir.insert_on_range %[[VAL_11]], %[[VAL_1]], [0 : index, 1 : index, 2 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_13:.*]] = fir.insert_value %[[VAL_12]], %[[VAL_3]], [2 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_14:.*]] = fir.insert_value %[[VAL_13]], %[[VAL_2]], [3 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_15:.*]] = fir.insert_on_range %[[VAL_14]], %[[VAL_3]], [4 : index, 2 : index, 2 : index, 3 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_16:.*]] = fir.insert_value %[[VAL_15]], %[[VAL_2]], [3 : index, 3 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_17:.*]] = fir.insert_on_range %[[VAL_16]], %[[VAL_3]], [4 : index, 4 : index, 3 : index, 4 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
+! CHECK: %[[VAL_18:.*]] = fir.insert_value %[[VAL_4]], %[[VAL_17]], [0 : index] : (tuple<!fir.array<5x5xf32>>, !fir.array<5x5xf32>) -> tuple<!fir.array<5x5xf32>>
+! CHECK: fir.has_value %[[VAL_18]] : tuple<!fir.array<5x5xf32>>
+
 ! CHECK-LABEL range
 subroutine range()
   ! Compile-time initalized arrays
@@ -129,25 +149,6 @@ subroutine rangeGlobal()
 end subroutine rangeGlobal
 
 block data
-   ! CHECK: %[[VAL_223:.*]] = constant 1.000000e+00 : f32
-   ! CHECK: %[[VAL_224:.*]] = constant 2.400000e+00 : f32
-   ! CHECK: %[[VAL_225:.*]] = constant 0.000000e+00 : f32
-   ! CHECK: %[[VAL_226:.*]] = fir.undefined tuple<!fir.array<5x5xf32>>
-   ! CHECK: %[[VAL_227:.*]] = fir.undefined !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_228:.*]] = fir.insert_on_range %[[VAL_227]], %[[VAL_223]], [0 : index, 1 : index, 0 : index, 0 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_229:.*]] = fir.insert_on_range %[[VAL_228]], %[[VAL_225]], [2 : index, 4 : index, 0 : index, 0 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_230:.*]] = fir.insert_on_range %[[VAL_229]], %[[VAL_223]], [0 : index, 1 : index, 1 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_231:.*]] = fir.insert_value %[[VAL_230]], %[[VAL_225]], [2 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_232:.*]] = fir.insert_value %[[VAL_231]], %[[VAL_224]], [3 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_233:.*]] = fir.insert_value %[[VAL_232]], %[[VAL_225]], [4 : index, 1 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_234:.*]] = fir.insert_on_range %[[VAL_233]], %[[VAL_223]], [0 : index, 1 : index, 2 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_235:.*]] = fir.insert_value %[[VAL_234]], %[[VAL_225]], [2 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_236:.*]] = fir.insert_value %[[VAL_235]], %[[VAL_224]], [3 : index, 2 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_237:.*]] = fir.insert_on_range %[[VAL_236]], %[[VAL_225]], [4 : index, 2 : index, 2 : index, 3 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_238:.*]] = fir.insert_value %[[VAL_237]], %[[VAL_224]], [3 : index, 3 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_239:.*]] = fir.insert_on_range %[[VAL_238]], %[[VAL_225]], [4 : index, 4 : index, 3 : index, 4 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>
-   ! CHECK: %[[VAL_240:.*]] = fir.insert_value %[[VAL_226]], %[[VAL_239]], [0 : index] : (tuple<!fir.array<5x5xf32>>, !fir.array<5x5xf32>) -> tuple<!fir.array<5x5xf32>>
-   ! CHECK: fir.has_value %[[VAL_240]] : tuple<!fir.array<5x5xf32>>
   real(selected_real_kind(6)) :: x(5,5)
   common /block/ x
   data x(1,1), x(2,1), x(3,1) / 1, 1, 0 /

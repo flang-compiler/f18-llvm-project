@@ -3,6 +3,12 @@
 
 ! Test global allocatable definition lowering
 
+! CHECK-LABEL: fir.global linkonce @_QMmod_allocatablesEc : !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>> {
+  ! CHECK-DAG: %[[modcNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1,10>>>
+  ! CHECK-DAG: %[[modcShape:.*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[modcInitBox:.*]] = fir.embox %[[modcNullAddr]](%[[modcShape]]) : (!fir.heap<!fir.array<?x!fir.char<1,10>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>
+  ! CHECK: fir.has_value %[[modcInitBox]] : !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>
+
 module mod_allocatables
   character(10), allocatable :: c(:)
 end module
@@ -31,12 +37,6 @@ subroutine test_globals()
   allocate(gx, gy(20, 30), gc3, gc4(40, 50))
   allocate(character(15):: gc1, gc2(60, 70))
 end subroutine
-
-! CHECK-LABEL: fir.global linkonce @_QMmod_allocatablesEc : !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>> {
-  ! CHECK-DAG: %[[modcNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1,10>>>
-  ! CHECK-DAG: %[[modcShape:.*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
-  ! CHECK: %[[modcInitBox:.*]] = fir.embox %[[modcNullAddr]](%[[modcShape]]) : (!fir.heap<!fir.array<?x!fir.char<1,10>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>
-  ! CHECK: fir.has_value %[[modcInitBox]] : !fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>
 
 ! CHECK-LABEL: fir.global internal @_QFtest_globalsEgc1 : !fir.box<!fir.heap<!fir.char<1,?>>>
   ! CHECK-DAG: %[[gc1NullAddr:.*]] = fir.zero_bits !fir.heap<!fir.char<1,?>>

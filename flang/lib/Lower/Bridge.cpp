@@ -106,34 +106,47 @@ using IncrementLoopNestInfo = llvm::SmallVector<IncrementLoopInfo>;
 
 namespace {
 
-/// Walk over the pre-FIR tree (PFT) and lower it to the FIR dialect of MLIR.
-///
-/// After building the PFT, the FirConverter processes that representation
-/// and lowers it to the FIR executable representation.
+/// Create a pre-FIR tree (PFT) from the parse tree, then traverse it to
+/// generate the FIR dialect of MLIR.
 class FirConverter : public Fortran::lower::AbstractConverter {
 public:
   explicit FirConverter(Fortran::lower::LoweringBridge &bridge)
       : bridge{bridge}, foldingContext{bridge.createFoldingContext()} {}
   virtual ~FirConverter() = default;
 
-  /// Convert the PFT to FIR
+  /// Convert the PFT to FIR.
   void run(Fortran::lower::pft::Program &pft) {
-    // Declare mlir::FuncOp for all the FunctionLikeUnit defined in the PFT
-    // before lowering any function bodies so that the definition signatures
-    // prevail on call spot signatures.
-    declareFunctions(pft);
+    // Preliminary translation pass.
+    //  - Declare all functions that have definitions so that definition
+    //    signatures prevail over call site signatures.
+    //  - Define module variables so they are available before lowering any
+    //    function that may use them.
+    //  - Translate block data programs so that common block definitions with
+    //    data initializations take precedence over other definitions.
+    for (auto &u : pft.getUnits()) {
+      std::visit(
+          Fortran::common::visitors{
+              [&](Fortran::lower::pft::FunctionLikeUnit &f) {
+                declareFunction(f);
+              },
+              [&](Fortran::lower::pft::ModuleLikeUnit &m) {
+                lowerModuleVariables(m);
+                for (auto &f : m.nestedFunctions)
+                  declareFunction(f);
+              },
+              [&](Fortran::lower::pft::BlockDataUnit &b) { lowerBlockData(b); },
+              [&](Fortran::lower::pft::CompilerDirectiveUnit &d) {},
+          },
+          u);
+    }
 
-    // Define variables of the modules defined in this program. This is done
-    // first to ensure they are defined before lowering any function that may
-    // use them.
-    lowerModuleVariables(pft);
-    // do translation
+    // Primary translation pass.
     for (auto &u : pft.getUnits()) {
       std::visit(
           Fortran::common::visitors{
               [&](Fortran::lower::pft::FunctionLikeUnit &f) { lowerFunc(f); },
               [&](Fortran::lower::pft::ModuleLikeUnit &m) { lowerMod(m); },
-              [&](Fortran::lower::pft::BlockDataUnit &b) { lowerBlockData(b); },
+              [&](Fortran::lower::pft::BlockDataUnit &b) {},
               [&](Fortran::lower::pft::CompilerDirectiveUnit &d) {
                 setCurrentPosition(
                     d.get<Fortran::parser::CompilerDirective>().source);
@@ -142,29 +155,6 @@ public:
               },
           },
           u);
-    }
-  }
-
-  /// Declare mlir::FuncOp for all the FunctionLikeUnit defined in the PFT
-  /// without any other side-effects.
-  void declareFunctions(Fortran::lower::pft::Program &pft) {
-    for (auto &u : pft.getUnits()) {
-      std::visit(Fortran::common::visitors{
-                     [&](Fortran::lower::pft::FunctionLikeUnit &f) {
-                       declareFunction(f);
-                     },
-                     [&](Fortran::lower::pft::ModuleLikeUnit &m) {
-                       for (auto &f : m.nestedFunctions)
-                         declareFunction(f);
-                     },
-                     [&](Fortran::lower::pft::BlockDataUnit &) {
-                       // No functions defined in block data.
-                     },
-                     [&](Fortran::lower::pft::CompilerDirectiveUnit &) {
-                       // No functions defined.
-                     },
-                 },
-                 u);
     }
   }
 
@@ -225,22 +215,6 @@ public:
         LLVM_DEBUG(llvm::dbgs() << "host associated symbol " << sym << '\n');
         escapees.insert(escapingSym);
       }
-    }
-  }
-
-  /// Loop through modules defined in this file to generate the fir::globalOp
-  /// for module variables.
-  void lowerModuleVariables(Fortran::lower::pft::Program &pft) {
-    for (auto &u : pft.getUnits()) {
-      std::visit(Fortran::common::visitors{
-                     [&](Fortran::lower::pft::ModuleLikeUnit &m) {
-                       lowerModuleVariables(m);
-                     },
-                     [](auto &) {
-                       // Not a module, so no processing needed here.
-                     },
-                 },
-                 u);
     }
   }
 
