@@ -14,7 +14,6 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   integer a6(6:i,j:*)
   real a7(i:70,7:j,k:80)
 
- 
   ! CHECK-LABEL: BeginExternalListOutput
   ! CHECK-DAG: fir.load %arg3 :
   ! CHECK-DAG: %[[i1:.*]] = subi %{{.*}}, %[[one:c1.*]] :
@@ -76,6 +75,7 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
   
 end subroutine s
 
+! CHECK-LABEL: fir.global @_QBblock
 ! CHECK: %[[VAL_1:.*]] = constant 1.000000e+00 : f32
 ! CHECK: %[[VAL_2:.*]] = constant 2.400000e+00 : f32
 ! CHECK: %[[VAL_3:.*]] = constant 0.000000e+00 : f32

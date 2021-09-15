@@ -106,8 +106,7 @@ using IncrementLoopNestInfo = llvm::SmallVector<IncrementLoopInfo>;
 
 namespace {
 
-/// Create a pre-FIR tree (PFT) from the parse tree, then traverse it to
-/// generate the FIR dialect of MLIR.
+/// Traverse the pre-FIR tree (PFT) to generate the FIR dialect of MLIR.
 class FirConverter : public Fortran::lower::AbstractConverter {
 public:
   explicit FirConverter(Fortran::lower::LoweringBridge &bridge)
