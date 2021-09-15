@@ -29,7 +29,7 @@ getDesignatorNameIfDataRef(const Fortran::parser::Designator &designator) {
   return dataRef ? std::get_if<Fortran::parser::Name>(&dataRef->u) : nullptr;
 }
 
-static void privatiseVars(Fortran::lower::AbstractConverter &converter,
+static void privatizeVars(Fortran::lower::AbstractConverter &converter,
                           const Fortran::parser::OmpClauseList &opClauseList) {
   auto &firOpBuilder = converter.getFirOpBuilder();
   Fortran::semantics::Symbol *sym = nullptr;
@@ -50,9 +50,13 @@ static void privatiseVars(Fortran::lower::AbstractConverter &converter,
                 },
                 [&](const Fortran::parser::Name &name) { sym = name.symbol; }},
             ompObject.u);
-        [[maybe_unused]] bool success =
-            converter.createHostAssociateVarClone(*sym);
-        assert(success && "Privatisation failed due to existing binding");
+        // Privatization for symbols which are pre-determined (like loop index
+        // variables) happen separately, for everything else privatize here
+        if (!sym->test(Fortran::semantics::Symbol::Flag::OmpPreDetermined)) {
+          [[maybe_unused]] bool success =
+              converter.createHostAssociateVarClone(*sym);
+          assert(success && "Privatization failed due to existing binding");
+        }
       }
     }
   }
@@ -128,7 +132,7 @@ static void createBodyOfOp(
   // Reset the insertion point to the start of the first block.
   firOpBuilder.setInsertionPointToStart(&block);
   if (clauses)
-    privatiseVars(converter, *clauses);
+    privatizeVars(converter, *clauses);
 }
 
 static void genOMP(Fortran::lower::AbstractConverter &converter,
@@ -199,7 +203,7 @@ genOMP(Fortran::lower::AbstractConverter &converter,
       standaloneConstruct.u);
 }
 
-template <typename Directive>
+template <typename Directive, bool isCombined>
 static void createParallelOp(Fortran::lower::AbstractConverter &converter,
                              Fortran::lower::pft::Evaluation &eval,
                              const Directive &directive) {
@@ -317,8 +321,11 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
     }
   }
 
+  // Avoid multiple privatization: If Parallel is part of a combined construct
+  // then privatization will be performed later when the other part of the
+  // combined construct is processed.
   createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation,
-                                  &opClauseList);
+                                  isCombined ? nullptr : &opClauseList);
 }
 
 static void
@@ -331,7 +338,7 @@ genOMP(Fortran::lower::AbstractConverter &converter,
       std::get<Fortran::parser::OmpBlockDirective>(beginBlockDirective.t);
 
   if (blockDirective.v == llvm::omp::OMPD_parallel) {
-    createParallelOp<Fortran::parser::OmpBeginBlockDirective>(
+    createParallelOp<Fortran::parser::OmpBeginBlockDirective, false>(
         converter, eval,
         std::get<Fortran::parser::OmpBeginBlockDirective>(blockConstruct.t));
   } else if (blockDirective.v == llvm::omp::OMPD_master) {
@@ -436,7 +443,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
       std::get<Fortran::parser::OmpLoopDirective>(
           std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t).t)
           .v) {
-    createParallelOp<Fortran::parser::OmpBeginLoopDirective>(
+    createParallelOp<Fortran::parser::OmpBeginLoopDirective, true>(
         converter, eval,
         std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t));
   } else {
