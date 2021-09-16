@@ -983,8 +983,23 @@ struct EmboxCommonConversion : public FIROpConversion<OP> {
                     mlir::ConversionPatternRewriter &rewriter) const {
     auto thisPt = rewriter.saveInsertionPoint();
     auto *thisBlock = rewriter.getInsertionBlock();
-    auto func = mlir::cast<mlir::LLVM::LLVMFuncOp>(thisBlock->getParentOp());
-    rewriter.setInsertionPointToStart(&func.front());
+    auto op = thisBlock->getParentOp();
+    // Order to find the Op in whose entry block the alloca should be inserted.
+    // The parent Op if it is an LLVM Function Op.
+    // The ancestor OpenMP Op which is outlineable.
+    // The ancestor LLVM Function Op.
+    if (isa<mlir::LLVM::LLVMFuncOp>(op)) {
+      auto func = mlir::cast<mlir::LLVM::LLVMFuncOp>(op);
+      rewriter.setInsertionPointToStart(&func.front());
+    } else if (auto iface =
+                   thisBlock->getParent()
+                       ->getParentOfType<
+                           mlir::omp::OutlineableOpenMPOpInterface>()) {
+      rewriter.setInsertionPointToStart(iface.getAllocaBlock());
+    } else {
+      auto func = op->getParentOfType<mlir::LLVM::LLVMFuncOp>();
+      rewriter.setInsertionPointToStart(&func.front());
+    }
     auto sz = this->genConstantOffset(loc, rewriter, 1);
     auto al = rewriter.create<mlir::LLVM::AllocaOp>(loc, toTy, sz, alignment);
     rewriter.restoreInsertionPoint(thisPt);
