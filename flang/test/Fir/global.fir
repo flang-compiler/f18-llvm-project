@@ -32,3 +32,28 @@ fir.global @str1 : !fir.char<1,6> {
   %1 = fir.string_lit "Hello!"(6) : !fir.char<1,6>
   fir.has_value %1 : !fir.char<1,6>
 }
+
+// CHECK: @_QEmask = internal global [32 x i32] [i32 1, i32 1
+fir.global internal @_QEmask : !fir.array<32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32xi32>
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 31 : index] : (!fir.array<32xi32>, i32) -> !fir.array<32xi32>
+  fir.has_value %2 : !fir.array<32xi32>
+}
+
+// CHECK: @_QEmultiarray = internal global [32 x [32 x i32]]
+fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32x32xi32>
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 31 : index, 0 : index, 31 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  fir.has_value %2 : !fir.array<32x32xi32>
+}
+
+// CHECK: @_QEmasklogical = internal global [32768 x i32] [i32 -1, i32 -1,
+fir.global internal @_QEmasklogical : !fir.array<32768x!fir.logical<4>> {
+  %true = constant true
+  %0 = fir.undefined !fir.array<32768x!fir.logical<4>>
+  %1 = fir.convert %true : (i1) -> !fir.logical<4>
+  %2 = fir.insert_on_range %0, %1, [0 : index, 32767 : index] : (!fir.array<32768x!fir.logical<4>>, !fir.logical<4>) -> !fir.array<32768x!fir.logical<4>>
+  fir.has_value %2 : !fir.array<32768x!fir.logical<4>>
+}

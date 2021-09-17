@@ -456,6 +456,9 @@ def fir_SequenceType : FIR_Type<"Sequence", "array"> {
 
     // The value `-1` represents an unknown extent for a dimension
     static constexpr Extent getUnknownExtent() { return -1; }
+
+    // Get the number of elements.
+    unsigned getNumElements() const;
   }];
 }
 

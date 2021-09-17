@@ -95,6 +95,20 @@ genConstantIndex(mlir::Location loc, mlir::Type ity,
   return rewriter.create<mlir::LLVM::ConstantOp>(loc, ity, cattr);
 }
 
+template <typename OpType>
+static OpType getSingleOpOfType(Block &block) {
+  OpType res = nullptr;
+  block.walk([&](OpType op) {
+    if (res) {
+      res = nullptr;
+      return WalkResult::interrupt();
+    }
+    res = op;
+    return WalkResult::advance();
+  });
+  return res;
+}
+
 namespace {
 /// FIR conversion pattern template
 template <typename FromOp>
@@ -2424,9 +2438,51 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     auto g = rewriter.create<mlir::LLVM::GlobalOp>(
         loc, tyAttr, isConst, linkage, global.sym_name(), initAttr);
     auto &gr = g.getInitializerRegion();
+    if (global.getType().isa<fir::SequenceType>() &&
+        !global.getType().dyn_cast<fir::SequenceType>().hasUnknownShape() &&
+        global.hasInitializationBody()) {
+      if (auto singleInsertOp = getSingleOpOfType<fir::InsertOnRangeOp>(
+              global.region().front())) {
+        auto globalType = global.getType().dyn_cast<fir::SequenceType>();
+        // Check if the initialization is on the full range.
+        if (getNumElementInRange(singleInsertOp.coor()) ==
+            globalType.getNumElements()) {
+          rewriter.inlineRegionBefore(global.region(), gr, gr.end());
+          auto insertOp = getSingleOpOfType<fir::InsertOnRangeOp>(gr.front());
+          auto op = insertOp.val().getDefiningOp();
+          auto constant = dyn_cast<mlir::ConstantOp>(op);
+          if (!constant) {
+            auto convertOp = dyn_cast<fir::ConvertOp>(op);
+            constant =
+                dyn_cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
+          }
+          mlir::Type vecType =
+              mlir::VectorType::get(globalType.getShape(), constant.getType());
+          auto denseAttr = mlir::DenseElementsAttr::get(
+              vecType.cast<ShapedType>(), constant.getValue());
+          rewriter.setInsertionPointAfter(insertOp);
+          rewriter.replaceOpWithNewOp<mlir::ConstantOp>(insertOp, tyAttr,
+                                                        denseAttr);
+          rewriter.eraseOp(global);
+          g.typeAttr(mlir::TypeAttr::get(tyAttr));
+          return success();
+        }
+      }
+    }
     rewriter.inlineRegionBefore(global.region(), gr, gr.end());
     rewriter.eraseOp(global);
     return success();
+  }
+
+  unsigned getNumElementInRange(mlir::ArrayAttr indexes) const {
+    assert(indexes.size() >= 2 && indexes.size() % 2 == 0);
+    unsigned numElementInRange = indexes[1].cast<IntegerAttr>().getInt() -
+                                 indexes[0].cast<IntegerAttr>().getInt() + 1;
+    for (unsigned i = 2; i < indexes.size(); i += 2) {
+      numElementInRange *= indexes[i + 1].cast<IntegerAttr>().getInt() -
+                           indexes[i].cast<IntegerAttr>().getInt() + 1;
+    }
+    return numElementInRange;
   }
 
   mlir::LLVM::Linkage convertLinkage(Optional<StringRef> optLinkage) const {
