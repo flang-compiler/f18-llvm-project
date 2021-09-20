@@ -818,14 +818,14 @@ bool fir::SequenceType::hasConstantInterior() const {
 
 size_t fir::SequenceType::getNumElements() const {
   if (hasUnknownShape())
-    return -1;
+    return getUnknownExtent();
 
   size_t numElements = 1;
   for (auto extent : getShape()) {
     if (extent != getUnknownExtent())
       numElements = numElements * extent;
     else
-      return -1;
+      return getUnknownExtent();
   }
   return numElements;
 }

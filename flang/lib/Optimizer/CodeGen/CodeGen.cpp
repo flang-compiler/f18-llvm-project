@@ -2438,20 +2438,25 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     auto g = rewriter.create<mlir::LLVM::GlobalOp>(
         loc, tyAttr, isConst, linkage, global.sym_name(), initAttr);
     auto &gr = g.getInitializerRegion();
-    if (global.getType().isa<fir::SequenceType>() &&
+    auto globalType = global.getType().dyn_cast<fir::SequenceType>();
+    if (globalType &&
         !global.getType().dyn_cast<fir::SequenceType>().hasUnknownShape() &&
         global.hasInitializationBody()) {
       if (auto singleInsertOp = getSingleOpOfType<fir::InsertOnRangeOp>(
               global.region().front())) {
-        auto globalType = global.getType().dyn_cast<fir::SequenceType>();
         // Check if the initialization is on the full range.
         if (isFullRange(singleInsertOp.coor(), globalType)) {
           rewriter.inlineRegionBefore(global.region(), gr, gr.end());
           auto insertOp = getSingleOpOfType<fir::InsertOnRangeOp>(gr.front());
           auto op = insertOp.val().getDefiningOp();
-          auto constant = dyn_cast<mlir::ConstantOp>(op);
+          auto constant = mlir::dyn_cast<mlir::ConstantOp>(op);
           if (!constant) {
-            auto convertOp = dyn_cast<fir::ConvertOp>(op);
+            auto convertOp = mlir::dyn_cast<fir::ConvertOp>(op);
+            if (!convertOp) {
+              rewriter.inlineRegionBefore(global.region(), gr, gr.end());
+              rewriter.eraseOp(global);
+              return success();
+            }
             constant = 
                 cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
           }
