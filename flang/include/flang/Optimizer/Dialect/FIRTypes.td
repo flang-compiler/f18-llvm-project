@@ -458,7 +458,7 @@ def fir_SequenceType : FIR_Type<"Sequence", "array"> {
     static constexpr Extent getUnknownExtent() { return -1; }
 
     // Get the number of elements.
-    unsigned getNumElements() const;
+    size_t getNumElements() const;
   }];
 }
 

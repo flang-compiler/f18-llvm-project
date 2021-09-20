@@ -2445,16 +2445,15 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
               global.region().front())) {
         auto globalType = global.getType().dyn_cast<fir::SequenceType>();
         // Check if the initialization is on the full range.
-        if (getNumElementInRange(singleInsertOp.coor()) ==
-            globalType.getNumElements()) {
+        if (isFullRange(singleInsertOp.coor(), globalType)) {
           rewriter.inlineRegionBefore(global.region(), gr, gr.end());
           auto insertOp = getSingleOpOfType<fir::InsertOnRangeOp>(gr.front());
           auto op = insertOp.val().getDefiningOp();
           auto constant = dyn_cast<mlir::ConstantOp>(op);
           if (!constant) {
             auto convertOp = dyn_cast<fir::ConvertOp>(op);
-            constant =
-                dyn_cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
+            constant = 
+                cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
           }
           mlir::Type vecType =
               mlir::VectorType::get(globalType.getShape(), constant.getType());
@@ -2474,15 +2473,18 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     return success();
   }
 
-  unsigned getNumElementInRange(mlir::ArrayAttr indexes) const {
+  bool isFullRange(mlir::ArrayAttr indexes, fir::SequenceType seqTy) const {
     assert(indexes.size() >= 2 && indexes.size() % 2 == 0);
-    unsigned numElementInRange = indexes[1].cast<IntegerAttr>().getInt() -
-                                 indexes[0].cast<IntegerAttr>().getInt() + 1;
-    for (unsigned i = 2; i < indexes.size(); i += 2) {
-      numElementInRange *= indexes[i + 1].cast<IntegerAttr>().getInt() -
-                           indexes[i].cast<IntegerAttr>().getInt() + 1;
+    auto extents = seqTy.getShape();
+    if (indexes.size() / 2 != extents.size())
+      return false;
+    for (unsigned i = 0; i < indexes.size(); i+= 2) {
+      if (indexes[i].cast<IntegerAttr>().getInt() != 0)
+        return false;
+      if (indexes[i+1].cast<IntegerAttr>().getInt() != extents[i/2] - 1)
+        return false;
     }
-    return numElementInRange;
+    return true;
   }
 
   mlir::LLVM::Linkage convertLinkage(Optional<StringRef> optLinkage) const {

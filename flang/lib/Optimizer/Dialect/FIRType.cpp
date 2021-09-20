@@ -816,11 +816,11 @@ bool fir::SequenceType::hasConstantInterior() const {
   return true;
 }
 
-unsigned fir::SequenceType::getNumElements() const {
+size_t fir::SequenceType::getNumElements() const {
   if (hasUnknownShape())
     return -1;
 
-  unsigned numElements = 1;
+  size_t numElements = 1;
   for (auto extent : getShape()) {
     if (extent != getUnknownExtent())
       numElements = numElements * extent;
