@@ -150,7 +150,6 @@ public:
     return maskVarMap.lookup(exp).second;
   }
 
-private:
   // Stack of WHERE constructs, each building a list of mask expressions.
   llvm::SmallVector<llvm::SmallVector<FrontEndMaskExpr>> &getMasks() {
     return stack;
@@ -160,6 +159,7 @@ private:
     return stack;
   }
 
+private:
   llvm::DenseMap<FrontEndExpr, std::pair<mlir::Value, mlir::Value>> maskVarMap;
 };
 
