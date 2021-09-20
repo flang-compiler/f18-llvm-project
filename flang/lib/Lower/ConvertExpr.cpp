@@ -3821,34 +3821,36 @@ public:
 
       // Handle the negated conditions. See 10.2.3.2p4 as to why this control
       // structure is produced.
-      auto maskExprs = implicitSpace->getExprs();
-      const auto size = maskExprs.size() - 1;
-      for (std::remove_const_t<decltype(size)> i = 0; i < size; ++i)
-        if (maskExprs[i]) {
+      auto masks = implicitSpace->getMasks();
+      for (auto maskExprs : masks) {
+        const auto size = maskExprs.size() - 1;
+        for (std::remove_const_t<decltype(size)> i = 0; i < size; ++i)
+          if (maskExprs[i]) {
+            auto ifOp = builder.create<fir::IfOp>(
+                loc, mlir::TypeRange{innerArg.getType()},
+                fir::getBase(genCond(
+                    implicitSpace->getBindingWithShape(maskExprs[i]), iters)),
+                /*withElseRegion=*/true);
+            builder.create<fir::ResultOp>(loc, ifOp.getResult(0));
+            builder.setInsertionPointToStart(&ifOp.thenRegion().front());
+            builder.create<fir::ResultOp>(loc, innerArg);
+            builder.setInsertionPointToStart(&ifOp.elseRegion().front());
+          }
+
+        // The last condition is either non-negated or unconditionally negated.
+        if (maskExprs[size]) {
           auto ifOp = builder.create<fir::IfOp>(
               loc, mlir::TypeRange{innerArg.getType()},
               fir::getBase(genCond(
-                  implicitSpace->getBindingWithShape(maskExprs[i]), iters)),
+                  implicitSpace->getBindingWithShape(maskExprs[size]), iters)),
               /*withElseRegion=*/true);
           builder.create<fir::ResultOp>(loc, ifOp.getResult(0));
-          builder.setInsertionPointToStart(&ifOp.thenRegion().front());
-          builder.create<fir::ResultOp>(loc, innerArg);
           builder.setInsertionPointToStart(&ifOp.elseRegion().front());
+          builder.create<fir::ResultOp>(loc, innerArg);
+          builder.setInsertionPointToStart(&ifOp.thenRegion().front());
+        } else {
+          // do nothing
         }
-
-      // The last condition is either non-negated or unconditionally negated.
-      if (maskExprs[size]) {
-        auto ifOp = builder.create<fir::IfOp>(
-            loc, mlir::TypeRange{innerArg.getType()},
-            fir::getBase(genCond(
-                implicitSpace->getBindingWithShape(maskExprs[size]), iters)),
-            /*withElseRegion=*/true);
-        builder.create<fir::ResultOp>(loc, ifOp.getResult(0));
-        builder.setInsertionPointToStart(&ifOp.elseRegion().front());
-        builder.create<fir::ResultOp>(loc, innerArg);
-        builder.setInsertionPointToStart(&ifOp.thenRegion().front());
-      } else {
-        // do nothing
       }
     }
 
