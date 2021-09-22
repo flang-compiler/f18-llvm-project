@@ -51,7 +51,8 @@ public:
       auto result =
           fir::NameUniquer::deconstruct(callee.getValue().getRootReference());
       if (fir::NameUniquer::isExternalFacingUniquedName(result))
-        op.calleeAttr(SymbolRefAttr::get(op.getContext(), mangleExternalName(result)));
+        op.calleeAttr(
+            SymbolRefAttr::get(op.getContext(), mangleExternalName(result)));
     }
     rewriter.finalizeRootUpdate(op);
     return success();
@@ -105,9 +106,9 @@ public:
                   mlir::PatternRewriter &rewriter) const override {
     auto result = fir::NameUniquer::deconstruct(op.symbol().getRootReference());
     if (fir::NameUniquer::isExternalFacingUniquedName(result)) {
-      auto newNameAttr = rewriter.getSymbolRefAttr(mangleExternalName(result));
+      auto newName = rewriter.getSymbolRefAttr(mangleExternalName(result));
       rewriter.replaceOpWithNewOp<fir::AddrOfOp>(op, op.resTy().getType(),
-                                                 newNameAttr);
+                                                 newName);
     }
     return success();
   }
@@ -125,8 +126,8 @@ public:
     auto result =
         fir::NameUniquer::deconstruct(op.funcname().getRootReference());
     if (fir::NameUniquer::isExternalFacingUniquedName(result))
-      op.funcnameAttr(SymbolRefAttr::get(op.getContext(), 
-          mangleExternalName(result)));
+      op.funcnameAttr(
+          SymbolRefAttr::get(op.getContext(), mangleExternalName(result)));
     rewriter.finalizeRootUpdate(op);
     return success();
   }
