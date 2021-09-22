@@ -58,16 +58,22 @@ bool isa_std_type(mlir::Type t);
 bool isa_fir_or_std_type(mlir::Type t);
 
 /// Is `t` a FIR dialect type that implies a memory (de)reference?
-bool isa_ref_type(mlir::Type t);
-
-/// Is `t` a type that is always trivially pass-by-reference? Specifically, this
-/// is testing if `t` is a ReferenceType or any box type. Compare this to
-/// conformsWithPassByRef(), which includes pointers and allocatables.
-bool isa_passbyref_type(mlir::Type t);
+inline bool isa_ref_type(mlir::Type t) {
+  return t.isa<ReferenceType>() || t.isa<PointerType>() || t.isa<HeapType>() ||
+         t.isa<fir::LLVMPointerType>();
+}
 
 /// Is `t` a boxed type?
 inline bool isa_box_type(mlir::Type t) {
   return t.isa<BoxType>() || t.isa<BoxCharType>() || t.isa<BoxProcType>();
+}
+
+/// Is `t` a type that is always trivially pass-by-reference? Specifically, this
+/// is testing if `t` is a ReferenceType or any box type. Compare this to
+/// conformsWithPassByRef(), which includes pointers and allocatables.
+inline bool isa_passbyref_type(mlir::Type t) {
+  return t.isa<ReferenceType>() || isa_box_type(t) ||
+         t.isa<mlir::FunctionType>();
 }
 
 /// Is `t` a type that can conform to be pass-by-reference? Depending on the
