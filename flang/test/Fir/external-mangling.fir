@@ -1,6 +1,6 @@
 // RUN: fir-opt --external-name-interop %s | FileCheck %s
 // RUN: tco --external-name-interop %s | FileCheck %s
-// RUN: tco --external-name-interop %s | tco | FileCheck %s --check-prefix=LLVMIR
+// RUN: tco --external-name-interop %s | tco --fir-to-llvm-ir | FileCheck %s --check-prefix=LLVMIR
 
 func @_QPfoo() {  
   %c0 = constant 0 : index
@@ -14,8 +14,6 @@ func @_QPfoo() {
   %7 = fir.convert %6 : (!fir.ref<i8>) -> !fir.ref<f32>
   fir.call @_QPbar(%3) : (!fir.ref<i32>) -> ()
   fir.call @_QPbar2(%7) : (!fir.ref<f32>) -> ()
-  %e6 = fir.alloca tuple<i32,f64>
-  %8 = fir.emboxproc @_QPfoo_impl, %e6 : ((!fir.box<!fir.type<derived3{f:f32}>>) -> (), !fir.ref<tuple<i32,f64>>) -> !fir.boxproc<(!fir.box<!fir.type<derived3{f:f32}>>) -> ()>
   return
 }
 fir.global common @_QBa(dense<0> : vector<4xi8>) : !fir.array<4xi8>
@@ -28,15 +26,16 @@ func private @_QPbar2(!fir.ref<f32>)
 // CHECK: %{{.*}} = fir.address_of(@__BLNK__) : !fir.ref<!fir.array<4xi8>>
 // CHECK: fir.call @bar_
 // CHECK: fir.call @bar2_
-// CHECK: %{{.*}}= fir.emboxproc @foo_impl_
 // CHECK: fir.global common @a_(dense<0> : vector<4xi8>) : !fir.array<4xi8>
 // CHECK: fir.global common @__BLNK__(dense<0> : vector<4xi8>) : !fir.array<4xi8>
 // CHECK: func private @bar_(!fir.ref<i32>)
 
-// LLVMIR: @a_ = common global [4 x i8] zeroinitializer
-// LLVMIR: @__BLNK__ = common global [4 x i8] zeroinitializer
-// LLVMIR: define void @foo_()
-// LLVMIR: call void @bar_(
-// LLVMIR: call void @bar2_(
-// LLVMIR: declare void @bar_(
-// LLVMIR: declare void @bar2_(
+// LLVMIR: %{{.*}} = llvm.mlir.addressof @a_ : !llvm.ptr<array<4 x i8>>
+// LLVMIR: %{{.*}} = llvm.mlir.addressof @__BLNK__ : !llvm.ptr<array<4 x i8>>
+// LLVMIR: llvm.call @bar_(%{{.*}}) {sym_name = "bar_"} : (!llvm.ptr<i32>) -> ()
+// LLVMIR: llvm.call @bar2_(%{{.*}}) {sym_name = "bar2_"} : (!llvm.ptr<f32>) -> ()
+
+// LLVMIR: llvm.mlir.global common @a_(dense<0> : vector<4xi8>) : !llvm.array<4 x i8>
+// LLVMIR: llvm.mlir.global common @__BLNK__(dense<0> : vector<4xi8>) : !llvm.array<4 x i8>
+// LLVMIR: llvm.func @bar_(!llvm.ptr<i32>) attributes {sym_visibility = "private"}
+// LLVMIR: llvm.func @bar2_(!llvm.ptr<f32>) attributes {sym_visibility = "private"}
