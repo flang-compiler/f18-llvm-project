@@ -372,7 +372,8 @@ private:
     auto &entryPointList = eval.getOwningProcedure()->entryPointList;
     evaluationListStack.back()->emplace_back(std::move(eval));
     lower::pft::Evaluation *p = &evaluationListStack.back()->back();
-    if (p->isActionStmt() || p->isConstructStmt() || p->isEndStmt()) {
+    if (p->isActionStmt() || p->isConstructStmt() || p->isDirective() ||
+        p->isEndStmt()) {
       if (lastLexicalEvaluation) {
         lastLexicalEvaluation->lexicalSuccessor = p;
         p->printIndex = lastLexicalEvaluation->printIndex + 1;
@@ -996,7 +997,10 @@ public:
     llvm::StringRef name = evaluationName(eval);
     std::string bang = eval.isUnstructured ? "!" : "";
     if (eval.isConstruct() || eval.isDirective()) {
-      outputStream << indentString << "<<" << name << bang << ">>";
+      outputStream << indentString;
+      if (eval.isDirective() && eval.printIndex)
+        outputStream << eval.printIndex << ' ';
+      outputStream << "<<" << name << bang << ">>";
       if (eval.constructExit)
         outputStream << " -> " << eval.constructExit->printIndex;
       outputStream << '\n';
