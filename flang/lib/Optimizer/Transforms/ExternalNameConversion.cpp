@@ -50,11 +50,8 @@ public:
     if (callee.hasValue()) {
       auto result =
           fir::NameUniquer::deconstruct(callee.getValue().getRootReference());
-      if (fir::NameUniquer::isExternalFacingUniquedName(result)) {
-        auto newName = mangleExternalName(result);
-        op.calleeAttr(SymbolRefAttr::get(op.getContext(), newName));
-        SymbolTable::setSymbolName(op, newName);
-      }
+      if (fir::NameUniquer::isExternalFacingUniquedName(result))
+        op.calleeAttr(SymbolRefAttr::get(op.getContext(), mangleExternalName(result)));
     }
     rewriter.finalizeRootUpdate(op);
     return success();
@@ -108,11 +105,9 @@ public:
                   mlir::PatternRewriter &rewriter) const override {
     auto result = fir::NameUniquer::deconstruct(op.symbol().getRootReference());
     if (fir::NameUniquer::isExternalFacingUniquedName(result)) {
-      auto newName = mangleExternalName(result);
       auto newNameAttr = rewriter.getSymbolRefAttr(mangleExternalName(result));
       rewriter.replaceOpWithNewOp<fir::AddrOfOp>(op, op.resTy().getType(),
                                                  newNameAttr);
-      SymbolTable::setSymbolName(op, newName);
     }
     return success();
   }
@@ -129,11 +124,9 @@ public:
     rewriter.startRootUpdate(op);
     auto result =
         fir::NameUniquer::deconstruct(op.funcname().getRootReference());
-    if (fir::NameUniquer::isExternalFacingUniquedName(result)) {
-      auto newName = mangleExternalName(result);
-      op.funcnameAttr(SymbolRefAttr::get(op.getContext(), newName));
-      SymbolTable::setSymbolName(op, newName);
-    }
+    if (fir::NameUniquer::isExternalFacingUniquedName(result))
+      op.funcnameAttr(SymbolRefAttr::get(op.getContext(), 
+          mangleExternalName(result)));
     rewriter.finalizeRootUpdate(op);
     return success();
   }
