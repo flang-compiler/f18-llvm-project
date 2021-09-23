@@ -498,3 +498,23 @@ func @ugly_char_convert() {
   fir.char_convert %2 for %2 to %3 : !fir.ref<!fir.char<1>>, !fir.ref<!fir.char<1>>, !fir.ref<!fir.array<?x!fir.char<2,?>>>
   return
 }
+
+// -----
+
+fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32x32xi32>
+  // expected-error@+1 {{'fir.insert_on_range' op has uneven number of values in ranges}}
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 31 : index, 0 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  fir.has_value %2 : !fir.array<32x32xi32>
+}
+
+// -----
+
+fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32x32xi32>
+  // expected-error@+1 {{'fir.insert_on_range' op has uneven number of values in ranges}}
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  fir.has_value %2 : !fir.array<32x32xi32>
+}
