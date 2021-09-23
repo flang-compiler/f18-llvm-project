@@ -995,6 +995,8 @@ void fir::InsertOnRangeOp::build(mlir::OpBuilder &builder,
 
 /// Range bounds must be nonnegative, and the range must not be empty.
 static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
+  assert(op.coor().size() >= 2 && op.coor().size() % 2 == 0 
+      && "Uneven number of values in ranges");
   bool rangeIsKnownToBeNonempty = false;
   for (auto i = op.coor().end(), b = op.coor().begin(); i != b;) {
     int64_t ub = (*--i).cast<IntegerAttr>().getInt();

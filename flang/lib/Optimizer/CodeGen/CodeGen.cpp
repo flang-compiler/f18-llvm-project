@@ -95,20 +95,6 @@ genConstantIndex(mlir::Location loc, mlir::Type ity,
   return rewriter.create<mlir::LLVM::ConstantOp>(loc, ity, cattr);
 }
 
-template <typename OpType>
-static OpType getSingleOpOfType(Block &block) {
-  OpType res = nullptr;
-  block.walk([&](OpType op) {
-    if (res) {
-      res = nullptr;
-      return WalkResult::interrupt();
-    }
-    res = op;
-    return WalkResult::advance();
-  });
-  return res;
-}
-
 namespace {
 /// FIR conversion pattern template
 template <typename FromOp>
@@ -2438,48 +2424,38 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     auto g = rewriter.create<mlir::LLVM::GlobalOp>(
         loc, tyAttr, isConst, linkage, global.sym_name(), initAttr);
     auto &gr = g.getInitializerRegion();
-    auto globalType = global.getType().dyn_cast<fir::SequenceType>();
-    if (globalType &&
-        !global.getType().dyn_cast<fir::SequenceType>().hasUnknownShape() &&
-        global.hasInitializationBody()) {
-      if (auto singleInsertOp = getSingleOpOfType<fir::InsertOnRangeOp>(
-              global.region().front())) {
-        // Check if the initialization is on the full range.
-        if (isFullRange(singleInsertOp.coor(), globalType)) {
-          rewriter.inlineRegionBefore(global.region(), gr, gr.end());
-          auto insertOp = getSingleOpOfType<fir::InsertOnRangeOp>(gr.front());
+    rewriter.inlineRegionBefore(global.region(), gr, gr.end());
+    if (!gr.empty()) {
+      // Replace insert_on_range with a constant dense attribute if the 
+      // initialization is on the full range.
+      auto insertOnRangeOps = gr.front().getOps<fir::InsertOnRangeOp>();
+      for (auto insertOp : insertOnRangeOps) {
+        if (isFullRange(insertOp.coor(), insertOp.getType())) {
+          auto seqTyAttr = convertType(insertOp.getType());
           auto op = insertOp.val().getDefiningOp();
           auto constant = mlir::dyn_cast<mlir::ConstantOp>(op);
           if (!constant) {
-            auto convertOp = mlir::dyn_cast<fir::ConvertOp>(op);
-            if (!convertOp) {
-              rewriter.inlineRegionBefore(global.region(), gr, gr.end());
-              rewriter.eraseOp(global);
-              return success();
-            }
-            constant = 
-                cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
+              auto convertOp = mlir::dyn_cast<fir::ConvertOp>(op);
+              if (!convertOp)
+                continue;
+              constant = 
+                  cast<mlir::ConstantOp>(convertOp.value().getDefiningOp());
           }
-          mlir::Type vecType =
-              mlir::VectorType::get(globalType.getShape(), constant.getType());
+          mlir::Type vecType = mlir::VectorType::get(
+              insertOp.getType().getShape(), constant.getType());
           auto denseAttr = mlir::DenseElementsAttr::get(
               vecType.cast<ShapedType>(), constant.getValue());
           rewriter.setInsertionPointAfter(insertOp);
-          rewriter.replaceOpWithNewOp<mlir::ConstantOp>(insertOp, tyAttr,
+          rewriter.replaceOpWithNewOp<mlir::ConstantOp>(insertOp, seqTyAttr,
                                                         denseAttr);
-          rewriter.eraseOp(global);
-          g.typeAttr(mlir::TypeAttr::get(tyAttr));
-          return success();
         }
       }
     }
-    rewriter.inlineRegionBefore(global.region(), gr, gr.end());
     rewriter.eraseOp(global);
     return success();
   }
 
   bool isFullRange(mlir::ArrayAttr indexes, fir::SequenceType seqTy) const {
-    assert(indexes.size() >= 2 && indexes.size() % 2 == 0);
     auto extents = seqTy.getShape();
     if (indexes.size() / 2 != extents.size())
       return false;
