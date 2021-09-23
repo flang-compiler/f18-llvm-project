@@ -208,6 +208,11 @@ TEST(InternalNamesTest, complexdeconstructTest) {
   expectedNameKind = NameKind::DISPATCH_TABLE;
   expectedComponents = {{}, {}, "t", {}};
   validateDeconstructedName(actual, expectedNameKind, expectedComponents);
+
+  actual = NameUniquer::deconstruct("_QFmstartGmpitop");
+  expectedNameKind = NameKind::NAMELIST_GROUP;
+  expectedComponents = {{}, {"mstart"}, "mpitop", {}};
+  validateDeconstructedName(actual, expectedNameKind, expectedComponents);
 }
 
 TEST(InternalNamesTest, needExternalNameMangling) {
@@ -217,6 +222,8 @@ TEST(InternalNamesTest, needExternalNameMangling) {
   ASSERT_FALSE(NameUniquer::needExternalNameMangling(""));
   ASSERT_FALSE(NameUniquer::needExternalNameMangling("_QDTmytypeK2K8K18"));
   ASSERT_FALSE(NameUniquer::needExternalNameMangling("exit_"));
+  ASSERT_FALSE(NameUniquer::needExternalNameMangling("_QFfooEx"));
+  ASSERT_FALSE(NameUniquer::needExternalNameMangling("_QFmstartGmpitop"));
   ASSERT_TRUE(NameUniquer::needExternalNameMangling("_QPfoo"));
   ASSERT_TRUE(NameUniquer::needExternalNameMangling("_QPbar"));
   ASSERT_TRUE(NameUniquer::needExternalNameMangling("_QBa"));

@@ -288,6 +288,10 @@ fir::NameUniquer::deconstruct(llvm::StringRef uniq) {
         else
           kinds.push_back(readInt(uniq, i, i + 1, end));
         break;
+      case 'G':
+        nk = NameKind::NAMELIST_GROUP;
+        name = readName(uniq, i, i + 1, end);
+        break;
 
       default:
         assert(false && "unknown uniquing code");
