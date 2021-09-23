@@ -136,6 +136,10 @@ enum class ConstituentSemantics {
   // Similar to CopyInCopyOut but `a` may be a transient projection (rather than
   // a whole array).
   ProjectedCopyInCopyOut,
+  // Similar to ProjectedCopyInCopyOut, except the merge value is not assigned
+  // automatically by the framework. Instead, and address for `[xs]` is made
+  // accessible so that custom assignments to `[xs]` can be implemented.
+  CustomCopyInCopyOut,
   // Referentially opaque. Refers to the address of `x_i`.
   RefOpaque
 };
@@ -219,18 +223,19 @@ static fir::ExtendedValue arrayLoadExtValue(fir::FirOpBuilder &builder,
   // Recover the extended value from the load.
   assert(!load.slice() && "slice is not allowed");
   auto arrTy = load.getType();
-  auto idxTy = builder.getIndexType();
   if (!path.empty()) {
     auto ty = fir::applyPathToType(arrTy, path);
     if (!ty)
       fir::emitFatalError(loc, "path does not apply to type");
     if (!ty.isa<fir::SequenceType>()) {
-      if (auto charTy = ty.dyn_cast<fir::CharacterType>()) {
-        // ???: Is this in CharacterExprHelper?
-        auto len = charTy.hasConstantLen()
-                       ? builder.createIntegerConstant(
-                             loc, idxTy, ty.cast<fir::CharacterType>().getLen())
-                       : load.typeparams()[0];
+      if (fir::isa_char(ty)) {
+        auto len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+            load.memref());
+        if (!len) {
+          assert(load.typeparams().size() == 1 &&
+                 "length must be in array_load");
+          len = load.typeparams()[0];
+        }
         return fir::CharBoxValue{newBase, len};
       }
       return newBase;
@@ -250,11 +255,13 @@ static fir::ExtendedValue arrayLoadExtValue(fir::FirOpBuilder &builder,
   }
   auto extents = fir::factory::getExtents(load.shape());
   auto lbounds = fir::factory::getOrigins(load.shape());
-  if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
-    auto len = charTy.hasConstantLen()
-                   ? builder.createIntegerConstant(
-                         loc, idxTy, eleTy.cast<fir::CharacterType>().getLen())
-                   : load.typeparams()[0];
+  if (fir::isa_char(eleTy)) {
+    auto len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+        load.memref());
+    if (!len) {
+      assert(load.typeparams().size() == 1 && "length must be in array_load");
+      len = load.typeparams()[0];
+    }
     return fir::CharArrayBoxValue{newBase, len, extents, lbounds};
   }
   if (load.typeparams().empty()) {
@@ -262,6 +269,25 @@ static fir::ExtendedValue arrayLoadExtValue(fir::FirOpBuilder &builder,
   }
   TODO(loc, "should build a BoxValue, but there is no good way to know which "
             "properties are explicit, assumed, deferred, or ?");
+}
+
+/// Convert the result of a fir.array_modify to an ExtendedValue given the
+/// related fir.array_load.
+static fir::ExtendedValue arrayModifyToExv(fir::FirOpBuilder &builder,
+                                           mlir::Location loc,
+                                           fir::ArrayLoadOp load,
+                                           mlir::Value elementAddr) {
+  auto eleTy = fir::unwrapPassByRefType(elementAddr.getType());
+  if (fir::isa_char(eleTy)) {
+    auto len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+        load.memref());
+    if (!len) {
+      assert(load.typeparams().size() == 1 && "length must be in array_load");
+      len = load.typeparams()[0];
+    }
+    return fir::CharBoxValue{elementAddr, len};
+  }
+  return elementAddr;
 }
 
 /// Is this a call to an elemental procedure with at least one array argument ?
@@ -1835,7 +1861,7 @@ public:
       });
       /// Result lengths parameters should not be provided to box storage
       /// allocation and save_results, but they are still useful information to
-      /// keep in the ExtentdedValue if non-deferred.
+      /// keep in the ExtendedValue if non-deferred.
       if (!type.isa<fir::BoxType>())
         resultLengths = lengths;
       auto temp =
@@ -2418,6 +2444,50 @@ static mlir::Value adjustedArrayElement(mlir::Location loc,
   return builder.createConvert(loc, adjustedArrayElementType(eleTy), val);
 }
 
+/// Helper to generate calls to scalar user defined assignment procedures.
+static void genScalarUserDefinedAssignmentCall(fir::FirOpBuilder &builder,
+                                               mlir::Location loc,
+                                               mlir::FuncOp func,
+                                               const fir::ExtendedValue &lhs,
+                                               const fir::ExtendedValue &rhs) {
+  auto prepareUserDefinedArg =
+      [](fir::FirOpBuilder &builder, mlir::Location loc,
+         const fir::ExtendedValue &value, mlir::Type argType) -> mlir::Value {
+    if (argType.isa<fir::BoxCharType>()) {
+      const auto *charBox = value.getCharBox();
+      assert(charBox && "argument type mismatch in elemental user assignment");
+      return fir::factory::CharacterExprHelper{builder, loc}.createEmbox(
+          *charBox);
+    }
+    if (argType.isa<fir::BoxType>()) {
+      auto box = builder.createBox(loc, value);
+      return builder.createConvert(loc, argType, box);
+    }
+    // Simple pass by address.
+    auto argBaseType = fir::unwrapRefType(argType);
+    assert(!fir::hasDynamicSize(argBaseType));
+    auto from = fir::getBase(value);
+    if (argBaseType != fir::unwrapRefType(from.getType())) {
+      // With logicals, it is possible that from is i1 here.
+      if (fir::isa_ref_type(from.getType()))
+        from = builder.create<fir::LoadOp>(loc, from);
+      from = builder.createConvert(loc, argBaseType, from);
+    }
+    if (!fir::isa_ref_type(from.getType())) {
+      auto temp = builder.createTemporary(loc, argBaseType);
+      builder.create<fir::StoreOp>(loc, from, temp);
+      from = temp;
+    }
+    return builder.createConvert(loc, argType, from);
+  };
+  assert(func.getNumArguments() == 2);
+  auto lhsType = func.getType().getInput(0);
+  auto rhsType = func.getType().getInput(1);
+  auto lhsArg = prepareUserDefinedArg(builder, loc, lhs, lhsType);
+  auto rhsArg = prepareUserDefinedArg(builder, loc, rhs, rhsType);
+  builder.create<fir::CallOp>(loc, func, mlir::ValueRange{lhsArg, rhsArg});
+}
+
 //===----------------------------------------------------------------------===//
 //
 // Lowering of scalar expressions in an explicit iteration space context.
@@ -2473,6 +2543,12 @@ public:
     // ill-formed, in which case there is no array to thread.
     if (auto updateOp = mlir::dyn_cast<fir::ArrayUpdateOp>(
             fir::getBase(lexv).getDefiningOp())) {
+      auto oldInnerArg = updateOp.sequence();
+      auto offset = expSpace.argPosition(oldInnerArg);
+      expSpace.setInnerArg(offset, fir::getBase(lexv));
+      builder.create<fir::ResultOp>(getLoc(), fir::getBase(lexv));
+    } else if (auto updateOp = mlir::dyn_cast<fir::ArrayModifyOp>(
+                   fir::getBase(lexv).getDefiningOp())) {
       auto oldInnerArg = updateOp.sequence();
       auto offset = expSpace.argPosition(oldInnerArg);
       expSpace.setInnerArg(offset, fir::getBase(lexv));
@@ -3619,6 +3695,8 @@ public:
     return abstractArrayExtValue(iterSpace.outerResult());
   }
 
+  /// Lower an elemental subroutine call with at least one array argument.
+  /// Not for user defined assignments.
   static void lowerArrayElementalSubroutine(
       Fortran::lower::AbstractConverter &converter,
       Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
@@ -3628,7 +3706,6 @@ public:
     ael.lowerArrayElementalSubroutine(call);
   }
 
-  // ! Not for user defined assignment elemental subroutine.
   void lowerArrayElementalSubroutine(
       const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &call) {
     auto f = genarr(call);
@@ -3636,6 +3713,48 @@ public:
     auto [iterSpace, insPt] = genImplicitLoops(shape, /*innerArg=*/{});
     f(iterSpace);
     builder.restoreInsertionPoint(insPt);
+  }
+
+  static void lowerElementalUserAssignment(
+      Fortran::lower::AbstractConverter &converter,
+      Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
+      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &call) {
+    ArrayExprLowering ael(converter, stmtCtx, symMap,
+                          ConstituentSemantics::CustomCopyInCopyOut);
+    auto procRef = std::get<Fortran::evaluate::ProcedureRef>(call.u);
+    assert(procRef.arguments().size() == 2);
+    const auto *lhs = procRef.arguments()[0].value().UnwrapExpr();
+    const auto *rhs = procRef.arguments()[1].value().UnwrapExpr();
+    assert(lhs && rhs &&
+           "user defined assignment arguments must be expressions");
+    auto func = Fortran::lower::CallerInterface(procRef, converter).getFuncOp();
+    ael.lowerElementalUserAssignment(func, *lhs, *rhs);
+  }
+
+  void lowerElementalUserAssignment(
+      mlir::FuncOp userAssignment,
+      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &lhs,
+      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &rhs) {
+    auto loc = getLoc();
+    PushSemantics(ConstituentSemantics::CustomCopyInCopyOut);
+    auto genArrayModify = genarr(lhs);
+    ccStoreToDest = [=](IterSpace iters) -> ExtValue {
+      auto modifiedArray = genArrayModify(iters);
+      auto arrayModify = mlir::dyn_cast_or_null<fir::ArrayModifyOp>(
+          fir::getBase(modifiedArray).getDefiningOp());
+      assert(arrayModify && "must be created by ArrayModifyOp");
+      auto lhs =
+          arrayModifyToExv(builder, loc, destination, arrayModify.getResult(0));
+      genScalarUserDefinedAssignmentCall(builder, loc, userAssignment, lhs,
+                                         iters.elementExv());
+      return modifiedArray;
+    };
+    determineShapeOfDest(lhs);
+    semant = ConstituentSemantics::RefTransparent;
+    auto exv = lowerArrayExpression(rhs);
+    builder.create<fir::ArrayMergeStoreOp>(
+        loc, destination, fir::getBase(exv), destination.memref(),
+        destination.slice(), destination.typeparams());
   }
 
   /// Compute the shape of a slice.
@@ -4994,6 +5113,23 @@ public:
         return abstractArrayExtValue(arrUpdate);
       };
     }
+    if (isCustomCopyInCopyOut()) {
+      // Create an array_modify to get the LHS element address and indicate
+      // the assignment, the actual assignment must be implemented in
+      // ccStoreToDest.
+      destination = arrLoad;
+      return [=](IterSpace iters) -> ExtValue {
+        auto innerArg = iters.innerArgument();
+        auto resTy = innerArg.getType();
+        auto eleTy = fir::applyPathToType(resTy, iters.iterVec());
+        auto refEleTy =
+            fir::isa_ref_type(eleTy) ? eleTy : builder.getRefType(eleTy);
+        auto arrModify = builder.create<fir::ArrayModifyOp>(
+            loc, mlir::TypeRange{refEleTy, resTy}, innerArg, iters.iterVec(),
+            destination.typeparams());
+        return abstractArrayExtValue(arrModify.getResult(1));
+      };
+    }
     if (isCopyInCopyOut()) {
       // Semantics are copy-in copy-out.
       // The continuation simply forwards the result of the `array_load` Op,
@@ -5914,6 +6050,10 @@ private:
     return semant == ConstituentSemantics::ProjectedCopyInCopyOut;
   }
 
+  bool isCustomCopyInCopyOut() {
+    return semant == ConstituentSemantics::CustomCopyInCopyOut;
+  }
+
   /// Array appears in a context where it must be boxed.
   bool isBoxValue() { return semant == ConstituentSemantics::BoxValue; }
 
@@ -6100,9 +6240,11 @@ mlir::Value Fortran::lower::createSubroutineCall(
     // Elemental user defined assignment has special requirements to deal with
     // LHS/RHS overlaps. See 10.2.1.5 p2.
     if (isUserDefAssignment)
-      TODO(converter.getCurrentLocation(), "elemental user defined assignment");
-    ArrayExprLowering::lowerArrayElementalSubroutine(converter, symMap, stmtCtx,
-                                                     call);
+      ArrayExprLowering::lowerElementalUserAssignment(converter, symMap,
+                                                      stmtCtx, call);
+    else
+      ArrayExprLowering::lowerArrayElementalSubroutine(converter, symMap,
+                                                       stmtCtx, call);
     return mlir::Value{};
   }
   // FIXME: The non elemental user defined assignment case with array arguments

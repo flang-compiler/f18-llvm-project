@@ -705,3 +705,19 @@ fir::factory::CharacterExprHelper::readLengthFromBox(mlir::Value box) {
   }
   return size;
 }
+
+mlir::Value fir::factory::CharacterExprHelper::getLength(mlir::Value memref) {
+  auto memrefType = memref.getType();
+  auto charType = recoverCharacterType(memrefType);
+  assert(charType && "must be a character type");
+  if (charType.hasConstantLen())
+    return builder.createIntegerConstant(loc, builder.getCharacterLengthType(),
+                                         charType.getLen());
+  if (memrefType.isa<fir::BoxType>())
+    return readLengthFromBox(memref);
+  if (memrefType.isa<fir::BoxCharType>())
+    return createUnboxChar(memref).second;
+
+  // Length cannot be deduced from memref.
+  return {};
+}
