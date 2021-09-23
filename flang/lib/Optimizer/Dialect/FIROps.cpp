@@ -500,6 +500,18 @@ static mlir::LogicalResult verify(fir::ArrayUpdateOp op) {
 }
 
 //===----------------------------------------------------------------------===//
+// ArrayModifyOp
+//===----------------------------------------------------------------------===//
+
+static mlir::LogicalResult verify(fir::ArrayModifyOp op) {
+  auto arrTy = op.sequence().getType().cast<fir::SequenceType>();
+  auto indSize = op.indices().size();
+  if (indSize < arrTy.getDimension())
+    return op.emitOpError("number of indices must match array dimension");
+  return mlir::success();
+}
+
+//===----------------------------------------------------------------------===//
 // BoxAddrOp
 //===----------------------------------------------------------------------===//
 

@@ -101,80 +101,134 @@ private:
 };
 } // namespace
 
-// Recursively trace operands to find all array operations relating to the
-// values merged.
-static void populateSets(llvm::SmallVectorImpl<mlir::Operation *> &reach,
-                         llvm::SmallPtrSetImpl<mlir::Value> &visited,
-                         mlir::Value val) {
-  if (!val || visited.contains(val))
-    return;
-  visited.insert(val);
+namespace {
 
-  if (auto *op = val.getDefiningOp()) {
-    // `val` is defined by an Op, process the defining Op.
-    // If `val` is defined by a region containing Op, we want to drill down and
-    // through that Op's region(s).
-    LLVM_DEBUG(llvm::dbgs() << "popset: " << val << '\n');
+/// Helper class to collect all array operations that produced an array value.
+class ReachCollector {
+public:
+  ReachCollector(llvm::SmallVectorImpl<mlir::Operation *> &reach,
+                 mlir::Region *loopRegion)
+      : reach{reach}, loopRegion{loopRegion} {}
+
+  // Recursively trace operands to find all array operations relating to the
+  // values merged.
+  void collectArrayAccessFrom(mlir::Value val) {
+    if (!val || visited.contains(val))
+      return;
+    visited.insert(val);
+
+    if (auto *op = val.getDefiningOp()) {
+      // `val` is defined by an Op, process the defining Op.
+      // If `val` is defined by a region containing Op, we want to drill down
+      // and through that Op's region(s).
+      LLVM_DEBUG(llvm::dbgs() << "popset: " << val << '\n');
+      auto popFn = [&](auto rop) {
+        auto resNum = val.cast<mlir::OpResult>().getResultNumber();
+        llvm::SmallVector<mlir::Value> results;
+        rop.resultToSourceOps(results, resNum);
+        for (auto u : results)
+          collectArrayAccessFrom(u);
+      };
+      if (auto rop = mlir::dyn_cast<DoLoopOp>(op)) {
+        popFn(rop);
+        return;
+      }
+      if (auto rop = mlir::dyn_cast<IterWhileOp>(op)) {
+        popFn(rop);
+        return;
+      }
+      if (auto rop = mlir::dyn_cast<fir::IfOp>(op)) {
+        popFn(rop);
+        return;
+      }
+
+      if (mlir::isa<fir::AllocaOp, fir::AllocMemOp>(op))
+        // Look for any stores inside the loops, and collect an array operation
+        // that produced the value being stored to it.
+        for (auto user : op->getUsers())
+          if (auto store = mlir::dyn_cast<fir::StoreOp>(user))
+            if (opIsInsideLoops(store))
+              collectArrayAccessFrom(store.value());
+
+      // Otherwise, Op does not contain a region so just chase its operands.
+      if (mlir::isa<ArrayLoadOp, ArrayUpdateOp, ArrayModifyOp, ArrayFetchOp>(
+              op)) {
+        LLVM_DEBUG(llvm::dbgs() << "add " << *op << " to reachable set\n");
+        reach.emplace_back(op);
+      }
+      // Array modify assignment is performed on the result. So the analysis
+      // must look at the what is done with the result.
+      if (mlir::isa<ArrayModifyOp>(op))
+        for (auto user : op->getResult(0).getUsers())
+          followUsers(user);
+
+      for (auto u : op->getOperands())
+        collectArrayAccessFrom(u);
+      return;
+    }
+
+    // Process a block argument.
+    auto ba = val.cast<mlir::BlockArgument>();
+    auto *parent = ba.getOwner()->getParentOp();
+    // If inside an Op holding a region, the block argument corresponds to an
+    // argument passed to the containing Op.
     auto popFn = [&](auto rop) {
-      auto resNum = val.cast<mlir::OpResult>().getResultNumber();
-      llvm::SmallVector<mlir::Value> results;
-      rop.resultToSourceOps(results, resNum);
-      for (auto u : results)
-        populateSets(reach, visited, u);
+      collectArrayAccessFrom(rop.blockArgToSourceOp(ba.getArgNumber()));
     };
-    if (auto rop = mlir::dyn_cast<DoLoopOp>(op)) {
+    if (auto rop = mlir::dyn_cast<DoLoopOp>(parent)) {
       popFn(rop);
       return;
     }
-    if (auto rop = mlir::dyn_cast<IterWhileOp>(op)) {
+    if (auto rop = mlir::dyn_cast<IterWhileOp>(parent)) {
       popFn(rop);
       return;
     }
-    if (auto rop = mlir::dyn_cast<fir::IfOp>(op)) {
-      popFn(rop);
-      return;
+    // Otherwise, a block argument is provided via the pred blocks.
+    for (auto *pred : ba.getOwner()->getPredecessors()) {
+      auto u = pred->getTerminator()->getOperand(ba.getArgNumber());
+      collectArrayAccessFrom(u);
     }
-
-    // Otherwise, Op does not contain a region so just chase its operands.
-    if (mlir::isa<ArrayLoadOp, ArrayUpdateOp, ArrayFetchOp>(op)) {
-      LLVM_DEBUG(llvm::dbgs() << "add " << *op << " to reachable set\n");
-      reach.emplace_back(op);
-    }
-    for (auto u : op->getOperands())
-      populateSets(reach, visited, u);
-    return;
   }
 
-  // Process a block argument.
-  auto ba = val.cast<mlir::BlockArgument>();
-  auto *parent = ba.getOwner()->getParentOp();
-  // If inside an Op holding a region, the block argument corresponds to an
-  // argument passed to the containing Op.
-  auto popFn = [&](auto rop) {
-    populateSets(reach, visited, rop.blockArgToSourceOp(ba.getArgNumber()));
-  };
-  if (auto rop = mlir::dyn_cast<DoLoopOp>(parent)) {
-    popFn(rop);
-    return;
+private:
+  /// Is \op inside the loop nest region ?
+  bool opIsInsideLoops(mlir::Operation *op) const {
+    auto *region = op->getParentRegion();
+    while (region) {
+      if (region == loopRegion)
+        return true;
+      region = region->getParentRegion();
+    }
+    return false;
   }
-  if (auto rop = mlir::dyn_cast<IterWhileOp>(parent)) {
-    popFn(rop);
-    return;
+
+  /// Recursively trace the use of an operation results, calling
+  /// collectArrayAccessFrom on the direct and indirect user operands.
+  void followUsers(mlir::Operation *op) {
+    for (auto userOperand : op->getOperands())
+      collectArrayAccessFrom(userOperand);
+    // Go through potential converts/coordinate_op.
+    for (auto indirectUser : op->getUsers())
+      followUsers(indirectUser);
   }
-  // Otherwise, a block argument is provided via the pred blocks.
-  for (auto *pred : ba.getOwner()->getPredecessors()) {
-    auto u = pred->getTerminator()->getOperand(ba.getArgNumber());
-    populateSets(reach, visited, u);
-  }
-}
+
+  llvm::SmallVectorImpl<mlir::Operation *> &reach;
+  llvm::SmallPtrSet<mlir::Value, 16> visited;
+  /// Region of the loops nest that produced the array value.
+  mlir::Region *loopRegion;
+};
+} // namespace
 
 /// Return all ops that produce the array value that is stored into the
 /// `array_merge_store`.
 static void reachingValues(llvm::SmallVectorImpl<mlir::Operation *> &reach,
                            mlir::Value seq) {
   reach.clear();
-  llvm::SmallPtrSet<mlir::Value, 16> visited;
-  populateSets(reach, visited, seq);
+  mlir::Region *loopRegion = nullptr;
+  if (auto doLoop = mlir::dyn_cast_or_null<fir::DoLoopOp>(seq.getDefiningOp()))
+    loopRegion = &doLoop->getRegion(0);
+  ReachCollector collector(reach, loopRegion);
+  collector.collectArrayAccessFrom(seq);
 }
 
 /// Find all the array operations that access the array value that is loaded by
@@ -186,7 +240,7 @@ void ArrayCopyAnalysis::arrayAccesses(
   if (lmIter != loadMapSets.end()) {
     for (auto *opnd : lmIter->second) {
       auto *owner = opnd->getOwner();
-      if (mlir::isa<ArrayFetchOp, ArrayUpdateOp>(owner))
+      if (mlir::isa<ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp>(owner))
         accesses.push_back(owner);
     }
     return;
@@ -249,6 +303,13 @@ void ArrayCopyAnalysis::arrayAccesses(
                  << "add update {" << *owner << "} to array value set\n");
       accesses.push_back(owner);
       appendToQueue(update.getResult());
+    } else if (auto update = mlir::dyn_cast<ArrayModifyOp>(owner)) {
+      // Keep track of array value modification and thread the return value
+      // uses.
+      LLVM_DEBUG(llvm::dbgs()
+                 << "add modify {" << *owner << "} to array value set\n");
+      accesses.push_back(owner);
+      appendToQueue(update.getResult(1));
     } else if (auto br = mlir::dyn_cast<mlir::BranchOp>(owner)) {
       branchOp(br.getDest(), br.destOperands());
     } else if (auto br = mlir::dyn_cast<mlir::CondBranchOp>(owner)) {
@@ -303,6 +364,12 @@ static bool conflictOnMerge(llvm::ArrayRef<mlir::Operation *> accesses) {
         continue;
       }
       compareVector = u.indices();
+    } else if (auto f = mlir::dyn_cast<ArrayModifyOp>(op)) {
+      if (indices.empty()) {
+        indices = f.indices();
+        continue;
+      }
+      compareVector = f.indices();
     } else if (auto f = mlir::dyn_cast<ArrayFetchOp>(op)) {
       if (indices.empty()) {
         indices = f.indices();
@@ -362,7 +429,7 @@ void ArrayCopyAnalysis::construct(mlir::MutableArrayRef<mlir::Region> regions) {
                                   << ", accesses: " << accesses.size() << '\n');
           for (auto *acc : accesses) {
             LLVM_DEBUG(llvm::dbgs() << " access: " << *acc << '\n');
-            if (mlir::isa<ArrayFetchOp, ArrayUpdateOp>(acc)) {
+            if (mlir::isa<ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp>(acc)) {
               if (useMap.count(acc)) {
                 mlir::emitError(
                     load.getLoc(),
@@ -496,103 +563,17 @@ genCoorOp(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Type eleTy,
 }
 
 namespace {
-/// Conversion of fir.array_update Op.
+/// Conversion of fir.array_update and fir.array_modify Ops.
 /// If there is a conflict for the update, then we need to perform a
 /// copy-in/copy-out to preserve the original values of the array. If there is
 /// no conflict, then it is save to eschew making any copies.
-class ArrayUpdateConversion : public mlir::OpRewritePattern<ArrayUpdateOp> {
+template <typename ArrayOp>
+class ArrayUpdateConversionBase : public mlir::OpRewritePattern<ArrayOp> {
 public:
-  explicit ArrayUpdateConversion(mlir::MLIRContext *ctx,
-                                 const ArrayCopyAnalysis &a,
-                                 const OperationUseMapT &m)
-      : OpRewritePattern{ctx}, analysis{a}, useMap{m} {}
-
-  mlir::LogicalResult
-  matchAndRewrite(ArrayUpdateOp update,
-                  mlir::PatternRewriter &rewriter) const override {
-    auto *op = update.getOperation();
-    auto *loadOp = useMap.lookup(op);
-    auto load = mlir::cast<ArrayLoadOp>(loadOp);
-    LLVM_DEBUG(llvm::outs() << "does " << load << " have a conflict?\n");
-    auto loc = update.getLoc();
-    auto copyElement = [&](mlir::Value coor) {
-      auto input = update.merge();
-      if (auto inEleTy = fir::dyn_cast_ptrEleTy(input.getType())) {
-        [[maybe_unused]] auto outEleTy =
-            fir::unwrapSequenceType(update.getType());
-        if (auto inChrTy = inEleTy.dyn_cast<fir::CharacterType>()) {
-          assert(outEleTy.isa<fir::CharacterType>());
-          fir::factory::genCharacterCopy(input, recoverCharLen(input), coor,
-                                         recoverCharLen(coor), rewriter, loc);
-        } else if (inEleTy.isa<fir::RecordType>()) {
-          fir::FirOpBuilder builder(
-              rewriter,
-              fir::getKindMapping(update->getParentOfType<mlir::ModuleOp>()));
-          if (!update.typeparams().empty()) {
-            auto boxTy = fir::BoxType::get(inEleTy);
-            mlir::Value emptyShape, emptySlice;
-            auto lhs = rewriter.create<fir::EmboxOp>(
-                loc, boxTy, coor, emptyShape, emptySlice, update.typeparams());
-            auto rhs = rewriter.create<fir::EmboxOp>(
-                loc, boxTy, input, emptyShape, emptySlice, update.typeparams());
-            fir::factory::genRecordAssignment(builder, loc, fir::BoxValue(lhs),
-                                              fir::BoxValue(rhs));
-          } else {
-            fir::factory::genRecordAssignment(builder, loc, coor, input);
-          }
-        } else {
-          llvm::report_fatal_error("not a legal reference type");
-        }
-      } else {
-        rewriter.create<fir::StoreOp>(loc, input, coor);
-      }
-    };
-
-    if (analysis.hasPotentialConflict(loadOp)) {
-      // If there is a conflict between the arrays, then we copy the lhs array
-      // to a temporary, update the temporary, and copy the temporary back to
-      // the lhs array. This yields Fortran's copy-in copy-out array semantics.
-      LLVM_DEBUG(llvm::outs() << "Yes, conflict was found\n");
-      rewriter.setInsertionPoint(loadOp);
-      // Copy in.
-      llvm::SmallVector<mlir::Value> extents;
-      auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents);
-      auto allocmem = rewriter.create<AllocMemOp>(
-          loc, dyn_cast_ptrOrBoxEleTy(load.memref().getType()),
-          load.typeparams(), extents);
-      genArrayCopy(load.getLoc(), rewriter, allocmem, load.memref(), shapeOp,
-                   load.getType());
-      rewriter.setInsertionPoint(op);
-      auto coor =
-          genCoorOp(rewriter, loc, getEleTy(load.getType()),
-                    toRefType(update.merge().getType()), allocmem, shapeOp,
-                    load.slice(), update.indices(), load.typeparams(),
-                    update->hasAttr(fir::factory::attrFortranArrayOffsets()));
-      copyElement(coor);
-      auto *storeOp = useMap.lookup(loadOp);
-      rewriter.setInsertionPoint(storeOp);
-      // Copy out.
-      auto store = mlir::cast<ArrayMergeStoreOp>(storeOp);
-      genArrayCopy(store.getLoc(), rewriter, store.memref(), allocmem, shapeOp,
-                   load.getType());
-      rewriter.create<FreeMemOp>(loc, allocmem);
-    } else {
-      // Otherwise, when there is no conflict (a possible loop-carried
-      // dependence), the lhs array can be updated in place.
-      LLVM_DEBUG(llvm::outs() << "No, conflict wasn't found\n");
-      rewriter.setInsertionPoint(op);
-      auto coorTy = getEleTy(load.getType());
-      auto coor =
-          genCoorOp(rewriter, loc, coorTy, toRefType(update.merge().getType()),
-                    load.memref(), load.shape(), load.slice(), update.indices(),
-                    load.typeparams(),
-                    update->hasAttr(fir::factory::attrFortranArrayOffsets()));
-      copyElement(coor);
-    }
-    update.replaceAllUsesWith(load.getResult());
-    rewriter.replaceOp(update, load.getResult());
-    return mlir::success();
-  }
+  explicit ArrayUpdateConversionBase(mlir::MLIRContext *ctx,
+                                     const ArrayCopyAnalysis &a,
+                                     const OperationUseMapT &m)
+      : mlir::OpRewritePattern<ArrayOp>{ctx}, analysis{a}, useMap{m} {}
 
   static llvm::SmallVector<mlir::Value> recoverTypeParams(mlir::Value val) {
     auto *op = val.getDefiningOp();
@@ -603,6 +584,8 @@ public:
     if (auto ao = mlir::dyn_cast<fir::ArrayFetchOp>(op))
       return {ao.typeparams().begin(), ao.typeparams().end()};
     if (auto ao = mlir::dyn_cast<fir::ArrayUpdateOp>(op))
+      return {ao.typeparams().begin(), ao.typeparams().end()};
+    if (auto ao = mlir::dyn_cast<fir::ArrayModifyOp>(op))
       return {ao.typeparams().begin(), ao.typeparams().end()};
     if (auto ao = mlir::dyn_cast<fir::ArrayLoadOp>(op))
       return {ao.typeparams().begin(), ao.typeparams().end()};
@@ -656,9 +639,141 @@ public:
     rewriter.restoreInsertionPoint(insPt);
   }
 
+  /// Copy the RHS element into the LHS and insert copy-in/copy-out between a
+  /// temp and the LHS if the analysis found potential overlaps between the RHS
+  /// and LHS arrays. The element copy generator must be provided through \p
+  /// assignElement. \p update must be the ArrayUpdateOp or the ArrayModifyOp.
+  /// Returns the address of the LHS element inside the loop and the LHS
+  /// ArrayLoad result.
+  std::pair<mlir::Value, mlir::Value>
+  materializeAssignment(mlir::Location loc, mlir::PatternRewriter &rewriter,
+                        ArrayOp update,
+                        const std::function<void(mlir::Value)> &assignElement,
+                        mlir::Type lhsEltRefType) const {
+    auto *op = update.getOperation();
+    auto *loadOp = useMap.lookup(op);
+    auto load = mlir::cast<ArrayLoadOp>(loadOp);
+    LLVM_DEBUG(llvm::outs() << "does " << load << " have a conflict?\n");
+    if (analysis.hasPotentialConflict(loadOp)) {
+      // If there is a conflict between the arrays, then we copy the lhs array
+      // to a temporary, update the temporary, and copy the temporary back to
+      // the lhs array. This yields Fortran's copy-in copy-out array semantics.
+      LLVM_DEBUG(llvm::outs() << "Yes, conflict was found\n");
+      rewriter.setInsertionPoint(loadOp);
+      // Copy in.
+      llvm::SmallVector<mlir::Value> extents;
+      auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents);
+      auto allocmem = rewriter.create<AllocMemOp>(
+          loc, dyn_cast_ptrOrBoxEleTy(load.memref().getType()),
+          load.typeparams(), extents);
+      genArrayCopy(load.getLoc(), rewriter, allocmem, load.memref(), shapeOp,
+                   load.getType());
+      rewriter.setInsertionPoint(op);
+      auto coor = genCoorOp(
+          rewriter, loc, getEleTy(load.getType()), lhsEltRefType, allocmem,
+          shapeOp, load.slice(), update.indices(), load.typeparams(),
+          update->hasAttr(fir::factory::attrFortranArrayOffsets()));
+      assignElement(coor);
+      auto *storeOp = useMap.lookup(loadOp);
+      auto store = mlir::cast<ArrayMergeStoreOp>(storeOp);
+      rewriter.setInsertionPoint(storeOp);
+      // Copy out.
+      genArrayCopy(store.getLoc(), rewriter, store.memref(), allocmem, shapeOp,
+                   load.getType());
+      rewriter.create<FreeMemOp>(loc, allocmem);
+      return {coor, load.getResult()};
+    }
+    // Otherwise, when there is no conflict (a possible loop-carried
+    // dependence), the lhs array can be updated in place.
+    LLVM_DEBUG(llvm::outs() << "No, conflict wasn't found\n");
+    rewriter.setInsertionPoint(op);
+    auto coorTy = getEleTy(load.getType());
+    auto coor = genCoorOp(
+        rewriter, loc, coorTy, lhsEltRefType, load.memref(), load.shape(),
+        load.slice(), update.indices(), load.typeparams(),
+        update->hasAttr(fir::factory::attrFortranArrayOffsets()));
+    assignElement(coor);
+    return {coor, load.getResult()};
+  }
+
 private:
   const ArrayCopyAnalysis &analysis;
   const OperationUseMapT &useMap;
+};
+
+class ArrayUpdateConversion : public ArrayUpdateConversionBase<ArrayUpdateOp> {
+public:
+  explicit ArrayUpdateConversion(mlir::MLIRContext *ctx,
+                                 const ArrayCopyAnalysis &a,
+                                 const OperationUseMapT &m)
+      : ArrayUpdateConversionBase{ctx, a, m} {}
+
+  mlir::LogicalResult
+  matchAndRewrite(ArrayUpdateOp update,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loc = update.getLoc();
+    auto assignElement = [&](mlir::Value coor) {
+      auto input = update.merge();
+      if (auto inEleTy = fir::dyn_cast_ptrEleTy(input.getType())) {
+        [[maybe_unused]] auto outEleTy =
+            fir::unwrapSequenceType(update.getType());
+        if (auto inChrTy = inEleTy.dyn_cast<fir::CharacterType>()) {
+          assert(outEleTy.isa<fir::CharacterType>());
+          fir::factory::genCharacterCopy(input, recoverCharLen(input), coor,
+                                         recoverCharLen(coor), rewriter, loc);
+        } else if (inEleTy.isa<fir::RecordType>()) {
+          fir::FirOpBuilder builder(
+              rewriter,
+              fir::getKindMapping(update->getParentOfType<mlir::ModuleOp>()));
+          if (!update.typeparams().empty()) {
+            auto boxTy = fir::BoxType::get(inEleTy);
+            mlir::Value emptyShape, emptySlice;
+            auto lhs = rewriter.create<fir::EmboxOp>(
+                loc, boxTy, coor, emptyShape, emptySlice, update.typeparams());
+            auto rhs = rewriter.create<fir::EmboxOp>(
+                loc, boxTy, input, emptyShape, emptySlice, update.typeparams());
+            fir::factory::genRecordAssignment(builder, loc, fir::BoxValue(lhs),
+                                              fir::BoxValue(rhs));
+          } else {
+            fir::factory::genRecordAssignment(builder, loc, coor, input);
+          }
+        } else {
+          llvm::report_fatal_error("not a legal reference type");
+        }
+      } else {
+        rewriter.create<fir::StoreOp>(loc, input, coor);
+      }
+    };
+    auto lhsEltRefType = toRefType(update.merge().getType());
+    auto [_, lhsLoadResult] = materializeAssignment(
+        loc, rewriter, update, assignElement, lhsEltRefType);
+    update.replaceAllUsesWith(lhsLoadResult);
+    rewriter.replaceOp(update, lhsLoadResult);
+    return mlir::success();
+  }
+};
+
+class ArrayModifyConversion : public ArrayUpdateConversionBase<ArrayModifyOp> {
+public:
+  explicit ArrayModifyConversion(mlir::MLIRContext *ctx,
+                                 const ArrayCopyAnalysis &a,
+                                 const OperationUseMapT &m)
+      : ArrayUpdateConversionBase{ctx, a, m} {}
+
+  mlir::LogicalResult
+  matchAndRewrite(ArrayModifyOp modify,
+                  mlir::PatternRewriter &rewriter) const override {
+    auto loc = modify.getLoc();
+    auto assignElement = [](mlir::Value) {
+      // Assignment already materialized by lowering using lhs element address.
+    };
+    auto lhsEltRefType = modify.getResult(0).getType();
+    auto [lhsEltCoor, lhsLoadResult] = materializeAssignment(
+        loc, rewriter, modify, assignElement, lhsEltRefType);
+    modify.replaceAllUsesWith(mlir::ValueRange{lhsEltCoor, lhsLoadResult});
+    rewriter.replaceOp(modify, mlir::ValueRange{lhsEltCoor, lhsLoadResult});
+    return mlir::success();
+  }
 };
 
 class ArrayFetchConversion : public mlir::OpRewritePattern<ArrayFetchOp> {
@@ -708,10 +823,11 @@ public:
     mlir::OwningRewritePatternList patterns1(context);
     patterns1.insert<ArrayFetchConversion>(context, useMap);
     patterns1.insert<ArrayUpdateConversion>(context, analysis, useMap);
+    patterns1.insert<ArrayModifyConversion>(context, analysis, useMap);
     mlir::ConversionTarget target(*context);
     target.addLegalDialect<FIROpsDialect, mlir::scf::SCFDialect,
                            mlir::StandardOpsDialect>();
-    target.addIllegalOp<ArrayFetchOp, ArrayUpdateOp>();
+    target.addIllegalOp<ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp>();
     // Rewrite the array fetch and array update ops.
     if (mlir::failed(
             mlir::applyPartialConversion(func, target, std::move(patterns1)))) {
