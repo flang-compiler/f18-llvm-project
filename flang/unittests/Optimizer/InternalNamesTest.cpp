@@ -162,6 +162,12 @@ TEST(InternalNamesTest, doProgramEntry) {
   ASSERT_EQ(actual.str(), expectedMangledName);
 }
 
+TEST(InternalNamesTest, doNamelistGroup) {
+  llvm::StringRef actual = NameUniquer::doNamelistGroup({"mod1"}, {}, {"nlg"});
+  std::string expectedMangledName = "_QMmod1Gnlg";
+  ASSERT_EQ(actual.str(), expectedMangledName);
+}
+
 TEST(InternalNamesTest, deconstructTest) {
   std::pair actual = NameUniquer::deconstruct("_QBhello");
   auto expectedNameKind = NameUniquer::NameKind::COMMON;
