@@ -163,9 +163,9 @@ TEST(InternalNamesTest, doProgramEntry) {
 }
 
 TEST(InternalNamesTest, doNamelistGroup) {
-  llvm::StringRef actual = NameUniquer::doNamelistGroup({"mod1"}, {}, {"nlg"});
+  std::string actual = NameUniquer::doNamelistGroup({"mod1"}, {}, "nlg");
   std::string expectedMangledName = "_QMmod1Gnlg";
-  ASSERT_EQ(actual.str(), expectedMangledName);
+  ASSERT_EQ(actual, expectedMangledName);
 }
 
 TEST(InternalNamesTest, deconstructTest) {
