@@ -518,3 +518,24 @@ fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
   %2 = fir.insert_on_range %0, %c0_i32, [0 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
   fir.has_value %2 : !fir.array<32x32xi32>
 }
+
+// -----
+
+fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32x32xi32>
+  // expected-error@+1 {{'fir.insert_on_range' op negative range bound}}
+  %2 = fir.insert_on_range %0, %c0_i32, [-1 : index, 0 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  fir.has_value %2 : !fir.array<32x32xi32>
+}
+
+// -----
+
+fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
+  %c0_i32 = constant 1 : i32
+  %0 = fir.undefined !fir.array<32x32xi32>
+  // expected-error@+1 {{'fir.insert_on_range' op empty range}}
+  %2 = fir.insert_on_range %0, %c0_i32, [10 : index, 9 : index] : (!fir.array<32x32xi32>, i32) -> !fir.array<32x32xi32>
+  fir.has_value %2 : !fir.array<32x32xi32>
+}
+
