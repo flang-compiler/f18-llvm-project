@@ -151,19 +151,7 @@ def fir_AllocaOp : fir_Op<"alloca", [AttrSizedOperandSegments,
       CArg<"mlir::ValueRange", "{}">:$shape,
       CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>];
 
-  let verifier = [{
-    llvm::SmallVector<llvm::StringRef> visited;
-    if (verifyInType(getInType(), visited, numShapeOperands()))
-      return emitOpError("invalid type for allocation");
-    if (verifyTypeParamCount(getInType(), numLenParams()))
-      return emitOpError("LEN params do not correspond to type");
-    mlir::Type outType = getType();
-    if (!outType.isa<fir::ReferenceType>())
-      return emitOpError("must be a !fir.ref type");
-    if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
-      return emitOpError("cannot allocate !fir.box of unknown rank or type");
-    return mlir::success();
-  }];
+  let verifier = [{ return ::verify(*this); }];
 
   let extraClassDeclaration = [{
     mlir::Type getAllocatedType();
@@ -220,19 +208,7 @@ def fir_AllocMemOp : fir_Op<"allocmem",
       CArg<"mlir::ValueRange", "{}">:$shape,
       CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>];
 
-  let verifier = [{
-    llvm::SmallVector<llvm::StringRef> visited;
-    if (verifyInType(getInType(), visited, numShapeOperands()))
-      return emitOpError("invalid type for allocation");
-    if (verifyTypeParamCount(getInType(), numLenParams()))
-      return emitOpError("LEN params do not correspond to type");
-    mlir::Type outType = getType();
-    if (!outType.dyn_cast<fir::HeapType>())
-      return emitOpError("must be a !fir.heap type");
-    if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
-      return emitOpError("cannot allocate !fir.box of unknown rank or type");
-    return mlir::success();
-  }];
+  let verifier = [{ return ::verify(*this); }];
 
   let extraClassDeclaration = [{
     mlir::Type getAllocatedType();

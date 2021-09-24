@@ -202,6 +202,20 @@ void fir::AllocaOp::build(mlir::OpBuilder &builder,
   result.addAttributes(attributes);
 }
 
+static mlir::LogicalResult verify(fir::AllocaOp &op) {
+  llvm::SmallVector<llvm::StringRef> visited;
+  if (verifyInType(op.getInType(), visited, op.numShapeOperands()))
+    return op.emitOpError("invalid type for allocation");
+  if (verifyTypeParamCount(op.getInType(), op.numLenParams()))
+    return op.emitOpError("LEN params do not correspond to type");
+  mlir::Type outType = op.getType();
+  if (!outType.isa<fir::ReferenceType>())
+    return op.emitOpError("must be a !fir.ref type");
+  if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
+    return op.emitOpError("cannot allocate !fir.box of unknown rank or type");
+  return mlir::success();
+}
+
 //===----------------------------------------------------------------------===//
 // AllocMemOp
 //===----------------------------------------------------------------------===//
@@ -265,6 +279,20 @@ void fir::AllocMemOp::build(mlir::OpBuilder &builder,
   build(builder, result, wrapAllocMemResultType(in_type), in_type, {}, {},
         typeparams, shape);
   result.addAttributes(attributes);
+}
+
+static mlir::LogicalResult verify(fir::AllocMemOp &op) {
+  llvm::SmallVector<llvm::StringRef> visited;
+  if (verifyInType(op.getInType(), visited, op.numShapeOperands()))
+    return op.emitOpError("invalid type for allocation");
+  if (verifyTypeParamCount(op.getInType(), op.numLenParams()))
+    return op.emitOpError("LEN params do not correspond to type");
+  mlir::Type outType = op.getType();
+  if (!outType.dyn_cast<fir::HeapType>())
+    return op.emitOpError("must be a !fir.heap type");
+  if (fir::isa_unknown_size_box(fir::dyn_cast_ptrEleTy(outType)))
+    return op.emitOpError("cannot allocate !fir.box of unknown rank or type");
+  return mlir::success();
 }
 
 //===----------------------------------------------------------------------===//
