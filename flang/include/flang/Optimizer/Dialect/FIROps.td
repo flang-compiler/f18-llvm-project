@@ -134,15 +134,16 @@ def fir_AllocaOp : fir_Op<"alloca", [AttrSizedOperandSegments,
   );
   let results = (outs fir_ReferenceType);
 
-  let parser = "return parseAlloca(parser, result);";
-  let printer = "printAlloca(p, *this);";
+  let parser =
+      "return parseAllocatableOp(wrapAllocaResultType, parser, result);";
+  let printer = "printAllocatableOp(p, (*this));";
 
   let builders = [
-    OpBuilder<(ins "mlir::Type":$in_type, "llvm::StringRef":$uniq_name,
-      "llvm::StringRef":$bindc_name, CArg<"mlir::ValueRange", "{}">:$typeparams,
+    OpBuilder<(ins "mlir::Type":$inType, "llvm::StringRef":$uniqName,
+      "llvm::StringRef":$bindcName, CArg<"mlir::ValueRange", "{}">:$typeparams,
       CArg<"mlir::ValueRange", "{}">:$shape,
       CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>,
-    OpBuilder<(ins "mlir::Type":$in_type, "llvm::StringRef":$uniq_name,
+    OpBuilder<(ins "mlir::Type":$inType, "llvm::StringRef":$uniqName,
       CArg<"mlir::ValueRange", "{}">:$typeparams,
       CArg<"mlir::ValueRange", "{}">:$shape,
       CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>,
@@ -191,8 +192,9 @@ def fir_AllocMemOp : fir_Op<"allocmem",
   );
   let results = (outs fir_HeapType);
 
-  let parser = "return parseAllocMem(parser, result);";
-  let printer = "printAllocMem(p, *this);";
+  let parser = 
+      "return parseAllocatableOp(wrapAllocMemResultType, parser, result);";
+  let printer = "printAllocatableOp(p, (*this));";
 
   let builders = [
     OpBuilder<(ins "mlir::Type":$in_type, "llvm::StringRef":$uniq_name,

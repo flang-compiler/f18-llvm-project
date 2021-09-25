@@ -75,7 +75,11 @@ static bool verifyTypeParamCount(mlir::Type inType, unsigned numParams) {
   return false;
 }
 
-// Parser shared by Alloca and Allocmem
+/// Parser shared by Alloca and Allocmem
+///
+/// operation ::= %res = (`fir.alloca` | `fir.allocmem`) $in_type
+///                      ( `(` $typeparams `)` )? ( `,` $shape )?
+///                      attr-dict-without-keyword
 template <typename FN>
 static mlir::ParseResult parseAllocatableOp(FN wrapResultType,
                                             mlir::OpAsmParser &parser,
@@ -151,15 +155,6 @@ static mlir::Type wrapAllocaResultType(mlir::Type intype) {
   return ReferenceType::get(intype);
 }
 
-static mlir::ParseResult parseAlloca(mlir::OpAsmParser &parser,
-                                     mlir::OperationState &result) {
-  return parseAllocatableOp(wrapAllocaResultType, parser, result);
-}
-
-static void printAlloca(mlir::OpAsmPrinter &p, fir::AllocaOp &op) {
-  printAllocatableOp(p, op);
-}
-
 mlir::Type fir::AllocaOp::getAllocatedType() {
   return getType().cast<ReferenceType>().getEleTy();
 }
@@ -169,35 +164,35 @@ mlir::Type fir::AllocaOp::getRefTy(mlir::Type ty) {
 }
 
 void fir::AllocaOp::build(mlir::OpBuilder &builder,
-                          mlir::OperationState &result, mlir::Type in_type,
-                          llvm::StringRef uniq_name,
-                          mlir::ValueRange typeparams, mlir::ValueRange shape,
+                          mlir::OperationState &result, mlir::Type inType,
+                          llvm::StringRef uniqName, mlir::ValueRange typeparams,
+                          mlir::ValueRange shape,
                           llvm::ArrayRef<mlir::NamedAttribute> attributes) {
-  auto nameAttr = builder.getStringAttr(uniq_name);
-  build(builder, result, wrapAllocaResultType(in_type), in_type, nameAttr, {},
+  auto nameAttr = builder.getStringAttr(uniqName);
+  build(builder, result, wrapAllocaResultType(inType), inType, nameAttr, {},
         typeparams, shape);
   result.addAttributes(attributes);
 }
 
 void fir::AllocaOp::build(mlir::OpBuilder &builder,
-                          mlir::OperationState &result, mlir::Type in_type,
-                          llvm::StringRef uniq_name, llvm::StringRef bindc_name,
+                          mlir::OperationState &result, mlir::Type inType,
+                          llvm::StringRef uniqName, llvm::StringRef bindcName,
                           mlir::ValueRange typeparams, mlir::ValueRange shape,
                           llvm::ArrayRef<mlir::NamedAttribute> attributes) {
   auto nameAttr =
-      uniq_name.empty() ? mlir::StringAttr{} : builder.getStringAttr(uniq_name);
-  auto bindcAttr = bindc_name.empty() ? mlir::StringAttr{}
-                                      : builder.getStringAttr(bindc_name);
-  build(builder, result, wrapAllocaResultType(in_type), in_type, nameAttr,
+      uniqName.empty() ? mlir::StringAttr{} : builder.getStringAttr(uniqName);
+  auto bindcAttr =
+      bindcName.empty() ? mlir::StringAttr{} : builder.getStringAttr(bindcName);
+  build(builder, result, wrapAllocaResultType(inType), inType, nameAttr,
         bindcAttr, typeparams, shape);
   result.addAttributes(attributes);
 }
 
 void fir::AllocaOp::build(mlir::OpBuilder &builder,
-                          mlir::OperationState &result, mlir::Type in_type,
+                          mlir::OperationState &result, mlir::Type inType,
                           mlir::ValueRange typeparams, mlir::ValueRange shape,
                           llvm::ArrayRef<mlir::NamedAttribute> attributes) {
-  build(builder, result, wrapAllocaResultType(in_type), in_type, {}, {},
+  build(builder, result, wrapAllocaResultType(inType), inType, {}, {},
         typeparams, shape);
   result.addAttributes(attributes);
 }
@@ -231,15 +226,6 @@ static mlir::Type wrapAllocMemResultType(mlir::Type intype) {
   return HeapType::get(intype);
 }
 
-static mlir::ParseResult parseAllocMem(mlir::OpAsmParser &parser,
-                                       mlir::OperationState &result) {
-  return parseAllocatableOp(wrapAllocMemResultType, parser, result);
-}
-
-static void printAllocMem(mlir::OpAsmPrinter &p, fir::AllocMemOp &op) {
-  printAllocatableOp(p, op);
-}
-
 mlir::Type fir::AllocMemOp::getAllocatedType() {
   return getType().cast<HeapType>().getEleTy();
 }
@@ -249,34 +235,34 @@ mlir::Type fir::AllocMemOp::getRefTy(mlir::Type ty) {
 }
 
 void fir::AllocMemOp::build(mlir::OpBuilder &builder,
-                            mlir::OperationState &result, mlir::Type in_type,
-                            llvm::StringRef uniq_name,
+                            mlir::OperationState &result, mlir::Type inType,
+                            llvm::StringRef uniqName,
                             mlir::ValueRange typeparams, mlir::ValueRange shape,
                             llvm::ArrayRef<mlir::NamedAttribute> attributes) {
-  auto nameAttr = builder.getStringAttr(uniq_name);
-  build(builder, result, wrapAllocMemResultType(in_type), in_type, nameAttr, {},
+  auto nameAttr = builder.getStringAttr(uniqName);
+  build(builder, result, wrapAllocMemResultType(inType), inType, nameAttr, {},
         typeparams, shape);
   result.addAttributes(attributes);
 }
 
 void fir::AllocMemOp::build(mlir::OpBuilder &builder,
-                            mlir::OperationState &result, mlir::Type in_type,
-                            llvm::StringRef uniq_name,
-                            llvm::StringRef bindc_name,
+                            mlir::OperationState &result, mlir::Type inType,
+                            llvm::StringRef uniqName,
+                            llvm::StringRef bindcName,
                             mlir::ValueRange typeparams, mlir::ValueRange shape,
                             llvm::ArrayRef<mlir::NamedAttribute> attributes) {
-  auto nameAttr = builder.getStringAttr(uniq_name);
-  auto bindcAttr = builder.getStringAttr(bindc_name);
-  build(builder, result, wrapAllocMemResultType(in_type), in_type, nameAttr,
+  auto nameAttr = builder.getStringAttr(uniqName);
+  auto bindcAttr = builder.getStringAttr(bindcName);
+  build(builder, result, wrapAllocMemResultType(inType), inType, nameAttr,
         bindcAttr, typeparams, shape);
   result.addAttributes(attributes);
 }
 
 void fir::AllocMemOp::build(mlir::OpBuilder &builder,
-                            mlir::OperationState &result, mlir::Type in_type,
+                            mlir::OperationState &result, mlir::Type inType,
                             mlir::ValueRange typeparams, mlir::ValueRange shape,
                             llvm::ArrayRef<mlir::NamedAttribute> attributes) {
-  build(builder, result, wrapAllocMemResultType(in_type), in_type, {}, {},
+  build(builder, result, wrapAllocMemResultType(inType), inType, {}, {},
         typeparams, shape);
   result.addAttributes(attributes);
 }
