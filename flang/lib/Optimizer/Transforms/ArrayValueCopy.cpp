@@ -162,7 +162,7 @@ static void populateSets(llvm::SmallVectorImpl<mlir::Operation *> &reach,
     return;
   }
   // Otherwise, a block argument is provided via the pred blocks.
-  for (auto pred : ba.getOwner()->getPredecessors()) {
+  for (auto *pred : ba.getOwner()->getPredecessors()) {
     auto u = pred->getTerminator()->getOperand(ba.getArgNumber());
     populateSets(reach, visited, u);
   }

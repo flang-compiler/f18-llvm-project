@@ -293,10 +293,11 @@ mlir::Value fir::runtime::genNearest(fir::FirOpBuilder &builder,
       builder.create<mlir::CmpFOp>(loc, mlir::CmpFPredicate::OGT, s, zero);
 
   mlir::Type boolTy = mlir::IntegerType::get(builder.getContext(), 1);
-  mlir::Value False = builder.createIntegerConstant(loc, boolTy, 0);
-  mlir::Value True = builder.createIntegerConstant(loc, boolTy, 1);
+  mlir::Value falseCst = builder.createIntegerConstant(loc, boolTy, 0);
+  mlir::Value trueCst = builder.createIntegerConstant(loc, boolTy, 1);
 
-  mlir::Value positive = builder.create<mlir::SelectOp>(loc, cmp, True, False);
+  mlir::Value positive = 
+      builder.create<mlir::SelectOp>(loc, cmp, trueCst, falseCst);
   auto args = fir::runtime::createArguments(builder, loc, funcTy, x, positive);
 
   return builder.create<fir::CallOp>(loc, func, args).getResult(0);

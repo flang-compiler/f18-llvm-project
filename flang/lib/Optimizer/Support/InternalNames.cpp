@@ -21,7 +21,7 @@ static llvm::cl::opt<std::string> mainEntryName(
     llvm::cl::desc("override the name of the default PROGRAM entry (may be "
                    "helpful for using other runtimes)"));
 
-constexpr std::int64_t BAD_VALUE = -1;
+constexpr std::int64_t badValue = -1;
 
 inline std::string prefix() { return "_Q"; }
 
@@ -69,9 +69,9 @@ static std::int64_t readInt(llvm::StringRef uniq, std::size_t &i,
   for (i = init; i < end && uniq[i] >= '0' && uniq[i] <= '9'; ++i) {
     // do nothing
   }
-  std::int64_t result = BAD_VALUE;
+  std::int64_t result = badValue;
   if (uniq.substr(init, i - init).getAsInteger(10, result))
-    return BAD_VALUE;
+    return badValue;
   return result;
 }
 

@@ -44,7 +44,7 @@ using LLVMIRLoweringPrinter =
 std::unique_ptr<mlir::Pass> createLLVMDialectToLLVMPass(
     llvm::raw_ostream &output,
     LLVMIRLoweringPrinter printer =
-        [](llvm::Module &M, llvm::raw_ostream &out) { M.print(out, nullptr); });
+        [](llvm::Module &m, llvm::raw_ostream &out) { m.print(out, nullptr); });
 
 // declarative passes
 #define GEN_PASS_REGISTRATION

@@ -413,7 +413,7 @@ public:
   template <typename A, typename = std::enable_if_t<
                             !std::is_same_v<std::decay_t<A>, ExtendedValue>>>
   constexpr ExtendedValue(A &&a) : box{std::forward<A>(a)} {
-    if (auto b = getUnboxed()) {
+    if (const auto *b = getUnboxed()) {
       if (*b) {
         auto type = b->getType();
         if (type.template isa<fir::BoxCharType>())

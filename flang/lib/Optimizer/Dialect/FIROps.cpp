@@ -26,7 +26,7 @@
 
 namespace {
 #include "flang/Optimizer/Transforms/RewritePatterns.inc"
-}
+} // namespace
 using namespace fir;
 
 /// Return true if a sequence type is of some incomplete size or a record type
@@ -388,7 +388,7 @@ static mlir::LogicalResult verify(fir::ArrayMergeStoreOp op) {
   if (!isa<ArrayLoadOp>(op.original().getDefiningOp()))
     return op.emitOpError("operand #0 must be result of a fir.array_load op");
   if (auto sl = op.slice()) {
-    if (auto slOp = sl.getDefiningOp()) {
+    if (auto *slOp = sl.getDefiningOp()) {
       auto sliceOp = mlir::cast<fir::SliceOp>(slOp);
       if (!sliceOp.fields().empty()) {
         // This is an intra-object merge, where the slice is projecting the
@@ -469,7 +469,7 @@ static mlir::LogicalResult verify(fir::ArrayUpdateOp op) {
 //===----------------------------------------------------------------------===//
 
 mlir::OpFoldResult fir::BoxAddrOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
-  if (auto v = val().getDefiningOp()) {
+  if (auto *v = val().getDefiningOp()) {
     if (auto box = dyn_cast<fir::EmboxOp>(v))
       return box.memref();
     if (auto box = dyn_cast<fir::EmboxCharOp>(v))
@@ -484,7 +484,7 @@ mlir::OpFoldResult fir::BoxAddrOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
 
 mlir::OpFoldResult
 fir::BoxCharLenOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {
-  if (auto v = val().getDefiningOp()) {
+  if (auto *v = val().getDefiningOp()) {
     if (auto box = dyn_cast<fir::EmboxCharOp>(v))
       return box.len();
   }
@@ -957,7 +957,7 @@ mlir::ParseResult fir::GlobalOp::verifyValidLinkage(StringRef linkage) {
 template <bool AllowFields>
 static void appendAsAttribute(llvm::SmallVectorImpl<mlir::Attribute> &attrs,
                               mlir::Value val) {
-  if (auto op = val.getDefiningOp()) {
+  if (auto *op = val.getDefiningOp()) {
     if (auto cop = mlir::dyn_cast<mlir::ConstantOp>(op)) {
       // append the integer constant value
       if (auto iattr = cop.getValue().dyn_cast<mlir::IntegerAttr>()) {
@@ -1169,9 +1169,9 @@ static mlir::ParseResult parseIterWhileOp(mlir::OpAsmParser &parser,
     llvm::ArrayRef<mlir::Type> resTypes = regionTypes;
     resTypes = prependCount ? resTypes.drop_front(2) : resTypes;
     // Resolve input operands.
-    for (auto operand_type : llvm::zip(operands, resTypes))
-      if (parser.resolveOperand(std::get<0>(operand_type),
-                                std::get<1>(operand_type), result.operands))
+    for (auto operandType : llvm::zip(operands, resTypes))
+      if (parser.resolveOperand(std::get<0>(operandType),
+                                std::get<1>(operandType), result.operands))
         return failure();
     if (prependCount) {
       result.addTypes(regionTypes);
@@ -1308,7 +1308,7 @@ bool fir::IterWhileOp::isDefinedOutsideOfLoop(mlir::Value value) {
 
 mlir::LogicalResult
 fir::IterWhileOp::moveOutOfLoop(llvm::ArrayRef<mlir::Operation *> ops) {
-  for (auto op : ops)
+  for (auto *op : ops)
     op->moveBefore(*this);
   return success();
 }
@@ -1409,10 +1409,10 @@ static mlir::ParseResult parseDoLoopOp(mlir::OpAsmParser &parser,
       prependCount = true;
     // Resolve input operands.
     llvm::ArrayRef<mlir::Type> resTypes = result.types;
-    for (auto operand_type :
+    for (auto operandType :
          llvm::zip(operands, prependCount ? resTypes.drop_front() : resTypes))
-      if (parser.resolveOperand(std::get<0>(operand_type),
-                                std::get<1>(operand_type), result.operands))
+      if (parser.resolveOperand(std::get<0>(operandType),
+                                std::get<1>(operandType), result.operands))
         return failure();
   } else if (succeeded(parser.parseOptionalArrow())) {
     if (parser.parseKeyword("index"))
@@ -1532,7 +1532,7 @@ bool fir::DoLoopOp::isDefinedOutsideOfLoop(mlir::Value value) {
 
 mlir::LogicalResult
 fir::DoLoopOp::moveOutOfLoop(llvm::ArrayRef<mlir::Operation *> ops) {
-  for (auto op : ops)
+  for (auto *op : ops)
     op->moveBefore(*this);
   return success();
 }
@@ -1611,7 +1611,7 @@ static mlir::LogicalResult verify(fir::ReboxOp op) {
                               "when there is a slice");
       }
     }
-    if (auto sliceOp = slice.getDefiningOp()) {
+    if (auto *sliceOp = slice.getDefiningOp()) {
       auto slicedRank = mlir::cast<fir::SliceOp>(sliceOp).getOutRank();
       if (slicedRank != outRank)
         return op.emitOpError("result type rank and rank after applying slice "
@@ -1943,7 +1943,7 @@ void fir::SelectCaseOp::build(mlir::OpBuilder &builder,
   result.addAttribute(getCompareOffsetAttr(),
                       builder.getI32VectorAttr(operOffs));
   const auto count = destinations.size();
-  for (auto d : destinations)
+  for (auto *d : destinations)
     result.addSuccessors(d);
   const auto opCount = destOperands.size();
   llvm::SmallVector<int32_t> argOffs;
@@ -1977,7 +1977,7 @@ void fir::SelectCaseOp::build(mlir::OpBuilder &builder,
                               llvm::ArrayRef<mlir::ValueRange> destOperands,
                               llvm::ArrayRef<mlir::NamedAttribute> attributes) {
   llvm::SmallVector<mlir::ValueRange> cmpOpers;
-  auto iter = cmpOpList.begin();
+  const auto *iter = cmpOpList.begin();
   for (auto &attr : compareAttrs) {
     if (attr.isa<fir::ClosedIntervalAttr>()) {
       cmpOpers.push_back(mlir::ValueRange({iter, iter + 2}));
@@ -2118,7 +2118,7 @@ unsigned fir::SliceOp::getOutputRank(mlir::ValueRange triples) {
   unsigned rank = 0;
   if (!triples.empty()) {
     for (unsigned i = 1, end = triples.size(); i < end; i += 3) {
-      auto op = triples[i].getDefiningOp();
+      auto *op = triples[i].getDefiningOp();
       if (!mlir::isa_and_nonnull<fir::UndefOp>(op))
         ++rank;
     }
@@ -2152,13 +2152,13 @@ mkNamedIntegerAttr(mlir::OpBuilder &builder, llvm::StringRef name, int64_t v) {
 }
 
 void fir::StringLitOp::build(mlir::OpBuilder &builder, OperationState &result,
-                             fir::CharacterType in_type, llvm::StringRef val,
+                             fir::CharacterType inType, llvm::StringRef val,
                              llvm::Optional<int64_t> len) {
   auto valAttr = builder.getNamedAttr(value(), builder.getStringAttr(val));
-  int64_t length = len.hasValue() ? len.getValue() : in_type.getLen();
+  int64_t length = len.hasValue() ? len.getValue() : inType.getLen();
   auto lenAttr = mkNamedIntegerAttr(builder, size(), length);
   result.addAttributes({valAttr, lenAttr});
-  result.addTypes(in_type);
+  result.addTypes(inType);
 }
 
 template <typename C>
@@ -2172,39 +2172,39 @@ static mlir::ArrayAttr convertToArrayAttr(mlir::OpBuilder &builder,
 }
 
 void fir::StringLitOp::build(mlir::OpBuilder &builder, OperationState &result,
-                             fir::CharacterType in_type,
+                             fir::CharacterType inType,
                              llvm::ArrayRef<char> vlist,
                              llvm::Optional<int64_t> len) {
   auto valAttr =
       builder.getNamedAttr(xlist(), convertToArrayAttr(builder, vlist));
-  std::int64_t length = len.hasValue() ? len.getValue() : in_type.getLen();
+  std::int64_t length = len.hasValue() ? len.getValue() : inType.getLen();
   auto lenAttr = mkNamedIntegerAttr(builder, size(), length);
   result.addAttributes({valAttr, lenAttr});
-  result.addTypes(in_type);
+  result.addTypes(inType);
 }
 
 void fir::StringLitOp::build(mlir::OpBuilder &builder, OperationState &result,
-                             fir::CharacterType in_type,
+                             fir::CharacterType inType,
                              llvm::ArrayRef<char16_t> vlist,
                              llvm::Optional<int64_t> len) {
   auto valAttr =
       builder.getNamedAttr(xlist(), convertToArrayAttr(builder, vlist));
-  std::int64_t length = len.hasValue() ? len.getValue() : in_type.getLen();
+  std::int64_t length = len.hasValue() ? len.getValue() : inType.getLen();
   auto lenAttr = mkNamedIntegerAttr(builder, size(), length);
   result.addAttributes({valAttr, lenAttr});
-  result.addTypes(in_type);
+  result.addTypes(inType);
 }
 
 void fir::StringLitOp::build(mlir::OpBuilder &builder, OperationState &result,
-                             fir::CharacterType in_type,
+                             fir::CharacterType inType,
                              llvm::ArrayRef<char32_t> vlist,
                              llvm::Optional<int64_t> len) {
   auto valAttr =
       builder.getNamedAttr(xlist(), convertToArrayAttr(builder, vlist));
-  std::int64_t length = len.hasValue() ? len.getValue() : in_type.getLen();
+  std::int64_t length = len.hasValue() ? len.getValue() : inType.getLen();
   auto lenAttr = mkNamedIntegerAttr(builder, size(), length);
   result.addAttributes({valAttr, lenAttr});
-  result.addTypes(in_type);
+  result.addTypes(inType);
 }
 
 //===----------------------------------------------------------------------===//
@@ -2393,7 +2393,7 @@ bool fir::valueHasFirAttribute(mlir::Value value,
   // If this is a fir.box that was loaded, the fir attributes will be on the
   // related fir.ref<fir.box> creation.
   if (value.getType().isa<fir::BoxType>())
-    if (auto definingOp = value.getDefiningOp())
+    if (auto *definingOp = value.getDefiningOp())
       if (auto loadOp = mlir::dyn_cast<fir::LoadOp>(definingOp))
         value = loadOp.memref();
   // If this is a function argument, look in the argument attributes.
@@ -2405,7 +2405,7 @@ bool fir::valueHasFirAttribute(mlir::Value value,
           return true;
     return false;
   }
-  if (auto definingOp = value.getDefiningOp()) {
+  if (auto *definingOp = value.getDefiningOp()) {
     // If this is an allocated value, look at the allocation attributes.
     if (mlir::isa<fir::AllocMemOp, fir::AllocaOp, mlir::FuncOp>(definingOp))
       return definingOp->hasAttr(attributeName);
@@ -2438,7 +2438,7 @@ mlir::Type fir::applyPathToType(mlir::Type eleTy, mlir::ValueRange path) {
   for (auto i = path.begin(), end = path.end(); eleTy && i < end;) {
     eleTy = llvm::TypeSwitch<mlir::Type, mlir::Type>(eleTy)
                 .Case<fir::RecordType>([&](fir::RecordType ty) {
-                  if (auto op = (*i++).getDefiningOp()) {
+                  if (auto *op = (*i++).getDefiningOp()) {
                     if (auto off = mlir::dyn_cast<fir::FieldIndexOp>(op))
                       return ty.getType(off.getFieldName());
                     if (auto off = mlir::dyn_cast<mlir::ConstantOp>(op))
@@ -2455,7 +2455,7 @@ mlir::Type fir::applyPathToType(mlir::Type eleTy, mlir::ValueRange path) {
                   return valid ? ty.getEleTy() : mlir::Type{};
                 })
                 .Case<mlir::TupleType>([&](mlir::TupleType ty) {
-                  if (auto op = (*i++).getDefiningOp())
+                  if (auto *op = (*i++).getDefiningOp())
                     if (auto off = mlir::dyn_cast<mlir::ConstantOp>(op))
                       return ty.getType(fir::toInt(off));
                   return mlir::Type{};

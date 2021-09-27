@@ -45,8 +45,7 @@ static mlir::Type getResultArgumentType(mlir::Type resultType,
           [&](mlir::Type type) -> mlir::Type {
             if (options.boxResult)
               return fir::BoxType::get(type);
-            else
-              return fir::ReferenceType::get(type);
+            return fir::ReferenceType::get(type);
           })
       .Case<fir::BoxType>([](mlir::Type type) -> mlir::Type {
         return fir::ReferenceType::get(type);
@@ -162,12 +161,12 @@ public:
     rewriter.setInsertionPoint(ret);
     auto returnedValue = ret.getOperand(0);
     bool replacedStorage = false;
-    if (auto op = returnedValue.getDefiningOp())
+    if (auto *op = returnedValue.getDefiningOp())
       if (auto load = mlir::dyn_cast<fir::LoadOp>(op)) {
         auto resultStorage = load.memref();
         load.memref().replaceAllUsesWith(options.newArg);
         replacedStorage = true;
-        if (auto alloc = resultStorage.getDefiningOp())
+        if (auto *alloc = resultStorage.getDefiningOp())
           if (alloc->use_empty())
             rewriter.eraseOp(alloc);
       }

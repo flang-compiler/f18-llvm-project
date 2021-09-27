@@ -45,15 +45,15 @@ namespace fir {
 template <class NodeTy, bool IsPostDom>
 class IDFCalculator {
 public:
-  IDFCalculator(mlir::DominanceInfo &DT) : DT(DT), useLiveIn(false) {}
+  IDFCalculator(mlir::DominanceInfo &dt) : dt(dt), useLiveIn(false) {}
 
   /// Give the IDF calculator the set of blocks in which the value is
   /// defined.  This is equivalent to the set of starting blocks it should be
   /// calculating the IDF for (though later gets pruned based on liveness).
   ///
   /// Note: This set *must* live for the entire lifetime of the IDF calculator.
-  void setDefiningBlocks(const llvm::SmallPtrSetImpl<NodeTy *> &Blocks) {
-    DefBlocks = &Blocks;
+  void setDefiningBlocks(const llvm::SmallPtrSetImpl<NodeTy *> &blocks) {
+    defBlocks = &blocks;
   }
 
   /// Give the IDF calculator the set of blocks in which the value is
@@ -61,15 +61,15 @@ public:
   /// not include blocks where any phi insertion would be dead.
   ///
   /// Note: This set *must* live for the entire lifetime of the IDF calculator.
-  void setLiveInBlocks(const llvm::SmallPtrSetImpl<NodeTy *> &Blocks) {
-    LiveInBlocks = &Blocks;
+  void setLiveInBlocks(const llvm::SmallPtrSetImpl<NodeTy *> &blocks) {
+    liveInBlocks = &blocks;
     useLiveIn = true;
   }
 
   /// Reset the live-in block set to be empty, and tell the IDF
   /// calculator to not use liveness anymore.
   void resetLiveInBlocks() {
-    LiveInBlocks = nullptr;
+    liveInBlocks = nullptr;
     useLiveIn = false;
   }
 
@@ -79,13 +79,13 @@ public:
   /// the file-level comment.  It performs DF->IDF pruning using the live-in
   /// set, to avoid computing the IDF for blocks where an inserted PHI node
   /// would be dead.
-  void calculate(llvm::SmallVectorImpl<NodeTy *> &IDFBlocks);
+  void calculate(llvm::SmallVectorImpl<NodeTy *> &idfBlocks);
 
 private:
-  mlir::DominanceInfo &DT;
+  mlir::DominanceInfo &dt;
   bool useLiveIn;
-  const llvm::SmallPtrSetImpl<NodeTy *> *LiveInBlocks;
-  const llvm::SmallPtrSetImpl<NodeTy *> *DefBlocks;
+  const llvm::SmallPtrSetImpl<NodeTy *> *liveInBlocks;
+  const llvm::SmallPtrSetImpl<NodeTy *> *defBlocks;
 };
 
 typedef IDFCalculator<mlir::Block, false> ForwardIDFCalculator;

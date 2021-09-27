@@ -23,7 +23,7 @@ namespace fir {
 
 template <class NodeTy, bool IsPostDom>
 void IDFCalculator<NodeTy, IsPostDom>::calculate(
-    llvm::SmallVectorImpl<NodeTy *> &PHIBlocks) {
+    llvm::SmallVectorImpl<NodeTy *> &phiBlocks) {
   // Use a priority queue keyed on dominator tree level so that inserted nodes
   // are handled from the bottom of the dominator tree upwards. We also augment
   // the level with a DFS number to ensure that the blocks are ordered in a
@@ -35,68 +35,68 @@ void IDFCalculator<NodeTy, IsPostDom>::calculate(
       std::priority_queue<DomTreeNodePair,
                           llvm::SmallVector<DomTreeNodePair, 32>,
                           llvm::less_second>;
-  IDFPriorityQueue PQ;
+  IDFPriorityQueue pq;
 
-  if (DefBlocks->empty())
+  if (defBlocks->empty())
     return;
 
-  DT.updateDFSNumbers();
+  dt.updateDFSNumbers();
 
-  for (NodeTy *BB : *DefBlocks) {
-    if (DomTreeNode *Node = DT.getNode(BB))
-      PQ.push({Node, std::make_pair(Node->getLevel(), Node->getDFSNumIn())});
+  for (NodeTy *bb : *defBlocks) {
+    if (DomTreeNode *node = dt.getNode(bb))
+      pq.push({node, std::make_pair(node->getLevel(), node->getDFSNumIn())});
   }
 
-  llvm::SmallVector<DomTreeNode *, 32> Worklist;
-  llvm::SmallPtrSet<DomTreeNode *, 32> VisitedPQ;
-  llvm::SmallPtrSet<DomTreeNode *, 32> VisitedWorklist;
+  llvm::SmallVector<DomTreeNode *, 32> worklist;
+  llvm::SmallPtrSet<DomTreeNode *, 32> visitedpq;
+  llvm::SmallPtrSet<DomTreeNode *, 32> visitedWorklist;
 
-  while (!PQ.empty()) {
-    DomTreeNodePair RootPair = PQ.top();
-    PQ.pop();
-    DomTreeNode *Root = RootPair.first;
-    unsigned RootLevel = RootPair.second.first;
+  while (!pq.empty()) {
+    DomTreeNodePair rootPair = pq.top();
+    pq.pop();
+    DomTreeNode *root = rootPair.first;
+    unsigned rootLevel = rootPair.second.first;
 
     // Walk all dominator tree children of Root, inspecting their CFG edges with
     // targets elsewhere on the dominator tree. Only targets whose level is at
     // most Root's level are added to the iterated dominance frontier of the
     // definition set.
 
-    Worklist.clear();
-    Worklist.push_back(Root);
-    VisitedWorklist.insert(Root);
+    worklist.clear();
+    worklist.push_back(root);
+    visitedWorklist.insert(root);
 
-    while (!Worklist.empty()) {
-      DomTreeNode *Node = Worklist.pop_back_val();
-      NodeTy *BB = Node->getBlock();
+    while (!worklist.empty()) {
+      DomTreeNode *node = worklist.pop_back_val();
+      NodeTy *bb = node->getBlock();
       // Succ is the successor in the direction we are calculating IDF, so it is
       // successor for IDF, and predecessor for Reverse IDF.
-      auto DoWork = [&](NodeTy *Succ) {
-        DomTreeNode *SuccNode = DT.getNode(Succ);
+      auto doWork = [&](NodeTy *succ) {
+        DomTreeNode *succNode = dt.getNode(succ);
 
-        const unsigned SuccLevel = SuccNode->getLevel();
-        if (SuccLevel > RootLevel)
+        const unsigned succLevel = succNode->getLevel();
+        if (succLevel > rootLevel)
           return;
 
-        if (!VisitedPQ.insert(SuccNode).second)
+        if (!visitedpq.insert(succNode).second)
           return;
 
-        NodeTy *SuccBB = SuccNode->getBlock();
-        if (useLiveIn && !LiveInBlocks->count(SuccBB))
+        NodeTy *succBB = succNode->getBlock();
+        if (useLiveIn && !liveInBlocks->count(succBB))
           return;
 
-        PHIBlocks.emplace_back(SuccBB);
-        if (!DefBlocks->count(SuccBB))
-          PQ.push(std::make_pair(
-              SuccNode, std::make_pair(SuccLevel, SuccNode->getDFSNumIn())));
+        phiBlocks.emplace_back(succBB);
+        if (!defBlocks->count(succBB))
+          pq.push(std::make_pair(
+              succNode, std::make_pair(succLevel, succNode->getDFSNumIn())));
       };
 
-      for (auto *Succ : BB->getSuccessors())
-        DoWork(Succ);
+      for (auto *succ : bb->getSuccessors())
+        doWork(succ);
 
-      for (auto DomChild : *Node) {
-        if (VisitedWorklist.insert(DomChild).second)
-          Worklist.push_back(DomChild);
+      for (auto domChild : *node) {
+        if (visitedWorklist.insert(domChild).second)
+          worklist.push_back(domChild);
       }
     }
   }

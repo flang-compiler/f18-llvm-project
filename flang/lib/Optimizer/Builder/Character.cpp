@@ -70,7 +70,7 @@ LLVM_ATTRIBUTE_UNUSED static bool needToMaterialize(mlir::Value str) {
 
 /// Unwrap integer constant from mlir::Value.
 static llvm::Optional<std::int64_t> getIntIfConstant(mlir::Value value) {
-  if (auto definingOp = value.getDefiningOp())
+  if (auto *definingOp = value.getDefiningOp())
     if (auto cst = mlir::dyn_cast<mlir::ConstantOp>(definingOp))
       if (auto intAttr = cst.getValue().dyn_cast<mlir::IntegerAttr>())
         return intAttr.getInt();
@@ -135,7 +135,7 @@ fir::factory::CharacterExprHelper::toExtendedValue(mlir::Value character,
     // If the embox is accessible, use its operand to avoid filling
     // the generated fir with embox/unbox.
     mlir::Value boxCharLen;
-    if (auto definingOp = character.getDefiningOp()) {
+    if (auto *definingOp = character.getDefiningOp()) {
       if (auto box = dyn_cast<fir::EmboxCharOp>(definingOp)) {
         base = box.memref();
         boxCharLen = box.len();

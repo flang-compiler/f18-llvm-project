@@ -69,32 +69,32 @@ struct AllocaInfo {
 
   /// Scan the uses of the specified alloca, filling in the AllocaInfo used
   /// by the rest of the pass to reason about the uses of this alloca.
-  void analyzeAlloca(ALLOCA &AI) {
+  void analyzeAlloca(ALLOCA &ai) {
     clear();
 
     // As we scan the uses of the alloca instruction, keep track of stores,
     // and decide whether all of the loads and stores to the alloca are within
     // the same basic block.
-    for (auto UI = AI.getResult().use_begin(), E = AI.getResult().use_end();
-         UI != E;) {
-      auto *User = UI->getOwner();
-      UI++;
+    for (auto ui = ai.getResult().use_begin(), e = ai.getResult().use_end();
+         ui != e;) {
+      auto *user = ui->getOwner();
+      ui++;
 
-      if (auto SI = mlir::dyn_cast<STORE>(User)) {
+      if (auto si = mlir::dyn_cast<STORE>(user)) {
         // Remember the basic blocks which define new values for the alloca
-        definingBlocks.push_back(SI.getOperation()->getBlock());
-        onlyStore = SI.getOperation();
+        definingBlocks.push_back(si.getOperation()->getBlock());
+        onlyStore = si.getOperation();
       } else {
-        auto LI = mlir::cast<LOAD>(User);
+        auto li = mlir::cast<LOAD>(user);
         // Otherwise it must be a load instruction, keep track of variable
         // reads.
-        usingBlocks.push_back(LI.getOperation()->getBlock());
+        usingBlocks.push_back(li.getOperation()->getBlock());
       }
 
       if (onlyUsedInOneBlock) {
         if (!onlyBlock)
-          onlyBlock = User->getBlock();
-        else if (onlyBlock != User->getBlock())
+          onlyBlock = user->getBlock();
+        else if (onlyBlock != user->getBlock())
           onlyUsedInOneBlock = false;
       }
     }
@@ -105,16 +105,16 @@ struct RenamePassData {
   using ValVector = std::vector<mlir::Value>;
 
   RenamePassData(mlir::Block *b, mlir::Block *p, const ValVector &v)
-      : BB(b), Pred(p), Values(v) {}
+      : bb(b), pred(p), values(v) {}
   RenamePassData(RenamePassData &&) = default;
   RenamePassData &operator=(RenamePassData &&) = delete;
   RenamePassData(const RenamePassData &) = delete;
   RenamePassData &operator=(const RenamePassData &) = delete;
   ~RenamePassData() = default;
 
-  mlir::Block *BB;
-  mlir::Block *Pred;
-  ValVector Values;
+  mlir::Block *bb;
+  mlir::Block *pred;
+  ValVector values;
 };
 
 template <typename LOAD, typename STORE, typename ALLOCA>
@@ -122,12 +122,12 @@ struct LargeBlockInfo {
   using INMap = llvm::DenseMap<mlir::Operation *, unsigned>;
   INMap instNumbers;
 
-  static bool isInterestingInstruction(mlir::Operation &I) {
-    if (mlir::isa<LOAD>(I)) {
-      if (auto op = I.getOperand(0).getDefiningOp())
+  static bool isInterestingInstruction(mlir::Operation &i) {
+    if (mlir::isa<LOAD>(i)) {
+      if (auto *op = i.getOperand(0).getDefiningOp())
         return mlir::isa<ALLOCA>(op);
-    } else if (mlir::isa<STORE>(I)) {
-      if (auto op = I.getOperand(1).getDefiningOp())
+    } else if (mlir::isa<STORE>(i)) {
+      if (auto *op = i.getOperand(1).getDefiningOp())
         return mlir::isa<ALLOCA>(op);
     }
     return false;
@@ -174,60 +174,60 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
 
   /// Contains a stable numbering of basic blocks to avoid non-determinstic
   /// behavior.
-  llvm::DenseMap<mlir::Block *, unsigned> BBNumbers;
+  llvm::DenseMap<mlir::Block *, unsigned> bbNumbers;
   llvm::DenseMap<mlir::Block *, unsigned> bbInitialArgs;
 
   /// Reverse mapping of Allocas.
   llvm::DenseMap<mlir::Operation *, unsigned> allocaLookup;
 
   /// The set of basic blocks the renamer has already visited.
-  llvm::SmallPtrSet<mlir::Block *, 16> Visited;
+  llvm::SmallPtrSet<mlir::Block *, 16> visited;
 
   llvm::DenseMap<std::pair<mlir::Block *, mlir::Operation *>, unsigned>
-      BlockArgs;
+      blockArgs;
   llvm::DenseMap<std::pair<mlir::Block *, unsigned>, unsigned> argToAllocaMap;
 
-  bool rewriteSingleStoreAlloca(ALLOCA &AI,
-                                AllocaInfo<LOAD, STORE, ALLOCA> &Info,
-                                LargeBlockInfo<LOAD, STORE, ALLOCA> &LBI) {
-    STORE onlyStore(mlir::cast<STORE>(Info.onlyStore));
-    mlir::Block *StoreBB = Info.onlyStore->getBlock();
-    int StoreIndex = -1;
+  bool rewriteSingleStoreAlloca(ALLOCA &ai,
+                                AllocaInfo<LOAD, STORE, ALLOCA> &info,
+                                LargeBlockInfo<LOAD, STORE, ALLOCA> &lbi) {
+    STORE onlyStore(mlir::cast<STORE>(info.onlyStore));
+    mlir::Block *storeBB = info.onlyStore->getBlock();
+    int storeIndex = -1;
 
     // Clear out usingBlocks.  We will reconstruct it here if needed.
-    Info.usingBlocks.clear();
+    info.usingBlocks.clear();
 
-    for (auto UI = AI.getResult().use_begin(), E = AI.getResult().use_end();
-         UI != E;) {
-      auto *UserInst = UI->getOwner();
-      UI++;
+    for (auto ui = ai.getResult().use_begin(), e = ai.getResult().use_end();
+         ui != e;) {
+      auto *userInst = ui->getOwner();
+      ui++;
 
-      if (mlir::dyn_cast<STORE>(UserInst))
+      if (mlir::dyn_cast<STORE>(userInst))
         continue;
 
-      auto LI = mlir::cast<LOAD>(UserInst);
+      auto li = mlir::cast<LOAD>(userInst);
 
       // Okay, if we have a load from the alloca, we want to replace it with the
       // only value stored to the alloca.  We can do this if the value is
       // dominated by the store.  If not, we use the rest of the MemToReg
       // machinery to insert the phi nodes as needed.
-      if (LI.getOperation()->getBlock() == StoreBB) {
+      if (li.getOperation()->getBlock() == storeBB) {
         // If we have a use that is in the same block as the store, compare
         // the indices of the two instructions to see which one came first. If
         // the load came before the store, we can't handle it.
-        if (StoreIndex == -1)
-          StoreIndex = LBI.getInstructionIndex(onlyStore);
+        if (storeIndex == -1)
+          storeIndex = lbi.getInstructionIndex(onlyStore);
 
-        if (unsigned(StoreIndex) > LBI.getInstructionIndex(LI)) {
+        if (unsigned(storeIndex) > lbi.getInstructionIndex(li)) {
           // Can't handle this load, bail out.
-          Info.usingBlocks.push_back(StoreBB);
+          info.usingBlocks.push_back(storeBB);
           continue;
         }
-      } else if (!domTree->dominates(StoreBB, LI.getOperation()->getBlock())) {
+      } else if (!domTree->dominates(storeBB, li.getOperation()->getBlock())) {
         // If the load and store are in different blocks, use BB dominance to
         // check their relationships.  If the store doesn't dom the use, bail
         // out.
-        Info.usingBlocks.push_back(LI.getOperation()->getBlock());
+        info.usingBlocks.push_back(li.getOperation()->getBlock());
         continue;
       }
 
@@ -235,38 +235,38 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
       mlir::Value replVal = onlyStore.getOperand(0);
       // If the replacement value is the load, this must occur in unreachable
       // code.
-      if (replVal == LI.getResult())
-        replVal = builder->create<UNDEF>(LI.getLoc(), LI.getType());
+      if (replVal == li.getResult())
+        replVal = builder->create<UNDEF>(li.getLoc(), li.getType());
 
-      LI.replaceAllUsesWith(replVal);
-      LI.erase();
-      LBI.deleteValue(LI);
+      li.replaceAllUsesWith(replVal);
+      li.erase();
+      lbi.deleteValue(li);
     }
 
     // Finally, after the scan, check to see if the store is all that is left.
-    if (!Info.usingBlocks.empty())
+    if (!info.usingBlocks.empty())
       return false; // If not, we'll have to fall back for the remainder.
 
     // Remove the (now dead) store and alloca.
-    Info.onlyStore->erase();
+    info.onlyStore->erase();
 
-    AI.erase();
+    ai.erase();
     return true;
   }
 
-  bool promoteSingleBlockAlloca(ALLOCA &AI,
-                                AllocaInfo<LOAD, STORE, ALLOCA> &Info,
-                                LargeBlockInfo<LOAD, STORE, ALLOCA> &LBI) {
+  bool promoteSingleBlockAlloca(ALLOCA &ai,
+                                AllocaInfo<LOAD, STORE, ALLOCA> &info,
+                                LargeBlockInfo<LOAD, STORE, ALLOCA> &lbi) {
     // Walk the use-def list of the alloca, getting the locations of all stores.
     using StoresByIndexTy =
         llvm::SmallVector<std::pair<unsigned, mlir::Operation *>, 64>;
     StoresByIndexTy storesByIndex;
 
-    for (auto U = AI.getResult().use_begin(), E = AI.getResult().use_end();
-         U != E; U++)
-      if (STORE SI = mlir::dyn_cast<STORE>(U->getOwner()))
-        storesByIndex.emplace_back(LBI.getInstructionIndex(SI),
-                                   SI.getOperation());
+    for (auto u = ai.getResult().use_begin(), e = ai.getResult().use_end();
+         u != e; u++)
+      if (STORE si = mlir::dyn_cast<STORE>(u->getOwner()))
+        storesByIndex.emplace_back(lbi.getInstructionIndex(si),
+                                   si.getOperation());
 
     // Sort the stores by their index, making it efficient to do a lookup with a
     // binary search.
@@ -274,25 +274,25 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
 
     // Walk all of the loads from this alloca, replacing them with the nearest
     // store above them, if any.
-    for (auto UI = AI.getResult().use_begin(), E = AI.getResult().use_end();
-         UI != E;) {
-      auto LI = mlir::dyn_cast<LOAD>(UI->getOwner());
-      UI++;
-      if (!LI)
+    for (auto ui = ai.getResult().use_begin(), e = ai.getResult().use_end();
+         ui != e;) {
+      auto li = mlir::dyn_cast<LOAD>(ui->getOwner());
+      ui++;
+      if (!li)
         continue;
 
-      unsigned LoadIdx{LBI.getInstructionIndex(LI)};
+      unsigned loadIdx{lbi.getInstructionIndex(li)};
 
       // Find the nearest store that has a lower index than this load.
-      typename StoresByIndexTy::iterator I = llvm::lower_bound(
+      typename StoresByIndexTy::iterator i = llvm::lower_bound(
           storesByIndex,
-          std::make_pair(LoadIdx, static_cast<mlir::Operation *>(nullptr)),
+          std::make_pair(loadIdx, static_cast<mlir::Operation *>(nullptr)),
           llvm::less_first());
-      if (I == storesByIndex.begin()) {
+      if (i == storesByIndex.begin()) {
         if (storesByIndex.empty()) {
           // If there are no stores, the load takes the undef value.
-          auto undef = builder->create<UNDEF>(LI.getLoc(), LI.getType());
-          LI.replaceAllUsesWith(undef.getResult());
+          auto undef = builder->create<UNDEF>(li.getLoc(), li.getType());
+          li.replaceAllUsesWith(undef.getResult());
         } else {
           // There is no store before this load, bail out (load may be affected
           // by the following stores - see main comment).
@@ -302,112 +302,112 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
         // Otherwise, there was a store before this load, the load takes its
         // value. Note, if the load was marked as nonnull we don't want to lose
         // that information when we erase it. So we preserve it with an assume.
-        mlir::Value replVal = std::prev(I)->second->getOperand(0);
+        mlir::Value replVal = std::prev(i)->second->getOperand(0);
 
         // If the replacement value is the load, this must occur in unreachable
         // code.
-        if (replVal == LI)
-          replVal = builder->create<UNDEF>(LI.getLoc(), LI.getType());
+        if (replVal == li)
+          replVal = builder->create<UNDEF>(li.getLoc(), li.getType());
 
-        LI.replaceAllUsesWith(replVal);
+        li.replaceAllUsesWith(replVal);
       }
 
-      LI.erase();
-      LBI.deleteValue(LI);
+      li.erase();
+      lbi.deleteValue(li);
     }
 
     // Remove the (now dead) stores and alloca.
-    while (!AI.use_empty()) {
-      auto ae = AI.getResult();
-      for (auto ai = ae.user_begin(), E = ae.user_end(); ai != E; ai++)
+    while (!ai.use_empty()) {
+      auto ae = ai.getResult();
+      for (auto ai = ae.user_begin(), e = ae.user_end(); ai != e; ai++)
         if (STORE si = mlir::dyn_cast<STORE>(*ai)) {
           si.erase();
-          LBI.deleteValue(si);
+          lbi.deleteValue(si);
         }
     }
 
-    AI.erase();
+    ai.erase();
     return true;
   }
 
   void
-  computeLiveInBlocks(ALLOCA &ae, AllocaInfo<LOAD, STORE, ALLOCA> &Info,
-                      const llvm::SmallPtrSetImpl<mlir::Block *> &DefBlocks,
+  computeLiveInBlocks(ALLOCA &ae, AllocaInfo<LOAD, STORE, ALLOCA> &info,
+                      const llvm::SmallPtrSetImpl<mlir::Block *> &defBlocks,
                       llvm::SmallPtrSetImpl<mlir::Block *> &liveInBlks) {
-    auto *AI = ae.getOperation();
+    auto *ai = ae.getOperation();
     // To determine liveness, we must iterate through the predecessors of blocks
     // where the def is live.  Blocks are added to the worklist if we need to
     // check their predecessors.  Start with all the using blocks.
-    llvm::SmallVector<mlir::Block *, 64> LiveInBlockWorklist(
-        Info.usingBlocks.begin(), Info.usingBlocks.end());
+    llvm::SmallVector<mlir::Block *, 64> liveInBlockWorklist(
+        info.usingBlocks.begin(), info.usingBlocks.end());
 
     // If any of the using blocks is also a definition block, check to see if
     // the definition occurs before or after the use.  If it happens before the
     // use, the value isn't really live-in.
-    for (std::size_t i = 0, e{LiveInBlockWorklist.size()}; i != e; ++i) {
-      mlir::Block *BB = LiveInBlockWorklist[i];
-      if (!DefBlocks.count(BB))
+    for (std::size_t i = 0, e{liveInBlockWorklist.size()}; i != e; ++i) {
+      mlir::Block *bb = liveInBlockWorklist[i];
+      if (!defBlocks.count(bb))
         continue;
 
       // Okay, this is a block that both uses and defines the value.  If the
       // first reference to the alloca is a def (store), then we know it isn't
       // live-in.
-      for (mlir::Block::iterator I = BB->begin();; ++I) {
-        if (STORE SI = mlir::dyn_cast<STORE>(I)) {
-          if (SI.getOperand(1).getDefiningOp() != AI)
+      for (mlir::Block::iterator it = bb->begin();; ++i) {
+        if (STORE si = mlir::dyn_cast<STORE>(it)) {
+          if (si.getOperand(1).getDefiningOp() != ai)
             continue;
 
           // We found a store to the alloca before a load.  The alloca is not
           // actually live-in here.
-          LiveInBlockWorklist[i] = LiveInBlockWorklist.back();
-          LiveInBlockWorklist.pop_back();
+          liveInBlockWorklist[i] = liveInBlockWorklist.back();
+          liveInBlockWorklist.pop_back();
           --i;
           --e;
           break;
         }
 
-        if (auto LI = mlir::dyn_cast<LOAD>(I))
+        if (auto li = mlir::dyn_cast<LOAD>(it))
           // Okay, we found a load before a store to the alloca.  It is actually
           // live into this block.
-          if (LI.getOperand().getDefiningOp() == AI)
+          if (li.getOperand().getDefiningOp() == ai)
             break;
       }
     }
 
     // Now that we have a set of blocks where the phi is live-in, recursively
     // add their predecessors until we find the full region the value is live.
-    while (!LiveInBlockWorklist.empty()) {
-      mlir::Block *BB = LiveInBlockWorklist.pop_back_val();
+    while (!liveInBlockWorklist.empty()) {
+      mlir::Block *bb = liveInBlockWorklist.pop_back_val();
 
       // The block really is live in here, insert it into the set.  If already
       // in the set, then it has already been processed.
-      if (!liveInBlks.insert(BB).second)
+      if (!liveInBlks.insert(bb).second)
         continue;
 
       // Since the value is live into BB, it is either defined in a predecessor
       // or live into it to.  Add the preds to the worklist unless they are a
       // defining block.
-      for (mlir::Block *P : BB->getPredecessors()) {
+      for (mlir::Block *p : bb->getPredecessors()) {
         // The value is not live into a predecessor if it defines the value.
-        if (DefBlocks.count(P))
+        if (defBlocks.count(p))
           continue;
 
         // Otherwise it is, add to the worklist.
-        LiveInBlockWorklist.push_back(P);
+        liveInBlockWorklist.push_back(p);
       }
     }
   }
 
-  bool addBlockArgument(mlir::Block *BB, ALLOCA &Alloca, unsigned allocaNum) {
-    auto *ae = Alloca.getOperation();
-    auto key = std::make_pair(BB, ae);
-    auto argNoIter = BlockArgs.find(key);
-    if (argNoIter != BlockArgs.end())
+  bool addBlockArgument(mlir::Block *bb, ALLOCA &alloca, unsigned allocaNum) {
+    auto *ae = alloca.getOperation();
+    auto key = std::make_pair(bb, ae);
+    auto argNoIter = blockArgs.find(key);
+    if (argNoIter != blockArgs.end())
       return false;
-    auto argNo = BB->getNumArguments();
-    BB->addArgument(Alloca.getAllocatedType());
-    BlockArgs[key] = argNo;
-    argToAllocaMap[std::make_pair(BB, argNo)] = allocaNum;
+    auto argNo = bb->getNumArguments();
+    bb->addArgument(alloca.getAllocatedType());
+    blockArgs[key] = argNo;
+    argToAllocaMap[std::make_pair(bb, argNo)] = allocaNum;
     return true;
   }
 
@@ -512,40 +512,40 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
   ///
   /// IncomingVals indicates what value each Alloca contains on exit from the
   /// predecessor block Pred.
-  void renamePass(mlir::Block *BB, mlir::Block *Pred,
-                  RenamePassData::ValVector &IncomingVals,
-                  std::vector<RenamePassData> &Worklist) {
-  NextIteration:
+  void renamePass(mlir::Block *bb, mlir::Block *pred,
+                  RenamePassData::ValVector &incomingVals,
+                  std::vector<RenamePassData> &worklist) {
+  nextIteration:
     // Does this block take arguments?
-    const auto aiEnd = BB->getNumArguments();
-    if ((!BB->hasNoPredecessors()) && (aiEnd > bbInitialArgs[BB])) {
+    const auto aiEnd = bb->getNumArguments();
+    if ((!bb->hasNoPredecessors()) && (aiEnd > bbInitialArgs[bb])) {
       // add the values from block `Pred` to the argument list in the proper
       // positions
       for (std::remove_const_t<decltype(aiEnd)> ai = 0; ai != aiEnd; ++ai) {
-        auto iter = argToAllocaMap.find(std::make_pair(BB, ai));
+        auto iter = argToAllocaMap.find(std::make_pair(bb, ai));
         if (iter == argToAllocaMap.end())
           continue;
         auto allocaNo = iter->second;
-        auto offset = bbInitialArgs[BB];
-        setParam(Pred, ai + offset, IncomingVals[allocaNo], BB, aiEnd + offset);
+        auto offset = bbInitialArgs[bb];
+        setParam(pred, ai + offset, incomingVals[allocaNo], bb, aiEnd + offset);
         // use the block argument, not the live def in the pred block
-        addValue(IncomingVals, allocaNo, BB->getArgument(ai + offset));
+        addValue(incomingVals, allocaNo, bb->getArgument(ai + offset));
       }
     }
 
     // Don't revisit blocks.
-    if (!Visited.insert(BB).second)
+    if (!visited.insert(bb).second)
       return;
 
-    mlir::Block::iterator II = BB->begin();
+    mlir::Block::iterator ii = bb->begin();
     while (true) {
-      if (II == BB->end())
+      if (ii == bb->end())
         break;
-      mlir::Operation &opn = *II;
-      II++;
+      mlir::Operation &opn = *ii;
+      ii++;
 
-      if (auto LI = mlir::dyn_cast<LOAD>(opn)) {
-        auto *srcOpn = LI.getOperand().getDefiningOp();
+      if (auto li = mlir::dyn_cast<LOAD>(opn)) {
+        auto *srcOpn = li.getOperand().getDefiningOp();
         if (!srcOpn)
           continue;
 
@@ -558,10 +558,10 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
           continue;
 
         // Anything using the load now uses the current value.
-        LI.replaceAllUsesWith(IncomingVals[ai->second]);
-        LI.erase();
-      } else if (auto SI = mlir::dyn_cast<STORE>(opn)) {
-        auto *dstOpn = SI.getOperand(1).getDefiningOp();
+        li.replaceAllUsesWith(incomingVals[ai->second]);
+        li.erase();
+      } else if (auto si = mlir::dyn_cast<STORE>(opn)) {
+        auto *dstOpn = si.getOperand(1).getDefiningOp();
         if (!dstOpn)
           continue;
 
@@ -576,51 +576,51 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
         // Delete this instruction and mark the name as the current holder of
         // the value
         unsigned allocaNo = ai->second;
-        addValue(IncomingVals, allocaNo, SI.getOperand(0));
-        SI.erase();
+        addValue(incomingVals, allocaNo, si.getOperand(0));
+        si.erase();
       }
     }
 
     // 'Recurse' to our successors.
-    auto I = BB->succ_begin();
-    auto E = BB->succ_end();
-    if (I == E)
+    auto i = bb->succ_begin();
+    auto e = bb->succ_end();
+    if (i == e)
       return;
 
     // Keep track of the successors so we don't visit the same successor twice
-    llvm::SmallPtrSet<mlir::Block *, 8> VisitedSuccs;
+    llvm::SmallPtrSet<mlir::Block *, 8> visitedSuccs;
 
     // Handle the first successor without using the worklist.
-    VisitedSuccs.insert(*I);
-    Pred = BB;
-    BB = *I;
-    ++I;
+    visitedSuccs.insert(*i);
+    pred = bb;
+    bb = *i;
+    ++i;
 
-    for (; I != E; ++I)
-      if (VisitedSuccs.insert(*I).second)
-        Worklist.emplace_back(*I, Pred, IncomingVals);
-    goto NextIteration;
+    for (; i != e; ++i)
+      if (visitedSuccs.insert(*i).second)
+        worklist.emplace_back(*i, pred, incomingVals);
+    goto nextIteration;
   }
 
   void doPromotion() {
-    auto F = this->getFunction();
+    auto f = this->getFunction();
     std::vector<ALLOCA> aes;
     AllocaInfo<LOAD, STORE, ALLOCA> info;
     LargeBlockInfo<LOAD, STORE, ALLOCA> lbi;
-    ForwardIDFCalculator IDF(*domTree);
+    ForwardIDFCalculator idf(*domTree);
 
     assert(!allocas.empty());
 
-    for (std::size_t allocaNum = 0, End{allocas.size()}; allocaNum != End;
+    for (std::size_t allocaNum = 0, end{allocas.size()}; allocaNum != end;
          ++allocaNum) {
       auto ae = allocas[allocaNum];
-      assert(ae->template getParentOfType<mlir::FuncOp>() == F);
+      assert(ae->template getParentOfType<mlir::FuncOp>() == f);
       if (ae.use_empty()) {
         ae.erase();
         continue;
       }
       info.analyzeAlloca(ae);
-      builder->setInsertionPointToStart(&F.front());
+      builder->setInsertionPointToStart(&f.front());
       if (info.definingBlocks.size() == 1)
         if (rewriteSingleStoreAlloca(ae, info, lbi))
           continue;
@@ -630,11 +630,11 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
 
       // If we haven't computed a numbering for the BB's in the function, do
       // so now.
-      if (BBNumbers.empty()) {
+      if (bbNumbers.empty()) {
         unsigned id = 0;
-        for (auto &BB : F) {
-          BBNumbers[&BB] = id++;
-          bbInitialArgs[&BB] = BB.getNumArguments();
+        for (auto &bb : f) {
+          bbNumbers[&bb] = id++;
+          bbInitialArgs[&bb] = bb.getNumArguments();
         }
       }
 
@@ -659,16 +659,16 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
       // and the standard SSA construction algorithm.  Determine which blocks
       // need phi nodes and see if we can optimize out some work by avoiding
       // insertion of dead phi nodes.
-      IDF.setLiveInBlocks(liveInBlks);
-      IDF.setDefiningBlocks(defBlocks);
+      idf.setLiveInBlocks(liveInBlks);
+      idf.setDefiningBlocks(defBlocks);
       llvm::SmallVector<mlir::Block *, 32> phiBlocks;
-      IDF.calculate(phiBlocks);
-      llvm::sort(phiBlocks, [this](mlir::Block *A, mlir::Block *B) {
-        return BBNumbers.find(A)->second < BBNumbers.find(B)->second;
+      idf.calculate(phiBlocks);
+      llvm::sort(phiBlocks, [this](mlir::Block *a, mlir::Block *b) {
+        return bbNumbers.find(a)->second < bbNumbers.find(b)->second;
       });
 
-      for (mlir::Block *BB : phiBlocks)
-        addBlockArgument(BB, ae, allocaNum);
+      for (mlir::Block *bb : phiBlocks)
+        addBlockArgument(bb, ae, allocaNum);
 
       aes.push_back(ae);
     }
@@ -690,25 +690,25 @@ struct MemToReg : public mlir::PassWrapper<MemToReg<LOAD, STORE, ALLOCA, UNDEF>,
     // Walks all basic blocks in the function performing the SSA rename
     // algorithm and inserting the phi nodes we marked as necessary
     std::vector<RenamePassData> renameWorklist;
-    renameWorklist.emplace_back(&F.front(), nullptr, values);
+    renameWorklist.emplace_back(&f.front(), nullptr, values);
     do {
       RenamePassData rpd(std::move(renameWorklist.back()));
       renameWorklist.pop_back();
       // renamePass may add new worklist entries.
-      renamePass(rpd.BB, rpd.Pred, rpd.Values, renameWorklist);
+      renamePass(rpd.bb, rpd.pred, rpd.values, renameWorklist);
     } while (!renameWorklist.empty());
 
     // The renamer uses the Visited set to avoid infinite loops.  Clear it
     // now.
-    Visited.clear();
+    visited.clear();
 
     // Remove the allocas themselves from the function.
     for (auto aa : allocas) {
-      mlir::Operation *A = aa.getOperation();
+      mlir::Operation *a = aa.getOperation();
       // If there are any uses of the alloca instructions left, they must be
       // in unreachable basic blocks that were not processed by walking the
       // dominator tree. Just delete the users now.
-      if (!A->use_empty()) {
+      if (!a->use_empty()) {
         auto undef = builder->create<UNDEF>(aa.getLoc(), aa.getType());
         aa.replaceAllUsesWith(undef.getResult());
       }

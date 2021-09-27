@@ -92,23 +92,21 @@ mlir::Value
 fir::FirOpBuilder::createRealConstant(mlir::Location loc, mlir::Type fltTy,
                                       llvm::APFloat::integerPart val) {
   auto apf = [&]() -> llvm::APFloat {
-    if (auto ty = fltTy.dyn_cast<fir::RealType>()) {
+    if (auto ty = fltTy.dyn_cast<fir::RealType>())
       return llvm::APFloat(kindMap.getFloatSemantics(ty.getFKind()), val);
-    } else {
-      if (fltTy.isF16())
-        return llvm::APFloat(llvm::APFloat::IEEEhalf(), val);
-      if (fltTy.isBF16())
-        return llvm::APFloat(llvm::APFloat::BFloat(), val);
-      if (fltTy.isF32())
-        return llvm::APFloat(llvm::APFloat::IEEEsingle(), val);
-      if (fltTy.isF64())
-        return llvm::APFloat(llvm::APFloat::IEEEdouble(), val);
-      if (fltTy.isF80())
-        return llvm::APFloat(llvm::APFloat::x87DoubleExtended(), val);
-      if (fltTy.isF128())
-        return llvm::APFloat(llvm::APFloat::IEEEquad(), val);
-      llvm_unreachable("unhandled MLIR floating-point type");
-    }
+    if (fltTy.isF16())
+      return llvm::APFloat(llvm::APFloat::IEEEhalf(), val);
+    if (fltTy.isBF16())
+      return llvm::APFloat(llvm::APFloat::BFloat(), val);
+    if (fltTy.isF32())
+      return llvm::APFloat(llvm::APFloat::IEEEsingle(), val);
+    if (fltTy.isF64())
+      return llvm::APFloat(llvm::APFloat::IEEEdouble(), val);
+    if (fltTy.isF80())
+      return llvm::APFloat(llvm::APFloat::x87DoubleExtended(), val);
+    if (fltTy.isF128())
+      return llvm::APFloat(llvm::APFloat::IEEEquad(), val);
+    llvm_unreachable("unhandled MLIR floating-point type");
   };
   return createRealConstant(loc, fltTy, apf());
 }

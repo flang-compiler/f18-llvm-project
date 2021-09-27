@@ -99,7 +99,7 @@ public:
     CharacterConversionOptions clOpts{useRuntimeCalls.getValue()};
     if (clOpts.runtimeName.empty()) {
       auto *context = &getContext();
-      auto func = getOperation();
+      auto *func = getOperation();
       mlir::OwningRewritePatternList patterns(context);
       patterns.insert<CharacterConvertConversion>(context);
       mlir::ConversionTarget target(*context);

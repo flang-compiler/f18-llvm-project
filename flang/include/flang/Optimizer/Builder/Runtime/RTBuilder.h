@@ -34,7 +34,7 @@ struct c_double_complex_t;
 
 namespace Fortran::runtime {
 class Descriptor;
-}
+} // namespace Fortran::runtime
 
 namespace fir::runtime {
 

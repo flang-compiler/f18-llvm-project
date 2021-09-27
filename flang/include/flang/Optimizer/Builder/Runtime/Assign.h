@@ -16,7 +16,7 @@ class Location;
 
 namespace fir {
 class FirOpBuilder;
-}
+} // namespace fir
 
 namespace fir::runtime {
 
