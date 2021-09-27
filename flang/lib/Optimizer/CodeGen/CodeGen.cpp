@@ -3021,12 +3021,12 @@ struct DivcOpConversion : public FIROpConversion<fir::DivcOp> {
     auto x1 = rewriter.create<mlir::LLVM::ExtractValueOp>(loc, eleTy, b, c0);
     auto y1 = rewriter.create<mlir::LLVM::ExtractValueOp>(loc, eleTy, b, c1);
     auto xx = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, x0, x1);
-    auto xX = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, x1, x1);
+    auto x1x1 = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, x1, x1);
     auto yx = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, y0, x1);
     auto xy = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, x0, y1);
     auto yy = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, y0, y1);
-    auto yY = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, y1, y1);
-    auto d = rewriter.create<mlir::LLVM::FAddOp>(loc, eleTy, xX, yY);
+    auto y1y1 = rewriter.create<mlir::LLVM::FMulOp>(loc, eleTy, y1, y1);
+    auto d = rewriter.create<mlir::LLVM::FAddOp>(loc, eleTy, x1x1, y1y1);
     auto rrn = rewriter.create<mlir::LLVM::FAddOp>(loc, eleTy, xx, yy);
     auto rin = rewriter.create<mlir::LLVM::FSubOp>(loc, eleTy, yx, xy);
     auto rr = rewriter.create<mlir::LLVM::FDivOp>(loc, eleTy, rrn, d);
