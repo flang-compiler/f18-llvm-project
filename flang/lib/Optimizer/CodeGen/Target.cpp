@@ -115,7 +115,7 @@ struct TargetI386 : public GenericTarget<TargetI386> {
 //===----------------------------------------------------------------------===//
 
 namespace {
-struct TargetX8664 : public GenericTarget<TargetX8664> {
+struct TargetX86_64 : public GenericTarget<TargetX86_64> {
   using GenericTarget::GenericTarget;
 
   static constexpr int defaultWidth = 64;
@@ -255,8 +255,8 @@ fir::CodeGenSpecifics::get(mlir::MLIRContext *ctx, llvm::Triple &&trp,
       break;
     case llvm::Triple::OSType::Linux:
     case llvm::Triple::OSType::Darwin:
-      return std::make_unique<TargetX8664>(ctx, std::move(trp),
-                                           std::move(kindMap));
+      return std::make_unique<TargetX86_64>(ctx, std::move(trp),
+                                            std::move(kindMap));
     }
     break;
   case llvm::Triple::ArchType::aarch64:
