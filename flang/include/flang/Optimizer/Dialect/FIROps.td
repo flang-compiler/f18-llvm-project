@@ -743,34 +743,7 @@ def fir_SelectTypeOp : fir_SwitchTerminatorOp<"select_type"> {
     "llvm::ArrayRef<mlir::Attribute>":$typeOperands,
     "llvm::ArrayRef<mlir::Block *>":$destinations,
     CArg<"llvm::ArrayRef<mlir::ValueRange>", "{}">:$destOperands,
-    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes),
-    [{
-      $_state.addOperands(selector);
-      $_state.addAttribute(getCasesAttr(),
-        $_builder.getArrayAttr(typeOperands));
-      const auto count = destinations.size();
-      for (auto d : destinations)
-        $_state.addSuccessors(d);
-      const auto opCount = destOperands.size();
-      llvm::SmallVector<int32_t> argOffs;
-      int32_t sumArgs = 0;
-      for (std::remove_const_t<decltype(count)> i = 0; i != count; ++i) {
-        if (i < opCount) {
-          $_state.addOperands(destOperands[i]);
-          const auto argSz = destOperands[i].size();
-          argOffs.push_back(argSz);
-          sumArgs += argSz;
-        } else {
-          argOffs.push_back(0);
-        }
-      }
-      $_state.addAttribute(getOperandSegmentSizeAttr(),
-        $_builder.getI32VectorAttr({1, 0, sumArgs}));
-      $_state.addAttribute(getTargetOffsetAttr(),
-        $_builder.getI32VectorAttr(argOffs));
-      $_state.addAttributes(attributes);
-    }]
-  >];
+    CArg<"llvm::ArrayRef<mlir::NamedAttribute>", "{}">:$attributes)>];
 
   let parser = "return parseSelectType(parser, result);";
 
@@ -1695,14 +1668,7 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
   let printer = "::print(p, *this);";
 
   let builders = [OpBuilder<(ins "llvm::StringRef":$fieldName,
-      "mlir::Type":$recTy, CArg<"mlir::ValueRange","{}">:$operands),
-    [{
-      $_state.addAttribute(fieldAttrName(),
-        $_builder.getStringAttr(fieldName));
-      $_state.addAttribute(typeAttrName(), TypeAttr::get(recTy));
-      $_state.addOperands(operands);
-    }]
-  >];
+      "mlir::Type":$recTy, CArg<"mlir::ValueRange","{}">:$operands)>];
 
   let extraClassDeclaration = [{
     static constexpr llvm::StringRef fieldAttrName() { return "field_id"; }
@@ -2285,21 +2251,10 @@ def fir_CallOp : fir_Op<"call", [CallOpInterface]> {
 
   let builders = [
     OpBuilder<(ins "mlir::FuncOp":$callee,
-        CArg<"mlir::ValueRange", "{}">:$operands),
-    [{
-      $_state.addOperands(operands);
-      $_state.addAttribute(calleeAttrName(),
-        $_builder.getSymbolRefAttr(callee));
-      $_state.addTypes(callee.getType().getResults());
-    }]>,
+        CArg<"mlir::ValueRange", "{}">:$operands)>,
     OpBuilder<(ins "mlir::SymbolRefAttr":$callee,
         "llvm::ArrayRef<mlir::Type>":$results,
-        CArg<"mlir::ValueRange", "{}">:$operands),
-    [{
-      $_state.addOperands(operands);
-      $_state.addAttribute(calleeAttrName(), callee);
-      $_state.addTypes(results);
-    }]>,
+        CArg<"mlir::ValueRange", "{}">:$operands)>,
     OpBuilder<(ins "llvm::StringRef":$callee,
         "llvm::ArrayRef<mlir::Type>":$results,
         CArg<"mlir::ValueRange", "{}">:$operands),
