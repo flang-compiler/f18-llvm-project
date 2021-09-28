@@ -271,25 +271,6 @@ static fir::ExtendedValue arrayLoadExtValue(fir::FirOpBuilder &builder,
             "properties are explicit, assumed, deferred, or ?");
 }
 
-/// Convert the result of a fir.array_modify to an ExtendedValue given the
-/// related fir.array_load.
-static fir::ExtendedValue arrayModifyToExv(fir::FirOpBuilder &builder,
-                                           mlir::Location loc,
-                                           fir::ArrayLoadOp load,
-                                           mlir::Value elementAddr) {
-  auto eleTy = fir::unwrapPassByRefType(elementAddr.getType());
-  if (fir::isa_char(eleTy)) {
-    auto len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
-        load.memref());
-    if (!len) {
-      assert(load.typeparams().size() == 1 && "length must be in array_load");
-      len = load.typeparams()[0];
-    }
-    return fir::CharBoxValue{elementAddr, len};
-  }
-  return elementAddr;
-}
-
 /// Is this a call to an elemental procedure with at least one array argument ?
 static bool
 isElementalProcWithArrayArgs(const Fortran::evaluate::ProcedureRef &procRef) {
@@ -2488,6 +2469,25 @@ static void genScalarUserDefinedAssignmentCall(fir::FirOpBuilder &builder,
   builder.create<fir::CallOp>(loc, func, mlir::ValueRange{lhsArg, rhsArg});
 }
 
+/// Convert the result of a fir.array_modify to an ExtendedValue given the
+/// related fir.array_load.
+static fir::ExtendedValue arrayModifyToExv(fir::FirOpBuilder &builder,
+                                           mlir::Location loc,
+                                           fir::ArrayLoadOp load,
+                                           mlir::Value elementAddr) {
+  auto eleTy = fir::unwrapPassByRefType(elementAddr.getType());
+  if (fir::isa_char(eleTy)) {
+    auto len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+        load.memref());
+    if (!len) {
+      assert(load.typeparams().size() == 1 && "length must be in array_load");
+      len = load.typeparams()[0];
+    }
+    return fir::CharBoxValue{elementAddr, len};
+  }
+  return elementAddr;
+}
+
 //===----------------------------------------------------------------------===//
 //
 // Lowering of scalar expressions in an explicit iteration space context.
@@ -2540,7 +2540,8 @@ public:
     // 3) Finalize the inner context.
     expSpace.finalizeContext();
     // 4) Thread the array value updated forward. Note: the lhs might be
-    // ill-formed, in which case there is no array to thread.
+    // ill-formed (performing scalar assignment in an array context),
+    // in which case there is no array to thread.
     if (auto updateOp = mlir::dyn_cast<fir::ArrayUpdateOp>(
             fir::getBase(lexv).getDefiningOp())) {
       auto oldInnerArg = updateOp.sequence();
@@ -2554,6 +2555,45 @@ public:
       expSpace.setInnerArg(offset, fir::getBase(lexv));
       builder.create<fir::ResultOp>(getLoc(), fir::getBase(lexv));
     }
+    return lexv;
+  }
+
+  ExtValue userAssign(mlir::FuncOp userAssignment,
+                      const Fortran::lower::SomeExpr &lhs,
+                      const Fortran::lower::SomeExpr &rhs) {
+    auto loc = getLoc();
+    semant = ConstituentSemantics::RefTransparent;
+    // 1) Lower the rhs expression with array_fetch op(s).
+    auto rexv = lower(rhs);
+    // 2) Lower the lhs expression to an array_modify.
+    semant = ConstituentSemantics::CustomCopyInCopyOut;
+    auto lexv = lower(lhs);
+    bool isIllFormedLHS = false;
+    // 3) Insert the call
+    if (auto modifyOp = mlir::dyn_cast<fir::ArrayModifyOp>(
+            fir::getBase(lexv).getDefiningOp())) {
+      auto oldInnerArg = modifyOp.sequence();
+      auto offset = expSpace.argPosition(oldInnerArg);
+      expSpace.setInnerArg(offset, fir::getBase(lexv));
+      auto exv =
+          arrayModifyToExv(builder, loc, expSpace.getLhsLoad(0).getValue(),
+                           modifyOp.getResult(0));
+      genScalarUserDefinedAssignmentCall(builder, loc, userAssignment, exv,
+                                         rexv);
+    } else {
+      // LHS is ill formed, it is a scalar with no references to FORALL
+      // subscripts, so there is actually no array assignment here. The user
+      // code is probably bad, but still insert user assignment call since it
+      // was not rejected by semantics (a warning was emitted).
+      isIllFormedLHS = true;
+      genScalarUserDefinedAssignmentCall(builder, getLoc(), userAssignment,
+                                         lexv, rexv);
+    }
+    // 4) Finalize the inner context.
+    expSpace.finalizeContext();
+    // 5). Thread the array value updated forward.
+    if (!isIllFormedLHS)
+      builder.create<fir::ResultOp>(getLoc(), fir::getBase(lexv));
     return lexv;
   }
 
@@ -2605,9 +2645,9 @@ private:
   ExtValue applyPathToArrayLoad(fir::ArrayLoadOp load) {
     auto loc = getLoc();
     ExtValue result;
+    auto path = lowerPath(load.getType());
     if (semant == ConstituentSemantics::ProjectedCopyInCopyOut) {
       auto innerArg = expSpace.findArgumentOfLoad(load);
-      auto path = lowerPath(load.getType());
       auto eleTy = fir::applyPathToType(innerArg.getType(), path);
       auto toTy = adjustedArrayElementType(eleTy);
       auto castedElement = builder.createConvert(loc, toTy, elementalValue);
@@ -2618,8 +2658,22 @@ private:
       update->setAttr(fir::factory::attrFortranArrayOffsets(),
                       builder.getUnitAttr());
       result = arrayLoadExtValue(builder, loc, load, {}, update);
+    } else if (semant == ConstituentSemantics::CustomCopyInCopyOut) {
+      // Create an array_modify to get the LHS element address and indicate
+      // the assignment, and create the call to the user defined assignment.
+      auto innerArg = expSpace.findArgumentOfLoad(load);
+      auto eleTy = fir::applyPathToType(innerArg.getType(), path);
+      auto refEleTy =
+          fir::isa_ref_type(eleTy) ? eleTy : builder.getRefType(eleTy);
+      auto arrModify = builder.create<fir::ArrayModifyOp>(
+          loc, mlir::TypeRange{refEleTy, innerArg.getType()}, innerArg, path,
+          load.typeparams());
+      // Flag the offsets as "Fortran" as they are not zero-origin.
+      arrModify->setAttr(fir::factory::attrFortranArrayOffsets(),
+                         builder.getUnitAttr());
+      result =
+          arrayLoadExtValue(builder, loc, load, {}, arrModify.getResult(1));
     } else {
-      auto path = lowerPath(load.getType());
       auto eleTy = fir::applyPathToType(load.getType(), path);
       assert(eleTy && "path did not apply to type");
       auto resTy = adjustedArrayElementType(eleTy);
@@ -3715,13 +3769,16 @@ public:
     builder.restoreInsertionPoint(insPt);
   }
 
-  static void lowerElementalUserAssignment(
-      Fortran::lower::AbstractConverter &converter,
-      Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
-      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &call) {
+  static void
+  lowerElementalUserAssignment(Fortran::lower::AbstractConverter &converter,
+                               Fortran::lower::SymMap &symMap,
+                               Fortran::lower::StatementContext &stmtCtx,
+                               Fortran::lower::ExplicitIterSpace &explicitSpace,
+                               Fortran::lower::ImplicitIterSpace &implicitSpace,
+                               const Fortran::evaluate::ProcedureRef &procRef) {
     ArrayExprLowering ael(converter, stmtCtx, symMap,
-                          ConstituentSemantics::CustomCopyInCopyOut);
-    auto procRef = std::get<Fortran::evaluate::ProcedureRef>(call.u);
+                          ConstituentSemantics::CustomCopyInCopyOut,
+                          &explicitSpace, &implicitSpace);
     assert(procRef.arguments().size() == 2);
     const auto *lhs = procRef.arguments()[0].value().UnwrapExpr();
     const auto *rhs = procRef.arguments()[1].value().UnwrapExpr();
@@ -3752,9 +3809,12 @@ public:
     determineShapeOfDest(lhs);
     semant = ConstituentSemantics::RefTransparent;
     auto exv = lowerArrayExpression(rhs);
-    builder.create<fir::ArrayMergeStoreOp>(
-        loc, destination, fir::getBase(exv), destination.memref(),
-        destination.slice(), destination.typeparams());
+    if (explicitSpaceIsActive())
+      builder.create<fir::ResultOp>(loc, fir::getBase(exv));
+    else
+      builder.create<fir::ArrayMergeStoreOp>(
+          loc, destination, fir::getBase(exv), destination.memref(),
+          destination.slice(), destination.typeparams());
   }
 
   /// Compute the shape of a slice.
@@ -5914,6 +5974,25 @@ public:
         return arrayLoadExtValue(builder, loc, load, {}, update);
       };
     }
+    if (semant == ConstituentSemantics::CustomCopyInCopyOut) {
+      // Create an array_modify to get the LHS element address and indicate
+      // the assignment, and create the call to the user defined assignment.
+      destination = load;
+      auto innerArg = explicitSpace->findArgumentOfLoad(load);
+      return [=](IterSpace iters) mutable {
+        auto [path, eleTy] = lowerPath(loc, revPath, load.getType(), iters);
+        auto refEleTy =
+            fir::isa_ref_type(eleTy) ? eleTy : builder.getRefType(eleTy);
+        auto arrModify = builder.create<fir::ArrayModifyOp>(
+            loc, mlir::TypeRange{refEleTy, innerArg.getType()}, innerArg, path,
+            load.typeparams());
+        // Flag the offsets as "Fortran" as they are not zero-origin.
+        arrModify->setAttr(fir::factory::attrFortranArrayOffsets(),
+                           builder.getUnitAttr());
+        return arrayLoadExtValue(builder, loc, load, {},
+                                 arrModify.getResult(1));
+      };
+    }
     return [=](IterSpace iters) mutable {
       auto [path, eleTy] = lowerPath(loc, revPath, load.getType(), iters);
       auto resTy = adjustedArrayElementType(eleTy);
@@ -6232,26 +6311,61 @@ fir::MutableBoxValue Fortran::lower::createMutableBox(
 }
 
 mlir::Value Fortran::lower::createSubroutineCall(
-    AbstractConverter &converter,
-    const evaluate::Expr<evaluate::SomeType> &call, SymMap &symMap,
-    StatementContext &stmtCtx, bool isUserDefAssignment) {
+    AbstractConverter &converter, const evaluate::ProcedureRef &call,
+    ExplicitIterSpace &explicitIterSpace, ImplicitIterSpace &implicitIterSpace,
+    SymMap &symMap, StatementContext &stmtCtx, bool isUserDefAssignment) {
   auto loc = converter.getCurrentLocation();
-  if (isElementalProcWithArrayArgs(call)) {
-    // Elemental user defined assignment has special requirements to deal with
-    // LHS/RHS overlaps. See 10.2.1.5 p2.
-    if (isUserDefAssignment)
-      ArrayExprLowering::lowerElementalUserAssignment(converter, symMap,
-                                                      stmtCtx, call);
-    else
-      ArrayExprLowering::lowerArrayElementalSubroutine(converter, symMap,
-                                                       stmtCtx, call);
-    return mlir::Value{};
+
+  if (isUserDefAssignment) {
+    assert(call.arguments().size() == 2);
+    const auto *lhs = call.arguments()[0].value().UnwrapExpr();
+    const auto *rhs = call.arguments()[1].value().UnwrapExpr();
+    assert(lhs && rhs &&
+           "user defined assignment arguments must be expressions");
+    if (call.IsElemental() && lhs->Rank() > 0) {
+      // Elemental user defined assignment has special requirements to deal with
+      // LHS/RHS overlaps. See 10.2.1.5 p2.
+      ArrayExprLowering::lowerElementalUserAssignment(
+          converter, symMap, stmtCtx, explicitIterSpace, implicitIterSpace,
+          call);
+    } else if (explicitIterSpace.isActive() && lhs->Rank() == 0) {
+      // Scalar defined assignment (elemental or not) in a FORALL context.
+      auto func = Fortran::lower::CallerInterface(call, converter).getFuncOp();
+      ScalarArrayExprLowering sael(converter, symMap, explicitIterSpace,
+                                   stmtCtx);
+      sael.userAssign(func, *lhs, *rhs);
+    } else if (explicitIterSpace.isActive()) {
+      // TODO: need to array fetch/modify sub-arrays ?
+      TODO(loc, "non elemental user defined array assignment inside FORALL");
+    } else {
+      if (!implicitIterSpace.empty())
+        fir::emitFatalError(
+            loc,
+            "C1032: user defined assignment inside WHERE must be elemental");
+      // Non elemental user defined assignment outside of FORALL and WHERE.
+      // FIXME: The non elemental user defined assignment case with array
+      // arguments must be take into account potential overlap. So far the front
+      // end does not add parentheses around the RHS argument in the call as it
+      // should according to 15.4.3.4.3 p2.
+      Fortran::semantics::SomeExpr expr{call};
+      Fortran::lower::createSomeExtendedExpression(loc, converter, expr, symMap,
+                                                   stmtCtx);
+    }
+    return {};
   }
-  // FIXME: The non elemental user defined assignment case with array arguments
-  // must be take into account potential overlap. So far the front end does not
-  // add parentheses around the RHS argument in the call as it should according
-  // to 15.4.3.4.3 p2.
-  auto res = Fortran::lower::createSomeExtendedExpression(loc, converter, call,
+
+  assert(implicitIterSpace.empty() && !explicitIterSpace.isActive() &&
+         "subroutine calls are not allowed inside WHERE and FORALL");
+
+  if (isElementalProcWithArrayArgs(call)) {
+    Fortran::semantics::SomeExpr expr{call};
+    ArrayExprLowering::lowerArrayElementalSubroutine(converter, symMap, stmtCtx,
+                                                     expr);
+    return {};
+  }
+  // Simple subroutine call, with potential alternate return.
+  Fortran::semantics::SomeExpr expr{call};
+  auto res = Fortran::lower::createSomeExtendedExpression(loc, converter, expr,
                                                           symMap, stmtCtx);
   return fir::getBase(res);
 }
