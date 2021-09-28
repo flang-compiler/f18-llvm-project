@@ -661,9 +661,9 @@ private:
     setCurrentPosition(stmt.v.source);
     assert(stmt.typedCall && "Call was not analyzed");
     // Call statement lowering shares code with function call lowering.
-    Fortran::semantics::SomeExpr expr{*stmt.typedCall};
     auto res = Fortran::lower::createSubroutineCall(
-        *this, expr, localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
+        *this, *stmt.typedCall, explicitIterSpace, implicitIterSpace,
+        localSymbols, stmtCtx, /*isUserDefAssignment=*/false);
     if (!res)
       return; // "Normal" subroutine call.
     // Call with alternate return specifiers.
@@ -1941,18 +1941,12 @@ private:
             // [2] User defined assignment. If the context is a scalar
             // expression then call the procedure.
             [&](const Fortran::evaluate::ProcedureRef &procRef) {
-              if (implicitIterationSpace())
-                TODO(loc, "user defined assignment within WHERE");
-
-              Fortran::semantics::SomeExpr expr{procRef};
               auto &ctx = explicitIterationSpace()
                               ? explicitIterSpace.stmtContext()
                               : stmtCtx;
               Fortran::lower::createSubroutineCall(
-                  *this, expr, localSymbols, ctx, /*isUserDefAssignment=*/true);
-              if (explicitIterationSpace())
-                builder->create<fir::ResultOp>(
-                    loc, explicitIterSpace.getInnerArgs());
+                  *this, procRef, explicitIterSpace, implicitIterSpace,
+                  localSymbols, ctx, /*isUserDefAssignment=*/true);
             },
 
             // [3] Pointer assignment with possibly empty bounds-spec. R1035: a
@@ -2595,8 +2589,24 @@ private:
     explicitIterSpace.exprBase(&e, LHS);
   }
   void analyzeExplicitSpace(const Fortran::evaluate::Assignment *assign) {
-    analyzeExplicitSpace</*LHS=*/true>(assign->lhs);
-    analyzeExplicitSpace(assign->rhs);
+    auto analyzeAssign = [&](const Fortran::lower::SomeExpr &lhs,
+                             const Fortran::lower::SomeExpr &rhs) {
+      analyzeExplicitSpace</*LHS=*/true>(lhs);
+      analyzeExplicitSpace(rhs);
+    };
+    std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::evaluate::ProcedureRef &procRef) {
+              // Ensure the procRef expressions are the one being visited.
+              assert(procRef.arguments().size() == 2);
+              const auto *lhs = procRef.arguments()[0].value().UnwrapExpr();
+              const auto *rhs = procRef.arguments()[1].value().UnwrapExpr();
+              assert(lhs && rhs &&
+                     "user defined assignment arguments must be expressions");
+              analyzeAssign(*lhs, *rhs);
+            },
+            [&](const auto &) { analyzeAssign(assign->lhs, assign->rhs); }},
+        assign->u);
     explicitIterSpace.endAssign();
   }
   void analyzeExplicitSpace(const Fortran::parser::ForallAssignmentStmt &stmt) {

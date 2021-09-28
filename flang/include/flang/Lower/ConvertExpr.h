@@ -205,7 +205,9 @@ createSomeArrayBox(AbstractConverter &converter,
 /// returns, the returned value indicates which label the code should jump to.
 /// The returned value is null otherwise.
 mlir::Value createSubroutineCall(AbstractConverter &converter,
-                                 const evaluate::Expr<evaluate::SomeType> &call,
+                                 const evaluate::ProcedureRef &call,
+                                 ExplicitIterSpace &explicitIterSpace,
+                                 ImplicitIterSpace &implicitIterSpace,
                                  SymMap &symMap, StatementContext &stmtCtx,
                                  bool isUserDefAssignment);
 
