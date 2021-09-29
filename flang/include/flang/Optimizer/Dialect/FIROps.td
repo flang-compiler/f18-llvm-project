@@ -2367,16 +2367,16 @@ def fir_StringLitOp : fir_Op<"string_lit", [NoSideEffect]> {
   let printer = "::print(p, *this);";
 
   let builders = [
-    OpBuilder<(ins "fir::CharacterType":$in_type,
+    OpBuilder<(ins "fir::CharacterType":$inType,
       "llvm::StringRef":$value,
       CArg<"llvm::Optional<int64_t>", "{}">:$len)>,
-    OpBuilder<(ins "fir::CharacterType":$in_type,
+    OpBuilder<(ins "fir::CharacterType":$inType,
       "llvm::ArrayRef<char>":$xlist,
       CArg<"llvm::Optional<int64_t>", "{}">:$len)>,
-    OpBuilder<(ins "fir::CharacterType":$in_type,
+    OpBuilder<(ins "fir::CharacterType":$inType,
       "llvm::ArrayRef<char16_t>":$xlist,
       CArg<"llvm::Optional<int64_t>", "{}">:$len)>,
-    OpBuilder<(ins "fir::CharacterType":$in_type,
+    OpBuilder<(ins "fir::CharacterType":$inType,
       "llvm::ArrayRef<char32_t>":$xlist,
       CArg<"llvm::Optional<int64_t>", "{}">:$len)>];
 
