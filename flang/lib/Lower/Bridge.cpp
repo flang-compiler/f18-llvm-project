@@ -394,6 +394,8 @@ public:
       Fortran::lower::StatementContext stmtCtx;
       createSomeArrayAssignment(*this, exv, hexv, localSymbols, stmtCtx);
       stmtCtx.finalize();
+    } else if (hexv.getBoxOf<fir::CharBoxValue>()) {
+      fir::factory::CharacterExprHelper{*builder, loc}.createAssign(exv, hexv);
     } else if (hsb.toExtendedValue().getBoxOf<fir::MutableBoxValue>()) {
       TODO(loc, "firstprivatisation of allocatable variables");
     } else {
