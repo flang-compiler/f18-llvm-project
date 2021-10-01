@@ -401,7 +401,7 @@ func @bad_save_result(%buffer : !fir.ref<!fir.box<!fir.array<*:f32>>>) {
 
 func @bad_save_result(%buffer : !fir.ref<f64>) {
   %res = fir.call @array_func() : () -> f64
-  // expected-error@+1 {{'fir.save_result' op value operand must be a fir.box, fir.array or fir.type}}
+  // expected-error@+1 {{'fir.save_result' op operand #0 must be fir.box, fir.array or fir.type, but got 'f64'}}
   fir.save_result %res to %buffer : f64, !fir.ref<f64>
   return
 }

@@ -362,7 +362,7 @@ def fir_SaveResultOp : fir_Op<"save_result", [AttrSizedOperandSegments]> {
 
   }];
 
-  let arguments = (ins AnyType:$value,
+  let arguments = (ins ArrayOrBoxOrRecord:$value,
                    Arg<AnyReferenceLike, "", [MemWrite]>:$memref,
                    Optional<AnyShapeType>:$shape,
                    Variadic<AnyIntegerType>:$typeparams);

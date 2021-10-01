@@ -2195,10 +2195,6 @@ static mlir::LogicalResult verify(fir::SaveResultOp op) {
   if (fir::isa_unknown_size_box(resultType))
     return op.emitOpError("cannot save !fir.box of unknown rank or type");
 
-  if (!resultType.isa<fir::BoxType, fir::SequenceType, fir::RecordType>())
-    return op.emitOpError(
-        "value operand must be a fir.box, fir.array or fir.type");
-
   if (resultType.isa<fir::BoxType>()) {
     if (op.shape() || !op.typeparams().empty())
       return op.emitOpError(
