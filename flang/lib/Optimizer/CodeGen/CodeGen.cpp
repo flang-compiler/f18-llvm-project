@@ -988,7 +988,7 @@ struct EmboxCommonConversion : public FIROpConversion<OP> {
     // The parent Op if it is an LLVM Function Op.
     // The ancestor OpenMP Op which is outlineable.
     // The ancestor LLVM Function Op.
-    if (isa<mlir::LLVM::LLVMFuncOp>(op)) {
+    if (mlir::isa<mlir::LLVM::LLVMFuncOp>(op)) {
       auto func = mlir::cast<mlir::LLVM::LLVMFuncOp>(op);
       rewriter.setInsertionPointToStart(&func.front());
     } else if (auto iface =
