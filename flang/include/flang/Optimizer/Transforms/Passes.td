@@ -37,7 +37,7 @@ def AffineDialectPromotion : FunctionPass<"promote-to-affine"> {
   }];
   let constructor = "::fir::createPromoteToAffinePass()";
   let dependentDialects = [
-    "fir::FIROpsDialect", "mlir::StandardOpsDialect", "mlir::AffineDialect"    
+    "fir::FIROpsDialect", "mlir::StandardOpsDialect", "mlir::AffineDialect"
   ];
 }
 
