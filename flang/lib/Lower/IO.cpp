@@ -657,9 +657,14 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     auto ifOp = dyn_cast<fir::IfOp>(op);
     auto *lastOp = &ifOp.thenRegion().front().back();
     builder.setInsertionPointAfter(lastOp);
-    builder.create<fir::ResultOp>(loc, lastOp->getResult(0)); // runtime result
+    // The primary ifOp result is the result of an IO call or loop.
+    if (mlir::isa<fir::CallOp,fir::IfOp>(*lastOp))
+      builder.create<fir::ResultOp>(loc, lastOp->getResult(0));
+    else
+      builder.create<fir::ResultOp>(loc, ok); // loop result
+    // The else branch propagates an early exit false result.
     builder.setInsertionPointToStart(&ifOp.elseRegion().front());
-    builder.create<fir::ResultOp>(loc, falseValue); // known false result
+    builder.create<fir::ResultOp>(loc, falseValue);
   }
   builder.setInsertionPointToEnd(iterWhileOp.getBody());
   auto iterateResult = builder.getBlock()->back().getResult(0);

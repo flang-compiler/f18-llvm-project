@@ -106,6 +106,29 @@ c = 1; d = 9
 write(*,'(8F4.1,I5)',iostat=m) (c,d,j=11,14), j
 end
 
+! CHECK-LABEL: func @_QPloopnest
+subroutine loopnest
+   integer :: aa(3,3)
+   aa = 10
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: BeginExternalListOutput
+   ! CHECK: EnableHandlers
+   ! CHECK: fir.iterate_while
+   ! CHECK: fir.if
+   ! CHECK: fir.iterate_while
+   ! CHECK: fir.if
+   ! CHECK: OutputInteger64
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: fir.result
+   ! CHECK: EndIoStatement
+   write(*,*,err=66) ((aa(j,k)+j+k,j=1,3),k=1,3)
+66 continue
+end
 
 ! CHECK-LABEL: func @_QPimpliedformat
 subroutine impliedformat
