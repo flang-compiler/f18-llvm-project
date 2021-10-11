@@ -1746,8 +1746,8 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
       "mlir::Type":$recTy, CArg<"mlir::ValueRange","{}">:$operands)>];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef fieldAttrName() { return "field_id"; }
-    static constexpr llvm::StringRef typeAttrName() { return "on_type"; }
+    static constexpr llvm::StringRef getFieldAttrName() { return "field_id"; }
+    static constexpr llvm::StringRef getTypeAttrName() { return "on_type"; }
     llvm::StringRef getFieldName() { return field_id(); }
   }];
 }
@@ -2012,16 +2012,17 @@ def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {
   let builders = [OpBuilder<(ins "llvm::StringRef":$fieldName,
       "mlir::Type":$recTy),
     [{
-      $_state.addAttribute(fieldAttrName(), $_builder.getStringAttr(fieldName));
-      $_state.addAttribute(typeAttrName(), TypeAttr::get(recTy));
+      $_state.addAttribute(getFieldAttrName(),
+          $_builder.getStringAttr(fieldName));
+      $_state.addAttribute(getTypeAttrName(), TypeAttr::get(recTy));
     }]
   >];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef fieldAttrName() { return "field_id"; }
-    static constexpr llvm::StringRef typeAttrName() { return "on_type"; }
+    static constexpr llvm::StringRef getFieldAttrName() { return "field_id"; }
+    static constexpr llvm::StringRef getTypeAttrName() { return "on_type"; }
     mlir::Type getOnType() {
-      return (*this)->getAttrOfType<TypeAttr>(typeAttrName()).getValue();
+      return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
     }
   }];
 }
@@ -2104,8 +2105,10 @@ def fir_DoLoopOp : region_Op<"do_loop",
   ];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef unorderedAttrName() { return "unordered"; }
-    static constexpr llvm::StringRef finalValueAttrName() {
+    static constexpr llvm::StringRef getUnorderedAttrName() {
+      return "unordered";
+    }
+    static constexpr llvm::StringRef getFinalValueAttrName() {
       return "finalValue";
     }
 
@@ -2143,7 +2146,7 @@ def fir_DoLoopOp : region_Op<"do_loop",
     mlir::Block *getBody() { return &region().front(); }
 
     void setUnordered() {
-      (*this)->setAttr(unorderedAttrName(),
+      (*this)->setAttr(getUnorderedAttrName(),
                               mlir::UnitAttr::get(getContext()));
     }
 
@@ -2254,7 +2257,7 @@ def fir_IterWhileOp : region_Op<"iterate_while",
   ];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef finalValueAttrName() {
+    static constexpr llvm::StringRef getFinalValueAttrName() {
       return "finalValue";
     }
     mlir::Block *getBody() { return &region().front(); }
@@ -2339,14 +2342,14 @@ def fir_CallOp : fir_Op<"call", [CallOpInterface]> {
     }]>];
 
   let extraClassDeclaration = [{
-    static constexpr StringRef calleeAttrName() { return "callee"; }
+    static constexpr StringRef getCalleeAttrName() { return "callee"; }
 
     mlir::FunctionType getFunctionType();
 
     /// Get the argument operands to the called function.
     operand_range getArgOperands() {
       if (auto calling =
-          (*this)->getAttrOfType<SymbolRefAttr>(calleeAttrName()))
+          (*this)->getAttrOfType<SymbolRefAttr>(getCalleeAttrName()))
         return {arg_operand_begin(), arg_operand_end()};
       return {arg_operand_begin() + 1, arg_operand_end()};
     }
@@ -2357,7 +2360,7 @@ def fir_CallOp : fir_Op<"call", [CallOpInterface]> {
     /// Return the callee of this operation.
     CallInterfaceCallable getCallableForCallee() {
       if (auto calling =
-          (*this)->getAttrOfType<SymbolRefAttr>(calleeAttrName()))
+          (*this)->getAttrOfType<SymbolRefAttr>(getCalleeAttrName()))
         return calling;
       return getOperand(0);
     }
@@ -2397,10 +2400,10 @@ def fir_DispatchOp : fir_Op<"dispatch", []> {
     // operand[0] is the object (of box type)
     operand_iterator arg_operand_begin() { return operand_begin() + 1; }
     operand_iterator arg_operand_end() { return operand_end(); }
-    static constexpr llvm::StringRef passArgAttrName() {
+    static constexpr llvm::StringRef getPassArgAttrName() {
       return "pass_arg_pos";
     }
-    static constexpr llvm::StringRef methodAttrName() { return "method"; }
+    static constexpr llvm::StringRef getMethodAttrName() { return "method"; }
     unsigned passArgPos();
   }];
 }
@@ -2498,11 +2501,13 @@ def fir_ConstcOp : fir_Op<"constc", [NoSideEffect]> {
   let verifier = "return ::verify(*this);";
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef realAttrName() { return "real"; }
-    static constexpr llvm::StringRef imagAttrName() { return "imaginary"; }
+    static constexpr llvm::StringRef getRealAttrName() { return "real"; }
+    static constexpr llvm::StringRef getImagAttrName() { return "imaginary"; }
 
-    mlir::Attribute getReal() { return (*this)->getAttr(realAttrName()); }
-    mlir::Attribute getImaginary() { return (*this)->getAttr(imagAttrName()); }
+    mlir::Attribute getReal() { return (*this)->getAttr(getRealAttrName()); }
+    mlir::Attribute getImaginary() {
+      return (*this)->getAttr(getImagAttrName());
+    }
   }];
 }
 
@@ -2746,15 +2751,17 @@ def fir_GlobalOp : fir_Op<"global", [IsolatedFromAbove, Symbol]> {
   ];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef symbolAttrName() { return "symref"; }
-    static constexpr llvm::StringRef constantAttrName() { return "constant"; }
-    static constexpr llvm::StringRef initValAttrName() { return "initVal"; }
-    static constexpr llvm::StringRef linkageAttrName() { return "linkName"; }
-    static constexpr llvm::StringRef typeAttrName() { return "type"; }
+    static constexpr llvm::StringRef getSymbolAttrName() { return "symref"; }
+    static constexpr llvm::StringRef getConstantAttrName() {
+      return "constant";
+    }
+    static constexpr llvm::StringRef getInitValAttrName() { return "initVal"; }
+    static constexpr llvm::StringRef getLinkageAttrName() { return "linkName"; }
+    static constexpr llvm::StringRef getTypeAttrName() { return "type"; }
 
     /// The printable type of the global
     mlir::Type getType() {
-      return (*this)->getAttrOfType<TypeAttr>(typeAttrName()).getValue();
+      return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
     }
 
     /// The semantic type of the global
@@ -2812,8 +2819,10 @@ def fir_GlobalLenOp : fir_Op<"global_len", []> {
   let printer = "::print(p, *this);";
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef lenParamAttrName() { return "lenparam"; }
-    static constexpr llvm::StringRef intAttrName() { return "intval"; }
+    static constexpr llvm::StringRef getLenParamAttrName() {
+      return "lenparam";
+    }
+    static constexpr llvm::StringRef getIntAttrName() { return "intval"; }
   }];
 }
 
@@ -2894,8 +2903,8 @@ def fir_DTEntryOp : fir_Op<"dt_entry", []> {
   let printer = "::print(p, *this);";
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef methodAttrName() { return "method"; }
-    static constexpr llvm::StringRef procAttrName() { return "proc"; }
+    static constexpr llvm::StringRef getMethodAttrName() { return "method"; }
+    static constexpr llvm::StringRef getProcAttrName() { return "proc"; }
   }];
 }
 
