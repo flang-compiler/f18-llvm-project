@@ -658,7 +658,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     auto *lastOp = &ifOp.thenRegion().front().back();
     builder.setInsertionPointAfter(lastOp);
     // The primary ifOp result is the result of an IO call or loop.
-    if (mlir::isa<fir::CallOp,fir::IfOp>(*lastOp))
+    if (mlir::isa<fir::CallOp, fir::IfOp>(*lastOp))
       builder.create<fir::ResultOp>(loc, lastOp->getResult(0));
     else
       builder.create<fir::ResultOp>(loc, ok); // loop result

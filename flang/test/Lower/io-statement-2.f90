@@ -110,21 +110,25 @@ end
 subroutine loopnest
    integer :: aa(3,3)
    aa = 10
-   ! CHECK: fir.result
-   ! CHECK: fir.result
    ! CHECK: BeginExternalListOutput
    ! CHECK: EnableHandlers
-   ! CHECK: fir.iterate_while
-   ! CHECK: fir.if
-   ! CHECK: fir.iterate_while
-   ! CHECK: fir.if
-   ! CHECK: OutputInteger64
-   ! CHECK: fir.result
-   ! CHECK: fir.result
-   ! CHECK: fir.result
-   ! CHECK: fir.result
-   ! CHECK: fir.result
-   ! CHECK: fir.result
+   ! CHECK: {{.*}}:2 = fir.iterate_while ({{.*}} = {{.*}} to {{.*}} step {{.*}}) and ({{.*}} = {{.*}}) -> (index, i1) {
+   ! CHECK:   fir.if {{.*}} -> (i1) {
+   ! CHECK:     {{.*}}:2 = fir.iterate_while ({{.*}} = {{.*}} to {{.*}} step {{.*}}) and ({{.*}} = {{.*}}) -> (index, i1) {
+   ! CHECK:       fir.if {{.*}} -> (i1) {
+   ! CHECK:         OutputInteger64
+   ! CHECK:         fir.result {{.*}} : i1
+   ! CHECK:       } else {
+   ! CHECK:         fir.result {{.*}} : i1
+   ! CHECK:       }
+   ! CHECK:       fir.result {{.*}}, {{.*}} : index, i1
+   ! CHECK:     }
+   ! CHECK:     fir.result {{.*}}#1 : i1
+   ! CHECK:   } else {
+   ! CHECK:     fir.result {{.*}} : i1
+   ! CHECK:   }
+   ! CHECK:   fir.result {{.*}}, {{.*}} : index, i1
+   ! CHECK: }
    ! CHECK: EndIoStatement
    write(*,*,err=66) ((aa(j,k)+j+k,j=1,3),k=1,3)
 66 continue
