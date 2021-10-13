@@ -17,6 +17,7 @@
 namespace {
 // Optimizer Passes
 DisableOption(FirCse, "fir-cse", "CSE for FIR dialect");
+DisableOption(CfgConversion, "cfg-conversion", "disable FIR to CFG pass");
 
 // CodeGen Passes
 #if !defined(FLANG_EXCLUDE_CODEGEN)
@@ -44,6 +45,11 @@ void addNestedPassConditionally(
 } // namespace
 
 namespace fir {
+
+inline void addCfgConversionPass(mlir::PassManager &pm) {
+  addNestedPassConditionally<mlir::FuncOp>(
+      pm, disableCfgConversion, fir::createFirToCfgPass);
+}
 
 inline void addCSE(mlir::PassManager &pm) {
   addNestedPassConditionally<mlir::FuncOp>(

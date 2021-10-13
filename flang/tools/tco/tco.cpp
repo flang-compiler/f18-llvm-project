@@ -121,7 +121,7 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
     pm.addPass(mlir::createCSEPass());
 
     // convert control flow to CFG form
-    pm.addNestedPass<mlir::FuncOp>(fir::createFirToCfgPass());
+    fir::addCfgConversionPass(pm);
     pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
     pm.addPass(mlir::createLowerToCFGPass());
 
