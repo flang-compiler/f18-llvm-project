@@ -29,15 +29,16 @@ public:
 
   /// Build loop [\p lb, \p ub] with step \p step.
   /// If \p step is an empty value, 1 is used for the step.
-  void createLoop(mlir::Value lb, mlir::Value ub, mlir::Value step,
-                  const BodyGenerator &bodyGenerator);
+  fir::DoLoopOp createLoop(mlir::Value lb, mlir::Value ub, mlir::Value step,
+                          const BodyGenerator &bodyGenerator);
 
   /// Build loop [\p lb,  \p ub] with step 1.
-  void createLoop(mlir::Value lb, mlir::Value ub,
-                  const BodyGenerator &bodyGenerator);
+  fir::DoLoopOp createLoop(mlir::Value lb, mlir::Value ub,
+                           const BodyGenerator &bodyGenerator);
 
   /// Build loop [0, \p count) with step 1.
-  void createLoop(mlir::Value count, const BodyGenerator &bodyGenerator);
+  fir::DoLoopOp createLoop(mlir::Value count, 
+                           const BodyGenerator &bodyGenerator);
 
 private:
   fir::FirOpBuilder &builder;

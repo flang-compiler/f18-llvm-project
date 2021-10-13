@@ -12,7 +12,7 @@
 // DoLoopHelper implementation
 //===----------------------------------------------------------------------===//
 
-void fir::factory::DoLoopHelper::createLoop(
+fir::DoLoopOp fir::factory::DoLoopHelper::createLoop(
     mlir::Value lb, mlir::Value ub, mlir::Value step,
     const BodyGenerator &bodyGenerator) {
   auto lbi = builder.convertToIndexType(loc, lb);
@@ -25,20 +25,21 @@ void fir::factory::DoLoopHelper::createLoop(
   auto index = loop.getInductionVar();
   bodyGenerator(builder, index);
   builder.restoreInsertionPoint(insertPt);
+  return loop;
 }
 
-void fir::factory::DoLoopHelper::createLoop(
+fir::DoLoopOp fir::factory::DoLoopHelper::createLoop(
     mlir::Value lb, mlir::Value ub, const BodyGenerator &bodyGenerator) {
-  createLoop(lb, ub,
+  return createLoop(lb, ub,
              builder.createIntegerConstant(loc, builder.getIndexType(), 1),
              bodyGenerator);
 }
 
-void fir::factory::DoLoopHelper::createLoop(
+fir::DoLoopOp fir::factory::DoLoopHelper::createLoop(
     mlir::Value count, const BodyGenerator &bodyGenerator) {
   auto indexType = builder.getIndexType();
   auto zero = builder.createIntegerConstant(loc, indexType, 0);
   auto one = builder.createIntegerConstant(loc, count.getType(), 1);
   auto up = builder.create<mlir::SubIOp>(loc, count, one);
-  createLoop(zero, up, one, bodyGenerator);
+  return createLoop(zero, up, one, bodyGenerator);
 }
