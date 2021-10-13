@@ -120,6 +120,11 @@ def CFGConversion : FunctionPass<"cfg-conversion"> {
   let dependentDialects = [
     "fir::FIROpsDialect", "mlir::StandardOpsDialect"
   ];
+  let options = [
+    Option<"forceLoopToExecuteOnce", "always-execute-loop-body", "bool",
+           /*default=*/"false",
+           "force the body of a loop to execute at least once">
+  ];
 }
 
 def ArrayValueCopy : FunctionPass<"array-value-copy"> {

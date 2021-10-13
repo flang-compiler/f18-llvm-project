@@ -17,6 +17,7 @@
 #include "flang/Lower/AbstractConverter.h"
 #include "flang/Optimizer/Support/KindMapping.h"
 #include "mlir/IR/BuiltinOps.h"
+#include "llvm/Support/CommandLine.h"
 
 namespace Fortran {
 namespace common {

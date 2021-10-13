@@ -16,18 +16,6 @@
 #include "mlir/Transforms/DialectConversion.h"
 #include "llvm/Support/CommandLine.h"
 
-/// disable FIR to scf dialect conversion
-static llvm::cl::opt<bool>
-    disableCfgConversion("disable-cfg-conversion",
-                         llvm::cl::desc("disable FIR to CFG pass"),
-                         llvm::cl::init(false));
-
-/// minimum trip count is 1, not 0
-static llvm::cl::opt<bool> forceLoopToExecuteOnce(
-    "always-execute-loop-body",
-    llvm::cl::desc("force the body of a loop to execute at least once"),
-    llvm::cl::init(false));
-
 using namespace fir;
 
 namespace {
@@ -40,7 +28,11 @@ namespace {
 /// Convert `fir.do_loop` to CFG
 class CfgLoopConv : public mlir::OpRewritePattern<fir::DoLoopOp> {
 public:
-  using OpRewritePattern::OpRewritePattern;
+using OpRewritePattern::OpRewritePattern;
+
+  CfgLoopConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
+      : mlir::OpRewritePattern<fir::DoLoopOp>(ctx),
+        forceLoopToExecuteOnce(forceLoopToExecuteOnce) {}
 
   mlir::LogicalResult
   matchAndRewrite(DoLoopOp loop,
@@ -133,12 +125,18 @@ public:
     rewriter.replaceOp(loop, args.drop_back());
     return success();
   }
+
+private:
+  bool forceLoopToExecuteOnce;
 };
 
 /// Convert `fir.if` to control-flow
 class CfgIfConv : public mlir::OpRewritePattern<fir::IfOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
+
+  CfgIfConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
+      : mlir::OpRewritePattern<fir::IfOp>(ctx) {}
 
   mlir::LogicalResult
   matchAndRewrite(IfOp ifOp, mlir::PatternRewriter &rewriter) const override {
@@ -199,6 +197,9 @@ public:
 class CfgIterWhileConv : public mlir::OpRewritePattern<fir::IterWhileOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
+
+  CfgIterWhileConv(mlir::MLIRContext *ctx, bool forceLoopToExecuteOnce)
+      : mlir::OpRewritePattern<fir::IterWhileOp>(ctx) {}
 
   mlir::LogicalResult
   matchAndRewrite(fir::IterWhileOp whileOp,
@@ -292,12 +293,10 @@ public:
 class CfgConversion : public CFGConversionBase<CfgConversion> {
 public:
   void runOnFunction() override {
-    if (disableCfgConversion)
-      return;
-
     auto *context = &getContext();
     mlir::OwningRewritePatternList patterns(context);
-    patterns.insert<CfgLoopConv, CfgIfConv, CfgIterWhileConv>(context);
+    patterns.insert<CfgLoopConv, CfgIfConv, CfgIterWhileConv>(
+        context, forceLoopToExecuteOnce);
     mlir::ConversionTarget target(*context);
     target.addLegalDialect<mlir::AffineDialect, FIROpsDialect,
                            mlir::StandardOpsDialect>();
@@ -315,7 +314,6 @@ public:
 };
 } // namespace
 
-bool fir::isAlwaysExecuteLoopBody() { return forceLoopToExecuteOnce; }
 /// Convert FIR's structured control flow ops to CFG ops.  This
 /// conversion enables the `createLowerToCFGPass` to transform these to CFG
 /// form.

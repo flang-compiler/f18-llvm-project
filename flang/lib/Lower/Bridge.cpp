@@ -58,6 +58,10 @@ static llvm::cl::opt<bool> dumpBeforeFir(
     "fdebug-dump-pre-fir", llvm::cl::init(false),
     llvm::cl::desc("dump the Pre-FIR tree prior to FIR generation"));
 
+static llvm::cl::opt<bool> forceLoopToExecuteOnce(
+    "always-execute-loop-body", llvm::cl::init(false),
+    llvm::cl::desc("force the body of a loop to execute at least once"));
+
 namespace {
 /// Information for generating a structured or unstructured increment loop.
 struct IncrementLoopInfo {
@@ -1012,7 +1016,7 @@ private:
         tripCount =
             builder->create<mlir::SignedDivIOp>(loc, diff2, info.stepValue);
       }
-      if (fir::isAlwaysExecuteLoopBody()) { // minimum tripCount is 1
+      if (forceLoopToExecuteOnce) { // minimum tripCount is 1
         auto one = builder->createIntegerConstant(loc, controlType, 1);
         auto cond = builder->create<mlir::CmpIOp>(loc, CmpIPredicate::slt,
                                                   tripCount, one);
