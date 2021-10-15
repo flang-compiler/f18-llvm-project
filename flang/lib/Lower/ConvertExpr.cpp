@@ -2741,12 +2741,11 @@ public:
       auto lbs = fir::factory::getOrigins(arrayOperands[0].shape);
       lbounds.append(lbs.begin(), lbs.end());
     }
-    fir::factory::genReallocIfNeeded(builder, loc, mutableBox, lbounds,
-                                     destShape, lengthParams);
+    auto realloc = fir::factory::genReallocIfNeeded(builder, loc, mutableBox,
+                                                    destShape, lengthParams);
     // Create ArrayLoad for the mutable box and save it into `destination`.
     PushSemantics(ConstituentSemantics::ProjectedCopyInCopyOut);
-    ccStoreToDest =
-        genarr(fir::factory::genMutableBoxRead(builder, loc, mutableBox));
+    ccStoreToDest = genarr(realloc.newValue);
     // If the rhs is scalar, get shape from the allocatable ArrayLoad.
     if (destShape.empty())
       destShape = getShape(destination);
@@ -2761,6 +2760,8 @@ public:
           loc, destination, fir::getBase(exv), destination.memref(),
           destination.slice(), destination.typeparams());
     }
+    fir::factory::finalizeRealloc(builder, loc, mutableBox, lbounds,
+                                  takeLboundsIfRealloc, realloc);
   }
 
   /// Entry point for when an array expression appears in a context where the

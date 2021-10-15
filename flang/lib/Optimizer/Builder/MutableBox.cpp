@@ -618,15 +618,11 @@ void fir::factory::disassociateMutableBox(fir::FirOpBuilder &builder,
   MutablePropertyWriter{builder, loc, box}.setUnallocatedStatus();
 }
 
-void fir::factory::genInlinedAllocation(fir::FirOpBuilder &builder,
-                                        mlir::Location loc,
-                                        const fir::MutableBoxValue &box,
-                                        mlir::ValueRange lbounds,
-                                        mlir::ValueRange extents,
-                                        mlir::ValueRange lenParams,
-                                        llvm::StringRef allocName) {
-  auto idxTy = builder.getIndexType();
+static llvm::SmallVector<mlir::Value>
+getNewLengths(fir::FirOpBuilder &builder, mlir::Location loc,
+              const fir::MutableBoxValue &box, mlir::ValueRange lenParams) {
   llvm::SmallVector<mlir::Value> lengths;
+  auto idxTy = builder.getIndexType();
   if (auto charTy = box.getEleTy().dyn_cast<fir::CharacterType>()) {
     if (charTy.getLen() == fir::CharacterType::unknownLen()) {
       if (box.hasNonDeferredLenParams())
@@ -639,8 +635,30 @@ void fir::factory::genInlinedAllocation(fir::FirOpBuilder &builder,
             loc, "could not deduce character lengths in character allocation");
     }
   }
-  mlir::Value heap = builder.create<fir::AllocMemOp>(
-      loc, box.getBaseTy(), allocName, lengths, extents);
+  return lengths;
+}
+
+static mlir::Value
+allocateNewStorage(fir::FirOpBuilder &builder, mlir::Location loc,
+                   const fir::MutableBoxValue &box, mlir::ValueRange extents,
+                   mlir::ValueRange lenParams, llvm::StringRef allocName) {
+  auto lengths = getNewLengths(builder, loc, box, lenParams);
+  return builder.create<fir::AllocMemOp>(loc, box.getBaseTy(), allocName,
+                                         lengths, extents);
+  // TODO: run initializer if any. Currently, there is no way to know this is
+  // required here.
+}
+
+void fir::factory::genInlinedAllocation(fir::FirOpBuilder &builder,
+                                        mlir::Location loc,
+                                        const fir::MutableBoxValue &box,
+                                        mlir::ValueRange lbounds,
+                                        mlir::ValueRange extents,
+                                        mlir::ValueRange lenParams,
+                                        llvm::StringRef allocName) {
+  auto lengths = getNewLengths(builder, loc, box, lenParams);
+  auto heap = builder.create<fir::AllocMemOp>(loc, box.getBaseTy(), allocName,
+                                              lengths, extents);
   // TODO: run initializer if any. Currently, there is no way to know this is
   // required here.
   MutablePropertyWriter{builder, loc, box}.updateMutableBox(heap, lbounds,
@@ -655,73 +673,146 @@ void fir::factory::genInlinedDeallocate(fir::FirOpBuilder &builder,
   MutablePropertyWriter{builder, loc, box}.setUnallocatedStatus();
 }
 
-void fir::factory::genReallocIfNeeded(fir::FirOpBuilder &builder,
-                                      mlir::Location loc,
-                                      const fir::MutableBoxValue &box,
-                                      mlir::ValueRange lbounds,
-                                      mlir::ValueRange shape,
-                                      mlir::ValueRange lengthParams) {
+fir::factory::MutableBoxReallocation
+fir::factory::genReallocIfNeeded(fir::FirOpBuilder &builder, mlir::Location loc,
+                                 const fir::MutableBoxValue &box,
+                                 mlir::ValueRange shape,
+                                 mlir::ValueRange lengthParams) {
   // Implement 10.2.1.3 point 3 logic when lhs is an array.
   auto reader = MutablePropertyReader(builder, loc, box);
   auto addr = reader.readBaseAddress();
+  auto i1Type = builder.getI1Type();
+  auto addrType = addr.getType();
   auto isAllocated = builder.genIsNotNull(loc, addr);
-  builder.genIfThenElse(loc, isAllocated)
-      .genThen([&]() {
-        // The box is allocated. Check if it must be reallocated and reallocate.
-        mlir::Value mustReallocate = builder.createBool(loc, false);
-        auto compareProperty = [&](mlir::Value previous, mlir::Value required) {
-          auto castPrevious =
-              builder.createConvert(loc, required.getType(), previous);
-          // reallocate = reallocate || previous != required
-          auto cmp = builder.create<mlir::arith::CmpIOp>(
-              loc, mlir::arith::CmpIPredicate::ne, castPrevious, required);
-          mustReallocate =
-              builder.create<mlir::SelectOp>(loc, cmp, cmp, mustReallocate);
-        };
-        llvm::SmallVector<mlir::Value> previousLbounds;
-        llvm::SmallVector<mlir::Value> previousExtents =
-            reader.readShape(&previousLbounds);
-        if (!shape.empty())
-          for (auto [previousExtent, requested] :
-               llvm::zip(previousExtents, shape))
-            compareProperty(previousExtent, requested);
+  auto ifOp =
+      builder
+          .genIfOp(loc, {i1Type, addrType}, isAllocated,
+                   /*withElseRegion=*/true)
+          .genThen([&]() {
+            // The box is allocated. Check if it must be reallocated and
+            // reallocate.
+            auto mustReallocate = builder.createBool(loc, false);
+            auto compareProperty = [&](mlir::Value previous,
+                                       mlir::Value required) {
+              auto castPrevious =
+                  builder.createConvert(loc, required.getType(), previous);
+              auto cmp = builder.create<mlir::arith::CmpIOp>(
+                  loc, mlir::arith::CmpIPredicate::ne, castPrevious, required);
+              mustReallocate =
+                  builder.create<mlir::SelectOp>(loc, cmp, cmp, mustReallocate);
+            };
+            llvm::SmallVector<mlir::Value> previousExtents = reader.readShape();
+            if (!shape.empty())
+              for (auto [previousExtent, requested] :
+                   llvm::zip(previousExtents, shape))
+                compareProperty(previousExtent, requested);
 
-        if (box.isCharacter() && !box.hasNonDeferredLenParams()) {
-          // When the allocatable length is not deferred, it must not be
-          // reallocated in case of length mismatch, instead, padding/trimming
-          // will ocur in later assignment to it.
-          assert(!lengthParams.empty() &&
-                 "must provide length parameters for character");
-          compareProperty(reader.readCharacterLength(), lengthParams[0]);
-        } else if (box.isDerivedWithLengthParameters()) {
+            if (box.isCharacter() && !box.hasNonDeferredLenParams()) {
+              // When the allocatable length is not deferred, it must not be
+              // reallocated in case of length mismatch, instead,
+              // padding/trimming will occur in later assignment to it.
+              assert(!lengthParams.empty() &&
+                     "must provide length parameters for character");
+              compareProperty(reader.readCharacterLength(), lengthParams[0]);
+            } else if (box.isDerivedWithLengthParameters()) {
+              TODO(loc, "automatic allocation of derived type allocatable with "
+                        "length parameters");
+            }
+            auto ifOp =
+                builder
+                    .genIfOp(loc, {addrType}, mustReallocate,
+                             /*withElseRegion=*/true)
+                    .genThen([&]() {
+                      // If shape or length mismatch, allocate new storage.
+                      // When rhs is a scalar, keep the previous shape
+                      auto extents = shape.empty()
+                                         ? mlir::ValueRange(previousExtents)
+                                         : shape;
+                      auto heap =
+                          allocateNewStorage(builder, loc, box, extents,
+                                             lengthParams, ".auto.alloc");
+                      builder.create<fir::ResultOp>(loc, heap);
+                    })
+                    .genElse(
+                        [&]() { builder.create<fir::ResultOp>(loc, addr); });
+            ifOp.end();
+            auto newAddr = ifOp.getResults()[0];
+            builder.create<fir::ResultOp>(
+                loc, mlir::ValueRange{mustReallocate, newAddr});
+          })
+          .genElse([&]() {
+            auto trueValue = builder.createBool(loc, true);
+            // The box is not yet allocated, simply allocate it.
+            if (shape.empty() && box.rank() != 0) {
+              // TODO:
+              // runtime error: right hand side must be allocated if right hand
+              // side is a scalar and the box is an array.
+              builder.create<fir::ResultOp>(loc,
+                                            mlir::ValueRange{trueValue, addr});
+            } else {
+              auto heap = allocateNewStorage(builder, loc, box, shape,
+                                             lengthParams, ".auto.alloc");
+              builder.create<fir::ResultOp>(loc,
+                                            mlir::ValueRange{trueValue, heap});
+            }
+          });
+  ifOp.end();
+  auto wasReallocated = ifOp.getResults()[0];
+  auto newAddr = ifOp.getResults()[1];
+  // Create an ExtentedValue for the new storage.
+  auto newValue = [&]() -> fir::ExtendedValue {
+    mlir::SmallVector<mlir::Value> extents;
+    if (box.hasRank()) {
+      if (shape.empty())
+        extents = reader.readShape();
+      else
+        extents.append(shape.begin(), shape.end());
+    }
+    if (box.isCharacter()) {
+      auto len = box.hasNonDeferredLenParams() ? reader.readCharacterLength()
+                                               : lengthParams[0];
+      if (box.hasRank())
+        return fir::CharArrayBoxValue{newAddr, len, extents};
+      return fir::CharBoxValue{newAddr, len};
+    }
+    if (box.isDerivedWithLengthParameters())
+      TODO(loc, "reallocation of derived type entities with length parameters");
+    if (box.hasRank())
+      return fir::ArrayBoxValue{newAddr, extents};
+    return newAddr;
+  }();
+  return {newValue, addr, wasReallocated, isAllocated};
+}
+
+void fir::factory::finalizeRealloc(fir::FirOpBuilder &builder,
+                                   mlir::Location loc,
+                                   const fir::MutableBoxValue &box,
+                                   mlir::ValueRange lbounds,
+                                   bool takeLboundsIfRealloc,
+                                   const MutableBoxReallocation &realloc) {
+  builder.genIfThen(loc, realloc.wasReallocated)
+      .genThen([&]() {
+        auto reader = MutablePropertyReader(builder, loc, box);
+        llvm::SmallVector<mlir::Value> previousLbounds;
+        if (!takeLboundsIfRealloc && box.hasRank())
+          reader.readShape(&previousLbounds);
+        auto lbs =
+            takeLboundsIfRealloc ? lbounds : mlir::ValueRange{previousLbounds};
+        llvm::SmallVector<mlir::Value> lenParams;
+        if (box.isCharacter())
+          lenParams.push_back(fir::getLen(realloc.newValue));
+        if (box.isDerivedWithLengthParameters())
           TODO(loc,
-               "automatic allocation of derived type allocatable with length "
-               "parameters");
-        }
-        builder.genIfThen(loc, mustReallocate)
-            .genThen([&]() {
-              // If shape or length mismatch, deallocate and reallocate.
-              genFinalizeAndFree(builder, loc, addr);
-              // When rhs is a scalar, keep the previous shape
-              auto extents =
-                  shape.empty() ? mlir::ValueRange(previousExtents) : shape;
-              auto lbs =
-                  shape.empty() ? mlir::ValueRange(previousLbounds) : lbounds;
-              genInlinedAllocation(builder, loc, box, lbs, extents,
-                                   lengthParams, ".auto.alloc");
-            })
+               "reallocation of derived type entities with length parameters");
+        auto lengths = getNewLengths(builder, loc, box, lenParams);
+        auto heap = fir::getBase(realloc.newValue);
+        auto extents = fir::factory::getExtents(builder, loc, realloc.newValue);
+        builder.genIfThen(loc, realloc.oldAddressWasAllocated)
+            .genThen(
+                [&]() { genFinalizeAndFree(builder, loc, realloc.oldAddress); })
             .end();
-      })
-      .genElse([&]() {
-        // The box is not yet allocated, simply allocate it.
-        if (shape.empty() && box.rank() != 0) {
-          // TODO:
-          // runtime error: right hand side must be allocated if right hand
-          // side is a scalar and the box is an array.
-        } else {
-          genInlinedAllocation(builder, loc, box, lbounds, shape, lengthParams,
-                               ".auto.alloc");
-        }
+        MutablePropertyWriter{builder, loc, box}.updateMutableBox(
+            heap, lbs, extents, lengths);
       })
       .end();
 }

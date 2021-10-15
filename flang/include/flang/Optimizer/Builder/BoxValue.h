@@ -467,6 +467,14 @@ inline bool isUnboxedValue(const ExtendedValue &exv) {
       [](const fir::UnboxedValue &box) { return box ? true : false; },
       [](const auto &) { return false; });
 }
+
+/// Is the extended value `exv` a derived type with length parameters ?
+inline bool isDerivedWithLengthParameters(const ExtendedValue &exv) {
+  auto type = fir::unwrapPassByRefType(fir::getBase(exv).getType());
+  auto record = fir::unwrapSequenceType(type).dyn_cast<fir::RecordType>();
+  return record && record.getNumLenParams() != 0;
+}
+
 } // namespace fir
 
 #endif // FORTRAN_OPTIMIZER_BUILDER_BOXVALUE_H

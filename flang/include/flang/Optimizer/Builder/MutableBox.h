@@ -13,6 +13,7 @@
 #ifndef FORTRAN_OPTIMIZER_BUILDER_MUTABLEBOX_H
 #define FORTRAN_OPTIMIZER_BUILDER_MUTABLEBOX_H
 
+#include "flang/Optimizer/Builder/BoxValue.h"
 #include "llvm/ADT/StringRef.h"
 
 namespace mlir {
@@ -24,8 +25,6 @@ class Location;
 
 namespace fir {
 class FirOpBuilder;
-class MutableBoxValue;
-class ExtendedValue;
 } // namespace fir
 
 namespace fir::factory {
@@ -86,10 +85,23 @@ void disassociateMutableBox(fir::FirOpBuilder &builder, mlir::Location loc,
 /// parameter mismatch can trigger a reallocation. See Fortran 10.2.1.3 point 3
 /// that this function is implementing for more details. The polymorphic
 /// requirements are not yet covered by this function.
-void genReallocIfNeeded(fir::FirOpBuilder &builder, mlir::Location loc,
-                        const fir::MutableBoxValue &box,
-                        mlir::ValueRange lbounds, mlir::ValueRange shape,
-                        mlir::ValueRange lengthParams);
+struct MutableBoxReallocation {
+  fir::ExtendedValue newValue;
+  mlir::Value oldAddress;
+  mlir::Value wasReallocated;
+  mlir::Value oldAddressWasAllocated;
+};
+
+MutableBoxReallocation genReallocIfNeeded(fir::FirOpBuilder &builder,
+                                          mlir::Location loc,
+                                          const fir::MutableBoxValue &box,
+                                          mlir::ValueRange shape,
+                                          mlir::ValueRange lengthParams);
+
+void finalizeRealloc(fir::FirOpBuilder &builder, mlir::Location loc,
+                     const fir::MutableBoxValue &box, mlir::ValueRange lbounds,
+                     bool takeLboundsIfRealloc,
+                     const MutableBoxReallocation &realloc);
 
 /// Finalize a mutable box if it is allocated or associated. This includes both
 /// calling the finalizer, if any, and deallocating the storage.

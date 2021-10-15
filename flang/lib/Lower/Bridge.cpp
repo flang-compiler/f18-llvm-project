@@ -1942,26 +1942,25 @@ private:
                   isNumericScalarCategory(lhsType->category());
               auto rhs = isNumericScalar ? genExprValue(assign.rhs, stmtCtx)
                                          : genExprAddr(assign.rhs, stmtCtx);
-              auto lowerAllocatableLHS = [&]() -> fir::ExtendedValue {
-                auto lhs = genExprMutableBox(loc, assign.lhs);
-                llvm::SmallVector<mlir::Value> lengthParams;
-                if (auto *charBox = rhs.getCharBox())
-                  lengthParams.push_back(charBox->getLen());
-                else if (lhs.isDerivedWithLengthParameters())
-                  TODO(loc, "assignment to derived type allocatable with "
-                            "length parameters");
-                fir::factory::genReallocIfNeeded(
-                    *builder, loc, lhs, /*lbounds=*/llvm::None,
-                    /*shape=*/llvm::None, lengthParams);
-                // Assume lhs is not polymorphic for now given TODO above,
-                // otherwise, the read would is conservative and returns
-                // BoxValue for derived types.
-                return fir::factory::genMutableBoxRead(
-                    *builder, loc, lhs, /*mayBePolymorphic=*/false);
-              };
-              auto lhs = isWholeAllocatable(assign.lhs)
-                             ? lowerAllocatableLHS()
-                             : genExprAddr(assign.lhs, stmtCtx);
+              bool lhsIsWholeAllocatable = isWholeAllocatable(assign.lhs);
+              llvm::Optional<fir::factory::MutableBoxReallocation> lhsRealloc;
+              llvm::Optional<fir::MutableBoxValue> lhsMutableBox;
+              auto lhs = [&]() -> fir::ExtendedValue {
+                if (lhsIsWholeAllocatable) {
+                  lhsMutableBox = genExprMutableBox(loc, assign.lhs);
+                  llvm::SmallVector<mlir::Value> lengthParams;
+                  if (auto *charBox = rhs.getCharBox())
+                    lengthParams.push_back(charBox->getLen());
+                  else if (fir::isDerivedWithLengthParameters(rhs))
+                    TODO(loc, "assignment to derived type allocatable with "
+                              "length parameters");
+                  lhsRealloc = fir::factory::genReallocIfNeeded(
+                      *builder, loc, *lhsMutableBox,
+                      /*shape=*/llvm::None, lengthParams);
+                  return lhsRealloc->newValue;
+                }
+                return genExprAddr(assign.lhs, stmtCtx);
+              }();
 
               if (isNumericScalar) {
                 // Fortran 2018 10.2.1.3 p8 and p9
@@ -1983,21 +1982,22 @@ private:
                       toLocation(), builder->getRefType(toTy), addr);
                 }
                 builder->create<fir::StoreOp>(loc, cast, addr);
-                return;
-              }
-              if (isCharacterCategory(lhsType->category())) {
+              } else if (isCharacterCategory(lhsType->category())) {
                 // Fortran 2018 10.2.1.3 p10 and p11
                 fir::factory::CharacterExprHelper{*builder, loc}.createAssign(
                     lhs, rhs);
-                return;
-              }
-              if (isDerivedCategory(lhsType->category())) {
+              } else if (isDerivedCategory(lhsType->category())) {
                 // Fortran 2018 10.2.1.3 p13 and p14
                 // Recursively gen an assignment on each element pair.
                 fir::factory::genRecordAssignment(*builder, loc, lhs, rhs);
-                return;
+              } else {
+                llvm_unreachable("unknown category");
               }
-              llvm_unreachable("unknown category");
+              if (lhsIsWholeAllocatable)
+                fir::factory::finalizeRealloc(
+                    *builder, loc, lhsMutableBox.getValue(),
+                    /*lbounds=*/llvm::None, /*takeLboundsIfRealloc=*/false,
+                    lhsRealloc.getValue());
             },
 
             // [2] User defined assignment. If the context is a scalar
