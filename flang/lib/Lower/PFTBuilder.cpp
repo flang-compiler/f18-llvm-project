@@ -410,8 +410,9 @@ private:
     evaluationListStack.pop_back();
   }
 
-  /// Rewrite IfConstructs containing a GotoStmt to eliminate an unstructured
-  /// branch and a trivial basic block.  The pre-branch-analysis code:
+  /// Rewrite IfConstructs containing a GotoStmt or CycleStmt to eliminate an
+  /// unstructured branch and a trivial basic block.  The pre-branch-analysis
+  /// code:
   ///
   ///       <<IfConstruct>>
   ///         1 If[Then]Stmt: if(cond) goto L
@@ -433,8 +434,8 @@ private:
   ///       6 Statement: L ...
   ///
   /// The If[Then]Stmt condition is implicitly negated.  It is not modified
-  /// in the PFT.  It must be negated when generating FIR.  The GotoStmt is
-  /// deleted.
+  /// in the PFT.  It must be negated when generating FIR.  The GotoStmt or
+  /// CycleStmt is deleted.
   ///
   /// The transformation is only valid for forward branch targets at the same
   /// construct nesting level as the IfConstruct.  The result must not violate
@@ -451,31 +452,49 @@ private:
   void rewriteIfGotos() {
     using T = struct {
       lower::pft::EvaluationList::iterator ifConstructIt;
-      parser::Label ifTargetLabel;
+      parser::Label ifTargetLabel; // 0 for cycle statements
     };
-    llvm::SmallVector<T> ifExpansionStack;
+    llvm::SmallVector<T> ifCandidateStack;
     auto &evaluationList = *evaluationListStack.back();
     for (auto it = evaluationList.begin(), end = evaluationList.end();
          it != end; ++it) {
       auto &eval = *it;
       if (eval.isA<parser::EntryStmt>()) {
-        ifExpansionStack.clear();
+        ifCandidateStack.clear();
         continue;
       }
       auto firstStmt = [](lower::pft::Evaluation *e) {
         return e->isConstruct() ? &*e->evaluationList->begin() : e;
       };
       auto &targetEval = *firstStmt(&eval);
-      if (targetEval.label) {
-        while (!ifExpansionStack.empty() &&
-               ifExpansionStack.back().ifTargetLabel == *targetEval.label) {
-          auto ifConstructIt = ifExpansionStack.back().ifConstructIt;
+      bool targetEvalIsEndDoStmt = targetEval.isA<parser::EndDoStmt>();
+      auto branchTargetMatch = [&]() {
+        auto targetLabel = ifCandidateStack.back().ifTargetLabel;
+        if (targetLabel && targetLabel == *targetEval.label)
+          return true; // goto target match
+        if (targetEvalIsEndDoStmt && !targetLabel) {
+          auto cycleName = ifCandidateStack.back().ifConstructIt->visit(
+              [&](const auto &stmt) { return getConstructName(stmt); });
+          if (cycleName.empty())
+            return true; // anonymous cycle target match
+          auto doName = eval.visit(
+              [&](const auto &stmt) { return getConstructName(stmt); });
+          if (cycleName == doName)
+            return true; // named cycle target match
+        }
+        return false;
+      };
+      if (targetEval.label || targetEvalIsEndDoStmt) {
+        while (!ifCandidateStack.empty() && branchTargetMatch()) {
+          auto ifConstructIt = ifCandidateStack.back().ifConstructIt;
           auto successorIt = std::next(ifConstructIt);
           if (successorIt != it) {
             auto &ifBodyList = *ifConstructIt->evaluationList;
-            auto gotoStmtIt = std::next(ifBodyList.begin());
-            assert(gotoStmtIt->isA<parser::GotoStmt>() && "expected GotoStmt");
-            ifBodyList.erase(gotoStmtIt);
+            auto branchStmtIt = std::next(ifBodyList.begin());
+            assert((branchStmtIt->isA<parser::GotoStmt>() ||
+                    branchStmtIt->isA<parser::CycleStmt>()) &&
+                   "expected goto or cycle statement");
+            ifBodyList.erase(branchStmtIt);
             auto &ifStmt = *ifBodyList.begin();
             ifStmt.negateCondition = true;
             ifStmt.lexicalSuccessor = firstStmt(&*successorIt);
@@ -486,13 +505,16 @@ private:
             for (; successorIt != endIfStmtIt; ++successorIt)
               successorIt->parentConstruct = &*ifConstructIt;
           }
-          ifExpansionStack.pop_back();
+          ifCandidateStack.pop_back();
         }
       }
       if (eval.isA<parser::IfConstruct>() && eval.evaluationList->size() == 3) {
         if (auto *gotoStmt = std::next(eval.evaluationList->begin())
                                  ->getIf<parser::GotoStmt>())
-          ifExpansionStack.push_back({it, gotoStmt->v});
+          ifCandidateStack.push_back({it, gotoStmt->v});
+        else if (std::next(eval.evaluationList->begin())
+                     ->isA<parser::CycleStmt>())
+          ifCandidateStack.push_back({it, {}});
       }
     }
   }
