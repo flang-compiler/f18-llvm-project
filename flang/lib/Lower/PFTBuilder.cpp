@@ -452,7 +452,8 @@ private:
   void rewriteIfGotos() {
     using T = struct {
       lower::pft::EvaluationList::iterator ifConstructIt;
-      parser::Label ifTargetLabel; // 0 for cycle statements
+      parser::Label ifTargetLabel;
+      bool isCycleStmt = false;
     };
     llvm::SmallVector<T> ifCandidateStack;
     auto &evaluationList = *evaluationListStack.back();
@@ -469,10 +470,10 @@ private:
       auto &targetEval = *firstStmt(&eval);
       bool targetEvalIsEndDoStmt = targetEval.isA<parser::EndDoStmt>();
       auto branchTargetMatch = [&]() {
-        auto targetLabel = ifCandidateStack.back().ifTargetLabel;
-        if (targetLabel && targetLabel == *targetEval.label)
-          return true; // goto target match
-        if (targetEvalIsEndDoStmt && !targetLabel) {
+        if (auto targetLabel = ifCandidateStack.back().ifTargetLabel)
+          if (targetLabel == *targetEval.label)
+            return true; // goto target match
+        if (targetEvalIsEndDoStmt && ifCandidateStack.back().isCycleStmt) {
           auto cycleName = ifCandidateStack.back().ifConstructIt->visit(
               [&](const auto &stmt) { return getConstructName(stmt); });
           if (cycleName.empty())
@@ -514,7 +515,7 @@ private:
           ifCandidateStack.push_back({it, gotoStmt->v});
         else if (std::next(eval.evaluationList->begin())
                      ->isA<parser::CycleStmt>())
-          ifCandidateStack.push_back({it, {}});
+          ifCandidateStack.push_back({it, {}, true});
       }
     }
   }
