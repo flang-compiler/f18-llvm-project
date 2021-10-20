@@ -616,16 +616,15 @@ genOMP(Fortran::lower::AbstractConverter &converter,
         std::get<std::optional<Fortran::parser::Name>>(cd.t).value().ToString();
   }
 
-  mlir::omp::SyncHintKindAttr hint;
+  mlir::IntegerAttr hint = firOpBuilder.getI64IntegerAttr(0);
   const auto &clauseList = std::get<Fortran::parser::OmpClauseList>(cd.t);
   for (const auto &clause : clauseList.v)
     if (auto hintClause =
             std::get_if<Fortran::parser::OmpClause::Hint>(&clause.u)) {
       const auto *expr = Fortran::semantics::GetExpr(hintClause->v);
       const auto hintValue = Fortran::evaluate::ToInt64(*expr);
-      hint = mlir::omp::SyncHintKindAttr::get(
-          firOpBuilder.getContext(),
-          mlir::omp::symbolizeSyncHintKind(*hintValue).getValue());
+      // wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(*orderedValue));
+      hint = firOpBuilder.getI64IntegerAttr(*hintValue);
       break;
     }
 

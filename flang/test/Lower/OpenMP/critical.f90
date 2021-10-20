@@ -26,8 +26,8 @@ program mn
 
 ! Test that the same name can be used again
 ! Also test with the zero hint expression
-!FIRDialect: omp.critical(@help) hint(none)
-!LLVMIRDialect: omp.critical(@help) hint(none)
+!FIRDialect: omp.critical(@help)
+!LLVMIRDialect: omp.critical(@help)
 !LLVMIR: call void @__kmpc_critical_with_hint({{.*}}, {{.*}}, {{.*}} @{{.*}}help.var, i32 0)
 !$OMP CRITICAL(help) HINT(omp_lock_hint_none)
         x = x - y
@@ -38,7 +38,7 @@ program mn
 
 !FIRDialect: omp.critical
 !LLVMIRDialect: omp.critical
-!LLVMIR: call void @__kmpc_critical({{.*}}, {{.*}}, {{.*}} @{{.*}}_.var)
+!LLVMIR: call void @__kmpc_critical_with_hint({{.*}}, {{.*}}, {{.*}} @{{.*}}_.var, i32 0)
 !$OMP CRITICAL
         y = x + y
 !FIRDialect: omp.terminator

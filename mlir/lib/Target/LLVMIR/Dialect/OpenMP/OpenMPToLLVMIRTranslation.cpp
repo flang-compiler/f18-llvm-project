@@ -300,12 +300,9 @@ convertOmpCritical(Operation &opInst, llvm::IRBuilderBase &builder,
   llvm::OpenMPIRBuilder::LocationDescription ompLoc(
       builder.saveIP(), builder.getCurrentDebugLocation());
   llvm::LLVMContext &llvmContext = moduleTranslation.getLLVMContext();
-  llvm::Constant *hint = nullptr;
-  if (criticalOp.hint().hasValue()) {
-    hint =
-        llvm::ConstantInt::get(llvm::Type::getInt32Ty(llvmContext),
-                               static_cast<int>(criticalOp.hint().getValue()));
-  }
+  llvm::Constant *hint = llvm::ConstantInt::get(
+      llvm::Type::getInt32Ty(llvmContext), static_cast<int>(criticalOp.hint()));
+
   builder.restoreIP(moduleTranslation.getOpenMPBuilder()->createCritical(
       ompLoc, bodyGenCB, finiCB, criticalOp.name().getValueOr(""), hint));
   return success();
