@@ -616,32 +616,29 @@ genOMP(Fortran::lower::AbstractConverter &converter,
         std::get<std::optional<Fortran::parser::Name>>(cd.t).value().ToString();
   }
 
-  mlir::IntegerAttr hint = firOpBuilder.getI64IntegerAttr(0);
+  uint64_t hint = 0;
   const auto &clauseList = std::get<Fortran::parser::OmpClauseList>(cd.t);
   for (const auto &clause : clauseList.v)
     if (auto hintClause =
             std::get_if<Fortran::parser::OmpClause::Hint>(&clause.u)) {
       const auto *expr = Fortran::semantics::GetExpr(hintClause->v);
-      const auto hintValue = Fortran::evaluate::ToInt64(*expr);
-      // wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(*orderedValue));
-      hint = firOpBuilder.getI64IntegerAttr(*hintValue);
+      hint = *Fortran::evaluate::ToInt64(*expr);
       break;
     }
 
   mlir::omp::CriticalOp criticalOp = [&]() -> mlir::omp::CriticalOp {
     if (name.empty()) {
-      return firOpBuilder.create<mlir::omp::CriticalOp>(
-          currentLocation, FlatSymbolRefAttr(), hint);
+      return firOpBuilder.create<mlir::omp::CriticalOp>(currentLocation,
+                                                        FlatSymbolRefAttr());
     } else {
       auto module = firOpBuilder.getModule();
       mlir::OpBuilder modBuilder(module.getBodyRegion());
       auto global = module.lookupSymbol<mlir::omp::CriticalDeclareOp>(name);
       if (!global)
         global = modBuilder.create<mlir::omp::CriticalDeclareOp>(
-            currentLocation, name);
+            currentLocation, name, hint);
       return firOpBuilder.create<mlir::omp::CriticalOp>(
-          currentLocation, firOpBuilder.getSymbolRefAttr(global.sym_name()),
-          hint);
+          currentLocation, firOpBuilder.getSymbolRefAttr(global.sym_name()));
     }
   }();
   createBodyOfOp<omp::CriticalOp>(criticalOp, converter, currentLocation);

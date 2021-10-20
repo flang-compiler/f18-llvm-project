@@ -541,11 +541,11 @@ llvm.func @collapse_wsloop(
 
 // -----
 
-omp.critical.declare @mutex
+omp.critical.declare @mutex hint(contended)
 
 // CHECK-LABEL: @omp_critical
 llvm.func @omp_critical(%x : !llvm.ptr<i32>, %xval : i32) -> () {
-  // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_.var{{.*}}, i32 0)
+  // CHECK: call void @__kmpc_critical({{.*}}critical_user_.var{{.*}})
   // CHECK: br label %omp.critical.region
   // CHECK: omp.critical.region
   omp.critical {
@@ -558,14 +558,14 @@ llvm.func @omp_critical(%x : !llvm.ptr<i32>, %xval : i32) -> () {
   // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_mutex.var{{.*}}, i32 2)
   // CHECK: br label %omp.critical.region
   // CHECK: omp.critical.region
-  omp.critical(@mutex) hint(contended) {
+  omp.critical(@mutex) {
   // CHECK: store
     llvm.store %xval, %x : !llvm.ptr<i32>
     omp.terminator
   }
   // CHECK: call void @__kmpc_end_critical({{.*}}critical_user_mutex.var{{.*}})
 
-  // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_mutex.var{{.*}}, i32 0)
+  // CHECK: call void @__kmpc_critical_with_hint({{.*}}critical_user_mutex.var{{.*}}, i32 2)
   // CHECK: br label %omp.critical.region
   // CHECK: omp.critical.region
   omp.critical(@mutex) {

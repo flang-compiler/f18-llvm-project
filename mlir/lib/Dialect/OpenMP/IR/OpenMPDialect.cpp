@@ -1093,13 +1093,11 @@ static LogicalResult verifyWsLoopOp(WsLoopOp op) {
   return success();
 }
 
+static LogicalResult verifyCriticalDeclareOp(CriticalDeclareOp op) {
+  return verifySynchronizationHint(op, op.hint());
+}
+
 static LogicalResult verifyCriticalOp(CriticalOp op) {
-  if (failed(verifySynchronizationHint(op, op.hint()))) {
-    return failure();
-  }
-  if (!op.name().hasValue() && op.hint() != 0)
-    return op.emitOpError() << "must specify a name unless the effect is as if "
-                               "no hint is specified";
 
   if (op.nameAttr()) {
     auto symbolRef = op.nameAttr().cast<SymbolRefAttr>();
