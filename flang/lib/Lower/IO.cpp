@@ -462,8 +462,8 @@ genOutputItemList(Fortran::lower::AbstractConverter &converter,
       if (fir::isa_complex(itemTy)) {
         auto parts = fir::factory::ComplexExprHelper{builder, loc}.extractParts(
             itemValue);
-        outputFuncArgs.push_back(parts.first);
-        outputFuncArgs.push_back(parts.second);
+        outputFuncArgs.push_back(builder.createConvert(loc, argType, parts.first));
+        outputFuncArgs.push_back(builder.createConvert(loc, argType, parts.second));
       } else {
         itemValue = builder.createConvert(loc, argType, itemValue);
         outputFuncArgs.push_back(itemValue);
