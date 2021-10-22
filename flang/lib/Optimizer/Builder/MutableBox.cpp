@@ -87,7 +87,7 @@ public:
   /// also read into it.
   llvm::SmallVector<mlir::Value>
   readShape(llvm::SmallVectorImpl<mlir::Value> *lbounds = nullptr) {
-    llvm::SmallVector<mlir::Value> extents(box.rank());
+    llvm::SmallVector<mlir::Value> extents;
     auto rank = box.rank();
     for (decltype(rank) dim = 0; dim < rank; ++dim) {
       auto [lb, extent] = readShape(dim);
@@ -527,9 +527,9 @@ void fir::factory::associateMutableBoxWithRemap(
     for (auto [lb, ub] : llvm::zip(lbounds, ubounds)) {
       auto lbi = builder.createConvert(loc, idxTy, lb);
       auto ubi = builder.createConvert(loc, idxTy, ub);
-      auto diff = builder.create<arith::SubIOp>(loc, idxTy, ubi, lbi);
+      auto diff = builder.create<mlir::SubIOp>(loc, idxTy, ubi, lbi);
       extents.emplace_back(
-          builder.create<arith::AddIOp>(loc, idxTy, diff, one));
+          builder.create<mlir::AddIOp>(loc, idxTy, diff, one));
     }
   } else {
     // lbounds are default. Upper bounds and extents are the same.
@@ -673,8 +673,8 @@ void fir::factory::genReallocIfNeeded(fir::FirOpBuilder &builder,
           auto castPrevious =
               builder.createConvert(loc, required.getType(), previous);
           // reallocate = reallocate || previous != required
-          auto cmp = builder.create<arith::CmpIOp>(
-              loc, arith::CmpIPredicate::ne, castPrevious, required);
+          auto cmp = builder.create<mlir::CmpIOp>(
+              loc, mlir::CmpIPredicate::ne, castPrevious, required);
           mustReallocate =
               builder.create<mlir::SelectOp>(loc, cmp, cmp, mustReallocate);
         };
