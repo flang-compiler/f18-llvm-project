@@ -52,7 +52,7 @@ subroutine eoshift_test3(arr, shift, dim)
   character(4), dimension(3,3) :: arr, res
   integer :: shift, dim
 
-! CHECK: %[[resBox:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x?x!fir.char<1,?>>>>
+! CHECK: %[[resBox:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x?x!fir.char<1,4>>>>
 ! CHECK: %[[arr:.*]]:2 = fir.unboxchar %arg0 : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK: %[[array:.*]] = fir.convert %[[arr]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<3x3x!fir.char<1,4>>>
 ! CHECK: %[[res:.*]] = fir.alloca !fir.array<3x3x!fir.char<1,4>> {bindc_name = "res", uniq_name = "_QFeoshift_test3Eres"}
@@ -64,7 +64,7 @@ subroutine eoshift_test3(arr, shift, dim)
 
 ! CHECK: %[[boundBox:.*]] = fir.absent !fir.box<none>
 ! CHECK: %[[shiftBox:.*]] = fir.embox %arg1 : (!fir.ref<i32>) -> !fir.box<i32>
-! CHECK: %[[resIRBox:.*]] = fir.convert %[[resBox]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?x?x!fir.char<1,?>>>>>) -> !fir.ref<!fir.box<none>>
+! CHECK: %[[resIRBox:.*]] = fir.convert %[[resBox]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?x?x!fir.char<1,4>>>>>) -> !fir.ref<!fir.box<none>>
 ! CHECK: %[[arrayBoxNone:.*]] = fir.convert %[[arrayBox]] : (!fir.box<!fir.array<3x3x!fir.char<1,4>>>) -> !fir.box<none>
 ! CHECK: %[[shiftBoxNone:.*]] = fir.convert %[[shiftBox]] : (!fir.box<i32>) -> !fir.box<none>
 ! CHECK: %[[tmp:.*]] = fir.call @_FortranAEoshift(%[[resIRBox]], %[[arrayBoxNone]], %[[shiftBoxNone]], %[[boundBox]], %[[dim]], {{.*}}, {{.*}}) : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.box<none>, !fir.box<none>, i32, !fir.ref<i8>, i32) -> none

@@ -5606,11 +5606,12 @@ public:
     return std::visit([&](const auto &v) { return genarr(v, &x); }, x.parent());
   }
 
-  template <Fortran::common::TypeCategory TC, int KIND>
-  CC genarr(
-      const Fortran::evaluate::FunctionRef<Fortran::evaluate::Type<TC, KIND>>
-          &x) {
-    return genProcRef(x, {converter.genType(TC, KIND)});
+  template <typename T>
+  CC genarr(const Fortran::evaluate::FunctionRef<T> &funRef) {
+    // Note that it's possible that the function being called returns either an
+    // array or a scalar.  In the first case, use the element type of the array.
+    return genProcRef(
+        funRef, fir::unwrapSequenceType(converter.genType(toEvExpr(funRef))));
   }
 
   //===--------------------------------------------------------------------===//
