@@ -87,7 +87,7 @@ public:
   /// also read into it.
   llvm::SmallVector<mlir::Value>
   readShape(llvm::SmallVectorImpl<mlir::Value> *lbounds = nullptr) {
-    llvm::SmallVector<mlir::Value> extents;
+    llvm::SmallVector<mlir::Value> extents(box.rank());
     auto rank = box.rank();
     for (decltype(rank) dim = 0; dim < rank; ++dim) {
       auto [lb, extent] = readShape(dim);
@@ -242,11 +242,9 @@ private:
         // unknown or constant lengths.
         auto bt = box.getBaseTy();
         auto addrTy = addr.getType();
-        auto type = addrTy.isa<fir::HeapType>()
-                        ? fir::HeapType::get(bt)
-                        : addrTy.isa<fir::PointerType>()
-                              ? fir::PointerType::get(bt)
-                              : builder.getRefType(bt);
+        auto type = addrTy.isa<fir::HeapType>()      ? fir::HeapType::get(bt)
+                    : addrTy.isa<fir::PointerType>() ? fir::PointerType::get(bt)
+                                                     : builder.getRefType(bt);
         cleanedAddr = builder.createConvert(loc, type, addr);
         if (charTy.getLen() == fir::CharacterType::unknownLen())
           cleanedLengths.append(lengths.begin(), lengths.end());
@@ -325,7 +323,7 @@ fir::factory::createUnallocatedBox(fir::FirOpBuilder &builder,
         loc, fir::ArrayBoxValue{nullAddr, extents, /*lbounds=*/llvm::None});
   }
   // Provide dummy length parameters if they are dynamic. If a length parameter
-  // is deferred. it is set to zero here and will be set on allocation.
+  // is deferred. It is set to zero here and will be set on allocation.
   llvm::SmallVector<mlir::Value> lenParams;
   if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
     if (charTy.getLen() == fir::CharacterType::unknownLen()) {
@@ -356,7 +354,7 @@ fir::factory::createTempMutableBox(fir::FirOpBuilder &builder,
   return box;
 }
 
-/// Helper to decide if a MutableBoxValue must be read to an BoxValue or
+/// Helper to decide if a MutableBoxValue must be read to a BoxValue or
 /// can be read to a reified box value.
 static bool readToBoxValue(const fir::MutableBoxValue &box,
                            bool mayBePolymorphic) {
@@ -368,11 +366,11 @@ static bool readToBoxValue(const fir::MutableBoxValue &box,
   // Track value as fir.box
   if ((box.isDerived() && mayBePolymorphic) || box.isUnlimitedPolymorphic())
     return true;
-  // Intrinsic alloctables are contiguous, no need to track the value by
+  // Intrinsic allocatables are contiguous, no need to track the value by
   // fir.box.
   if (box.isAllocatable() || box.rank() == 0)
     return false;
-  // Pointer are known to be contiguous at compile time iff they have the
+  // Pointers are known to be contiguous at compile time iff they have the
   // CONTIGUOUS attribute.
   return !fir::valueHasFirAttribute(box.getAddr(),
                                     fir::getContiguousAttrName());
@@ -529,8 +527,9 @@ void fir::factory::associateMutableBoxWithRemap(
     for (auto [lb, ub] : llvm::zip(lbounds, ubounds)) {
       auto lbi = builder.createConvert(loc, idxTy, lb);
       auto ubi = builder.createConvert(loc, idxTy, ub);
-      auto diff = builder.create<mlir::SubIOp>(loc, idxTy, ubi, lbi);
-      extents.emplace_back(builder.create<mlir::AddIOp>(loc, idxTy, diff, one));
+      auto diff = builder.create<arith::SubIOp>(loc, idxTy, ubi, lbi);
+      extents.emplace_back(
+          builder.create<arith::AddIOp>(loc, idxTy, diff, one));
     }
   } else {
     // lbounds are default. Upper bounds and extents are the same.
@@ -674,8 +673,8 @@ void fir::factory::genReallocIfNeeded(fir::FirOpBuilder &builder,
           auto castPrevious =
               builder.createConvert(loc, required.getType(), previous);
           // reallocate = reallocate || previous != required
-          auto cmp = builder.create<mlir::CmpIOp>(loc, mlir::CmpIPredicate::ne,
-                                                  castPrevious, required);
+          auto cmp = builder.create<arith::CmpIOp>(
+              loc, arith::CmpIPredicate::ne, castPrevious, required);
           mustReallocate =
               builder.create<mlir::SelectOp>(loc, cmp, cmp, mustReallocate);
         };
@@ -733,7 +732,7 @@ void fir::factory::genReallocIfNeeded(fir::FirOpBuilder &builder,
 
 /// Depending on the implementation, allocatable/pointer descriptor and the
 /// MutableBoxValue need to be synced before and after calls passing the
-/// descriptor. These calls will generate the syncing if needed and be no-op
+/// descriptor. These calls will generate the syncing if needed or be no-op.
 mlir::Value fir::factory::getMutableIRBox(fir::FirOpBuilder &builder,
                                           mlir::Location loc,
                                           const fir::MutableBoxValue &box) {

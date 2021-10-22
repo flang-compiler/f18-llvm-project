@@ -123,7 +123,7 @@ fir::ExtendedValue genMutableBoxRead(fir::FirOpBuilder &builder,
 /// Returns the fir.ref<fir.box<T>> of a MutableBoxValue filled with the current
 /// association / allocation properties. If the fir.ref<fir.box> already exists
 /// and is-up to date, this is a no-op, otherwise, code will be generated to
-/// fill the it.
+/// fill it.
 mlir::Value getMutableIRBox(fir::FirOpBuilder &builder, mlir::Location loc,
                             const fir::MutableBoxValue &box);
 
