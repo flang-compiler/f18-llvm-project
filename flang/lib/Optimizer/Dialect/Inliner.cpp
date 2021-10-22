@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 
-#include "flang/Optimizer/Transforms/Passes.h"
+#include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "llvm/Support/CommandLine.h"
 
 static llvm::cl::opt<bool>

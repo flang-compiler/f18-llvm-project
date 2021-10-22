@@ -14,7 +14,6 @@
 #include "flang/Optimizer/Dialect/FIRAttr.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
-#include "flang/Optimizer/Transforms/Passes.h"
 #include "mlir/Transforms/InliningUtils.h"
 
 using namespace fir;

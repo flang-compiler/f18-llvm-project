@@ -44,11 +44,6 @@ std::unique_ptr<mlir::Pass> createExternalNameConversionPass();
 /// TODO: This pass needs some additional work.
 std::unique_ptr<mlir::Pass> createMemToRegPass();
 
-/// Support for inlining on FIR.
-bool canLegallyInline(mlir::Operation *op, mlir::Region *reg, bool,
-                      mlir::BlockAndValueMapping &map);
-bool canLegallyInline(mlir::Operation *, mlir::Operation *, bool);
-
 /// Optionally force the body of a DO to execute at least once.
 bool isAlwaysExecuteLoopBody();
 

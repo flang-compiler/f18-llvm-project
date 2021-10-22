@@ -19,7 +19,6 @@ add_flang_library(FIRTransforms
   FIRDialect
   FIRSupport
   FIROptTransformsPassIncGen
-  RewritePatternsIncGen
 
   LINK_LIBS
   FIRAnalysis

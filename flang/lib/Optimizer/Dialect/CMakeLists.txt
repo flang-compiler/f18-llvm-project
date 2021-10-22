@@ -10,6 +10,7 @@ add_flang_library(FIRDialect
   FIRSupport
   FIROpsIncGen
   FIRTypesIncGen
+  RewritePatternsIncGen
 
   LINK_LIBS
   FIRSupport
