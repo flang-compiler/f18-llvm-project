@@ -79,7 +79,7 @@ func @overlap(%arg0: !fir.ref<!fir.array<100xf32>>) {
 // CHECK-DAG:           %[[VAL_5:.*]] = constant 0 : index
 // CHECK:           %[[VAL_6:.*]] = fir.alloca f32
 // CHECK:           %[[VAL_7:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
-// CHECK:           %[[VAL_8:.*]] = fir.allocmem !fir.array<100xf32>, %[[VAL_1]]
+// CHECK:           %[[VAL_8:.*]] = fir.allocmem !fir.array<100xf32>{{$}}
 // CHECK:           %[[VAL_9:.*]] = fir.convert %[[VAL_1]] : (index) -> index
 // CHECK:           %[[VAL_10:.*]] = constant 0 : index
 // CHECK:           %[[VAL_11:.*]] = constant 1 : index

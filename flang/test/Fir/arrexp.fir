@@ -101,7 +101,7 @@ func @f4(%a : !fir.ref<!fir.array<?x?xf32>>, %b : !fir.ref<!fir.array<?x?xf32>>,
 // Array expression assignment with potentially non contiguous arrays (e.g.
 // `a = b + f`, with and v assumed shapes.
 // Tests that the stride from the descriptor is used.
-// CHECK-LINE: define void @f6
+// CHECK-LINE: define void @f5
 // CHECK: ({ float*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[A:[^,]*]], { float*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[B:[^,]*]], float %[[F:.*]])
 func @f5(%arg0: !fir.box<!fir.array<?xf32>>, %arg1: !fir.box<!fir.array<?xf32>>, %arg2: f32) {
   %c0 = constant 0 : index
@@ -133,7 +133,6 @@ func @f5(%arg0: !fir.box<!fir.array<?xf32>>, %arg1: !fir.box<!fir.array<?xf32>>,
   return
 }
 
-
 // Overlapping array expression assignment with a potentially non
 // contiguous array (e.g. `a(2:10:1) = a(1:9:1) + f`, with a assumed shape).
 // Test that a temp is created.
@@ -145,13 +144,11 @@ func @f6(%arg0: !fir.box<!fir.array<?xf32>>, %arg1: f32) {
   %c2 = constant 2 : index
   %c9 = constant 9 : index
   %c10 = constant 10 : index
-
   // CHECK: %[[EXT_GEP:.*]] = getelementptr {{.*}} %[[A]], i32 0, i32 7, i64 0, i32 1
   // CHECK: %[[EXTENT:.*]] = load i64, i64* %[[EXT_GEP]]
   // CHECK: %[[SIZE:.*]] = mul i64 4, %[[EXTENT]]
   // CHECK: %[[MALLOC:.*]] = call i8* @malloc(i64 %[[SIZE]])
   // CHECK: %[[TMP:.*]] = bitcast i8* %[[MALLOC]] to float*
-
   %1 = fir.slice %c2, %c10, %c1 : (index, index, index) -> !fir.slice<1>
   %2 = fir.array_load %arg0 [%1] : (!fir.box<!fir.array<?xf32>>, !fir.slice<1>) -> !fir.array<?xf32>
   %3 = fir.slice %c1, %c9, %c1 : (index, index, index) -> !fir.slice<1>

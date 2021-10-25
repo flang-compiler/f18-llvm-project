@@ -797,11 +797,19 @@ public:
       LLVM_DEBUG(llvm::outs() << "Yes, conflict was found\n");
       rewriter.setInsertionPoint(loadOp);
       // Copy in.
-      llvm::SmallVector<mlir::Value> extents;
+      llvm::SmallVector<mlir::Value> extents, nonconstantExtents;
       auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents);
+      auto arrTy = fir::unwrapRefType(load.memref().getType());
+      if (auto boxTy = arrTy.template dyn_cast<BoxType>())
+        arrTy = boxTy.getEleTy();
+      auto seqTy = arrTy.template dyn_cast<fir::SequenceType>();
+      assert(seqTy && "expecting sequence type");
+      for (auto [s, x] : llvm::zip(seqTy.getShape(), extents))
+        if (s == fir::SequenceType::getUnknownExtent())
+          nonconstantExtents.emplace_back(x);
       auto allocmem = rewriter.create<AllocMemOp>(
           loc, dyn_cast_ptrOrBoxEleTy(load.memref().getType()),
-          load.typeparams(), extents);
+          load.typeparams(), nonconstantExtents);
       genArrayCopy(load.getLoc(), rewriter, allocmem, load.memref(), shapeOp,
                    load);
       rewriter.setInsertionPoint(op);
