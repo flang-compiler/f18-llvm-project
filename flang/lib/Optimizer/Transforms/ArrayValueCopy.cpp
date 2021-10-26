@@ -797,7 +797,8 @@ public:
       LLVM_DEBUG(llvm::outs() << "Yes, conflict was found\n");
       rewriter.setInsertionPoint(loadOp);
       // Copy in.
-      llvm::SmallVector<mlir::Value> extents, nonconstantExtents;
+      llvm::SmallVector<mlir::Value> extents;
+      llvm::SmallVector<mlir::Value> nonconstantExtents;
       auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents);
       auto arrTy = fir::unwrapPassByRefType(load.memref().getType());
       auto seqTy = arrTy.template dyn_cast<fir::SequenceType>();

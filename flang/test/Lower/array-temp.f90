@@ -1,21 +1,91 @@
 ! RUN: bbc %s -o - | FileCheck %s
 
-  ! CHECK: %[[aa:[0-9]+]] = fir.address_of(@_QEaa) : !fir.ref<!fir.array<2650000xf32>>{{$}}
-  ! CHECK: %[[shape:[0-9]+]] = fir.shape %{{.*}} : (index) -> !fir.shape<1>
+! CHECK-LABEL: func @_QPss1()
+subroutine ss1
+  ! CHECK: %[[aa:[0-9]+]] = fir.alloca !fir.array<2650000xf32> {bindc_name = "aa", uniq_name = "_QFss1Eaa"}
+  ! CHECK: %[[shape:[0-9]+]] = fir.shape {{.*}} : (index) -> !fir.shape<1>
   integer, parameter :: N = 2650000
   real aa(N)
-  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) %{{[0-9]+}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
   aa = -2
   ! CHECK: %[[temp:[0-9]+]] = fir.allocmem !fir.array<2650000xf32>
-  ! CHECK: %15 = fir.array_coor %[[aa]](%[[shape]]) %{{[0-9]+}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
-  ! CHECK: %16 = fir.array_coor %[[temp]](%[[shape]]) %{{[0-9]+}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
-  ! CHECK: %24 = fir.array_coor %[[aa]](%[[shape]]) [%{{[0-9]+}}] %{{[0-9]+}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
-  ! CHECK: %27 = fir.array_coor %[[temp]](%[[shape]]) [%9] %{{[0-9]+}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
-  ! CHECK: %33 = fir.array_coor %[[temp]](%[[shape]]) %{{[0-9]+}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
-  ! CHECK: %34 = fir.array_coor %[[aa]](%[[shape]]) %{{[0-9]+}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) [{{.*}}] {{.*}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) [{{.*}}] {{.*}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}} : (!fir.heap<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
   ! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<2650000xf32>>
   aa(2:N) = aa(1:N-1) + 7.0
-  ! CHECK: %40 = fir.coordinate_of %[[aa]], %{{.*}} : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
-  ! CHECK: %43 = fir.coordinate_of %[[aa]], %{{.*}} : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
-  print*, aa(1), aa(N)
+! print*, aa(1:2), aa(N-1:N)
+end
+
+! CHECK-LABEL: func @_QPss2
+subroutine ss2(N)
+  ! CHECK: %[[arg:[0-9]+]] = fir.load %arg0 : !fir.ref<i32>
+  ! CHECK: %[[n:[0-9]+]] = fir.convert %[[arg]] : (i32) -> index
+  ! CHECK: %[[aa:[0-9]+]] = fir.alloca !fir.array<?xf32>, %[[n]] {bindc_name = "aa", uniq_name = "_QFss2Eaa"}
+  real aa(N)
+  ! CHECK: %[[shape:[0-9]+]] = fir.shape %[[n]] : (index) -> !fir.shape<1>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<?xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  aa = -2
+  ! CHECK: %[[temp:[0-9]+]] = fir.allocmem !fir.array<?xf32>, %[[n]]
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<?xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}} : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) [{{.*}}] {{.*}} : (!fir.ref<!fir.array<?xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) [{{.*}}] {{.*}} : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}} : (!fir.heap<!fir.array<?xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}} : (!fir.ref<!fir.array<?xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?xf32>>
+  aa(2:N) = aa(1:N-1) + 7.0
+! print*, aa(1:2), aa(N-1:N)
+end
+
+! CHECK-LABEL: func @_QPss3
+subroutine ss3(N)
+  ! CHECK: %[[arg:[0-9]+]] = fir.load %arg0 : !fir.ref<i32>
+  ! CHECK: %[[n:[0-9]+]] = fir.convert %[[arg]] : (i32) -> index
+  ! CHECK: %[[aa:[0-9]+]] = fir.alloca !fir.array<2x?xf32>, %[[n]] {bindc_name = "aa", uniq_name = "_QFss3Eaa"}
+  real aa(2,N)
+  ! CHECK: %[[shape:[0-9]+]] = fir.shape {{.*}} %[[n]] : (index, index) -> !fir.shape<2>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<2x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  aa = -2
+  ! CHECK: %[[temp:[0-9]+]] = fir.allocmem !fir.array<2x?xf32>, %[[n]]
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<2x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}}, {{.*}} : (!fir.heap<!fir.array<2x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) [{{.*}}] {{.*}}, {{.*}} : (!fir.ref<!fir.array<2x?xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) [{{.*}}] {{.*}}, {{.*}} : (!fir.heap<!fir.array<2x?xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}}, {{.*}} : (!fir.heap<!fir.array<2x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<2x?xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<2x?xf32>>
+  aa(:,2:N) = aa(:,1:N-1) + 7.0
+! print*, aa(:,1:2), aa(:,N-1:N)
+end
+
+! CHECK-LABEL: func @_QPss4
+subroutine ss4(N)
+  ! CHECK: %[[arg:[0-9]+]] = fir.load %arg0 : !fir.ref<i32>
+  ! CHECK: %[[n:[0-9]+]] = fir.convert %[[arg]] : (i32) -> index
+  ! CHECK: %[[aa:[0-9]+]] = fir.alloca !fir.array<?x2xf32>, %[[n]] {bindc_name = "aa", uniq_name = "_QFss4Eaa"}
+  real aa(N,2)
+  ! CHECK: %[[shape:[0-9]+]] = fir.shape %[[n]], {{.*}} : (index, index) -> !fir.shape<2>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<?x2xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  aa = -2
+  ! CHECK: %[[temp:[0-9]+]] = fir.allocmem !fir.array<?x2xf32>, %[[n]]
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<?x2xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}}, {{.*}} : (!fir.heap<!fir.array<?x2xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) [{{.*}}] {{.*}}, {{.*}} : (!fir.ref<!fir.array<?x2xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) [{{.*}}] {{.*}}, {{.*}} : (!fir.heap<!fir.array<?x2xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[temp]](%[[shape]]) {{.*}}, {{.*}} : (!fir.heap<!fir.array<?x2xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%[[shape]]) {{.*}}, {{.*}} : (!fir.ref<!fir.array<?x2xf32>>, !fir.shape<2>, index, index) -> !fir.ref<f32>
+  ! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?x2xf32>>
+  aa(2:N,:) = aa(1:N-1,:) + 7.0
+! print*, aa(1:2,:), aa(N-1:N,:)
+end
+
+program p
+! call ss1
+! call ss2(2650000)
+! call ss3(2650000)
+! call ss4(2650000)
 end
