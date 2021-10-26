@@ -214,7 +214,10 @@ public:
       Fortran::lower::pft::FunctionLikeUnit &funit,
       llvm::SetVector<const Fortran::semantics::Symbol *> &escapees) {
     for (const auto &var : funit.getOrderedSymbolTable()) {
-      const auto &sym = var.getSymbol();
+      const auto &sym = var.isAggregateStore()
+                            ? var.getAggregateStore().getNamingSymbol()
+                            : var.getSymbol();
+      //      const auto &sym = var.getSymbol();
       if (const auto *escapingSym = getIfHostProcedureSymbol(sym)) {
         LLVM_DEBUG(llvm::dbgs() << "host associated symbol " << sym << '\n');
         escapees.insert(escapingSym);

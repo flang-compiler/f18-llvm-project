@@ -444,8 +444,10 @@ struct Variable {
       : var{Nominal(&sym, depth, global)} {}
   explicit Variable(AggregateStore &&istore) : var{std::move(istore)} {}
 
-  /// Return the front-end symbol for a nominal variable.
+  /// Return the front-end symbol for a nominal or equivalenced variable.
   const Fortran::semantics::Symbol &getSymbol() const {
+    if (isAggregateStore())
+      return getAggregateStore().getNamingSymbol();
     assert(hasSymbol() && "variable is not nominal");
     return *std::get<Nominal>(var).symbol;
   }
