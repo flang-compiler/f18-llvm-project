@@ -11,9 +11,9 @@ mlir_tablegen(FIROpsTypes.h.inc --gen-typedef-decls)
 mlir_tablegen(FIROpsTypes.cpp.inc --gen-typedef-defs)
 add_public_tablegen_target(FIRTypesIncGen)
 
-set(LLVM_TARGET_DEFINITIONS RewritePatterns.td)
-mlir_tablegen(RewritePatterns.inc -gen-rewriters)
-add_public_tablegen_target(RewritePatternsIncGen)
+set(LLVM_TARGET_DEFINITIONS CanonicalizationPatterns.td)
+mlir_tablegen(CanonicalizationPatterns.inc -gen-rewriters)
+add_public_tablegen_target(CanonicalizationPatternsIncGen)
 
 add_custom_target(flang-doc)
 set(dialect_doc_filename "FIRLangRef")
