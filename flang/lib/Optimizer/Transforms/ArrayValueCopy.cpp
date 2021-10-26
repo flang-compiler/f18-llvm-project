@@ -799,9 +799,7 @@ public:
       // Copy in.
       llvm::SmallVector<mlir::Value> extents, nonconstantExtents;
       auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents);
-      auto arrTy = fir::unwrapRefType(load.memref().getType());
-      if (auto boxTy = arrTy.template dyn_cast<BoxType>())
-        arrTy = boxTy.getEleTy();
+      auto arrTy = fir::unwrapPassByRefType(load.memref().getType());
       auto seqTy = arrTy.template dyn_cast<fir::SequenceType>();
       assert(seqTy && "expecting sequence type");
       for (auto [s, x] : llvm::zip(seqTy.getShape(), extents))

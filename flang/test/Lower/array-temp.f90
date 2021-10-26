@@ -3,7 +3,7 @@
   ! CHECK: %[[aa:[0-9]+]] = fir.address_of(@_QEaa) : !fir.ref<!fir.array<2650000xf32>>{{$}}
   integer, parameter :: N = 2650000
   real aa(N)
-  ! CHECK: %7 = fir.array_coor %[[aa]](%1) %6 : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
+  ! CHECK: fir.array_coor %[[aa]](%1) %6 : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
   aa = -2
   ! CHECK: %[[temp:[0-9]+]] = fir.allocmem !fir.array<2650000xf32>
   ! CHECK: %15 = fir.array_coor %[[aa]](%1) %14 : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
