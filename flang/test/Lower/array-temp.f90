@@ -15,7 +15,7 @@
   ! CHECK: %34 = fir.array_coor %[[aa]](%[[shape]]) %{{[0-9]+}} : (!fir.ref<!fir.array<2650000xf32>>, !fir.shape<1>, index) -> !fir.ref<f32>
   ! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<2650000xf32>>
   aa(2:N) = aa(1:N-1) + 7.0
-  ! CHECK: %40 = fir.coordinate_of %[[aa]], %c0_i64 : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
-  ! CHECK: %43 = fir.coordinate_of %[[aa]], %c2649999_i64 : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
+  ! CHECK: %40 = fir.coordinate_of %[[aa]], %{{.*}} : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
+  ! CHECK: %43 = fir.coordinate_of %[[aa]], %{{.*}} : (!fir.ref<!fir.array<2650000xf32>>, i64) -> !fir.ref<f32>
   print*, aa(1), aa(N)
 end
