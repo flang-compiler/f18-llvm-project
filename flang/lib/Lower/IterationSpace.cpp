@@ -208,7 +208,7 @@ public:
     unsigned args = 13u;
     for (const auto &v : x.arguments())
       args -= getHashValue(v);
-    return getHashValue(x.proc()) * 101u;
+    return getHashValue(x.proc()) * 101u - args;
   }
   template <typename A>
   static unsigned
@@ -217,16 +217,15 @@ public:
     return 127u;
   }
   static unsigned getHashValue(const Fortran::evaluate::ImpliedDoIndex &x) {
-    // FIXME: hash the contents.
-    return 131u;
+    return llvm::hash_value(toStringRef(x.name).str()) * 131u;
   }
   static unsigned getHashValue(const Fortran::evaluate::TypeParamInquiry &x) {
-    // FIXME: hash the contents.
-    return 137u;
+    return getHashValue(x.base()) * 137u - getHashValue(x.parameter()) * 3u;
   }
   static unsigned getHashValue(const Fortran::evaluate::DescriptorInquiry &x) {
-    // FIXME: hash the contents.
-    return 139u;
+    return getHashValue(x.base()) * 139u -
+           static_cast<unsigned>(x.field()) * 13u +
+           static_cast<unsigned>(x.dimension());
   }
   static unsigned
   getHashValue(const Fortran::evaluate::StructureConstructor &x) {
@@ -278,6 +277,10 @@ unsigned Fortran::lower::getHashValue(
     const Fortran::lower::ExplicitIterSpace::ArrayBases &x) {
   return std::visit(
       [&](const auto *p) { return HashEvaluateExpr::getHashValue(*p); }, x);
+}
+
+unsigned Fortran::lower::getHashValue(Fortran::lower::FrontEndExpr x) {
+  return HashEvaluateExpr::getHashValue(*x);
 }
 
 namespace {
@@ -464,9 +467,8 @@ public:
         return isEqual(*xs, *ys);
       return false;
     }
-    if ([[maybe_unused]] const auto *ys = y.GetAssumedTypeDummy())
-      return false;
-    return isEqual(*x.UnwrapExpr(), *y.UnwrapExpr());
+    return !y.GetAssumedTypeDummy() &&
+           isEqual(*x.UnwrapExpr(), *y.UnwrapExpr());
   }
   static bool isEqual(const Fortran::evaluate::ProcedureDesignator &x,
                       const Fortran::evaluate::ProcedureDesignator &y) {
@@ -484,15 +486,16 @@ public:
   }
   static bool isEqual(const Fortran::evaluate::ImpliedDoIndex &x,
                       const Fortran::evaluate::ImpliedDoIndex &y) {
-    llvm::report_fatal_error("not implemented");
+    return toStringRef(x.name) == toStringRef(y.name);
   }
   static bool isEqual(const Fortran::evaluate::TypeParamInquiry &x,
                       const Fortran::evaluate::TypeParamInquiry &y) {
-    llvm::report_fatal_error("not implemented");
+    return isEqual(x.base(), y.base()) && isEqual(x.parameter(), y.parameter());
   }
   static bool isEqual(const Fortran::evaluate::DescriptorInquiry &x,
                       const Fortran::evaluate::DescriptorInquiry &y) {
-    llvm::report_fatal_error("not implemented");
+    return isEqual(x.base(), y.base()) && x.field() == y.field() &&
+           x.dimension() == y.dimension();
   }
   static bool isEqual(const Fortran::evaluate::StructureConstructor &x,
                       const Fortran::evaluate::StructureConstructor &y) {
@@ -570,6 +573,16 @@ bool Fortran::lower::isEqual(
             }
           }},
       x, y);
+}
+
+bool Fortran::lower::isEqual(Fortran::lower::FrontEndExpr x,
+                             Fortran::lower::FrontEndExpr y) {
+  auto empty = llvm::DenseMapInfo<Fortran::lower::FrontEndExpr>::getEmptyKey();
+  auto tombstone =
+      llvm::DenseMapInfo<Fortran::lower::FrontEndExpr>::getTombstoneKey();
+  if (x == empty || y == empty || x == tombstone || y == tombstone)
+    return x == y;
+  return x == y || IsEqualEvaluateExpr::isEqual(*x, *y);
 }
 
 namespace {
