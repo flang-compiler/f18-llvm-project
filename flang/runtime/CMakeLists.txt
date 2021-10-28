@@ -33,6 +33,7 @@ add_flang_library(FortranRuntime PARTIAL_SOURCES_INTENDED
   complex-reduction.c
   copy.cpp
   character.cpp
+  coarray.cpp
   connection.cpp
   derived.cpp
   derived-api.cpp
