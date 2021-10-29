@@ -31,7 +31,7 @@ struct TargetRewriteOptions {
 };
 
 /// Prerequiste pass for code gen. Perform intermediate rewrites to tailor the
-/// IR for the chosen target.
+/// FIR for the chosen target.
 std::unique_ptr<mlir::OperationPass<mlir::ModuleOp>> createFirTargetRewritePass(
     const TargetRewriteOptions &options = TargetRewriteOptions());
 

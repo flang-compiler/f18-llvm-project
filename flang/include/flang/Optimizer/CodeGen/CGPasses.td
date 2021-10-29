@@ -49,6 +49,8 @@ def TargetRewrite : Pass<"target-rewrite", "mlir::ModuleOp"> {
   let constructor = "::fir::createFirTargetRewritePass()";
   let dependentDialects = [ "fir::FIROpsDialect" ];
   let options = [
+    Option<"forcedTargetTriple", "target", "std::string", /*default=*/"",
+           "Override module's target triple.">,
     Option<"noCharacterConversion", "no-character-conversion",
            "bool", /*default=*/"false",
            "Disable target-specific conversion of CHARACTER.">,

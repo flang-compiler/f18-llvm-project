@@ -6,12 +6,17 @@
 //
 //===----------------------------------------------------------------------===//
 //
+// Target rewrite: rewriting of ops to make target-specific lowerings manifest.
+// LLVM expects different lowering idioms to be used for distinct target
+// triples. These distinctions are handled by this pass.
+//
 // Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
 //
 //===----------------------------------------------------------------------===//
 
 #include "PassDetail.h"
 #include "Target.h"
+#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/CodeGen/CodeGen.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
@@ -22,12 +27,6 @@
 #include "llvm/ADT/TypeSwitch.h"
 #include "llvm/Support/Debug.h"
 
-//===----------------------------------------------------------------------===//
-// Target rewrite: rewriting of ops to make target-specific lowerings manifest.
-// LLVM expects different lowering idioms to be used for distinct target
-// triples. These distinctions are handled by this pass.
-//===----------------------------------------------------------------------===//
-
 using namespace fir;
 
 #define DEBUG_TYPE "flang-target-rewrite"
@@ -36,12 +35,15 @@ namespace {
 
 /// Fixups for updating a FuncOp's arguments and return values.
 struct FixupTy {
-  // clang-format off
   enum class Codes {
-    ArgumentAsLoad, ArgumentType, CharPair, ReturnAsStore, ReturnType,
-    Split, Trailing
+    ArgumentAsLoad,
+    ArgumentType,
+    CharPair,
+    ReturnAsStore,
+    ReturnType,
+    Split,
+    Trailing
   };
-  // clang-format on
 
   FixupTy(Codes code, std::size_t index, std::size_t second = 0)
       : code{code}, index{index}, second{second} {}
@@ -58,10 +60,10 @@ struct FixupTy {
   llvm::Optional<std::function<void(mlir::FuncOp)>> finalizer{};
 }; // namespace
 
-/// Target-specific rewriting of the IR. This is a prerequisite pass to code
-/// generation that traverses the IR and modifies types and operations to a
-/// form that appropriate for the specific target. LLVM IR has specific idioms
-/// that are used for distinct target processor and ABI combinations.
+/// Target-specific rewriting of the FIR. This is a prerequisite pass to code
+/// generation that traverses the FIR and modifies types and operations to a
+/// form that is appropriate for the specific target. LLVM IR has specific
+/// idioms that are used for distinct target processor and ABI combinations.
 class TargetRewrite : public TargetRewriteBase<TargetRewrite> {
 public:
   TargetRewrite(const TargetRewriteOptions &options) {
@@ -72,7 +74,12 @@ public:
   void runOnOperation() override final {
     auto &context = getContext();
     mlir::OpBuilder rewriter(&context);
+
     auto mod = getModule();
+    if (!forcedTargetTriple.empty()) {
+      setTargetTriple(mod, forcedTargetTriple);
+    }
+
     auto specifics = CodeGenSpecifics::get(getOperation().getContext(),
                                            getTargetTriple(getOperation()),
                                            getKindMapping(getOperation()));
@@ -212,10 +219,7 @@ public:
           })
           .Default([&](mlir::Type ty) { newResTys.push_back(ty); });
     } else if (fnTy.getResults().size() > 1) {
-      // If the function is returning more than 1 result, do not perform any
-      // target-specific lowering. (FIXME?) This may need to be revisited.
-      newResTys.insert(newResTys.end(), fnTy.getResults().begin(),
-                       fnTy.getResults().end());
+      TODO(loc, "multiple results not supported yet");
     }
 
     llvm::SmallVector<mlir::Type> trailingInTys;
@@ -238,7 +242,7 @@ public:
               // TODO: dispatch case; how do we put arguments on a call?
               // We cannot put both an sret and the dispatch object first.
               sret = false;
-              llvm_unreachable("not implemented");
+              TODO(loc, "dispatch + sret not supported yet");
             }
             auto m = specifics->boxcharArgumentType(boxTy.getEleTy(), sret);
             auto unbox =
@@ -290,7 +294,7 @@ public:
         replaceOp(callOp, newCall.getResults());
     } else {
       // A is fir::DispatchOp
-      llvm_unreachable("not implemented"); // TODO
+      TODO(loc, "dispatch not implemented");
     }
   }
 
@@ -501,7 +505,7 @@ public:
           func.front().eraseArgument(fixup.index + 1);
         } break;
         case FixupTy::Codes::ArgumentType: {
-          // Argument is pass-by-value, but its type is likely been modified to
+          // Argument is pass-by-value, but its type has likely been modified to
           // suit the target ABI convention.
           auto newArg =
               func.front().insertArgument(fixup.index, newInTys[fixup.index]);
