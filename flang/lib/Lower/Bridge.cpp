@@ -352,34 +352,9 @@ public:
     };
 
     fir::ExtendedValue hexv = getExtendedValue(hsb);
-    auto exval = hexv.match(
-        [&](const fir::BoxValue &box) -> fir::ExtendedValue {
-          const auto *type = sym.GetType();
-          if (type && type->IsPolymorphic())
-            TODO(loc, "create polymorphic host associated copy");
-          // Create a contiguous temp with the same shape and length as
-          // the original variable described by a fir.box.
-          auto extents = fir::factory::getExtents(*builder, loc, hexv);
-          if (box.isDerivedWithLengthParameters())
-            TODO(loc, "get length parameters from derived type BoxValue");
-          if (box.isCharacter()) {
-            auto len = fir::factory::readCharLen(*builder, loc, box);
-            auto temp = allocate(extents, {len});
-            return fir::CharArrayBoxValue{temp, len, extents};
-          }
-          return fir::ArrayBoxValue{allocate(extents, {}), extents};
-        },
-        [&](const fir::MutableBoxValue &box) -> fir::ExtendedValue {
-          // Allocate storage for a pointer/allocatble descriptor.
-          // No shape/lengths to be passed to the alloca.
-          return fir::MutableBoxValue(allocate({}, {}),
-                                      box.nonDeferredLenParams(), {});
-        },
-        [&](const auto &) -> fir::ExtendedValue {
-          auto temp = allocate(fir::factory::getExtents(*builder, loc, hexv),
-                               fir::getTypeParams(hexv));
-          return fir::substBase(hexv, temp);
-        });
+    auto temp = allocate(fir::factory::getExtents(*builder, loc, hexv),
+                         fir::getTypeParams(hexv));
+    auto exval = fir::substBase(hexv, temp);
     return bindSymbol(sym, exval);
   }
 
