@@ -326,22 +326,9 @@ public:
         llvm::None);
   }
 
-  bool createHostAssociateVarClone(
-      const Fortran::semantics::Symbol &sym) override final {
+  bool
+  createPrivateVarClone(const Fortran::semantics::Symbol &sym) override final {
     auto loc = genLocation(sym.name());
-    const auto *details = sym.detailsIf<Fortran::semantics::HostAssocDetails>();
-    assert(details != nullptr && "No host-association found");
-    const Fortran::semantics::Symbol &hsym = details->symbol();
-    Fortran::lower::SymbolBox hsb = lookupSymbol(hsym);
-
-    auto allocate = [&](llvm::ArrayRef<mlir::Value> shape,
-                        llvm::ArrayRef<mlir::Value> typeParams) -> mlir::Value {
-      mlir::Type symType = genType(sym);
-      return builder->allocateLocal(
-          loc, symType, mangleName(sym), toStringRef(sym.GetUltimate().name()),
-          /*pinned=*/true, shape, typeParams,
-          sym.GetUltimate().attrs().test(Fortran::semantics::Attr::TARGET));
-    };
 
     auto getExtendedValue = [&](Fortran::lower::SymbolBox sb) {
       return sb.match(
@@ -351,11 +338,72 @@ public:
           [&sb](auto &) { return sb.toExtendedValue(); });
     };
 
-    fir::ExtendedValue hexv = getExtendedValue(hsb);
-    auto temp = allocate(fir::factory::getExtents(*builder, loc, hexv),
-                         fir::getTypeParams(hexv));
-    auto exval = fir::substBase(hexv, temp);
-    return bindSymbol(sym, exval);
+    if (const auto *commonDet =
+            sym.detailsIf<Fortran::semantics::CommonBlockDetails>()) {
+      Fortran::lower::SymbolBox csb = lookupSymbol(sym);
+      fir::ExtendedValue cexv = csb.toExtendedValue();
+
+      mlir::Type symType = getSymbolAddress(sym).getType();
+      auto refTy = symType.dyn_cast<fir::ReferenceType>();
+      symType = refTy.getEleTy();
+
+      auto allocaVal = allocateThreadLocal(
+          sym, symType, fir::factory::getExtents(*builder, loc, cexv),
+          fir::getTypeParams(cexv));
+
+      for (const auto &mem : commonDet->objects()) {
+        const auto *memDet =
+            mem->detailsIf<Fortran::semantics::ObjectEntityDetails>();
+        assert(memDet != nullptr && "No common member object entity found");
+        Fortran::lower::SymbolBox memCsb = lookupSymbol(*mem);
+        auto *cvtSymOp = memCsb.getAddr().getDefiningOp();
+        auto *coordOp = cvtSymOp->getOperand(0).getDefiningOp();
+        auto cvtBlkVal = builder->createConvert(
+            loc, coordOp->getOperand(0).getType(), allocaVal);
+        auto coordVal = builder->create<fir::CoordinateOp>(
+            loc, cvtSymOp->getOperand(0).getType(), cvtBlkVal,
+            coordOp->getOperand(1));
+        auto cvtSymVal =
+            builder->createConvert(loc, memCsb.getAddr().getType(), coordVal);
+
+        fir::ExtendedValue memCexv = getExtendedValue(memCsb);
+        auto memExval = memCexv.match(
+            [&](const fir::CharBoxValue &box) -> fir::ExtendedValue {
+              return fir::CharBoxValue(
+                  cvtSymVal, fir::factory::readCharLen(*builder, loc, box));
+            },
+            [&](const fir::ArrayBoxValue &box) -> fir::ExtendedValue {
+              return fir::ArrayBoxValue{
+                  cvtSymVal, fir::factory::getExtents(*builder, loc, box)};
+            },
+            [&](const fir::CharArrayBoxValue &box) -> fir::ExtendedValue {
+              return fir::CharArrayBoxValue{
+                  cvtSymVal, fir::factory::readCharLen(*builder, loc, box),
+                  fir::factory::getExtents(*builder, loc, box)};
+            },
+            [&](const fir::MutableBoxValue &box) -> fir::ExtendedValue {
+              TODO(loc, "Pointer in common block not implemented");
+            },
+            [&](const auto &) -> fir::ExtendedValue { return cvtSymVal; });
+        localSymbols.addSymbol(*mem, memExval, true);
+      }
+    } else if (const auto *hostAssocDet =
+                   sym.detailsIf<Fortran::semantics::HostAssocDetails>()) {
+      assert(hostAssocDet != nullptr &&
+             "No common block or host-association found");
+      const Fortran::semantics::Symbol &hsym = hostAssocDet->symbol();
+      Fortran::lower::SymbolBox hsb = lookupSymbol(hsym);
+      fir::ExtendedValue hexv = getExtendedValue(hsb);
+      auto allocaVal = allocateThreadLocal(
+          sym, genType(sym), fir::factory::getExtents(*builder, loc, hexv),
+          fir::getTypeParams(hexv));
+      auto exval = fir::substBase(hexv, allocaVal);
+      if (!bindSymbol(sym, exval))
+        return false;
+    } else {
+      return false;
+    }
+    return true;
   }
 
   mlir::Location getCurrentLocation() override final { return toLocation(); }
@@ -456,6 +504,17 @@ private:
                                            toStringRef(sym.name()), shape);
     addSymbol(sym, newVal);
     return newVal;
+  }
+
+  mlir::Value allocateThreadLocal(const Fortran::semantics::Symbol &sym,
+                                  mlir::Type symType,
+                                  llvm::ArrayRef<mlir::Value> shape,
+                                  llvm::ArrayRef<mlir::Value> typeParams) {
+    return builder->allocateLocal(
+        genLocation(sym.name()), symType, mangleName(sym),
+        toStringRef(sym.GetUltimate().name()), /*pinned=*/true, shape,
+        typeParams,
+        sym.GetUltimate().attrs().test(Fortran::semantics::Attr::TARGET));
   }
 
   bool isNumericScalarCategory(Fortran::common::TypeCategory cat) {

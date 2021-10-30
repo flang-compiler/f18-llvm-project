@@ -136,3 +136,62 @@ subroutine private_clause_allocatable()
 !$OMP END PARALLEL
 
 end subroutine
+
+!FIRDialect: func @_QPprivate_clause_commonblock() {
+!FIRDialect:  [[TMP0:%.*]] = fir.address_of(@_QBblk) : !fir.ref<!fir.array<86xi8>>
+!FIRDialect:  [[TMP1:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP2:%.*]] = fir.coordinate_of [[TMP1]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP2]] : (!fir.ref<i8>) -> !fir.ref<i32>
+!FIRDialect:  [[TMP4:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP5:%.*]] = fir.coordinate_of [[TMP4]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP5]] : (!fir.ref<i8>) -> !fir.ref<!fir.array<10xf32>>
+!FIRDialect:  [[TMP7:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP8:%.*]] = fir.coordinate_of [[TMP7]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP8]] : (!fir.ref<i8>) -> !fir.ref<!fir.complex<4>>
+!FIRDialect:  [[TMP10:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP11:%.*]] = fir.coordinate_of [[TMP10]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP11]] : (!fir.ref<i8>) -> !fir.ref<!fir.logical<4>>
+!FIRDialect:  [[TMP13:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP14:%.*]] = fir.coordinate_of [[TMP13]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP14]] : (!fir.ref<i8>) -> !fir.ref<!fir.char<1,5>>
+!FIRDialect:  [[TMP16:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:  [[TMP17:%.*]] = fir.coordinate_of [[TMP16]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:  {{.*}} = fir.convert [[TMP17]] : (!fir.ref<i8>) -> !fir.ref<!fir.array<5x!fir.char<1,5>>>
+
+!FIRDialect:   omp.parallel {
+!FIRDialect:    [[TMP0:%.*]] = fir.alloca !fir.array<86xi8> {bindc_name = "blk", pinned, uniq_name = "_QBblk"}
+!FIRDialect:    [[TMP1:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP2:%.*]] = fir.coordinate_of [[TMP1]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP2]] : (!fir.ref<i8>) -> !fir.ref<i32>
+!FIRDialect:    [[TMP4:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP5:%.*]] = fir.coordinate_of [[TMP4]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP5]] : (!fir.ref<i8>) -> !fir.ref<!fir.array<10xf32>>
+!FIRDialect:    [[TMP7:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP8:%.*]] = fir.coordinate_of [[TMP7]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP8]] : (!fir.ref<i8>) -> !fir.ref<!fir.complex<4>>
+!FIRDialect:    [[TMP10:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP11:%.*]] = fir.coordinate_of [[TMP10]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP11]] : (!fir.ref<i8>) -> !fir.ref<!fir.logical<4>>
+!FIRDialect:    [[TMP13:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP14:%.*]] = fir.coordinate_of [[TMP13]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP14]] : (!fir.ref<i8>) -> !fir.ref<!fir.char<1,5>>
+!FIRDialect:    [[TMP16:%.*]] = fir.convert [[TMP0]] : (!fir.ref<!fir.array<86xi8>>) -> !fir.ref<!fir.array<?xi8>>
+!FIRDialect:    [[TMP17:%.*]] = fir.coordinate_of [[TMP16]], {{.*}} : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+!FIRDialect:    {{.*}} = fir.convert [[TMP17]] : (!fir.ref<i8>) -> !fir.ref<!fir.array<5x!fir.char<1,5>>>
+
+subroutine private_clause_commonblock()
+
+        integer :: a
+        real :: b(10)
+        complex :: c
+        logical :: d
+        character(5) :: e, f(5)
+        common /blk/ a, b, c, d, e, f
+
+        print *, a, b, c, d, e, f
+
+!$OMP PARALLEL PRIVATE(/blk/)
+        print *, a, b, c, d, e, f
+!$OMP END PARALLEL
+
+end subroutine

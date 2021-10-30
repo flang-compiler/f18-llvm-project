@@ -473,6 +473,16 @@ public:
             return fir::factory::genMutableBoxRead(builder, getLoc(), boxAddr);
           },
           [&val](auto &) { return val.toExtendedValue(); });
+    if (const auto *hostAssocDet =
+            sym->detailsIf<Fortran::semantics::HostAssocDetails>())
+      if (auto val = symMap.lookupSymbol(hostAssocDet->symbol()))
+        return val.match(
+            [&](const Fortran::lower::SymbolBox::PointerOrAllocatable
+                    &boxAddr) {
+              return fir::factory::genMutableBoxRead(builder, getLoc(),
+                                                     boxAddr);
+            },
+            [&val](auto &) { return val.toExtendedValue(); });
     LLVM_DEBUG(llvm::dbgs()
                << "unknown symbol: " << sym << "\nmap: " << symMap << '\n');
     fir::emitFatalError(getLoc(), "symbol is not mapped to any IR value");
