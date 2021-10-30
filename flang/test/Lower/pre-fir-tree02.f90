@@ -212,8 +212,7 @@ contains
   ! CHECK: Subroutine sub
   subroutine sub(a)
     real(4):: a
-    ! CompilerDirective
-    ! CHECK: <<CompilerDirective>>
+    ! CompilerDirective:
     !DIR$ IGNORE_TKR a
   end subroutine
 

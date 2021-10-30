@@ -2485,9 +2485,16 @@ private:
   /// Unconditionally switch code insertion to a new block.
   void startBlock(mlir::Block *newBlock) {
     assert(newBlock && "missing block");
+    // Default termination for the current block is a fallthrough branch to
+    // the new block.
     if (blockIsUnterminated())
-      genFIRBranch(newBlock); // default termination is a fallthrough branch
-    builder->setInsertionPointToEnd(newBlock); // newBlock might not be empty
+      genFIRBranch(newBlock);
+    // Some blocks may be re/started more than once, and might not be empty.
+    // If the new block already has (only) a terminator, set the insertion
+    // point to the start of the block.  Otherwise set it to the end.
+    builder->setInsertionPointToStart(newBlock);
+    if (blockIsUnterminated())
+      builder->setInsertionPointToEnd(newBlock);
   }
 
   /// Conditionally switch code insertion to a new block.

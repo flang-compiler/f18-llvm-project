@@ -93,9 +93,27 @@ static void genObjectList(const Fortran::parser::OmpObjectList &objectList,
   }
 }
 
+/// Create empty blocks for the current region.
+/// These blocks replace blocks parented to an enclosing region.
+void createEmptyRegionBlocks(
+    fir::FirOpBuilder &firOpBuilder,
+    std::list<Fortran::lower::pft::Evaluation> &evaluationList) {
+  auto *region = &firOpBuilder.getRegion();
+  for (auto &eval : evaluationList) {
+    if (eval.block) {
+      assert(eval.block->empty() && "block is not empty");
+      eval.block->erase();
+      eval.block = firOpBuilder.createBlock(region);
+    }
+    if (eval.hasNestedEvaluations())
+      createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
+  }
+}
+
 template <typename Op>
 static void createBodyOfOp(
     Op &op, Fortran::lower::AbstractConverter &converter, mlir::Location &loc,
+    Fortran::lower::pft::Evaluation &eval,
     const Fortran::parser::OmpClauseList *clauses = nullptr,
     const SmallVector<const Fortran::semantics::Symbol *> &args = {}) {
   auto &firOpBuilder = converter.getFirOpBuilder();
@@ -122,6 +140,8 @@ static void createBodyOfOp(
   }
   auto &block = op.getRegion().back();
   firOpBuilder.setInsertionPointToStart(&block);
+  if (eval.lowerAsUnstructured())
+    createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
   // Ensure the block is well-formed by inserting terminators.
   if constexpr (std::is_same_v<Op, omp::WsLoopOp>) {
     mlir::ValueRange results;
@@ -324,7 +344,7 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
   // Avoid multiple privatization: If Parallel is part of a combined construct
   // then privatization will be performed later when the other part of the
   // combined construct is processed.
-  createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation,
+  createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation, eval,
                                   isCombined ? nullptr : &opClauseList);
 }
 
@@ -345,7 +365,7 @@ genOMP(Fortran::lower::AbstractConverter &converter,
     auto &firOpBuilder = converter.getFirOpBuilder();
     auto currentLocation = converter.getCurrentLocation();
     auto masterOp = firOpBuilder.create<mlir::omp::MasterOp>(currentLocation);
-    createBodyOfOp<omp::MasterOp>(masterOp, converter, currentLocation);
+    createBodyOfOp<omp::MasterOp>(masterOp, converter, currentLocation, eval);
   }
 }
 
@@ -599,12 +619,13 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
         wsLoopOp.nowaitAttr(firOpBuilder.getUnitAttr());
   }
 
-  createBodyOfOp<omp::WsLoopOp>(wsLoopOp, converter, currentLocation,
+  createBodyOfOp<omp::WsLoopOp>(wsLoopOp, converter, currentLocation, eval,
                                 &wsLoopOpClauseList, iv);
 }
 
 static void
 genOMP(Fortran::lower::AbstractConverter &converter,
+       Fortran::lower::pft::Evaluation &eval,
        const Fortran::parser::OpenMPCriticalConstruct &criticalConstruct) {
   auto &firOpBuilder = converter.getFirOpBuilder();
   auto currentLocation = converter.getCurrentLocation();
@@ -642,7 +663,7 @@ genOMP(Fortran::lower::AbstractConverter &converter,
                                firOpBuilder.getContext(), global.sym_name()));
     }
   }();
-  createBodyOfOp<omp::CriticalOp>(criticalOp, converter, currentLocation);
+  createBodyOfOp<omp::CriticalOp>(criticalOp, converter, currentLocation, eval);
 }
 
 void Fortran::lower::genOpenMPConstruct(
@@ -678,7 +699,9 @@ void Fortran::lower::genOpenMPConstruct(
             TODO(converter.getCurrentLocation(), "OpenMPAtomicConstruct");
           },
           [&](const Fortran::parser::OpenMPCriticalConstruct
-                  &criticalConstruct) { genOMP(converter, criticalConstruct); },
+                  &criticalConstruct) {
+            genOMP(converter, eval, criticalConstruct);
+          },
       },
       ompConstruct.u);
 }

@@ -132,14 +132,12 @@ end function
 ! Test top level directives
 !DIR$ INTEGER=64
 ! CHECK: CompilerDirective:
-! CHECK: End CompilerDirective
 
 ! Test nested directive
 ! CHECK: Subroutine test_directive
 subroutine test_directive()
   !DIR$ INTEGER=64
-  ! CHECK: <<CompilerDirective>>
-  ! CHECK: <<End CompilerDirective>>
+  ! CHECK: CompilerDirective:
 end subroutine
 ! CHECK: EndSubroutine
 

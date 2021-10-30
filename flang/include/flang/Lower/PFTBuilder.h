@@ -134,9 +134,8 @@ using Constructs =
 
 using Directives =
     std::tuple<parser::CompilerDirective, parser::OpenACCConstruct,
-               parser::OpenMPConstruct, parser::OmpEndLoopDirective,
-               parser::OpenMPDeclarativeConstruct,
-               parser::OpenACCDeclarativeConstruct>;
+               parser::OpenACCDeclarativeConstruct, parser::OpenMPConstruct,
+               parser::OpenMPDeclarativeConstruct, parser::OmpEndLoopDirective>;
 
 template <typename A>
 static constexpr bool isActionStmt{common::HasMember<A, ActionStmts>};
@@ -167,6 +166,11 @@ static constexpr bool isNopConstructStmt{common::HasMember<
                   parser::EndSelectStmt, parser::ElseIfStmt, parser::ElseStmt,
                   parser::EndIfStmt, parser::SelectRankCaseStmt,
                   parser::TypeGuardStmt>>};
+
+template <typename A>
+static constexpr bool isExecutableDirective{common::HasMember<
+    A, std::tuple<parser::CompilerDirective, parser::OpenACCConstruct,
+                  parser::OpenMPConstruct>>};
 
 template <typename A>
 static constexpr bool isFunctionLike{common::HasMember<
@@ -246,6 +250,11 @@ struct Evaluation : EvaluationVariant {
       return pft::isNopConstructStmt<std::decay_t<decltype(r)>>;
     }});
   }
+  constexpr bool isExecutableDirective() const {
+    return visit(common::visitors{[](auto &r) {
+      return pft::isExecutableDirective<std::decay_t<decltype(r)>>;
+    }});
+  }
 
   /// Return the predicate:  "This is a non-initial, non-terminal construct
   /// statement."  For an IfConstruct, this is ElseIfStmt and ElseStmt.
@@ -297,11 +306,12 @@ struct Evaluation : EvaluationVariant {
 
   // FIR generation looks primarily at PFT ActionStmt and ConstructStmt leaf
   // nodes.  Members such as lexicalSuccessor and block are applicable only
-  // to these nodes.  The controlSuccessor member is used for nonlexical
-  // successors, such as linking to a GOTO target.  For multiway branches,
-  // it is set to the first target.  Successor and exit links always target
-  // statements.  An internal Construct node has a constructExit link that
-  // applies to exits from anywhere within the construct.
+  // to these nodes, plus some directives.  The controlSuccessor member is
+  // used for nonlexical successors, such as linking to a GOTO target.  For
+  // multiway branches, it is set to the first target.  Successor and exit
+  // links always target statements or directives.  An internal Construct
+  // node has a constructExit link that applies to exits from anywhere within
+  // the construct.
   //
   // An unstructured construct is one that contains some form of goto.  This
   // is indicated by the isUnstructured member flag, which may be set on a
@@ -329,8 +339,8 @@ struct Evaluation : EvaluationVariant {
   std::optional<parser::Label> label{};
   std::unique_ptr<EvaluationList> evaluationList; // nested evaluations
   Evaluation *parentConstruct{nullptr};  // set for nodes below the top level
-  Evaluation *lexicalSuccessor{nullptr}; // set for ActionStmt, ConstructStmt
-  Evaluation *controlSuccessor{nullptr}; // set for some statements
+  Evaluation *lexicalSuccessor{nullptr}; // set for leaf nodes, some directives
+  Evaluation *controlSuccessor{nullptr}; // set for some leaf nodes
   Evaluation *constructExit{nullptr};    // set for constructs
   bool isNewBlock{false};                // evaluation begins a new basic block
   bool isUnstructured{false};  // evaluation has unstructured control flow

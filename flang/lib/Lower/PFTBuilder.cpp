@@ -296,11 +296,11 @@ private:
     resetFunctionState();
   }
 
-  /// Initialize a new construct and make it the builder's focus.
+  /// Initialize a new construct or directive and make it the builder's focus.
   template <typename A>
-  bool enterConstructOrDirective(const A &construct) {
-    auto &eval =
-        addEvaluation(lower::pft::Evaluation{construct, pftParentStack.back()});
+  bool enterConstructOrDirective(const A &constructOrDirective) {
+    auto &eval = addEvaluation(
+        lower::pft::Evaluation{constructOrDirective, pftParentStack.back()});
     eval.evaluationList.reset(new lower::pft::EvaluationList);
     pushEvaluationList(eval.evaluationList.get());
     pftParentStack.emplace_back(eval);
@@ -310,6 +310,17 @@ private:
 
   void exitConstructOrDirective() {
     rewriteIfGotos();
+    auto *eval = constructAndDirectiveStack.back();
+    if (eval->isExecutableDirective()) {
+      // A construct at the end of an (unstructured) OpenACC or OpenMP
+      // construct region must have an exit target inside the region.
+      auto &evaluationList = *eval->evaluationList;
+      if (!evaluationList.empty() && evaluationList.back().isConstruct()) {
+        static const parser::ContinueStmt exitTarget{};
+        addEvaluation(
+            lower::pft::Evaluation{exitTarget, pftParentStack.back(), {}, {}});
+      }
+    }
     popEvaluationList();
     pftParentStack.pop_back();
     constructAndDirectiveStack.pop_back();
@@ -372,7 +383,8 @@ private:
     auto &entryPointList = eval.getOwningProcedure()->entryPointList;
     evaluationListStack.back()->emplace_back(std::move(eval));
     lower::pft::Evaluation *p = &evaluationListStack.back()->back();
-    if (p->isActionStmt() || p->isConstructStmt() || p->isEndStmt()) {
+    if (p->isActionStmt() || p->isConstructStmt() || p->isEndStmt() ||
+        p->isExecutableDirective()) {
       if (lastLexicalEvaluation) {
         lastLexicalEvaluation->lexicalSuccessor = p;
         p->printIndex = lastLexicalEvaluation->printIndex + 1;
@@ -1017,33 +1029,32 @@ public:
                       const lower::pft::Evaluation &eval,
                       const std::string &indentString, int indent = 1) {
     llvm::StringRef name = evaluationName(eval);
-    std::string bang = eval.isUnstructured ? "!" : "";
-    if (eval.isConstruct() || eval.isDirective()) {
-      outputStream << indentString << "<<" << name << bang << ">>";
-      if (eval.constructExit)
-        outputStream << " -> " << eval.constructExit->printIndex;
-      outputStream << '\n';
-      dumpEvaluationList(outputStream, *eval.evaluationList, indent + 1);
-      outputStream << indentString << "<<End " << name << bang << ">>\n";
-      return;
-    }
+    llvm::StringRef newBlock = eval.isNewBlock ? "^" : "";
+    llvm::StringRef bang = eval.isUnstructured ? "!" : "";
     outputStream << indentString;
     if (eval.printIndex)
       outputStream << eval.printIndex << ' ';
-    if (eval.isNewBlock)
-      outputStream << '^';
-    outputStream << name << bang;
-    if (eval.isActionStmt() || eval.isConstructStmt()) {
-      if (eval.negateCondition)
-        outputStream << " [negate]";
-      if (eval.controlSuccessor)
-        outputStream << " -> " << eval.controlSuccessor->printIndex;
-    } else if (eval.isA<parser::EntryStmt>() && eval.lexicalSuccessor) {
+    if (eval.hasNestedEvaluations())
+      outputStream << "<<" << newBlock << name << bang << ">>";
+    else
+      outputStream << newBlock << name << bang;
+    if (eval.negateCondition)
+      outputStream << " [negate]";
+    if (eval.constructExit)
+      outputStream << " -> " << eval.constructExit->printIndex;
+    else if (eval.controlSuccessor)
+      outputStream << " -> " << eval.controlSuccessor->printIndex;
+    else if (eval.isA<parser::EntryStmt>() && eval.lexicalSuccessor)
       outputStream << " -> " << eval.lexicalSuccessor->printIndex;
-    }
     if (!eval.position.empty())
       outputStream << ": " << eval.position.ToString();
+    else if (auto *dir = eval.getIf<Fortran::parser::CompilerDirective>())
+      outputStream << ": !" << dir->source.ToString();
     outputStream << '\n';
+    if (eval.hasNestedEvaluations()) {
+      dumpEvaluationList(outputStream, *eval.evaluationList, indent + 1);
+      outputStream << indentString << "<<End " << name << bang << ">>\n";
+    }
   }
 
   void dumpEvaluation(llvm::raw_ostream &ostream,
