@@ -167,9 +167,8 @@ public:
         auto &tup = e.value();
         auto ty = std::get<mlir::Type>(tup);
         auto index = e.index();
-        mlir::Value idx = rewriter->create<mlir::arith::ConstantOp>(
-            loc, iTy, mlir::IntegerAttr::get(iTy, index));
-        auto val = rewriter->create<ExtractValueOp>(loc, ty, oper, idx);
+        auto idx = rewriter->getIntegerAttr(iTy, index);
+        auto val = rewriter->create<ExtractValueOp>(loc, ty, oper, rewriter->getArrayAttr(idx));
         newInTys.push_back(ty);
         newOpers.push_back(val);
       }
@@ -575,16 +574,14 @@ public:
             rewriter->setInsertionPointToStart(&func.front());
             auto cplxTy = oldArgTys[fixup.index - offset - fixup.second];
             auto undef = rewriter->create<UndefOp>(loc, cplxTy);
-            auto iTy = rewriter->getIntegerType(32);
-            mlir::Value zero = rewriter->create<mlir::arith::ConstantOp>(
-                loc, iTy, mlir::IntegerAttr::get(iTy, 0));
-            mlir::Value one = rewriter->create<mlir::arith::ConstantOp>(
-                loc, iTy, mlir::IntegerAttr::get(iTy, 1));
+	    auto iTy = rewriter->getIntegerType(32);
+            auto zero = rewriter->getIntegerAttr(iTy, 0);
+            auto one = rewriter->getIntegerAttr(iTy, 1);
             auto cplx1 = rewriter->create<InsertValueOp>(
                 loc, cplxTy, undef, func.front().getArgument(fixup.index - 1),
-                zero);
+                rewriter->getArrayAttr(zero));
             auto cplx = rewriter->create<InsertValueOp>(loc, cplxTy, cplx1,
-                                                        newArg, one);
+                                                        newArg, rewriter->getArrayAttr(one));
             func.getArgument(fixup.index + 1).replaceAllUsesWith(cplx);
             func.front().eraseArgument(fixup.index + 1);
             offset++;

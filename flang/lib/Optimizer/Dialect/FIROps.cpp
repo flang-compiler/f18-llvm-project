@@ -1340,51 +1340,6 @@ static void print(mlir::OpAsmPrinter &p, fir::GlobalLenOp &op) {
 }
 
 //===----------------------------------------------------------------------===//
-// ExtractValueOp
-//===----------------------------------------------------------------------===//
-
-template <bool AllowFields>
-static void appendAsAttribute(llvm::SmallVectorImpl<mlir::Attribute> &attrs,
-                              mlir::Value val) {
-  if (auto *op = val.getDefiningOp()) {
-    if (auto cop = mlir::dyn_cast<mlir::arith::ConstantOp>(op)) {
-      // append the integer constant value
-      if (auto iattr = cop.value().dyn_cast<mlir::IntegerAttr>()) {
-        attrs.push_back(iattr);
-        return;
-      }
-    } else if (auto fld = mlir::dyn_cast<fir::FieldIndexOp>(op)) {
-      if constexpr (AllowFields) {
-        // append the field name and the record type
-        attrs.push_back(fld.field_idAttr());
-        attrs.push_back(fld.on_typeAttr());
-        return;
-      }
-    }
-  }
-  llvm::report_fatal_error("cannot build Op with these arguments");
-}
-
-template <bool AllowFields = true>
-static mlir::ArrayAttr collectAsAttributes(mlir::MLIRContext *ctxt,
-                                           OperationState &result,
-                                           llvm::ArrayRef<mlir::Value> inds) {
-  llvm::SmallVector<mlir::Attribute> attrs;
-  for (auto v : inds)
-    appendAsAttribute<AllowFields>(attrs, v);
-  assert(!attrs.empty());
-  return mlir::ArrayAttr::get(ctxt, attrs);
-}
-
-void fir::ExtractValueOp::build(mlir::OpBuilder &builder,
-                                OperationState &result, mlir::Type resTy,
-                                mlir::Value aggVal,
-                                llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, aa);
-}
-
-//===----------------------------------------------------------------------===//
 // FieldIndexOp
 //===----------------------------------------------------------------------===//
 
@@ -1448,17 +1403,16 @@ void fir::FieldIndexOp::build(mlir::OpBuilder &builder,
   result.addOperands(operands);
 }
 
+llvm::SmallVector<mlir::Attribute> fir::FieldIndexOp::getAttributes() {
+  llvm::SmallVector<mlir::Attribute, 2> attrs;
+  attrs.push_back(field_idAttr());
+  attrs.push_back(on_typeAttr());
+  return attrs;
+}
+
 //===----------------------------------------------------------------------===//
 // InsertOnRangeOp
 //===----------------------------------------------------------------------===//
-
-void fir::InsertOnRangeOp::build(mlir::OpBuilder &builder,
-                                 OperationState &result, mlir::Type resTy,
-                                 mlir::Value aggVal, mlir::Value eleVal,
-                                 llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<false>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, eleVal, aa);
-}
 
 /// Range bounds must be nonnegative, and the range must not be empty.
 static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
@@ -1484,14 +1438,6 @@ static mlir::LogicalResult verify(fir::InsertOnRangeOp op) {
 //===----------------------------------------------------------------------===//
 // InsertValueOp
 //===----------------------------------------------------------------------===//
-
-void fir::InsertValueOp::build(mlir::OpBuilder &builder, OperationState &result,
-                               mlir::Type resTy, mlir::Value aggVal,
-                               mlir::Value eleVal,
-                               llvm::ArrayRef<mlir::Value> inds) {
-  auto aa = collectAsAttributes<>(builder.getContext(), result, inds);
-  build(builder, result, resTy, aggVal, eleVal, aa);
-}
 
 static bool checkIsIntegerConstant(mlir::Attribute attr, int64_t conVal) {
   if (auto iattr = attr.dyn_cast<mlir::IntegerAttr>())

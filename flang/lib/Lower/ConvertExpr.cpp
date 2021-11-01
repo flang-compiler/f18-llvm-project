@@ -591,7 +591,7 @@ public:
       auto name = toStringRef(sym->name());
       auto componentTy = recTy.getType(name);
       // FIXME: type parameters must come from the derived-type-spec
-      mlir::Value field = builder.create<fir::FieldIndexOp>(
+      auto field = builder.create<fir::FieldIndexOp>(
           loc, fieldTy, name, ty,
           /*typeParams=*/mlir::ValueRange{} /*TODO*/);
 
@@ -601,8 +601,9 @@ public:
       if (Fortran::semantics::IsPointer(sym)) {
         auto initialTarget = Fortran::lower::genInitialDataTarget(
             converter, loc, componentTy, expr.value());
-        res = builder.create<fir::InsertValueOp>(loc, recTy, res, initialTarget,
-                                                 field);
+        res = builder.create<fir::InsertValueOp>(
+            loc, recTy, res, initialTarget,
+            builder.getArrayAttr(field.getAttributes()));
         continue;
       }
 
@@ -620,20 +621,24 @@ public:
         assert(cPtrRecTy && "c_ptr and c_funptr must be derived types");
         llvm::StringRef addrFieldName = Fortran::lower::builtin::cptrFieldName;
         auto addrFieldTy = cPtrRecTy.getType(addrFieldName);
-        mlir::Value addrField = builder.create<fir::FieldIndexOp>(
+        auto addrField = builder.create<fir::FieldIndexOp>(
             loc, fieldTy, addrFieldName, componentTy,
             /*typeParams=*/mlir::ValueRange{});
         auto castAddr = builder.createConvert(loc, addrFieldTy, baseAddr);
-        auto val = builder.create<fir::InsertValueOp>(loc, componentTy, undef,
-                                                      castAddr, addrField);
-        res = builder.create<fir::InsertValueOp>(loc, recTy, res, val, field);
+        auto val = builder.create<fir::InsertValueOp>(
+            loc, componentTy, undef, castAddr,
+            builder.getArrayAttr(addrField.getAttributes()));
+        res = builder.create<fir::InsertValueOp>(
+            loc, recTy, res, val, builder.getArrayAttr(field.getAttributes()));
         continue;
       }
 
       auto val = fir::getBase(genval(expr.value()));
       assert(!fir::isa_ref_type(val.getType()) && "expecting a constant value");
       auto castVal = builder.createConvert(loc, componentTy, val);
-      res = builder.create<fir::InsertValueOp>(loc, recTy, res, castVal, field);
+      res = builder.create<fir::InsertValueOp>(
+          loc, recTy, res, castVal,
+          builder.getArrayAttr(field.getAttributes()));
     }
     return res;
   }
@@ -1109,23 +1114,23 @@ public:
     }
     Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
     auto createIdx = [&]() {
-      llvm::SmallVector<mlir::Value> idx;
+      llvm::SmallVector<mlir::Attribute> idx;
       for (size_t i = 0; i < subscripts.size(); ++i)
-        idx.push_back(builder.createIntegerConstant(
-            getLoc(), idxTy, subscripts[i] - con.lbounds()[i]));
+        idx.push_back(
+            builder.getIntegerAttr(idxTy, subscripts[i] - con.lbounds()[i]));
       return idx;
     };
     if constexpr (TC == Fortran::common::TypeCategory::Character) {
       do {
         auto elementVal =
             fir::getBase(genScalarLit<KIND>(con.At(subscripts), con.LEN()));
-        array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
-                                                   elementVal, createIdx());
+        array = builder.create<fir::InsertValueOp>(
+            loc, arrayTy, array, elementVal, builder.getArrayAttr(createIdx()));
       } while (con.IncrementSubscripts(subscripts));
       auto len = builder.createIntegerConstant(loc, idxTy, con.LEN());
       return fir::CharArrayBoxValue{array, len, extents, lbounds};
     } else {
-      llvm::SmallVector<mlir::Value> rangeStartIdx;
+      llvm::SmallVector<mlir::Attribute> rangeStartIdx;
       uint64_t rangeSize = 0;
       do {
         auto getElementVal = [&]() {
@@ -1138,21 +1143,23 @@ public:
                           con.At(subscripts) == con.At(nextSubscripts);
         if (!rangeSize && !nextIsSame) { // single (non-range) value
           array = builder.create<fir::InsertValueOp>(
-              loc, arrayTy, array, getElementVal(), createIdx());
+              loc, arrayTy, array, getElementVal(),
+              builder.getArrayAttr(createIdx()));
         } else if (!rangeSize) { // start a range
           rangeStartIdx = createIdx();
           rangeSize = 1;
         } else if (nextIsSame) { // expand a range
           ++rangeSize;
         } else { // end a range
-          llvm::SmallVector<mlir::Value> rangeBounds;
+          llvm::SmallVector<mlir::Attribute> rangeBounds;
           auto idx = createIdx();
           for (size_t i = 0; i < idx.size(); ++i) {
             rangeBounds.push_back(rangeStartIdx[i]);
             rangeBounds.push_back(idx[i]);
           }
           array = builder.create<fir::InsertOnRangeOp>(
-              loc, arrayTy, array, getElementVal(), rangeBounds);
+              loc, arrayTy, array, getElementVal(),
+              builder.getArrayAttr(rangeBounds));
           rangeSize = 0;
         }
       } while (con.IncrementSubscripts(subscripts));
@@ -1180,11 +1187,11 @@ public:
     Fortran::evaluate::ConstantSubscripts subscripts = con.lbounds();
     do {
       auto derivedVal = fir::getBase(genval(con.At(subscripts)));
-      llvm::SmallVector<mlir::Value> idx;
+      llvm::SmallVector<mlir::Attribute> idx;
       for (auto [dim, lb] : llvm::zip(subscripts, con.lbounds()))
-        idx.push_back(builder.createIntegerConstant(loc, idxTy, dim - lb));
-      array = builder.create<fir::InsertValueOp>(loc, arrayTy, array,
-                                                 derivedVal, idx);
+        idx.push_back(builder.getIntegerAttr(idxTy, dim - lb));
+      array = builder.create<fir::InsertValueOp>(
+          loc, arrayTy, array, derivedVal, builder.getArrayAttr(idx));
     } while (con.IncrementSubscripts(subscripts));
     return fir::ArrayBoxValue{array, extents, lbounds};
   }

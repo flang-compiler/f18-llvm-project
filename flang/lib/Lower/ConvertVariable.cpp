@@ -322,30 +322,31 @@ static mlir::Value genDefaultInitializerValue(
     assert(componentValue && "must have been computed");
     componentValue = builder.createConvert(loc, componentTy, componentValue);
     // FIXME: type parameters must come from the derived-type-spec
-    mlir::Value field = builder.create<fir::FieldIndexOp>(
+    auto field = builder.create<fir::FieldIndexOp>(
         loc, fieldTy, name, scalarType,
         /*typeParams=*/mlir::ValueRange{} /*TODO*/);
-    initialValue = builder.create<fir::InsertValueOp>(loc, recTy, initialValue,
-                                                      componentValue, field);
+    initialValue = builder.create<fir::InsertValueOp>(
+        loc, recTy, initialValue, componentValue,
+        builder.getArrayAttr(field.getAttributes()));
   }
 
   if (sequenceType) {
     // For arrays, duplicate the scalar value to all elements with an
     // fir.insert_range covering the whole array.
     auto arrayInitialValue = builder.create<fir::UndefOp>(loc, sequenceType);
-    llvm::SmallVector<mlir::Value> rangeBounds;
+    llvm::SmallVector<mlir::Attribute> rangeBounds;
     auto idxTy = builder.getIndexType();
-    auto zero = builder.createIntegerConstant(loc, idxTy, 0);
+    auto zero = builder.getIntegerAttr(idxTy, 0);
     for (auto extent : sequenceType.getShape()) {
       if (extent == fir::SequenceType::getUnknownExtent())
         TODO(loc,
              "default initial value of array component with length parameters");
       rangeBounds.push_back(zero);
-      rangeBounds.push_back(
-          builder.createIntegerConstant(loc, idxTy, extent - 1));
+      rangeBounds.push_back(builder.getIntegerAttr(idxTy, extent - 1));
     }
     return builder.create<fir::InsertOnRangeOp>(
-        loc, sequenceType, arrayInitialValue, initialValue, rangeBounds);
+        loc, sequenceType, arrayInitialValue, initialValue,
+        builder.getArrayAttr(rangeBounds));
   }
   return initialValue;
 }
@@ -883,11 +884,11 @@ defineCommonBlock(Fortran::lower::AbstractConverter &converter,
                   ? Fortran::lower::genInitialDataTarget(
                         converter, loc, converter.genType(*mem), initExpr)
                   : genInitializerExprValue(converter, loc, initExpr, stmtCtx);
-          auto offVal = builder.createIntegerConstant(loc, idxTy, tupIdx);
+          auto offVal = builder.getIntegerAttr(idxTy, tupIdx);
           auto castVal = builder.createConvert(loc, commonTy.getType(tupIdx),
                                                fir::getBase(initVal));
           cb = builder.create<fir::InsertValueOp>(loc, commonTy, cb, castVal,
-                                                  offVal);
+                                                  builder.getArrayAttr(offVal));
           ++tupIdx;
           offset = mem->offset() + mem->size();
         }

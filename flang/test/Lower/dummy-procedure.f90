@@ -158,7 +158,6 @@ end subroutine
 
 !CHECK-LABEL: func private @fir.aimag.f32.ref_z4(%arg0: !fir.ref<!fir.complex<4>>)
   !CHECK: %[[load:.*]] = fir.load %arg0
-  !CHECK: %[[cst1:.*]] = arith.constant 1
   !CHECK: %[[imag:.*]] = fir.extract_value %[[load]], [1 : index] : (!fir.complex<4>) -> f32
   !CHECK: return %[[imag]] : f32
 

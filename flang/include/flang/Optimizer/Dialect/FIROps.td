@@ -1799,11 +1799,6 @@ def fir_ExtractValueOp : fir_OneResultOp<"extract_value", [NoSideEffect]> {
   let assemblyFormat = [{
     $adt `,` $coor attr-dict `:` functional-type(operands, results)
   }];
-
-  let builders = [
-    OpBuilder<(ins "mlir::Type":$rty, "mlir::Value":$adt,
-      "llvm::ArrayRef<mlir::Value>":$vcoor)>
-  ];
 }
 
 def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
@@ -1839,6 +1834,7 @@ def fir_FieldIndexOp : fir_OneResultOp<"field_index", [NoSideEffect]> {
     static constexpr llvm::StringRef getFieldAttrName() { return "field_id"; }
     static constexpr llvm::StringRef getTypeAttrName() { return "on_type"; }
     llvm::StringRef getFieldName() { return field_id(); }
+    llvm::SmallVector<mlir::Attribute> getAttributes();
   }];
 }
 
@@ -2048,11 +2044,6 @@ def fir_InsertValueOp : fir_OneResultOp<"insert_value", [NoSideEffect]> {
     $adt `,` $val `,` $coor attr-dict `:` functional-type(operands, results)
   }];
 
-  let builders = [
-    OpBuilder<(ins "mlir::Type":$rty, "mlir::Value":$adt, "mlir::Value":$val,
-      "llvm::ArrayRef<mlir::Value>":$vcoor)>
-  ];
-
   let hasCanonicalizer = 1;
 }
 
@@ -2083,11 +2074,6 @@ def fir_InsertOnRangeOp : fir_OneResultOp<"insert_on_range", [NoSideEffect]> {
   let assemblyFormat = [{
     $seq `,` $val `,` $coor attr-dict `:` functional-type(operands, results)
   }];
-
-  let builders = [
-    OpBuilder<(ins "mlir::Type":$rty, "mlir::Value":$adt, "mlir::Value":$val,
-      "llvm::ArrayRef<mlir::Value>":$vcoor)>
-  ];
 
   let verifier = "return ::verify(*this);";
 }

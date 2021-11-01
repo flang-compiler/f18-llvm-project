@@ -286,17 +286,18 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
   auto listMangleName = groupMangleName + ".list";
   auto listFunc = [&](fir::FirOpBuilder &builder) {
     mlir::Value list = builder.create<fir::UndefOp>(loc, listTy);
-    auto zero = builder.createIntegerConstant(loc, idxTy, 0);
-    auto one = builder.createIntegerConstant(loc, idxTy, 1);
-    llvm::SmallVector<mlir::Value, 2> idx = {mlir::Value{}, mlir::Value{}};
+    auto zero = builder.getIntegerAttr(idxTy, 0);
+    auto one = builder.getIntegerAttr(idxTy, 1);
+    llvm::SmallVector<mlir::Attribute, 2> idx = {mlir::Attribute{},
+                                                 mlir::Attribute{}};
     size_t n = 0;
     for (const Fortran::semantics::Symbol &s : details.objects()) {
-      idx[0] = builder.createIntegerConstant(loc, idxTy, n);
+      idx[0] = builder.getIntegerAttr(idxTy, n);
       idx[1] = zero;
       auto nameAddr =
           builder.createConvert(loc, charRefTy, fir::getBase(stringAddress(s)));
-      list =
-          builder.create<fir::InsertValueOp>(loc, listTy, list, nameAddr, idx);
+      list = builder.create<fir::InsertValueOp>(loc, listTy, list, nameAddr,
+                                                builder.getArrayAttr(idx));
       idx[1] = one;
       mlir::Value descAddr;
       if (auto desc =
@@ -316,8 +317,8 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
                                           /*lbounds=*/llvm::None);
       }
       descAddr = builder.createConvert(loc, descRefTy, descAddr);
-      list =
-          builder.create<fir::InsertValueOp>(loc, listTy, list, descAddr, idx);
+      list = builder.create<fir::InsertValueOp>(loc, listTy, list, descAddr,
+                                                builder.getArrayAttr(idx));
       ++n;
     }
     if (groupIsLocal)
@@ -336,24 +337,24 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
                               ? builder.create<fir::AllocaOp>(loc, groupTy)
                               : mlir::Value{};
   auto groupFunc = [&](fir::FirOpBuilder &builder) {
-    auto zero = builder.createIntegerConstant(loc, idxTy, 0);
-    auto one = builder.createIntegerConstant(loc, idxTy, 1);
-    auto two = builder.createIntegerConstant(loc, idxTy, 2);
+    auto zero = builder.getIntegerAttr(idxTy, 0);
+    auto one = builder.getIntegerAttr(idxTy, 1);
+    auto two = builder.getIntegerAttr(idxTy, 2);
     mlir::Value group = builder.create<fir::UndefOp>(loc, groupTy);
     auto nameAddr = builder.createConvert(loc, charRefTy,
                                           fir::getBase(stringAddress(symbol)));
-    group =
-        builder.create<fir::InsertValueOp>(loc, groupTy, group, nameAddr, zero);
+    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, nameAddr,
+                                               builder.getArrayAttr(zero));
     auto itemCount =
         builder.createIntegerConstant(loc, sizeTy, details.objects().size());
-    group =
-        builder.create<fir::InsertValueOp>(loc, groupTy, group, itemCount, one);
+    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, itemCount,
+                                               builder.getArrayAttr(one));
     if (auto list = builder.getNamedGlobal(listMangleName))
       listAddr = builder.create<fir::AddrOfOp>(loc, list.resultType(),
                                                list.getSymbol());
     assert(listAddr && "missing namelist object list");
-    group =
-        builder.create<fir::InsertValueOp>(loc, groupTy, group, listAddr, two);
+    group = builder.create<fir::InsertValueOp>(loc, groupTy, group, listAddr,
+                                               builder.getArrayAttr(two));
     if (groupIsLocal)
       builder.create<fir::StoreOp>(loc, group, groupAddr);
     else
