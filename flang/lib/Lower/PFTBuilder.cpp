@@ -1231,6 +1231,11 @@ struct SymbolDependenceDepth {
       : vars{vars}, reentrant{reentrant} {}
 
   void analyzeAliasesInCurrentScope(const semantics::Scope &scope) {
+    // FIXME: When this function is called on the scope of an internal
+    // procedure whose parent contains an EQUIVALENCE set and the internal
+    // procedure uses variables from that EQUIVALENCE set, we end up creating
+    // an AggregateStore for those variables unnecessarily.
+    //
     /// If this is a function nested in a module no host associated
     /// symbol are added to the function scope for module symbols used in this
     /// scope. As a result, alias analysis in parent module scopes must be
