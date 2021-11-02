@@ -1,3 +1,5 @@
+! Test unstructured code adjacent to and inside OpenMP constructs.
+
 ! RUN: bbc %s -fopenmp -o "-" | FileCheck %s
 
 ! CHECK-LABEL: func @_QPss1{{.*}} {
@@ -16,7 +18,7 @@
 ! CHECK:   }
 ! CHECK:   @_FortranAioBeginExternalListOutput
 ! CHECK: }
-subroutine ss1(n)
+subroutine ss1(n) ! unstructured code followed by a structured OpenMP construct
   do i = 1, 3
     if (i .eq. n) exit
     print*, 'ss1-A', i
@@ -44,7 +46,7 @@ end
 ! CHECK:   @_FortranAioBeginExternalListOutput
 ! CHECK:   @_FortranAioBeginExternalListOutput
 ! CHECK: }
-subroutine ss2(n)
+subroutine ss2(n) ! unstructured OpenMP construct; loop exit inside construct
   !$omp master
     print*, 'ss2-A', n
     do i = 1, 3
@@ -83,7 +85,7 @@ end
 ! CHECK:     omp.terminator
 ! CHECK:   }
 ! CHECK: }
-subroutine ss3(n)
+subroutine ss3(n) ! nested unstructured OpenMP constructs
   !$omp parallel
     do i = 1, 3
       !$omp do
