@@ -8,39 +8,34 @@
 
 # Brief Note on Flang's LLVM style.
 
-In the directories that deal extensively with MLIR and LLVM, the MLIR style
-and coding conventions, based on LLVM's coding style, is used. The lowering
-directories convert front-end functional data structures to MLIR and make
-very heavy use of MLIR interfaces and data structures. The FIR dialect is
-itself an extension of MLIR.
+In the directories that deal extensively with MLIR and LLVM, the MLIR
+coding style, based on LLVM's coding style, is used. These directories include
 
-Furthermore, the optimizer (passes over FIR) and code generation
-(converting to LLVM IR) also make very heavy use of MLIR and LLVM
-interfaces and data structures.
+- Lowering, which converts front-end functional data structures to the FIR
+dialect of MLIR
+- Optimizer, which are passes over FIR
+- Code generation, which is converting FIR to LLVM IR
 
-For consistency's sake, lowering, codegen, and the optimizer use the
-[MLIR style](https://mlir.llvm.org/getting_started/DeveloperGuide/).
+[The MLIR coding style can be found
+here.](https://mlir.llvm.org/getting_started/DeveloperGuide/).
 
-One additional clarification to the style used within these flang
-directories is with respect to [the use of
-auto](https://llvm.org/docs/CodingStandards.html#use-auto-type-deduction-to-make-code-more-readable). While
-LLVM does not disallow `auto`, it does come short of suggesting `auto` be
-used liberally as in a so-called "auto everywhere" style. In Flang, `auto`
-is used for nearly all local variable declarations that have initialization
-expressions. Variables that make use of default initialization or that use
-a constructor call use declared types and not `auto`. Function signatures
-have specified types unless they are lambdas where `auto` is used as a
-template type variable.
+The flang convention in these directories also follows a more liberal use
+of `auto` and type inferencing than [what is documented
+here](https://llvm.org/docs/CodingStandards.html#use-auto-type-deduction-to-make-code-more-readable). In
+Flang, `auto` is used for nearly all local variable declarations that have
+initialization expressions. Obviously, variables that make use of default
+initialization or that use a constructor call must use declared types and
+not `auto`. Function signatures have specified types unless they are
+lambdas where `auto` is used as a template type variable.
 
-For the flang project, use of `auto` in this way, which allows the
-compiler to type inference local variables, is generally seen as a win
-for the following reasons.
+For the flang project, use of `auto` in this way allows the compiler to
+type inference variables, resulting in the following benefits:
 
-- Some of the types are extremely large and typing them out is
-  error-prone and greatly diminishes understandability.
-- Repetitive token clutter from all the namespace tags that are used
-  is removed.
+- Extremely long and complicated type names are not used, which is less
+  error-prone and greatly improves understandability.
+- The clutter from repetitive namespace tags is removed.
 - Explicitly declared types can and do introduce hard-to-find bugs from
   unexpected or incorrect truncations, extensions, and other conversions.
-- Explicitly declared types increase refactoring costs when
+- Using `auto` instead of declared types simplifies refactoring when
   interfaces are rapidly evolving.
+- `auto` can be required when writing some templatized code.
