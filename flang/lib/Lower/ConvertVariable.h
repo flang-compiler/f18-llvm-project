@@ -6,7 +6,7 @@
 //
 //===----------------------------------------------------------------------===//
 //
-// Coding style: https://mlir.llvm.org/getting_started/DeveloperGuide/
+// Coding style: https://github.com/flang-compiler/f18-llvm-project/blob/fir-dev/flang/docs/LLVMCodingStyle.md
 //
 //===----------------------------------------------------------------------===//
 ///
