@@ -1898,8 +1898,8 @@ public:
     bool addHostAssociations = false;
     if (const auto *sym = caller.getIfIndirectCallSymbol()) {
       funcPointer = symMap.lookupSymbol(*sym).getAddr();
-      assert(funcPointer &&
-             "dummy procedure or procedure pointer not in symbol map");
+      if (!funcPointer)
+        TODO(loc, "calling a dummy procedure declared in an outer scope");
     } else {
       auto funcOpType = caller.getFuncOp().getType();
       auto symbolAttr = builder.getSymbolRefAttr(caller.getMangledName());
