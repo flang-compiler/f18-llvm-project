@@ -8,11 +8,11 @@
 
 # Brief Note on Flang's LLVM style.
 
-In the directories that deal extensively with MLIR and LLVM, the
-decision was made to adopt the MLIR style and coding conventions. The
-lowering directories convert front-end functional data structures to
-MLIR and make very heavy use of MLIR interfaces and data
-structures. The FIR dialect is itself an extension of MLIR.
+In the directories that deal extensively with MLIR and LLVM, the MLIR style
+and coding conventions, based on LLVM's coding style, is used. The lowering
+directories convert front-end functional data structures to MLIR and make
+very heavy use of MLIR interfaces and data structures. The FIR dialect is
+itself an extension of MLIR.
 
 Furthermore, the optimizer (passes over FIR) and code generation
 (converting to LLVM IR) also make very heavy use of MLIR and LLVM
@@ -25,9 +25,12 @@ One additional clarification to the style used within these flang
 directories is with respect to [the use of
 auto](https://llvm.org/docs/CodingStandards.html#use-auto-type-deduction-to-make-code-more-readable). While
 LLVM does not disallow `auto`, it does come short of suggesting `auto` be
-used rather liberally. In flang, we take a more open stance and use `auto`
-for most local variable declarations. Function signatures, on the other
-hand, should have specified types.
+used liberally as in a so-called "auto everywhere" style. In Flang, `auto`
+is used for nearly all local variable declarations that have initialization
+expressions. Variables that make use of default initialization or that use
+a constructor call use declared types and not `auto`. Function signatures
+have specified types unless they are lambdas where `auto` is used as a
+template type variable.
 
 For the flang project, use of `auto` in this way, which allows the
 compiler to type inference local variables, is generally seen as a win
