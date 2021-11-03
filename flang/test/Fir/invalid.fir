@@ -541,6 +541,26 @@ fir.global internal @_QEmultiarray : !fir.array<32x32xi32> {
 
 // -----
 
+fir.global internal @_QEmultiarray : !fir.array<?xi32> {
+  %c0_i32 = arith.constant 1 : i32
+  %0 = fir.undefined !fir.array<?xi32>
+  // expected-error@+1 {{'fir.insert_on_range' op must have constant shape and size}}
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 10 : index] : (!fir.array<?xi32>, i32) -> !fir.array<?xi32>
+  fir.has_value %2 : !fir.array<?xi32>
+}
+
+// -----
+
+fir.global internal @_QEmultiarray : !fir.array<*:i32> {
+  %c0_i32 = arith.constant 1 : i32
+  %0 = fir.undefined !fir.array<*:i32>
+  // expected-error@+1 {{'fir.insert_on_range' op must have constant shape and size}}
+  %2 = fir.insert_on_range %0, %c0_i32, [0 : index, 10 : index] : (!fir.array<*:i32>, i32) -> !fir.array<*:i32>
+  fir.has_value %2 : !fir.array<*:i32>
+}
+
+// -----
+
 func @bad_array_modify(%arr1 : !fir.ref<!fir.array<?x?xf32>>, %m : index, %n : index, %o : index, %p : index, %f : f32) {
   %i10 = arith.constant 10 : index
   %j20 = arith.constant 20 : index
