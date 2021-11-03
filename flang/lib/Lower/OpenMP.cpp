@@ -101,9 +101,24 @@ void createEmptyRegionBlocks(
   auto *region = &firOpBuilder.getRegion();
   for (auto &eval : evaluationList) {
     if (eval.block) {
-      assert(eval.block->empty() && "block is not empty");
-      eval.block->erase();
-      eval.block = firOpBuilder.createBlock(region);
+      if (eval.block->empty()) {
+        eval.block->erase();
+        eval.block = firOpBuilder.createBlock(region);
+      } else {
+        [[maybe_unused]] auto &terminatorOp = eval.block->back();
+        assert((mlir::isa<mlir::omp::TerminatorOp>(terminatorOp) ||
+                mlir::isa<mlir::omp::YieldOp>(terminatorOp)) &&
+               "expected terminator op");
+        // FIXME: Some subset of cases may need to insert a branch,
+        // although this could be handled elsewhere.
+        // if (?) {
+        //   auto insertPt = firOpBuilder.saveInsertionPoint();
+        //   firOpBuilder.setInsertionPointAfter(region->getParentOp());
+        //   firOpBuilder.create<mlir::BranchOp>(
+        //       terminatorOp.getLoc(), eval.block);
+        //   firOpBuilder.restoreInsertionPoint(insertPt);
+        // }
+      }
     }
     if (eval.hasNestedEvaluations())
       createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
