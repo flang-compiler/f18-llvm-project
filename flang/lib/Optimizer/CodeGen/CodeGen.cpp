@@ -309,6 +309,7 @@ static void createGlobal(mlir::Location loc, mlir::ModuleOp mod, StringRef name,
 }
 
 namespace {
+/// Lower `fir.address_of` operation to `llvm.address_of` operation.
 struct AddrOfOpConversion : public FIROpConversion<fir::AddrOfOp> {
   using FIROpConversion::FIROpConversion;
 
@@ -2447,6 +2448,7 @@ struct GlobalLenOpConversion : public FIROpConversion<fir::GlobalLenOp> {
   }
 };
 
+/// Lower `fir.has_value` operation to `llvm.return` operation.
 struct HasValueOpConversion : public FIROpConversion<fir::HasValueOp> {
   using FIROpConversion::FIROpConversion;
 
@@ -2458,6 +2460,9 @@ struct HasValueOpConversion : public FIROpConversion<fir::HasValueOp> {
   }
 };
 
+/// Lower `fir.global` operation to `llvm.global` operation.
+/// `fir.insert_on_range` operations are replaced with constant dense attribute
+/// if they are applied on the full range.
 struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
   using FIROpConversion::FIROpConversion;
 
@@ -2520,6 +2525,8 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     return true;
   }
 
+  // TODO: String comparaison should be avoided. Replace linkName with an
+  // enumeration.
   mlir::LLVM::Linkage convertLinkage(Optional<StringRef> optLinkage) const {
     if (optLinkage.hasValue()) {
       auto name = optLinkage.getValue();
