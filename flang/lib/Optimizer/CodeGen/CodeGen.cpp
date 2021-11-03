@@ -2525,7 +2525,7 @@ struct GlobalOpConversion : public FIROpConversion<fir::GlobalOp> {
     return true;
   }
 
-  // TODO: String comparaison should be avoided. Replace linkName with an
+  // TODO: String comparison should be avoided. Replace linkName with an
   // enumeration.
   mlir::LLVM::Linkage convertLinkage(Optional<StringRef> optLinkage) const {
     if (optLinkage.hasValue()) {
