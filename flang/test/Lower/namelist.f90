@@ -17,7 +17,7 @@ program p
   ! CHECK: fir.insert_value
   ! CHECK: fir.address_of
   ! CHECK: fir.insert_value
-  ! CHECK: fir.embox [[ccc]]
+  ! CHECK: fir.address_of(@_QEccc.desc) : !fir.ref<!fir.box<!fir.ptr<!fir.array<4x!fir.char<1,3>>>>>
   ! CHECK: fir.insert_value
   ! CHECK: fir.alloca tuple<!fir.ref<i8>, i64, !fir.ref<!fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>>>
   ! CHECK: fir.address_of
@@ -37,7 +37,7 @@ program p
   ! CHECK: fir.insert_value
   ! CHECK: fir.address_of
   ! CHECK: fir.insert_value
-  ! CHECK: fir.embox [[ccc]]
+  ! CHECK: fir.address_of(@_QEccc.desc) : !fir.ref<!fir.box<!fir.ptr<!fir.array<4x!fir.char<1,3>>>>>
   ! CHECK: fir.insert_value
   ! CHECK: fir.alloca tuple<!fir.ref<i8>, i64, !fir.ref<!fir.array<2xtuple<!fir.ref<i8>, !fir.ref<!fir.box<none>>>>>>
   ! CHECK: fir.address_of
@@ -72,3 +72,4 @@ end
   ! CHECK-DAG: fir.global linkonce @_QQcl.6A6A6A00 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.63636300 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.6E6E6E00 constant : !fir.char<1,4>
+  ! CHECK-DAG: fir.global linkonce @_QEccc.desc constant : !fir.box<!fir.ptr<!fir.array<4x!fir.char<1,3>>>>

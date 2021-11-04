@@ -1223,11 +1223,37 @@ bool Fortran::lower::definedInCommonBlock(const semantics::Symbol &sym) {
   return semantics::FindCommonBlockContaining(sym);
 }
 
+static bool isReEntrant(const Fortran::semantics::Scope &scope) {
+  if (scope.kind() == Fortran::semantics::Scope::Kind::MainProgram)
+    return false;
+  if (scope.kind() == Fortran::semantics::Scope::Kind::Subprogram) {
+    const auto *sym = scope.symbol();
+    assert(sym && "Subprogram scope must have a symbol");
+    return sym->attrs().test(semantics::Attr::RECURSIVE) ||
+           (!sym->attrs().test(semantics::Attr::NON_RECURSIVE) &&
+            Fortran::lower::defaultRecursiveFunctionSetting());
+  }
+  if (scope.kind() == Fortran::semantics::Scope::Kind::Module)
+    return false;
+  return true;
+}
+
 /// Is the symbol `sym` a global?
 bool Fortran::lower::symbolIsGlobal(const semantics::Symbol &sym) {
-  if (const auto *details = sym.detailsIf<semantics::ObjectEntityDetails>())
+  if (const auto *details = sym.detailsIf<semantics::ObjectEntityDetails>()) {
     if (details->init())
       return true;
+    if (!isReEntrant(sym.owner())) {
+      // Turn array and character of non re-entrant programs (like the main
+      // program) into global memory.
+      if (const auto *symTy = sym.GetType())
+        if (symTy->category() == semantics::DeclTypeSpec::Character)
+          if (auto e = symTy->characterTypeSpec().length().GetExplicit())
+            return true;
+      if (!details->shape().empty() || !details->coshape().empty())
+        return true;
+    }
+  }
   return semantics::IsSaved(sym) || lower::definedInCommonBlock(sym);
 }
 
@@ -1238,8 +1264,8 @@ namespace {
 /// symbol table, which is sorted by name.
 struct SymbolDependenceDepth {
   explicit SymbolDependenceDepth(
-      std::vector<std::vector<lower::pft::Variable>> &vars, bool reentrant)
-      : vars{vars}, reentrant{reentrant} {}
+      std::vector<std::vector<lower::pft::Variable>> &vars)
+      : vars{vars} {}
 
   void analyzeAliasesInCurrentScope(const semantics::Scope &scope) {
     // FIXME: When this function is called on the scope of an internal
@@ -1348,7 +1374,6 @@ struct SymbolDependenceDepth {
       llvm_unreachable("not yet implemented - derived type analysis");
 
     // Symbol must be something lowering will have to allocate.
-    bool global = lower::symbolIsGlobal(sym);
     int depth = 0;
     const auto *symTy = sym.GetType();
     assert(symTy && "symbol must have a type");
@@ -1361,12 +1386,9 @@ struct SymbolDependenceDepth {
     if (const auto *details = sym.detailsIf<semantics::ObjectEntityDetails>()) {
       // check CHARACTER's length
       if (symTy->category() == semantics::DeclTypeSpec::Character)
-        if (auto e = symTy->characterTypeSpec().length().GetExplicit()) {
-          // turn variable into a global if this unit is not reentrant
-          global = global || !reentrant;
+        if (auto e = symTy->characterTypeSpec().length().GetExplicit())
           for (const auto &s : evaluate::CollectSymbols(*e))
             depth = std::max(analyze(s) + 1, depth);
-        }
 
       auto doExplicit = [&](const auto &bound) {
         if (bound.isExplicit()) {
@@ -1376,15 +1398,11 @@ struct SymbolDependenceDepth {
         }
       };
       // handle any symbols in array bound declarations
-      if (!details->shape().empty())
-        global = global || !reentrant;
       for (const auto &subs : details->shape()) {
         doExplicit(subs.lbound());
         doExplicit(subs.ubound());
       }
       // handle any symbols in coarray bound declarations
-      if (!details->coshape().empty())
-        global = global || !reentrant;
       for (const auto &subs : details->coshape()) {
         doExplicit(subs.lbound());
         doExplicit(subs.ubound());
@@ -1395,6 +1413,7 @@ struct SymbolDependenceDepth {
           depth = std::max(analyze(s) + 1, depth);
     }
     adjustSize(depth + 1);
+    auto global = lower::symbolIsGlobal(sym);
     vars[depth].emplace_back(sym, global, depth);
     if (semantics::IsAllocatable(sym))
       vars[depth].back().setHeapAlloc();
@@ -1479,15 +1498,13 @@ private:
   /// Set of Scope that have been analyzed for aliases.
   llvm::SmallSet<const semantics::Scope *, 4> analyzedScopes;
   std::vector<Fortran::lower::pft::Variable::AggregateStore> stores;
-  bool reentrant;
 };
 } // namespace
 
 static void processSymbolTable(
     const semantics::Scope &scope,
-    std::vector<std::vector<Fortran::lower::pft::Variable>> &varList,
-    bool reentrant) {
-  SymbolDependenceDepth sdd{varList, reentrant};
+    std::vector<std::vector<Fortran::lower::pft::Variable>> &varList) {
+  SymbolDependenceDepth sdd{varList};
   sdd.analyzeAliasesInCurrentScope(scope);
   for (const auto &iter : scope)
     sdd.analyze(iter.second.get());
@@ -1510,12 +1527,12 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     beginStmt = FunctionStatement(programStmt.value());
     auto symbol = getSymbol(*beginStmt);
     entryPointList[0].first = symbol;
-    processSymbolTable(*symbol->scope(), varList, isRecursive());
+    processSymbolTable(*symbol->scope(), varList);
   } else {
     processSymbolTable(
         semanticsContext.FindScope(
             std::get<parser::Statement<parser::EndProgramStmt>>(func.t).source),
-        varList, isRecursive());
+        varList);
   }
 }
 
@@ -1527,7 +1544,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
       endStmt{getFunctionStmt<parser::EndFunctionStmt>(func)} {
   auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope(), varList, isRecursive());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
@@ -1538,7 +1555,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
       endStmt{getFunctionStmt<parser::EndSubroutineStmt>(func)} {
   auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope(), varList, isRecursive());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
@@ -1549,7 +1566,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
       endStmt{getFunctionStmt<parser::EndMpSubprogramStmt>(func)} {
   auto symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
-  processSymbolTable(*symbol->scope(), varList, isRecursive());
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::HostAssociations &
@@ -1583,7 +1600,7 @@ Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
     : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::ModuleStmt>(m)},
       endStmt{getModuleStmt<parser::EndModuleStmt>(m)} {
   auto symbol = getSymbol(beginStmt);
-  processSymbolTable(*symbol->scope(), varList, /*reentrant=*/false);
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
@@ -1592,7 +1609,7 @@ Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
                                   m)},
       endStmt{getModuleStmt<parser::EndSubmoduleStmt>(m)} {
   auto symbol = getSymbol(beginStmt);
-  processSymbolTable(*symbol->scope(), varList, /*reentrant=*/false);
+  processSymbolTable(*symbol->scope(), varList);
 }
 
 parser::CharBlock
@@ -1686,8 +1703,7 @@ std::vector<Fortran::lower::pft::Variable>
 Fortran::lower::pft::buildFuncResultDependencyList(
     const Fortran::semantics::Symbol &symbol) {
   std::vector<std::vector<pft::Variable>> variableList;
-  // reentrant does not matter, no locals involved for results ().
-  SymbolDependenceDepth sdd(variableList, /*reentrant=*/true);
+  SymbolDependenceDepth sdd(variableList);
   sdd.analyzeAliasesInCurrentScope(symbol.owner());
   sdd.analyze(symbol);
   sdd.finalize();
