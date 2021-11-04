@@ -316,3 +316,19 @@ subroutine issue857_char(rhs)
   ! CHECK: fir.store %[[len2]] to %[[lhs2_len]] : !fir.ref<index>
   lhs2(1:2, 1:25) => rhs(1:50:1)
 end subroutine
+
+! CHECK-LABEL: func @_QPissue1180(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32> {fir.target}) {
+subroutine issue1180(x)
+  integer, target :: x
+  integer, pointer :: p
+  common /some_common/ p
+  ! CHECK: %[[VAL_1:.*]] = fir.address_of(@_QBsome_common) : !fir.ref<!fir.array<24xi8>>
+  ! CHECK: %[[VAL_2:.*]] = fir.convert %[[VAL_1]] : (!fir.ref<!fir.array<24xi8>>) -> !fir.ref<!fir.array<?xi8>>
+  ! CHECK: %[[VAL_3:.*]] = arith.constant 0 : index
+  ! CHECK: %[[VAL_4:.*]] = fir.coordinate_of %[[VAL_2]], %[[VAL_3]] : (!fir.ref<!fir.array<?xi8>>, index) -> !fir.ref<i8>
+  ! CHECK: %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (!fir.ref<i8>) -> !fir.ref<!fir.box<!fir.ptr<i32>>>
+  ! CHECK: %[[VAL_6:.*]] = fir.embox %[[VAL_0]] : (!fir.ref<i32>) -> !fir.box<!fir.ptr<i32>>
+  ! CHECK: fir.store %[[VAL_6]] to %[[VAL_5]] : !fir.ref<!fir.box<!fir.ptr<i32>>>
+  p => x
+end subroutine

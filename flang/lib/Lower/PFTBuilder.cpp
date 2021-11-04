@@ -1348,7 +1348,7 @@ struct SymbolDependenceDepth {
       llvm_unreachable("not yet implemented - derived type analysis");
 
     // Symbol must be something lowering will have to allocate.
-    bool global = semantics::IsSaved(sym);
+    bool global = lower::symbolIsGlobal(sym);
     int depth = 0;
     const auto *symTy = sym.GetType();
     assert(symTy && "symbol must have a type");
@@ -1390,12 +1390,9 @@ struct SymbolDependenceDepth {
         doExplicit(subs.ubound());
       }
       // handle any symbols in initialization expressions
-      if (auto e = details->init()) {
-        // An object that is initialized is implicitly SAVE, so set the flag.
-        global = true;
+      if (auto e = details->init())
         for (const auto &s : evaluate::CollectSymbols(*e))
           depth = std::max(analyze(s) + 1, depth);
-      }
     }
     adjustSize(depth + 1);
     vars[depth].emplace_back(sym, global, depth);
