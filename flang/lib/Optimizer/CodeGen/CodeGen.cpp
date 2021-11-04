@@ -2678,34 +2678,6 @@ template <typename OP>
 void selectMatchAndRewrite(fir::LLVMTypeConverter &lowering, OP select,
                            OperandTy operands,
                            mlir::ConversionPatternRewriter &rewriter) {
-  // // We could target the LLVM switch instruction, but it isn't part of the
-  // // LLVM IR dialect.  Create an if-then-else ladder instead.
-  // auto conds = select.getNumConditions();
-  // auto attrName = OP::getCasesAttr();
-  // auto caseAttr = select->template getAttrOfType<mlir::ArrayAttr>(attrName);
-  // auto cases = caseAttr.getValue();
-  // auto ty = select.getSelector().getType();
-  // auto ity = lowering.convertType(ty);
-  // auto selector = select.getSelector(operands);
-  // auto loc = select.getLoc();
-  // assert(conds > 0 && "select must have cases");
-  // for (decltype(conds) t = 0; t != conds; ++t) {
-  //   mlir::Block *dest = select.getSuccessor(t);
-  //   auto destOps = select.getSuccessorOperands(operands, t);
-  //   auto &attr = cases[t];
-  //   if (auto intAttr = attr.template dyn_cast<mlir::IntegerAttr>()) {
-  //     auto ci = rewriter.create<mlir::LLVM::ConstantOp>(
-  //         loc, ity, rewriter.getIntegerAttr(ty, intAttr.getInt()));
-  //     auto cmp = rewriter.create<mlir::LLVM::ICmpOp>(
-  //         loc, mlir::LLVM::ICmpPredicate::eq, selector, ci);
-  //     genCaseLadderStep(loc, cmp, dest, destOps, rewriter);
-  //     continue;
-  //   }
-  //   assert(attr.template dyn_cast_or_null<mlir::UnitAttr>());
-  //   assert((t + 1 == conds) && "unit must be last");
-  //   genBrOp(select, dest, destOps, rewriter);
-  // }
-
   auto conds = select.getNumConditions();
   auto caseAttr =
       select->template getAttrOfType<mlir::ArrayAttr>(OP::getCasesAttr());
