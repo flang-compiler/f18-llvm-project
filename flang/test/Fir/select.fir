@@ -6,7 +6,9 @@
 func @f(%a : i32) -> i32 {
    %1 = arith.constant 1 : i32
    %2 = arith.constant 42 : i32
-   // CHECK: icmp eq i32 %{{.*}}, 1
+// CHECK: switch i32 %{{.*}}, label %{{.*}} [
+// CHECK:   i32 1, label %{{.*}}
+// CHECK: ]
    fir.select %a : i32 [1, ^bb2(%1:i32), unit, ^bb3(%2:i32)]
 ^bb2(%3 : i32) :
    return %3 : i32
@@ -20,8 +22,11 @@ func @f(%a : i32) -> i32 {
 func @g(%a : i32) -> i32 {
    %1 = arith.constant 1 : i32
    %2 = arith.constant 42 : i32
-   // CHECK-DAG: icmp eq i32 %{{.*}}, 1
-   // CHECK-DAG: icmp eq i32 %{{.*}}, -1
+
+// CHECK: switch i32 %{{.*}}, label %{{.*}} [
+// CHECK:  i32 1, label %{{.*}}
+// CHECK:  i32 -1, label %{{.*}}
+// CHECK: ]
    fir.select_rank %a : i32 [1, ^bb2(%1:i32), -1, ^bb4, unit, ^bb3(%2:i32)]
 ^bb2(%3 : i32) :
    return %3 : i32
