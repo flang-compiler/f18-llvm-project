@@ -39,7 +39,7 @@
 
   ! CHECK: call {{.*}}BeginExternalListOutput
   ! Note that 32 bit integers are output as 64 bits in the runtime API
-  ! CHECK: call {{.*}}OutputInteger64
+  ! CHECK: call {{.*}}OutputInteger32
   ! CHECK: call {{.*}}OutputReal32
   ! CHECK: call {{.*}}EndIoStatement
   write (8,*) i, f
@@ -113,3 +113,33 @@ subroutine inquire_test(ch, i, b)
   ! CHECK: call {{.*}}EndIoStatement
   inquire(91, id=id_func(), pending=b)
 end subroutine inquire_test
+
+! CHECK-LABEL: @_QPboz
+subroutine boz
+  ! CHECK: fir.call @_FortranAioOutputInteger8(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i8) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger16(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i16) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger128(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i128) -> i1
+  print '(*(Z3))', 96_1, 96_2, 96_4, 96_8, 96_16
+
+  ! CHECK: fir.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  print '(I3,2Z44)', 40, 2**40_8, 2**40_8+1
+
+  ! CHECK: fir.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  print '(I3,2I44)', 40, 1099511627776,  1099511627777
+
+  ! CHECK: fir.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  print '(I3,2O44)', 40, 2**40_8, 2**40_8+1
+
+  ! CHECK: fir.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i64) -> i1
+  print '(I3,2B44)', 40, 2**40_8, 2**40_8+1
+end

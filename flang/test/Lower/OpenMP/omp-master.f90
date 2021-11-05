@@ -68,7 +68,7 @@ if (alpha .ge. gama) then
 !$OMP PARALLEL
 !FIRDialect:   omp.parallel {
 !FIRDialect:     fir.call @_FortranAioBeginExternalListOutput
-!FIRDialect:     fir.call @_FortranAioOutputInteger64
+!FIRDialect:     fir.call @_FortranAioOutputInteger32
 !FIRDialect:     fir.call @_FortranAioEndIoStatement
 !FIRDialect:   omp.terminator
 !FIRDialect:   }

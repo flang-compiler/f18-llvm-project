@@ -91,22 +91,17 @@ end subroutine
 !FIRDialect-DAG:    fir.store %[[ARG6_VAL]] to %[[ARG6_PVT]] : !fir.ref<i128>
 !FIRDialect-DAG:    %[[LIST_IO:.*]] = fir.call @_FortranAioBeginExternalListOutput
 !FIRDialect-DAG:    %[[ARG1_PVT_VAL:.*]] = fir.load %[[ARG1_PVT]] : !fir.ref<i32>
-!FIRDialect-DAG:    %[[ARG1_PVT_CVT:.*]] = fir.convert %[[ARG1_PVT_VAL]] : (i32) -> i64
-!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG1_PVT_CVT]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger32(%[[LIST_IO]], %[[ARG1_PVT_VAL]]) : (!fir.ref<i8>, i32) -> i1
 !FIRDialect-DAG:    %[[ARG2_PVT_VAL:.*]] = fir.load %[[ARG2_PVT]] : !fir.ref<i8>
-!FIRDialect-DAG:    %[[ARG2_PVT_CVT:.*]] = fir.convert %[[ARG2_PVT_VAL]] : (i8) -> i64
-!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG2_PVT_CVT]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger8(%[[LIST_IO]], %[[ARG2_PVT_VAL]]) : (!fir.ref<i8>, i8) -> i1
 !FIRDialect-DAG:    %[[ARG3_PVT_VAL:.*]] = fir.load %[[ARG3_PVT]] : !fir.ref<i16>
-!FIRDialect-DAG:    %[[ARG3_PVT_CVT:.*]] = fir.convert %[[ARG3_PVT_VAL]] : (i16) -> i64
-!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG3_PVT_CVT]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger16(%[[LIST_IO]], %[[ARG3_PVT_VAL]]) : (!fir.ref<i8>, i16) -> i1
 !FIRDialect-DAG:    %[[ARG4_PVT_VAL:.*]] = fir.load %[[ARG4_PVT]] : !fir.ref<i32>
-!FIRDialect-DAG:    %[[ARG4_PVT_CVT:.*]] = fir.convert %[[ARG4_PVT_VAL]] : (i32) -> i64
-!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG4_PVT_CVT]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger32(%[[LIST_IO]], %[[ARG4_PVT_VAL]]) : (!fir.ref<i8>, i32) -> i1
 !FIRDialect-DAG:    %[[ARG5_PVT_VAL:.*]] = fir.load %[[ARG5_PVT]] : !fir.ref<i64>
 !FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG5_PVT_VAL]]) : (!fir.ref<i8>, i64) -> i1
 !FIRDialect-DAG:    %[[ARG6_PVT_VAL:.*]] = fir.load %[[ARG6_PVT]] : !fir.ref<i128>
-!FIRDialect-DAG:    %[[ARG6_PVT_CVT:.*]] = fir.convert %[[ARG6_PVT_VAL]] : (i128) -> i64
-!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger64(%[[LIST_IO]], %[[ARG6_PVT_CVT]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect-DAG:    %{{.*}} = fir.call @_FortranAioOutputInteger128(%[[LIST_IO]], %[[ARG6_PVT_VAL]]) : (!fir.ref<i8>, i128) -> i1
 !FIRDialect-DAG:    omp.terminator
 !FIRDialect-DAG:  }
 

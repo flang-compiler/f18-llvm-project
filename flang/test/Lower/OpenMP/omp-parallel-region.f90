@@ -46,7 +46,7 @@ program parallel
 !FIRDialect-NEXT:     }
 !FIRDialect:     fir.call @_FortranAioBeginExternalListOutput
 !FIRDialect:     fir.load %[[VAR_C]]
-!FIRDialect:     fir.call @_FortranAioOutputInteger64
+!FIRDialect:     fir.call @_FortranAioOutputInteger32
 !FIRDialect:     fir.call @_FortranAioEndIoStatement
 !FIRDialect:     omp.terminator
 !FIRDialect-NEXT: }
@@ -67,7 +67,7 @@ program parallel
 !LLVMIRDialect: ^bb2:  // 2 preds: ^bb0, ^bb1
 !LLVMIRDialect:     llvm.call @_FortranAioBeginExternalListOutput
 !LLVMIRDialect:     llvm.load %[[VAR_C]] : !llvm.ptr<i32>
-!LLVMIRDialect:     llvm.call @_FortranAioOutputInteger64
+!LLVMIRDialect:     llvm.call @_FortranAioOutputInteger32
 !LLVMIRDialect:     llvm.call @_FortranAioEndIoStatement
 !LLVMIRDialect:     omp.terminator
 !LLVMIRDialect-NEXT:   }
@@ -82,7 +82,7 @@ program parallel
 !LLVMIR: %[[COND_RES:.*]] = icmp sgt i32 %{{.*}}, 4
 !LLVMIR: br i1 %[[COND_RES]], label %{{.*}}, label %{{.*}}
 !LLVMIR:   call i8* @_FortranAioBeginExternalListOutput
-!LLVMIR:   call i1 @_FortranAioOutputInteger64
+!LLVMIR:   call i1 @_FortranAioOutputInteger32
 !LLVMIR:   call i32 @_FortranAioEndIoStatement
         c = a + b
 

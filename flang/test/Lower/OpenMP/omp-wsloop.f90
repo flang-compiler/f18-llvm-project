@@ -50,14 +50,12 @@ program wsloop
 do i=1, 9
 print*, i
 !FIRDialect:    %[[RTBEGIN:.*]] = fir.call @_FortranAioBeginExternalListOutput
-!FIRDialect:    %[[CONVERTED:.*]] = fir.convert %[[I]] : (i32) -> i64
-!FIRDialect:    fir.call @_FortranAioOutputInteger64(%[[RTBEGIN]], %[[CONVERTED]]) : (!fir.ref<i8>, i64) -> i1
+!FIRDialect:    fir.call @_FortranAioOutputInteger32(%[[RTBEGIN]], %[[I]]) : (!fir.ref<i8>, i32) -> i1
 !FIRDialect:    fir.call @_FortranAioEndIoStatement(%[[RTBEGIN]]) : (!fir.ref<i8>) -> i32
 
 
 !LLVMIRDialect:     llvm.call @_FortranAioBeginExternalListOutput(%{{.*}}, %{{.*}}, %{{.*}}) : (i32, !llvm.ptr<i8>, i32) -> !llvm.ptr<i8>
-!LLVMIRDialect:     %{{.*}} = llvm.sext %[[I]] : i32 to i64
-!LLVMIRDialect:     llvm.call @_FortranAioOutputInteger64(%{{.*}}, %{{.*}}) : (!llvm.ptr<i8>, i64) -> i1
+!LLVMIRDialect:     llvm.call @_FortranAioOutputInteger32(%{{.*}}, %{{.*}}) : (!llvm.ptr<i8>, i32) -> i1
 !LLVMIRDialect:     llvm.call @_FortranAioEndIoStatement(%{{.*}}) : (!llvm.ptr<i8>) -> i32
 
 !LLVMIR:   br label %omp_loop.cond
@@ -73,8 +71,7 @@ print*, i
 !LLVMIR:   br label %omp.wsloop.region
 !LLVMIR: omp.wsloop.region:                                ; preds = %omp_loop.body
 !LLVMIR:   %{{.*}} = call i8* @_FortranAioBeginExternalListOutput
-!LLVMIR:   %{{.*}} = sext i32 %{{.*}} to i64
-!LLVMIR:   %{{.*}} = call i1 @_FortranAioOutputInteger64
+!LLVMIR:   %{{.*}} = call i1 @_FortranAioOutputInteger32
 !LLVMIR:   %{{.*}} = call i32 @_FortranAioEndIoStatement
 
 end do

@@ -116,7 +116,7 @@ subroutine loopnest
    ! CHECK:   fir.if {{.*}} -> (i1) {
    ! CHECK:     {{.*}}:2 = fir.iterate_while ({{.*}} = {{.*}} to {{.*}} step {{.*}}) and ({{.*}} = {{.*}}) -> (index, i1) {
    ! CHECK:       fir.if {{.*}} -> (i1) {
-   ! CHECK:         OutputInteger64
+   ! CHECK:         OutputInteger32
    ! CHECK:         fir.result {{.*}} : i1
    ! CHECK:       } else {
    ! CHECK:         fir.result {{.*}} : i1

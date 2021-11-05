@@ -13,6 +13,7 @@
 #include "flang/Lower/IO.h"
 #include "ConvertVariable.h"
 #include "StatementContext.h"
+#include "flang/Common/uint128.h"
 #include "flang/Lower/Allocatable.h"
 #include "flang/Lower/Bridge.h"
 #include "flang/Lower/ConvertExpr.h"
@@ -85,15 +86,17 @@ static constexpr std::tuple<
     mkIOKey(SetRec), mkIOKey(SetRound), mkIOKey(SetSign),
     mkIOKey(OutputNamelist), mkIOKey(InputNamelist), mkIOKey(OutputDescriptor),
     mkIOKey(InputDescriptor), mkIOKey(OutputUnformattedBlock),
-    mkIOKey(InputUnformattedBlock), mkIOKey(OutputInteger64),
-    mkIOKey(InputInteger), mkIOKey(OutputReal32), mkIOKey(InputReal32),
-    mkIOKey(OutputReal64), mkIOKey(InputReal64), mkIOKey(OutputComplex32),
-    mkIOKey(InputComplex32), mkIOKey(OutputComplex64), mkIOKey(InputComplex64),
-    mkIOKey(OutputAscii), mkIOKey(InputAscii), mkIOKey(OutputLogical),
-    mkIOKey(InputLogical), mkIOKey(SetAccess), mkIOKey(SetAction),
-    mkIOKey(SetAsynchronous), mkIOKey(SetCarriagecontrol), mkIOKey(SetEncoding),
-    mkIOKey(SetForm), mkIOKey(SetPosition), mkIOKey(SetRecl),
-    mkIOKey(SetStatus), mkIOKey(SetFile), mkIOKey(GetNewUnit), mkIOKey(GetSize),
+    mkIOKey(InputUnformattedBlock), mkIOKey(OutputInteger8),
+    mkIOKey(OutputInteger16), mkIOKey(OutputInteger32),
+    mkIOKey(OutputInteger64), mkIOKey(OutputInteger128), mkIOKey(InputInteger),
+    mkIOKey(OutputReal32), mkIOKey(InputReal32), mkIOKey(OutputReal64),
+    mkIOKey(InputReal64), mkIOKey(OutputComplex32), mkIOKey(InputComplex32),
+    mkIOKey(OutputComplex64), mkIOKey(InputComplex64), mkIOKey(OutputAscii),
+    mkIOKey(InputAscii), mkIOKey(OutputLogical), mkIOKey(InputLogical),
+    mkIOKey(SetAccess), mkIOKey(SetAction), mkIOKey(SetAsynchronous),
+    mkIOKey(SetCarriagecontrol), mkIOKey(SetEncoding), mkIOKey(SetForm),
+    mkIOKey(SetPosition), mkIOKey(SetRecl), mkIOKey(SetStatus),
+    mkIOKey(SetFile), mkIOKey(GetNewUnit), mkIOKey(GetSize),
     mkIOKey(GetIoLength), mkIOKey(GetIoMsg), mkIOKey(InquireCharacter),
     mkIOKey(InquireLogical), mkIOKey(InquirePendingId),
     mkIOKey(InquireInteger64), mkIOKey(EndIoStatement)>
@@ -390,10 +393,23 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
                                   bool isFormatted) {
   if (!isFormatted)
     return getIORuntimeFunc<mkIOKey(OutputDescriptor)>(loc, builder);
-  if (auto ty = type.dyn_cast<mlir::IntegerType>())
-    return ty.getWidth() == 1
-               ? getIORuntimeFunc<mkIOKey(OutputLogical)>(loc, builder)
-               : getIORuntimeFunc<mkIOKey(OutputInteger64)>(loc, builder);
+  if (auto ty = type.dyn_cast<mlir::IntegerType>()) {
+    switch (ty.getWidth()) {
+    case 1:
+      return getIORuntimeFunc<mkIOKey(OutputLogical)>(loc, builder);
+    case 8:
+      return getIORuntimeFunc<mkIOKey(OutputInteger8)>(loc, builder);
+    case 16:
+      return getIORuntimeFunc<mkIOKey(OutputInteger16)>(loc, builder);
+    case 32:
+      return getIORuntimeFunc<mkIOKey(OutputInteger32)>(loc, builder);
+    case 64:
+      return getIORuntimeFunc<mkIOKey(OutputInteger64)>(loc, builder);
+    case 128:
+      return getIORuntimeFunc<mkIOKey(OutputInteger128)>(loc, builder);
+    }
+    llvm_unreachable("unknown OutputInteger kind");
+  }
   if (auto ty = type.dyn_cast<mlir::FloatType>())
     return ty.getWidth() <= 32
                ? getIORuntimeFunc<mkIOKey(OutputReal32)>(loc, builder)
