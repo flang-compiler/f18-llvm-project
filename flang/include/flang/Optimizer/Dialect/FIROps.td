@@ -478,7 +478,7 @@ class fir_SwitchTerminatorOp<string mnemonic, list<OpTrait> traits = []> :
 
     // The number of destination conditions that may be tested
     unsigned getNumConditions() {
-      return (*this)->getAttrOfType<mlir::ArrayAttr>(getCasesAttr()).size();
+      return getCases().size();
     }
 
     // The selector is the value being tested to determine the destination
@@ -506,6 +506,10 @@ class fir_SwitchTerminatorOp<string mnemonic, list<OpTrait> traits = []> :
         p.printSuccessorAndUseList(succ, ops.getValue());
       else
         p.printSuccessor(succ);
+    }
+
+    mlir::ArrayAttr getCases() {
+      return (*this)->getAttrOfType<mlir::ArrayAttr>(getCasesAttr());
     }
 
     unsigned targetOffsetSize();

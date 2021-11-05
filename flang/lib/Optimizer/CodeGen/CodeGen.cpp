@@ -2678,11 +2678,9 @@ template <typename OP>
 void selectMatchAndRewrite(fir::LLVMTypeConverter &lowering, OP select,
                            OperandTy operands,
                            mlir::ConversionPatternRewriter &rewriter) {
-  auto conds = select.getNumConditions();
-  auto caseAttr =
-      select->template getAttrOfType<mlir::ArrayAttr>(OP::getCasesAttr());
-  auto cases = caseAttr.getValue();
-  auto selector = select.getSelector(operands);
+  unsigned conds = select.getNumConditions();
+  auto cases = select.getCases().getValue();
+  mlir::Value selector = select.selector();
   auto loc = select.getLoc();
   assert(conds > 0 && "select must have cases");
 
@@ -2692,10 +2690,10 @@ void selectMatchAndRewrite(fir::LLVMTypeConverter &lowering, OP select,
   mlir::ValueRange defaultOperands;
   llvm::SmallVector<int32_t> caseValues;
 
-  for (decltype(conds) t = 0; t != conds; ++t) {
+  for (unsigned t = 0; t != conds; ++t) {
     mlir::Block *dest = select.getSuccessor(t);
     auto destOps = select.getSuccessorOperands(operands, t);
-    auto &attr = cases[t];
+    const mlir::Attribute &attr = cases[t];
     if (auto intAttr = attr.template dyn_cast<mlir::IntegerAttr>()) {
       destinations.push_back(dest);
       destinationsOperands.push_back(destOps.hasValue() ? *destOps
