@@ -497,8 +497,8 @@ private:
   fir::ExtendedValue getExtendedValue(Fortran::lower::SymbolBox sb) {
     return sb.match(
         [&](const Fortran::lower::SymbolBox::PointerOrAllocatable &box) {
-          return fir::factory::genMutableBoxRead(*builder,
-                                                   getCurrentLocation(), box);
+          return fir::factory::genMutableBoxRead(*builder, getCurrentLocation(),
+                                                 box);
         },
         [&sb](auto &) { return sb.toExtendedValue(); });
   }
@@ -2450,17 +2450,7 @@ private:
     }
 
     // Create most function blocks in advance.
-    auto *alternateEntryEval = funit.getEntryEval();
-    if (alternateEntryEval) {
-      // Move to executable successor.
-      alternateEntryEval = alternateEntryEval->lexicalSuccessor;
-      auto evalIsNewBlock = alternateEntryEval->isNewBlock;
-      alternateEntryEval->isNewBlock = true;
-      createEmptyBlocks(funit.evaluationList);
-      alternateEntryEval->isNewBlock = evalIsNewBlock;
-    } else {
-      createEmptyBlocks(funit.evaluationList);
-    }
+    createEmptyBlocks(funit.evaluationList);
 
     // Reinstate entry block as the current insertion point.
     builder->setInsertionPointToEnd(&func.front());
@@ -2480,14 +2470,20 @@ private:
       builder->create<fir::StoreOp>(loc, zero, altResult);
     }
 
-    if (alternateEntryEval) {
-      genFIRBranch(alternateEntryEval->block);
-      builder->setInsertionPointToStart(
-          builder->createBlock(&builder->getRegion()));
-    }
+    if (auto *alternateEntryEval = funit.getEntryEval())
+      genFIRBranch(alternateEntryEval->lexicalSuccessor->block);
   }
 
-  /// Create empty blocks for the current function.
+  /// Create global blocks for the current function.  This eliminates the
+  /// distinction between forward and backward targets when generating
+  /// branches.  A block is "global" if it can be the target of a GOTO or
+  /// other source code branch.  A block that can only be targeted by a
+  /// compiler generated branch is "local".  For example, a DO loop preheader
+  /// block containing loop initialization code is global.  A loop header
+  /// block, which is the target of the loop back edge, is local.  Blocks
+  /// belong to a region.  Any block within a nested region must be replaced
+  /// with a block belonging to that region.  Branches may not cross region
+  /// boundaries.
   void createEmptyBlocks(
       std::list<Fortran::lower::pft::Evaluation> &evaluationList) {
     auto *region = &builder->getRegion();

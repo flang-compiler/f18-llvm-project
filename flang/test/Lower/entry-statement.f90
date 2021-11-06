@@ -31,6 +31,10 @@ program entries
   m = 'abcd efgh'
   print*, hh(m)
   print*, qq(m)
+  call dd1
+  call dd2
+  call dd3(6)
+6 continue
 end
 
 ! CHECK-LABEL: func @_QPss(%arg0: !fir.ref<i32>)
@@ -92,3 +96,52 @@ function char_array()
 ! CHECK-LABEL: func @_QPchar_array_entry(%arg0: !fir.boxchar<1>)
 entry char_array_entry(c)
 end
+
+! CHECK-LABEL: func @_QPdd1()
+subroutine dd1
+    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
+    ! "_QFdd1Ekk"}
+    ! CHECK: br ^bb1
+    ! CHECK: ^bb1:  // pred: ^bb0
+    ! CHECK: %[[ten:.*]] = arith.constant 10 : i32
+    ! CHECK: fir.store %[[ten:.*]] to %[[kk]] : !fir.ref<i32>
+    ! CHECK: br ^bb2
+    ! CHECK: ^bb2:  // pred: ^bb1
+    ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
+    ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
+    ! CHECK: br ^bb3
+    ! CHECK: ^bb3:  // pred: ^bb2
+    ! CHECK: return
+    kk = 10
+
+    ! CHECK-LABEL: func @_QPdd2()
+    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
+    ! "_QFdd1Ekk"}
+    ! CHECK: br ^bb1
+    ! CHECK: ^bb1:  // pred: ^bb0
+    ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
+    ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
+    ! CHECK: br ^bb2
+    ! CHECK: ^bb2:  // pred: ^bb1
+    ! CHECK: return
+    entry dd2
+    kk = 20
+    return
+
+    ! CHECK-LABEL: func @_QPdd3
+    ! CHECK: %[[dd3:[0-9]*]] = fir.alloca index {bindc_name = "dd3"}
+    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
+    ! "_QFdd1Ekk"}
+    ! CHECK: %[[zero:.*]] = arith.constant 0 : index
+    ! CHECK: fir.store %[[zero:.*]] to %[[dd3]] : !fir.ref<index>
+    ! CHECK: br ^bb1
+    ! CHECK: ^bb1:  // pred: ^bb0
+    ! CHECK: %[[thirty:.*]] = arith.constant 30 : i32
+    ! CHECK: fir.store %[[thirty:.*]] to %[[kk:[0-9]*]] : !fir.ref<i32>
+    ! CHECK: br ^bb2
+    ! CHECK: ^bb2:  // pred: ^bb1
+    ! CHECK: %[[altret:[0-9]*]] = fir.load %[[dd3]] : !fir.ref<index>
+    ! CHECK: return %[[altret:[0-9]*]] : index
+    entry dd3(*)
+    kk = 30
+  end

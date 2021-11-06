@@ -770,6 +770,11 @@ private:
             markSuccessorAsNewBlock(eval);
           },
 
+          // The first executable statement after an EntryStmt is a new block.
+          [&](const parser::EntryStmt &) {
+            eval.lexicalSuccessor->isNewBlock = true;
+          },
+
           // Construct statements
           [&](const parser::AssociateStmt &s) {
             insertConstructName(s, parentConstruct);
@@ -945,7 +950,8 @@ private:
   /// also find one of the largest function results, since a single result
   /// container holds the result for all entries.
   void processEntryPoints() {
-    auto *unit = evaluationListStack.back()->front().getOwningProcedure();
+    auto *initialEval = &evaluationListStack.back()->front();
+    auto *unit = initialEval->getOwningProcedure();
     int entryCount = unit->entryPointList.size();
     if (entryCount == 1)
       return;
@@ -975,6 +981,13 @@ private:
     for (auto arg : dummyCountMap)
       if (arg.second < entryCount)
         unit->nonUniversalDummyArguments.push_back(arg.first);
+    // The first executable statement in the subprogram is preceded by a
+    // branch to the entry point, so it starts a new block.
+    if (initialEval->hasNestedEvaluations())
+      initialEval = &initialEval->getFirstNestedEvaluation();
+    else if (initialEval->isA<Fortran::parser::EntryStmt>())
+      initialEval = initialEval->lexicalSuccessor;
+    initialEval->isNewBlock = true;
   }
 
   std::unique_ptr<lower::pft::Program> pgm;
