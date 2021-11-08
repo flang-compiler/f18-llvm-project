@@ -5,6 +5,19 @@
 // SPDX-License-Identifier: Apache-2.0 WITH LLVM-exception
 //
 //===----------------------------------------------------------------------===//
+// LLVM IR dialect models of C++ types.
+//
+// This supplies a set of model builders to decompose the C declaration of a
+// descriptor (as encoded in ISO_Fortran_binding.h and elsewhere) and
+// reconstruct that type in the LLVM IR dialect.
+//
+// TODO: It is understood that this is deeply incorrect as far as building a
+// portability layer for cross-compilation as these reflected types are those of
+// the build machine and not necessarily that of either the host or the target.
+// This assumption that build == host == target is actually pervasive across the
+// compiler (https://llvm.org/PR52418).
+//
+//===----------------------------------------------------------------------===//
 
 #ifndef OPTIMIZER_DESCRIPTOR_MODEL_H
 #define OPTIMIZER_DESCRIPTOR_MODEL_H
@@ -16,21 +29,6 @@
 #include <tuple>
 
 namespace fir {
-
-//===----------------------------------------------------------------------===//
-// LLVM IR dialect models of C++ types.
-//
-// This supplies a set of model builders to decompose the C declaration of a
-// descriptor (as encoded in ISO_Fortran_binding.h and elsewhere) and
-// reconstruct that type in the LLVM IR dialect.
-//
-// TODO: It is understood that this is deeply incorrect as far as building a
-// portability layer for cross-compilation as these reflected types are those of
-// the build machine and not necessarily that of either the host or the target.
-// This assumption that build == host == target is actually pervasive across the
-// compiler.
-//
-//===----------------------------------------------------------------------===//
 
 using TypeBuilderFunc = mlir::Type (*)(mlir::MLIRContext *);
 
@@ -89,10 +87,9 @@ TypeBuilderFunc getModel<Fortran::ISO::CFI_type_t>() {
   };
 }
 template <>
-TypeBuilderFunc getModel<Fortran::ISO::CFI_index_t>() {
+TypeBuilderFunc getModel<long>() {
   return [](mlir::MLIRContext *context) -> mlir::Type {
-    return mlir::IntegerType::get(context,
-                                  sizeof(Fortran::ISO::CFI_index_t) * 8);
+    return mlir::IntegerType::get(context, sizeof(long) * 8);
   };
 }
 template <>
@@ -112,11 +109,12 @@ getModel<Fortran::ISO::cfi_internal::FlexibleArray<Fortran::ISO::CFI_dim_t>>() {
 // Descriptor reflection
 //===----------------------------------------------------------------------===//
 
-/// Get the type model of the field number `Field` in an ISO descriptor.
+/// Get the type model of the field number `Field` in an ISO CFI descriptor.
 template <int Field>
 static constexpr TypeBuilderFunc getDescFieldTypeModel() {
   Fortran::ISO::Fortran_2018::CFI_cdesc_t dummyDesc{};
-  // check that the descriptor is exactly 8 fields
+  // check that the descriptor is exactly 8 fields as specified in CFI_cdesc_t
+  // in flang/include/flang/ISO_Fortran_binding.h.
   auto [a, b, c, d, e, f, g, h] = dummyDesc;
   auto tup = std::tie(a, b, c, d, e, f, g, h);
   auto field = std::get<Field>(tup);
