@@ -226,7 +226,7 @@ arrayLoadExtValue(fir::FirOpBuilder &builder, mlir::Location loc,
   if (!path.empty()) {
     auto ty = fir::applyPathToType(arrTy, path);
     if (!ty)
-      fir::emitFatalError(loc, "path does not apply to type");
+      TODO(loc, "path does not apply to type");
     if (!ty.isa<fir::SequenceType>()) {
       if (fir::isa_char(ty)) {
         auto len = newLen;
@@ -5534,7 +5534,6 @@ private:
               [&](EndOfSubscripts) { ty = fir::unwrapSequenceType(ty); },
               [&](const Fortran::evaluate::Subscript *x) { addSub(*x); },
               [&](const Fortran::evaluate::ArrayRef *x) {
-                assert(!x->base().IsSymbol());
                 for (const auto &sub : x->subscript())
                   addSub(sub);
                 ty = fir::unwrapSequenceType(ty);
