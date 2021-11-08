@@ -5705,8 +5705,10 @@ private:
     auto result = genesp(x.base());
     if (pathIsEmpty())
       return result;
-    if (top)
+    if (top) {
+      reversePath.clear();
       return [=](IterSpace) { return asScalar(x); };
+    }
     auto loc = getLoc();
     return [=](IterSpace) {
       fir::emitFatalError(loc, "QQ reached arrayref with path");
