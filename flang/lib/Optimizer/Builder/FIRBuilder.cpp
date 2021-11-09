@@ -378,10 +378,13 @@ mlir::Value fir::FirOpBuilder::createSlice(mlir::Location loc,
         }
         return create<fir::SliceOp>(loc, trips, path);
       }
-      for (auto [lbnd, ext] : llvm::zip(lbounds, extents)) {
+      for (auto [lbnd, extent] : llvm::zip(lbounds, extents)) {
         auto lb = createConvert(loc, idxTy, lbnd);
+        auto ext = createConvert(loc, idxTy, extent);
+        auto shift = create<mlir::arith::SubIOp>(loc, lb, one);
+        auto ub = create<mlir::arith::AddIOp>(loc, ext, shift);
         trips.push_back(lb);
-        trips.push_back(ext);
+        trips.push_back(ub);
         trips.push_back(one);
       }
       return create<fir::SliceOp>(loc, trips, path);

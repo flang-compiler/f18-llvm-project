@@ -651,7 +651,7 @@ public:
 } // namespace
 
 static mlir::Type getEleTy(mlir::Type ty) {
-  auto eleTy = unwrapSequenceType(unwrapRefType(ty));
+  auto eleTy = unwrapSequenceType(unwrapPassByRefType(ty));
   // FIXME: keep ptr/heap/ref information.
   return ReferenceType::get(eleTy);
 }
@@ -695,8 +695,19 @@ getOrReadExtentsAndShapeOp(mlir::Location loc, mlir::PatternRewriter &rewriter,
                                                 loadOp.memref(), dimVal);
       result.emplace_back(dimInfo.getResult(1));
     }
-    auto shapeType = ShapeType::get(rewriter.getContext(), rank);
-    return rewriter.create<ShapeOp>(loc, shapeType, result);
+    if (!loadOp.shape()) {
+      auto shapeType = ShapeType::get(rewriter.getContext(), rank);
+      return rewriter.create<ShapeOp>(loc, shapeType, result);
+    }
+    auto shiftOp = loadOp.shape().getDefiningOp<fir::ShiftOp>();
+    auto shapeShiftType = ShapeShiftType::get(rewriter.getContext(), rank);
+    llvm::SmallVector<mlir::Value> shapeShiftOperands;
+    for (auto [lb, extent] : llvm::zip(shiftOp.getOrigins(), result)) {
+      shapeShiftOperands.push_back(lb);
+      shapeShiftOperands.push_back(extent);
+    }
+    return rewriter.create<ShapeShiftOp>(loc, shapeShiftType,
+                                         shapeShiftOperands);
   }
   getExtents(result, loadOp.shape());
   return loadOp.shape();
@@ -737,7 +748,6 @@ genCoorOp(mlir::PatternRewriter &rewriter, mlir::Location loc, mlir::Type eleTy,
 static void genArrayCopy(mlir::Location loc, mlir::PatternRewriter &rewriter,
                          mlir::Value dst, mlir::Value src, mlir::Value shapeOp,
                          ArrayLoadOp arrLoad) {
-  auto arrTy = arrLoad.getType();
   auto insPt = rewriter.saveInsertionPoint();
   llvm::SmallVector<mlir::Value> indices;
   llvm::SmallVector<mlir::Value> extents;
@@ -755,17 +765,16 @@ static void genArrayCopy(mlir::Location loc, mlir::PatternRewriter &rewriter,
   }
   // Reverse the indices so they are in column-major order.
   std::reverse(indices.begin(), indices.end());
-  auto ty = getEleTy(arrTy);
   auto typeparams = arrLoad.typeparams();
   auto fromAddr = rewriter.create<ArrayCoorOp>(
-      loc, ty, src, shapeOp, mlir::Value{},
+      loc, getEleTy(src.getType()), src, shapeOp, mlir::Value{},
       factory::originateIndices(loc, rewriter, src.getType(), shapeOp, indices),
       typeparams);
   auto toAddr = rewriter.create<ArrayCoorOp>(
-      loc, ty, dst, shapeOp, mlir::Value{},
+      loc, getEleTy(dst.getType()), dst, shapeOp, mlir::Value{},
       factory::originateIndices(loc, rewriter, dst.getType(), shapeOp, indices),
       typeparams);
-  auto eleTy = unwrapSequenceType(unwrapRefType(arrTy));
+  auto eleTy = unwrapSequenceType(unwrapPassByRefType(dst.getType()));
   if (hasDynamicSize(eleTy)) {
     if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
       assert(charTy.hasDynamicLen() && "dynamic size and constant length");
