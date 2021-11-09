@@ -546,6 +546,13 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     ToolChain.addFastMathRuntimeIfAvailable(Args, CmdArgs);
   }
 
+  if (D.IsFlangMode()) {
+    CmdArgs.push_back("-lFortran_main");
+    CmdArgs.push_back("-lFortranRuntime");
+    CmdArgs.push_back("-lFortranDecimal");
+    CmdArgs.push_back("-lm");
+  }
+
   Args.AddAllArgs(CmdArgs, options::OPT_L);
   Args.AddAllArgs(CmdArgs, options::OPT_u);
 
