@@ -24,3 +24,18 @@ subroutine associated_test(scalar, array)
   ! CHECK: fir.call @_FortranAPointerIsAssociatedWith(%[[sbox]], %[[zbox]]) : (!fir.box<none>, !fir.box<none>) -> i1
   print *, associated(scalar, ziel)
 end subroutine
+
+subroutine test_func_results()
+  interface
+    function get_pointer()
+      real, pointer :: get_pointer(:) 
+    end function
+  end interface
+  ! CHECK: %[[result:.*]] = fir.call @_QPget_pointer() : () -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
+  ! CHECK: fir.save_result %[[result]] to %[[box_storage:.*]] : !fir.box<!fir.ptr<!fir.array<?xf32>>>, !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+  ! CHECK: %[[box:.*]] = fir.load %[[box_storage]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+  ! CHECK: %[[addr:.*]] = fir.box_addr %[[box]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>) -> !fir.ptr<!fir.array<?xf32>>
+  ! CHECK: %[[addr_cast:.*]] = fir.convert %[[addr]] : (!fir.ptr<!fir.array<?xf32>>) -> i64
+  ! CHECK:  arith.cmpi ne, %[[addr_cast]], %c0{{.*}} : i64
+  print *, associated(get_pointer())
+end subroutine

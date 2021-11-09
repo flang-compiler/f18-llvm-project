@@ -207,7 +207,12 @@ convertOptExtentExpr(Fortran::lower::AbstractConverter &converter,
 }
 
 /// Does this expr designate an allocatable or pointer entity ?
-static bool isAllocatableOrPointer(const Fortran::lower::SomeExpr &expr) {
+static bool
+isAllocatableOrPointer(const Fortran::lower::SomeExpr &expr,
+                       Fortran::lower::AbstractConverter &converter) {
+  // First check if this is a pointer function result.
+  if (Fortran::evaluate::IsObjectPointer(expr, converter.getFoldingContext()))
+    return true;
   const auto *sym =
       Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(expr);
   return sym && Fortran::semantics::IsAllocatableOrPointer(*sym);
@@ -1613,7 +1618,7 @@ public:
   /// Helper to lower intrinsic arguments for inquiry intrinsic.
   ExtValue
   lowerIntrinsicArgumentAsInquired(const Fortran::lower::SomeExpr &expr) {
-    if (isAllocatableOrPointer(expr))
+    if (isAllocatableOrPointer(expr, converter))
       return genMutableBoxValue(expr);
     return gen(expr);
   }
@@ -2194,7 +2199,7 @@ public:
         // unallocated/disassociated entity to an optional. In this case, an
         // absent fir.box must be created instead of a fir.box with a null value
         // (Fortran 2018 15.5.2.12 point 1).
-        if (arg.isOptional() && isAllocatableOrPointer(*expr)) {
+        if (arg.isOptional() && isAllocatableOrPointer(*expr, converter)) {
           // Note that passing an absent allocatable to a non-allocatable
           // optional dummy argument is illegal (15.5.2.12 point 3 (8)). So
           // nothing has to be done to generate an absent argument in this case,
