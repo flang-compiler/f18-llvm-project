@@ -2311,7 +2311,7 @@ IntrinsicLibrary::genIchar(mlir::Type resultType,
   }
   LLVM_DEBUG(llvm::dbgs() << "ichar(" << charVal << ")\n");
   auto code = helper.extractCodeFromSingleton(charVal);
-  return builder.createConvert(loc, resultType, code);
+  return builder.create<mlir::arith::ExtUIOp>(loc, resultType, code);
 }
 
 // IEOR

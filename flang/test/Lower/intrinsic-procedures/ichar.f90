@@ -8,16 +8,19 @@ subroutine ichar_test(c)
   ! CHECK-DAG: %[[J:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Ej"}
   ! CHECK-DAG: %[[STR:.*]] = fir.alloca !fir.array{{.*}} {{{.*}}uniq_name = "{{.*}}Estr"}
   ! CHECK: %[[BOX:.*]] = fir.convert %[[unbox]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.char<1>>
-  ! CHECK: %[[CHAR:.*]] = fir.load %[[BOX]] : !fir.ref<!fir.char<1>>
-  ! CHECK: fir.extract_value %[[CHAR]], [0 : index] :
-  print *, ichar(c)
+  ! CHECK: %[[PTR:.*]] = fir.load %[[BOX]] : !fir.ref<!fir.char<1>>
+  ! CHECK: %[[CHAR:.*]] = fir.extract_value %[[PTR]], [0 : index] :
+  ! CHECK: %[[ARG:.*]] = arith.extui %[[CHAR]] : i8 to i32
+  ! CHECK: fir.call @{{.*}}OutputInteger32{{.*}}%[[ARG]]
   ! CHECK: fir.call @{{.*}}EndIoStatement
+  print *, ichar(c)
 
   ! CHECK-DAG: %{{.*}} = fir.load %[[J]] : !fir.ref<i32>
-  ! CHECK: %[[ptr:.*]] = fir.coordinate_of %[[STR]], %
-  ! CHECK: %[[VAL:.*]] = fir.load %[[ptr]] : !fir.ref<!fir.char<1>>
-  ! CHECK: fir.extract_value %[[VAL]], [0 : index] :
-  print *, ichar(str(J))
+  ! CHECK: %[[PTR1:.*]] = fir.coordinate_of %[[STR]], %
+  ! CHECK: %[[PTR2:.*]] = fir.load %[[PTR1]] : !fir.ref<!fir.char<1>>
+  ! CHECK: %[[CHAR:.*]] = fir.extract_value %[[PTR2]], [0 : index] :
+  ! CHECK: %[[ARG:.*]] = arith.extui %[[CHAR]] : i8 to i32
+  ! CHECK: fir.call @{{.*}}OutputInteger32{{.*}}%[[ARG]]
   ! CHECK: fir.call @{{.*}}EndIoStatement
+  print *, ichar(str(J))
 end subroutine
-
