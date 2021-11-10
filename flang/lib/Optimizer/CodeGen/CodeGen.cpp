@@ -2841,49 +2841,6 @@ struct UnboxCharOpConversion : public FIROpConversion<fir::UnboxCharOp> {
   }
 };
 
-// unbox a generic box reference, yielding its components
-struct UnboxOpConversion : public FIROpConversion<fir::UnboxOp> {
-  using FIROpConversion::FIROpConversion;
-
-  mlir::LogicalResult
-  matchAndRewrite(fir::UnboxOp unbox, OperandTy operands,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto loc = unbox.getLoc();
-    auto tuple = operands[0];
-    auto ty = tuple.getType();
-    auto oty = lowerTy().offsetType();
-    auto c0 = rewriter.create<mlir::LLVM::ConstantOp>(
-        loc, oty, rewriter.getI32IntegerAttr(0));
-    mlir::Value ptr = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 0);
-    mlir::Value len = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 1);
-    mlir::Value ver = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 2);
-    mlir::Value rank = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 3);
-    mlir::Value type = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 4);
-    mlir::Value attr = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 5);
-    mlir::Value xtra = genLoadWithIndex(loc, tuple, ty, rewriter, oty, c0, 6);
-    // FIXME: add dims, etc.
-    llvm::SmallVector<mlir::Value> repls{ptr, len, ver, rank, type, attr, xtra};
-    rewriter.replaceOp(unbox, repls);
-    return success();
-  }
-
-  // generate a GEP into a structure and load the element at position `x`
-  mlir::LLVM::LoadOp genLoadWithIndex(mlir::Location loc, mlir::Value tuple,
-                                      mlir::Type ty,
-                                      mlir::ConversionPatternRewriter &rewriter,
-                                      mlir::Type oty, mlir::LLVM::ConstantOp c0,
-                                      int x) const {
-    auto ax = rewriter.getI32IntegerAttr(x);
-    auto cx = rewriter.create<mlir::LLVM::ConstantOp>(loc, oty, ax);
-    auto sty = ty.dyn_cast<mlir::LLVM::LLVMStructType>();
-    assert(sty);
-    auto xty = sty.getBody()[x];
-    auto gep = genGEP(loc, mlir::LLVM::LLVMPointerType::get(xty), rewriter,
-                      tuple, c0, cx);
-    return rewriter.create<mlir::LLVM::LoadOp>(loc, xty, gep);
-  }
-};
-
 // unbox a procedure box value, yielding its components
 struct UnboxProcOpConversion : public FIROpConversion<fir::UnboxProcOp> {
   using FIROpConversion::FIROpConversion;
@@ -3230,9 +3187,9 @@ public:
         SelectOpConversion, SelectRankOpConversion, SelectTypeOpConversion,
         ShapeOpConversion, ShapeShiftOpConversion, ShiftOpConversion,
         SliceOpConversion, StoreOpConversion, StringLitOpConversion,
-        SubcOpConversion, UnboxCharOpConversion, UnboxOpConversion,
-        UnboxProcOpConversion, UndefOpConversion, UnreachableOpConversion,
-        XArrayCoorOpConversion, XEmboxOpConversion, XReboxOpConversion,
+        SubcOpConversion, UnboxCharOpConversion, UnboxProcOpConversion,
+        UndefOpConversion, UnreachableOpConversion, XArrayCoorOpConversion,
+        XEmboxOpConversion, XReboxOpConversion,
         ZeroOpConversion>(context, typeConverter);
     mlir::populateStdToLLVMConversionPatterns(typeConverter, pattern);
     mlir::populateOpenMPToLLVMConversionPatterns(typeConverter, pattern);
