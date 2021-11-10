@@ -933,6 +933,16 @@ static mlir::FunctionType genF64F64F64FuncType(mlir::MLIRContext *context) {
   return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
+static mlir::FunctionType genF80F80F80FuncType(mlir::MLIRContext *context) {
+  auto t = mlir::FloatType::getF80(context);
+  return mlir::FunctionType::get(context, {t, t}, {t});
+}
+
+static mlir::FunctionType genF128F128F128FuncType(mlir::MLIRContext *context) {
+  auto t = mlir::FloatType::getF128(context);
+  return mlir::FunctionType::get(context, {t, t}, {t});
+}
+
 template <int Bits>
 static mlir::FunctionType genIntF64FuncType(mlir::MLIRContext *context) {
   auto t = mlir::FloatType::getF64(context);
@@ -981,6 +991,10 @@ static constexpr RuntimeFunction llvmIntrinsics[] = {
     {"nint", "llvm.lround.i32.f32", genIntF32FuncType<32>},
     {"pow", "llvm.pow.f32", genF32F32F32FuncType},
     {"pow", "llvm.pow.f64", genF64F64F64FuncType},
+    {"sign", "llvm.copysign.f32", genF32F32F32FuncType},
+    {"sign", "llvm.copysign.f64", genF64F64F64FuncType},
+    {"sign", "llvm.copysign.f80", genF80F80F80FuncType},
+    {"sign", "llvm.copysign.f128", genF128F128F128FuncType},
     {"sin", "llvm.sin.f32", genF32F32FuncType},
     {"sin", "llvm.sin.f64", genF64F64FuncType},
     {"sinh", "sinhf", genF32F32FuncType},
@@ -2960,20 +2974,15 @@ mlir::Value IntrinsicLibrary::genSetExponent(mlir::Type resultType,
 mlir::Value IntrinsicLibrary::genSign(mlir::Type resultType,
                                       llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 2);
-  auto abs = genAbs(resultType, {args[0]});
   if (resultType.isa<mlir::IntegerType>()) {
+    auto abs = genAbs(resultType, {args[0]});
     auto zero = builder.createIntegerConstant(loc, resultType, 0);
     auto neg = builder.create<mlir::arith::SubIOp>(loc, zero, abs);
     auto cmp = builder.create<mlir::arith::CmpIOp>(
         loc, mlir::arith::CmpIPredicate::slt, args[1], zero);
     return builder.create<mlir::SelectOp>(loc, cmp, neg, abs);
   }
-  // TODO: Requirements when second argument is +0./0.
-  auto zero = builder.createRealZeroConstant(loc, resultType);
-  auto neg = builder.create<mlir::arith::NegFOp>(loc, abs);
-  auto cmp = builder.create<mlir::arith::CmpFOp>(
-      loc, mlir::arith::CmpFPredicate::OLT, args[1], zero);
-  return builder.create<mlir::SelectOp>(loc, cmp, neg, abs);
+  return genRuntimeCall("sign", resultType, args);
 }
 
 // SIZE
