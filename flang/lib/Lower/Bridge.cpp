@@ -201,16 +201,30 @@ public:
     assert(internalScope && "internal procedures symbol must create a scope");
     auto addToListIfEscapee = [&](const Fortran::semantics::Symbol &sym) {
       auto &ultimate = sym.GetUltimate();
+      const auto *namelistDetails =
+          sym.detailsIf<Fortran::semantics::NamelistDetails>();
       if (ultimate.has<Fortran::semantics::ObjectEntityDetails>() ||
           Fortran::semantics::IsProcedurePointer(ultimate) ||
-          Fortran::semantics::IsDummy(sym)) {
+          Fortran::semantics::IsDummy(sym) || namelistDetails) {
         const auto &ultimateScope = ultimate.owner();
         if (ultimateScope.kind() ==
                 Fortran::semantics::Scope::Kind::MainProgram ||
             ultimateScope.kind() == Fortran::semantics::Scope::Kind::Subprogram)
           if (ultimateScope != *internalScope &&
-              ultimateScope.Contains(*internalScope))
-            escapees.insert(&ultimate);
+              ultimateScope.Contains(*internalScope)) {
+            if (namelistDetails) {
+              // So far, namelist symbols are processed on the fly in IO and
+              // the related namelist data structure is not added to the symbol
+              // map, so it cannot be passed to the internal procedures.
+              // Instead, all the symbols of the host namelist used in the
+              // internal procedure must be considered as host associated so
+              // that IO lowering can find them when needed.
+              for (const auto &namelistObject : namelistDetails->objects())
+                escapees.insert(&*namelistObject);
+            } else {
+              escapees.insert(&ultimate);
+            }
+          }
       }
     };
     Fortran::lower::pft::visitAllSymbols(funit, addToListIfEscapee);

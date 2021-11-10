@@ -406,3 +406,24 @@ subroutine bar()
   call dummy_proc()
 end subroutine
 end subroutine
+
+! Test capture of namelist
+! CHECK-LABEL: func @_QPtest10(
+! CHECK-SAME: %[[i:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+subroutine test10(i)
+ implicit none
+ integer, pointer :: i(:)
+ namelist /a_namelist/ i
+ ! CHECK: %[[tupAddr:.*]] = fir.coordinate_of %[[tup:.*]], %c0{{.*}} : (!fir.ref<tuple<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>>, i32) -> !fir.llvm_ptr<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>
+ ! CHECK: fir.store %[[i]] to %[[tupAddr]] : !fir.llvm_ptr<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>
+ ! CHECK: fir.call @_QFtest10Pbar(%[[tup]]) : (!fir.ref<tuple<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>>) -> ()
+ call bar()
+contains
+! CHECK-LABEL: func @_QFtest10Pbar(
+! CHECK-SAME: %[[tup:.*]]: !fir.ref<tuple<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>> {fir.host_assoc}) {
+subroutine bar()
+  ! CHECK: %[[tupAddr:.*]] = fir.coordinate_of %[[tup]], %c0{{.*}} : (!fir.ref<tuple<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>>, i32) -> !fir.llvm_ptr<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>
+  ! CHECK: fir.load %[[tupAddr]] : !fir.llvm_ptr<!fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>>
+  read (88, NML = a_namelist) 
+end subroutine
+end subroutine
