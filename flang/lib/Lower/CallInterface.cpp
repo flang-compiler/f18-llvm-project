@@ -215,17 +215,32 @@ void Fortran::lower::CallerInterface::walkResultLengths(
   }
 }
 
+// Compute extent expr from shapeSpec of an explicit shape.
+// TODO: Allow evaluate shape analysis to work in a mode where it disregards
+// the non-constant aspects when building the shape to avoid having this here.
+static Fortran::evaluate::ExtentExpr
+getExtentExpr(const Fortran::semantics::ShapeSpec &shapeSpec) {
+  const auto &ubound = shapeSpec.ubound().GetExplicit();
+  const auto &lbound = shapeSpec.lbound().GetExplicit();
+  assert(lbound && ubound && "shape must be explicit");
+  return Fortran::common::Clone(*ubound) - Fortran::common::Clone(*lbound) +
+         Fortran::evaluate::ExtentExpr{1};
+}
+
 void Fortran::lower::CallerInterface::walkResultExtents(
     ExprVisitor visitor) const {
-  using Attr = Fortran::evaluate::characteristics::TypeAndShape::Attr;
-  assert(characteristic && "characteristic was not computed");
-  const auto &result = characteristic->functionResult.value();
-  const auto *typeAndShape = result.GetTypeAndShape();
-  assert(typeAndShape && "no result type");
-  if (typeAndShape->attrs().test(Attr::DeferredShape))
-    return;
-  for (auto extent : typeAndShape->shape())
-    visitor(AsGenericExpr(extent.value()));
+  // Walk directly the result symbol shape (the characteristic shape may contain
+  // descriptor inquiries to it that would fail to lower on the caller side).
+  const auto *interfaceSymbol = procRef.proc().GetInterfaceSymbol();
+  assert(interfaceSymbol &&
+         "can only walk result extent of user procedure with interface");
+  const auto &result =
+      interfaceSymbol->get<Fortran::semantics::SubprogramDetails>().result();
+  if (const auto *objectDetails =
+          result.detailsIf<Fortran::semantics::ObjectEntityDetails>())
+    if (objectDetails->shape().IsExplicitShape())
+      for (const auto &shapeSpec : objectDetails->shape())
+        visitor(Fortran::evaluate::AsGenericExpr(getExtentExpr(shapeSpec)));
 }
 
 bool Fortran::lower::CallerInterface::mustMapInterfaceSymbols() const {
