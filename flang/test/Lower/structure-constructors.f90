@@ -136,20 +136,41 @@ contains
   end subroutine
 
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_ptr(
-  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>, %[[a:.*]]: !fir.box<!fir.array<?x?xi32>>
+  ! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<f32>,
+  ! CHECK-SAME:    %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xi32>> {fir.target}) {
+  ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
+  ! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
+  ! CHECK:         %[[VAL_4:.*]] = fir.field_index x, !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
+  ! CHECK:         %[[VAL_5:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_4]] : (!fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>, !fir.field) -> !fir.ref<f32>
+  ! CHECK:         %[[VAL_6:.*]] = fir.load %[[VAL_0]] : !fir.ref<f32>
+  ! CHECK:         fir.store %[[VAL_6]] to %[[VAL_5]] : !fir.ref<f32>
+  ! CHECK:         %[[VAL_7:.*]] = fir.field_index p, !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
+  ! CHECK:         %[[VAL_8:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_7]] : (!fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xi32>>>>
+  ! CHECK:         %[[VAL_9:.*]] = arith.constant 1 : i64
+  ! CHECK:         %[[VAL_10:.*]] = fir.convert %[[VAL_9]] : (i64) -> index
+  ! CHECK:         %[[VAL_11:.*]] = arith.constant 2 : i64
+  ! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_11]] : (i64) -> index
+  ! CHECK:         %[[VAL_13:.*]] = arith.constant 4 : i64
+  ! CHECK:         %[[VAL_14:.*]] = fir.convert %[[VAL_13]] : (i64) -> index
+  ! CHECK:         %[[VAL_15:.*]] = arith.constant 1 : i64
+  ! CHECK:         %[[VAL_16:.*]] = fir.convert %[[VAL_15]] : (i64) -> index
+  ! CHECK:         %[[VAL_17:.*]] = arith.constant 1 : i64
+  ! CHECK:         %[[VAL_18:.*]] = fir.convert %[[VAL_17]] : (i64) -> index
+  ! CHECK:         %[[VAL_19:.*]] = arith.constant 3 : i64
+  ! CHECK:         %[[VAL_20:.*]] = fir.convert %[[VAL_19]] : (i64) -> index
+  ! CHECK:         %[[VAL_21:.*]] = fir.slice %[[VAL_10]], %[[VAL_14]], %[[VAL_12]], %[[VAL_16]], %[[VAL_20]], %[[VAL_18]] : (index, index, index, index, index, index) -> !fir.slice<2>
+  ! CHECK:         %[[VAL_22:.*]] = fir.rebox %[[VAL_1]] {{\[}}%[[VAL_21]]] : (!fir.box<!fir.array<?x?xi32>>, !fir.slice<2>) -> !fir.box<!fir.array<?x?xi32>>
+  ! CHECK:         %[[VAL_23:.*]] = fir.rebox %[[VAL_22]] : (!fir.box<!fir.array<?x?xi32>>) -> !fir.box<!fir.ptr<!fir.array<?x?xi32>>>
+  ! CHECK:         fir.store %[[VAL_23]] to %[[VAL_8]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xi32>>>>
+  ! CHECK:         %[[VAL_24:.*]] = fir.load %[[VAL_3]] : !fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>
+  ! CHECK:         fir.store %[[VAL_24]] to %[[VAL_2]] : !fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>
+  ! CHECK:         fir.call @_QMm_struct_ctorPprint_ptr(%[[VAL_2]]) : (!fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>) -> ()
+  ! CHECK:         return
+  ! CHECK:       }
+
   subroutine test_ptr(x, a)
     real :: x
     integer, target :: a(:, :)
-    ! CHECK: %[[tmp0:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
-    ! CHECK: %[[tmp:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
-    ! CHECK: fir.field_index x, !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
-
-    ! CHECK: %[[pfield:.*]] = fir.field_index p, !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
-    ! CHECK: %[[pcoor:.*]] = fir.coordinate_of %[[tmp]], %[[pfield]] : (!fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xi32>>>>
-    ! CHECK: %[[slice:.*]] = fir.slice %c1{{.*}}, %c4{{.*}}, %c2{{.*}}, %c1{{.*}}, %c3{{.*}}, %c1{{.*}} : (i64, i64, i64, i64, i64, i64) -> !fir.slice<2>
-    ! CHECK: %[[rebox:.*]] = fir.rebox %[[a]] [%[[slice]]] : (!fir.box<!fir.array<?x?xi32>>, !fir.slice<2>) -> !fir.box<!fir.array<?x?xi32>>
-    ! CHECK: %[[ptr:.*]] = fir.rebox %[[rebox]] : (!fir.box<!fir.array<?x?xi32>>) -> !fir.box<!fir.ptr<!fir.array<?x?xi32>>>
-    ! CHECK: fir.store %[[ptr]] to %[[pcoor]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xi32>>>>
     call print_ptr(t_ptr(x=x, p=a(1:4:2, 1:3:1)))
   end subroutine
 

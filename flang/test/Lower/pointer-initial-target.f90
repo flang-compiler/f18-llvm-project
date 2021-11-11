@@ -147,14 +147,40 @@ end subroutine
 !     Test array initial data target that are data references
 ! -----------------------------------------------------------------------------
 
+
 subroutine array_ref()
   real, save, target :: x(4:103, 5:104)
   real, pointer :: p(:) => x(10, 20:100:2)
-! CHECK-LABEL: fir.global internal @_QFarray_refEp : !fir.box<!fir.ptr<!fir.array<?xf32>>>
-  ! CHECK: %[[x:.*]] = fir.address_of(@_QFarray_refEx) : !fir.ref<!fir.array<100x100xf32>>
-  ! CHECK-DAG: %[[undef:.*]] = fir.undefined index
-  ! CHECK-DAG: %[[shape:.*]] = fir.shape_shift %c4, %c100, %c5, %c100_0 : (index, index, index, index) -> !fir.shapeshift<2>
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c10{{.*}}, %[[undef]], %[[undef]], %c20{{.*}}, %c100{{.*}}, %c2{{.*}} : (i64, index, index, i64, i64, i64) -> !fir.slice<2>
-  ! CHECK: %[[box:.*]] = fir.embox %[[x]](%[[shape]]) {{.}}%[[slice]]{{.}} : (!fir.ref<!fir.array<100x100xf32>>, !fir.shapeshift<2>, !fir.slice<2>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
-  ! CHECK: fir.has_value %[[box]] : !fir.box<!fir.ptr<!fir.array<?xf32>>>
 end subroutine
+
+! CHECK-LABEL: fir.global internal @_QFarray_refEp : !fir.box<!fir.ptr<!fir.array<?xf32>>> {
+! CHECK:         %[[VAL_0:.*]] = fir.address_of(@_QFarray_refEx) : !fir.ref<!fir.array<100x100xf32>>
+! CHECK:         %[[VAL_1:.*]] = arith.constant 4 : index
+! CHECK:         %[[VAL_2:.*]] = arith.constant 100 : index
+! CHECK:         %[[VAL_3:.*]] = arith.constant 5 : index
+! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
+! CHECK:         %[[VAL_5:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_6:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_7:.*]] = arith.constant 10 : i64
+! CHECK:         %[[VAL_8:.*]] = fir.undefined index
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_7]] : (i64) -> index
+! CHECK:         %[[VAL_10:.*]] = arith.subi %[[VAL_9]], %[[VAL_1]] : index
+! CHECK:         %[[VAL_11:.*]] = arith.constant 20 : i64
+! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_11]] : (i64) -> index
+! CHECK:         %[[VAL_13:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_14:.*]] = fir.convert %[[VAL_13]] : (i64) -> index
+! CHECK:         %[[VAL_15:.*]] = arith.constant 100 : i64
+! CHECK:         %[[VAL_16:.*]] = fir.convert %[[VAL_15]] : (i64) -> index
+! CHECK:         %[[VAL_17:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_18:.*]] = arith.subi %[[VAL_16]], %[[VAL_12]] : index
+! CHECK:         %[[VAL_19:.*]] = arith.addi %[[VAL_18]], %[[VAL_14]] : index
+! CHECK:         %[[VAL_20:.*]] = arith.divsi %[[VAL_19]], %[[VAL_14]] : index
+! CHECK:         %[[VAL_21:.*]] = arith.cmpi sgt, %[[VAL_20]], %[[VAL_17]] : index
+! CHECK:         %[[VAL_22:.*]] = select %[[VAL_21]], %[[VAL_20]], %[[VAL_17]] : index
+! CHECK:         %[[VAL_23:.*]] = fir.shape_shift %[[VAL_1]], %[[VAL_2]], %[[VAL_3]], %[[VAL_4]] : (index, index, index, index) -> !fir.shapeshift<2>
+! CHECK:         %[[VAL_24:.*]] = fir.slice %[[VAL_7]], %[[VAL_8]], %[[VAL_8]], %[[VAL_12]], %[[VAL_16]], %[[VAL_14]] : (i64, index, index, index, index, index) -> !fir.slice<2>
+! CHECK:         %[[VAL_25:.*]] = fir.embox %[[VAL_0]](%[[VAL_23]]) {{\[}}%[[VAL_24]]] : (!fir.ref<!fir.array<100x100xf32>>, !fir.shapeshift<2>, !fir.slice<2>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         %[[VAL_26:.*]] = fir.embox %[[VAL_0]](%[[VAL_23]]) {{\[}}%[[VAL_24]]] : (!fir.ref<!fir.array<100x100xf32>>, !fir.shapeshift<2>, !fir.slice<2>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
+! CHECK:         fir.has_value %[[VAL_26]] : !fir.box<!fir.ptr<!fir.array<?xf32>>>
+! CHECK:       }
+

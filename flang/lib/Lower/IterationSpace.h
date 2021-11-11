@@ -76,6 +76,17 @@ struct IterationSpace {
       : inArg(from.inArg), outRes(from.outRes), element(from.element),
         indices(idxs.begin(), idxs.end()) {}
 
+  /// Create a copy of the \p from IterationSpace and prepend the \p prefix
+  /// values and append the \p suffix values, respectively.
+  explicit IterationSpace(const IterationSpace &from,
+                          llvm::ArrayRef<mlir::Value> prefix,
+                          llvm::ArrayRef<mlir::Value> suffix)
+      : inArg(from.inArg), outRes(from.outRes), element(from.element) {
+    indices.assign(prefix.begin(), prefix.end());
+    indices.append(from.indices.begin(), from.indices.end());
+    indices.append(suffix.begin(), suffix.end());
+  }
+
   bool empty() const { return indices.empty(); }
 
   /// This is the output value as it appears as an argument in the innermost
@@ -128,6 +139,8 @@ struct IterationSpace {
 
   /// Get the element as an extended value.
   fir::ExtendedValue elementExv() const { return element; }
+
+  void clearIndices() { indices.clear(); }
 
 private:
   mlir::Value inArg;

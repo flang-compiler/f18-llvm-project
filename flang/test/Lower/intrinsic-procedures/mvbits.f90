@@ -34,46 +34,43 @@ function mvbits_test(from, frompos, len, to, topos)
 end
 
 ! CHECK-LABEL: func @_QPmvbits_array_test(
-! CHECK-SAME:                             %[[VAL_0:[^:]+]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                             %[[VAL_1:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME:                             %[[VAL_2:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME:                             %[[VAL_3:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                             %[[VAL_4:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>, %[[VAL_1:.*]]: !fir.ref<i32>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.box<!fir.array<?xi32>>, %[[VAL_4:.*]]: !fir.ref<i32>) {
+! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_6:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_5]] : (!fir.box<!fir.array<?xi32>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_7:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.array<?xi32>
+! CHECK:         %[[VAL_8:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:         %[[VAL_9:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! CHECK:         %[[VAL_10:.*]] = fir.load %[[VAL_4]] : !fir.ref<i32>
+! CHECK:         %[[VAL_11:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_12:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_13:.*]] = arith.subi %[[VAL_6]]#1, %[[VAL_11]] : index
+! CHECK:         fir.do_loop %[[VAL_14:.*]] = %[[VAL_12]] to %[[VAL_13]] step %[[VAL_11]] {
+! CHECK:           %[[VAL_15:.*]] = fir.array_fetch %[[VAL_7]], %[[VAL_14]] : (!fir.array<?xi32>, index) -> i32
+! CHECK:           %[[VAL_16:.*]] = arith.constant 1 : index
+! CHECK:           %[[VAL_17:.*]] = arith.addi %[[VAL_14]], %[[VAL_16]] : index
+! CHECK:           %[[VAL_18:.*]] = fir.array_coor %[[VAL_3]] %[[VAL_17]] : (!fir.box<!fir.array<?xi32>>, index) -> !fir.ref<i32>
+! CHECK:           %[[VAL_19:.*]] = fir.load %[[VAL_18]] : !fir.ref<i32>
+! CHECK:           %[[VAL_20:.*]] = arith.constant 0 : i32
+! CHECK:           %[[VAL_21:.*]] = arith.constant -1 : i32
+! CHECK:           %[[VAL_22:.*]] = arith.constant 32 : i32
+! CHECK:           %[[VAL_23:.*]] = arith.subi %[[VAL_22]], %[[VAL_9]] : i32
+! CHECK:           %[[VAL_24:.*]] = arith.shrui %[[VAL_21]], %[[VAL_23]] : i32
+! CHECK:           %[[VAL_25:.*]] = arith.shli %[[VAL_24]], %[[VAL_10]] : i32
+! CHECK:           %[[VAL_26:.*]] = arith.xori %[[VAL_25]], %[[VAL_21]] : i32
+! CHECK:           %[[VAL_27:.*]] = arith.andi %[[VAL_26]], %[[VAL_19]] : i32
+! CHECK:           %[[VAL_28:.*]] = arith.shrui %[[VAL_15]], %[[VAL_8]] : i32
+! CHECK:           %[[VAL_29:.*]] = arith.andi %[[VAL_28]], %[[VAL_24]] : i32
+! CHECK:           %[[VAL_30:.*]] = arith.shli %[[VAL_29]], %[[VAL_10]] : i32
+! CHECK:           %[[VAL_31:.*]] = arith.ori %[[VAL_27]], %[[VAL_30]] : i32
+! CHECK:           %[[VAL_32:.*]] = arith.cmpi eq, %[[VAL_9]], %[[VAL_20]] : i32
+! CHECK:           %[[VAL_33:.*]] = select %[[VAL_32]], %[[VAL_19]], %[[VAL_31]] : i32
+! CHECK:           fir.store %[[VAL_33]] to %[[VAL_18]] : !fir.ref<i32>
+! CHECK:         }
+! CHECK:         return
+! CHECK:       }
+
 subroutine mvbits_array_test(from, frompos, len, to, topos)
   integer :: from(:), frompos, len, to(:), topos
 
   call mvbits(from, frompos, len, to, topos)
-  ! CHECK:         %[[VAL_5:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.array<?xi32>
-  ! CHECK:         %[[VAL_6:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
-  ! CHECK:         %[[VAL_7:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-  ! CHECK:         %[[VAL_8:.*]] = fir.load %[[VAL_4]] : !fir.ref<i32>
-  ! CHECK:         %[[VAL_9:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_10:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_9]] : (!fir.box<!fir.array<?xi32>>, index) -> (index, index, index)
-  ! CHECK:         %[[VAL_11:.*]] = arith.constant 1 : index
-  ! CHECK:         %[[VAL_12:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_13:.*]] = arith.subi %[[VAL_10]]#1, %[[VAL_11]] : index
-  ! CHECK:         fir.do_loop %[[VAL_14:.*]] = %[[VAL_12]] to %[[VAL_13]] step %[[VAL_11]] {
-  ! CHECK:           %[[VAL_15:.*]] = fir.array_fetch %[[VAL_5]], %[[VAL_14]] : (!fir.array<?xi32>, index) -> i32
-  ! CHECK:           %[[VAL_16:.*]] = arith.constant 1 : index
-  ! CHECK:           %[[VAL_17:.*]] = arith.addi %[[VAL_14]], %[[VAL_16]] : index
-  ! CHECK:           %[[VAL_18:.*]] = fir.array_coor %[[VAL_3]] %[[VAL_17]] : (!fir.box<!fir.array<?xi32>>, index) -> !fir.ref<i32>
-  ! CHECK:           %[[VAL_19:.*]] = fir.load %[[VAL_18]] : !fir.ref<i32>
-  ! CHECK:           %[[VAL_20:.*]] = arith.constant 0 : i32
-  ! CHECK:           %[[VAL_21:.*]] = arith.constant -1 : i32
-  ! CHECK:           %[[VAL_22:.*]] = arith.constant 32 : i32
-  ! CHECK:           %[[VAL_23:.*]] = arith.subi %[[VAL_22]], %[[VAL_7]] : i32
-  ! CHECK:           %[[VAL_24:.*]] = arith.shrui %[[VAL_21]], %[[VAL_23]] : i32
-  ! CHECK:           %[[VAL_25:.*]] = arith.shli %[[VAL_24]], %[[VAL_8]] : i32
-  ! CHECK:           %[[VAL_26:.*]] = arith.xori %[[VAL_25]], %[[VAL_21]] : i32
-  ! CHECK:           %[[VAL_27:.*]] = arith.andi %[[VAL_26]], %[[VAL_19]] : i32
-  ! CHECK:           %[[VAL_28:.*]] = arith.shrui %[[VAL_15]], %[[VAL_6]] : i32
-  ! CHECK:           %[[VAL_29:.*]] = arith.andi %[[VAL_28]], %[[VAL_24]] : i32
-  ! CHECK:           %[[VAL_30:.*]] = arith.shli %[[VAL_29]], %[[VAL_8]] : i32
-  ! CHECK:           %[[VAL_31:.*]] = arith.ori %[[VAL_27]], %[[VAL_30]] : i32
-  ! CHECK:           %[[VAL_32:.*]] = arith.cmpi eq, %[[VAL_7]], %[[VAL_20]] : i32
-  ! CHECK:           %[[VAL_33:.*]] = select %[[VAL_32]], %[[VAL_19]], %[[VAL_31]] : i32
-  ! CHECK:           fir.store %[[VAL_33]] to %[[VAL_18]] : !fir.ref<i32>
-  ! CHECK:         }
-  ! CHECK:         return
-  ! CHECK:       }
 end subroutine

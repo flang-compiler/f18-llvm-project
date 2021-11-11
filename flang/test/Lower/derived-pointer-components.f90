@@ -121,32 +121,50 @@ subroutine ref_scalar_real_p(p0_0, p1_0, p0_1, p1_1)
   call takes_real_scalar(p1_1(5)%p(7))
 end subroutine
 
-
 ! CHECK-LABEL: func @_QMpcompPref_array_real_p(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>
+! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>,
+! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>) {
+! CHECK:         %[[VAL_2:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_2]] : (!fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_6:.*]]:3 = fir.box_dims %[[VAL_4]], %[[VAL_5]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_7:.*]] = arith.constant 20 : i64
+! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_7]] : (i64) -> index
+! CHECK:         %[[VAL_9:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_10:.*]] = fir.convert %[[VAL_9]] : (i64) -> index
+! CHECK:         %[[VAL_11:.*]] = arith.constant 50 : i64
+! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_11]] : (i64) -> index
+! CHECK:         %[[VAL_13:.*]] = fir.shift %[[VAL_6]]#0 : (index) -> !fir.shift<1>
+! CHECK:         %[[VAL_14:.*]] = fir.slice %[[VAL_8]], %[[VAL_12]], %[[VAL_10]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_15:.*]] = fir.rebox %[[VAL_4]](%[[VAL_13]]) {{\[}}%[[VAL_14]]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, !fir.shift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         fir.call @_QPtakes_real_array(%[[VAL_15]]) : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:         %[[VAL_16:.*]] = arith.constant 5 : i64
+! CHECK:         %[[VAL_17:.*]] = arith.constant 1 : i64
+! CHECK:         %[[VAL_18:.*]] = arith.subi %[[VAL_16]], %[[VAL_17]] : i64
+! CHECK:         %[[VAL_19:.*]] = fir.coordinate_of %[[VAL_1]], %[[VAL_18]] : (!fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>, i64) -> !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>
+! CHECK:         %[[VAL_20:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_21:.*]] = fir.coordinate_of %[[VAL_19]], %[[VAL_20]] : (!fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_22:.*]] = fir.load %[[VAL_21]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_23:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_24:.*]]:3 = fir.box_dims %[[VAL_22]], %[[VAL_23]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_25:.*]] = arith.constant 20 : i64
+! CHECK:         %[[VAL_26:.*]] = fir.convert %[[VAL_25]] : (i64) -> index
+! CHECK:         %[[VAL_27:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_28:.*]] = fir.convert %[[VAL_27]] : (i64) -> index
+! CHECK:         %[[VAL_29:.*]] = arith.constant 50 : i64
+! CHECK:         %[[VAL_30:.*]] = fir.convert %[[VAL_29]] : (i64) -> index
+! CHECK:         %[[VAL_31:.*]] = fir.shift %[[VAL_24]]#0 : (index) -> !fir.shift<1>
+! CHECK:         %[[VAL_32:.*]] = fir.slice %[[VAL_26]], %[[VAL_30]], %[[VAL_28]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_33:.*]] = fir.rebox %[[VAL_22]](%[[VAL_31]]) {{\[}}%[[VAL_32]]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, !fir.shift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         fir.call @_QPtakes_real_array(%[[VAL_33]]) : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:         return
+! CHECK:       }
+
+
 subroutine ref_array_real_p(p1_0, p1_1)
   type(real_p1) :: p1_0, p1_1(100)
-  ! CHECK: %[[fld:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
-  ! CHECK: %[[fld_coor:.*]] = fir.coordinate_of %[[arg0]], %[[fld]] : (!fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[box:.*]] = fir.load %[[fld_coor]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[dims:.*]]:3 = fir.box_dims %[[box]], %c0{{.*}} : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, index) -> (index, index, index)
-  ! CHECK-DAG: %[[shift:.*]] = fir.shift %[[dims]]#0 : (index) -> !fir.shift<1>
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c20{{.*}}, %c50{{.*}}, %c2{{.*}} : (i64, i64, i64) -> !fir.slice<1>
-  ! CHECK: %[[rebox:.*]] = fir.rebox %[[box]](%[[shift]]) [%[[slice]]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, !fir.shift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: fir.call @_QPtakes_real_array(%[[rebox]]) : (!fir.box<!fir.array<?xf32>>) -> ()
   call takes_real_array(p1_0%p(20:50:2))
-
-
-  ! CHECK: %[[p1_1_coor:.*]] = fir.coordinate_of %[[arg1]], %{{.*}} : (!fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>, i64) -> !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>
-  ! CHECK: %[[fld:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
-  ! CHECK: %[[fld_coor:.*]] = fir.coordinate_of %[[p1_1_coor]], %[[fld]] : (!fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[box:.*]] = fir.load %[[fld_coor]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[dims:.*]]:3 = fir.box_dims %[[box]], %c0{{.*}} : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, index) -> (index, index, index)
-  ! CHECK-DAG: %[[shift:.*]] = fir.shift %[[dims]]#0 : (index) -> !fir.shift<1>
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c20{{.*}}, %c50{{.*}}, %c2{{.*}} : (i64, i64, i64) -> !fir.slice<1>
-  ! CHECK: %[[rebox:.*]] = fir.rebox %[[box]](%[[shift]]) [%[[slice]]] : (!fir.box<!fir.ptr<!fir.array<?xf32>>>, !fir.shift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: fir.call @_QPtakes_real_array(%[[rebox]]) : (!fir.box<!fir.array<?xf32>>) -> ()
   call takes_real_array(p1_1(5)%p(20:50:2))
 end subroutine
 
@@ -721,15 +739,32 @@ module pinit
     ! CHECK: fir.has_value %[[insert]]
   type(real_p0) :: arp0 = real_p0(real_target)
 
-  ! CHECK-LABEL: fir.global {{.*}}@_QMpinitEbrp1
-    ! CHECK-DAG: %[[undef:.*]] = fir.undefined
-    ! CHECK-DAG: %[[fld:.*]] = fir.field_index p
-    ! CHECK-DAG: %[[target:.*]] = fir.address_of(@_QMpcompEreal_array_target)
-    ! CHECK-DAG: %[[shape:.*]] = fir.shape %c100{{.*}}
-    ! CHECK-DAG: %[[slice:.*]] = fir.slice %c10{{.*}}, %c50{{.*}}, %c5{{.*}}
-    ! CHECK: %[[box:.*]] = fir.embox %[[target]](%[[shape]]) [%[[slice]]] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
-    ! CHECK: %[[insert:.*]] = fir.insert_value %[[undef]], %[[box]], ["p", !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>] :
-    ! CHECK: fir.has_value %[[insert]]
+! CHECK-LABEL: fir.global @_QMpinitEbrp1 : !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}> {
+! CHECK:         %[[VAL_0:.*]] = fir.undefined !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_1:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QMpcompEreal_array_target) : !fir.ref<!fir.array<100xf32>>
+! CHECK:         %[[VAL_3:.*]] = arith.constant 100 : index
+! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_5:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_6:.*]] = arith.constant 10 : i64
+! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
+! CHECK:         %[[VAL_8:.*]] = arith.constant 5 : i64
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]] : (i64) -> index
+! CHECK:         %[[VAL_10:.*]] = arith.constant 50 : i64
+! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (i64) -> index
+! CHECK:         %[[VAL_12:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_13:.*]] = arith.subi %[[VAL_11]], %[[VAL_7]] : index
+! CHECK:         %[[VAL_14:.*]] = arith.addi %[[VAL_13]], %[[VAL_9]] : index
+! CHECK:         %[[VAL_15:.*]] = arith.divsi %[[VAL_14]], %[[VAL_9]] : index
+! CHECK:         %[[VAL_16:.*]] = arith.cmpi sgt, %[[VAL_15]], %[[VAL_12]] : index
+! CHECK:         %[[VAL_17:.*]] = select %[[VAL_16]], %[[VAL_15]], %[[VAL_12]] : index
+! CHECK:         %[[VAL_18:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_19:.*]] = fir.slice %[[VAL_7]], %[[VAL_11]], %[[VAL_9]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_20:.*]] = fir.embox %[[VAL_2]](%[[VAL_18]]) {{\[}}%[[VAL_19]]] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         %[[VAL_21:.*]] = fir.embox %[[VAL_2]](%[[VAL_18]]) {{\[}}%[[VAL_19]]] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
+! CHECK:         %[[VAL_22:.*]] = fir.insert_value %[[VAL_0]], %[[VAL_21]], ["p", !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>] : (!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>, !fir.box<!fir.ptr<!fir.array<?xf32>>>) -> !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:         fir.has_value %[[VAL_22]] : !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
+! CHECK:       }
   type(real_p1) :: brp1 = real_p1(real_array_target(10:50:5))
 
   ! CHECK-LABEL: fir.global {{.*}}@_QMpinitEccp0

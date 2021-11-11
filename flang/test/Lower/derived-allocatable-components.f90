@@ -123,34 +123,51 @@ subroutine ref_scalar_real_a(a0_0, a1_0, a0_1, a1_1)
   call takes_real_scalar(a1_1(5)%p(7))
 end subroutine
 
-
 ! CHECK-LABEL: func @_QMacompPref_array_real_a(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>
+! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>,
+! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>) {
+! CHECK:         %[[VAL_2:.*]] = fir.field_index p, !fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_2]] : (!fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_6:.*]]:3 = fir.box_dims %[[VAL_4]], %[[VAL_5]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_7:.*]] = fir.box_addr %[[VAL_4]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
+! CHECK:         %[[VAL_8:.*]] = arith.constant 20 : i64
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]] : (i64) -> index
+! CHECK:         %[[VAL_10:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (i64) -> index
+! CHECK:         %[[VAL_12:.*]] = arith.constant 50 : i64
+! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_12]] : (i64) -> index
+! CHECK:         %[[VAL_14:.*]] = fir.shape_shift %[[VAL_6]]#0, %[[VAL_6]]#1 : (index, index) -> !fir.shapeshift<1>
+! CHECK:         %[[VAL_15:.*]] = fir.slice %[[VAL_9]], %[[VAL_13]], %[[VAL_11]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_16:.*]] = fir.embox %[[VAL_7]](%[[VAL_14]]) {{\[}}%[[VAL_15]]] : (!fir.heap<!fir.array<?xf32>>, !fir.shapeshift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         fir.call @_QPtakes_real_array(%[[VAL_16]]) : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:         %[[VAL_17:.*]] = arith.constant 5 : i64
+! CHECK:         %[[VAL_18:.*]] = arith.constant 1 : i64
+! CHECK:         %[[VAL_19:.*]] = arith.subi %[[VAL_17]], %[[VAL_18]] : i64
+! CHECK:         %[[VAL_20:.*]] = fir.coordinate_of %[[VAL_1]], %[[VAL_19]] : (!fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>, i64) -> !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>
+! CHECK:         %[[VAL_21:.*]] = fir.field_index p, !fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>
+! CHECK:         %[[VAL_22:.*]] = fir.coordinate_of %[[VAL_20]], %[[VAL_21]] : (!fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_23:.*]] = fir.load %[[VAL_22]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
+! CHECK:         %[[VAL_24:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_25:.*]]:3 = fir.box_dims %[[VAL_23]], %[[VAL_24]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_26:.*]] = fir.box_addr %[[VAL_23]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
+! CHECK:         %[[VAL_27:.*]] = arith.constant 20 : i64
+! CHECK:         %[[VAL_28:.*]] = fir.convert %[[VAL_27]] : (i64) -> index
+! CHECK:         %[[VAL_29:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_30:.*]] = fir.convert %[[VAL_29]] : (i64) -> index
+! CHECK:         %[[VAL_31:.*]] = arith.constant 50 : i64
+! CHECK:         %[[VAL_32:.*]] = fir.convert %[[VAL_31]] : (i64) -> index
+! CHECK:         %[[VAL_33:.*]] = fir.shape_shift %[[VAL_25]]#0, %[[VAL_25]]#1 : (index, index) -> !fir.shapeshift<1>
+! CHECK:         %[[VAL_34:.*]] = fir.slice %[[VAL_28]], %[[VAL_32]], %[[VAL_30]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_35:.*]] = fir.embox %[[VAL_26]](%[[VAL_33]]) {{\[}}%[[VAL_34]]] : (!fir.heap<!fir.array<?xf32>>, !fir.shapeshift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         fir.call @_QPtakes_real_array(%[[VAL_35]]) : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:         return
+! CHECK:       }
+
 subroutine ref_array_real_a(a1_0, a1_1)
   type(real_a1) :: a1_0, a1_1(100)
-  ! CHECK: %[[fld:.*]] = fir.field_index p, !fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>
-  ! CHECK: %[[fld_coor:.*]] = fir.coordinate_of %[[arg0]], %[[fld]] : (!fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[box:.*]] = fir.load %[[fld_coor]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[addr:.*]] = fir.box_addr %[[box]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
-  ! CHECK-DAG: %[[dims:.*]]:3 = fir.box_dims %[[box]], %c0{{.*}} : (!fir.box<!fir.heap<!fir.array<?xf32>>>, index) -> (index, index, index)
-  ! CHECK-DAG: %[[shape:.*]] = fir.shape_shift %[[dims]]#0, %[[dims]]#1 : (index, index) -> !fir.shapeshift<1>
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c20{{.*}}, %c50{{.*}}, %c2{{.*}} : (i64, i64, i64) -> !fir.slice<1>
-  ! CHECK: %[[embox:.*]] = fir.embox %[[addr]](%[[shape]]) [%[[slice]]] : (!fir.heap<!fir.array<?xf32>>, !fir.shapeshift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: fir.call @_QPtakes_real_array(%[[embox]]) : (!fir.box<!fir.array<?xf32>>) -> ()
   call takes_real_array(a1_0%p(20:50:2))
-
-
-  ! CHECK: %[[a1_1_coor:.*]] = fir.coordinate_of %[[arg1]], %{{.*}} : (!fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>, i64) -> !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>
-  ! CHECK: %[[fld:.*]] = fir.field_index p, !fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>
-  ! CHECK: %[[fld_coor:.*]] = fir.coordinate_of %[[a1_1_coor]], %[[fld]] : (!fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[box:.*]] = fir.load %[[fld_coor]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
-  ! CHECK-DAG: %[[addr:.*]] = fir.box_addr %[[box]] : (!fir.box<!fir.heap<!fir.array<?xf32>>>) -> !fir.heap<!fir.array<?xf32>>
-  ! CHECK-DAG: %[[dims:.*]]:3 = fir.box_dims %[[box]], %c0{{.*}} : (!fir.box<!fir.heap<!fir.array<?xf32>>>, index) -> (index, index, index)
-  ! CHECK-DAG: %[[shape:.*]] = fir.shape_shift %[[dims]]#0, %[[dims]]#1 : (index, index) -> !fir.shapeshift<1>
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c20{{.*}}, %c50{{.*}}, %c2{{.*}} : (i64, i64, i64) -> !fir.slice<1>
-  ! CHECK: %[[embox:.*]] = fir.embox %[[addr]](%[[shape]]) [%[[slice]]] : (!fir.heap<!fir.array<?xf32>>, !fir.shapeshift<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: fir.call @_QPtakes_real_array(%[[embox]]) : (!fir.box<!fir.array<?xf32>>) -> ()
   call takes_real_array(a1_1(5)%p(20:50:2))
 end subroutine
 

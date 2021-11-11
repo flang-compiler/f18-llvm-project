@@ -29,51 +29,50 @@ subroutine trans_test(store, word)
   store = transfer(word, store)
 end subroutine
 
+! CHECK-LABEL: func @_QPtrans_test2(
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<3xi32>>,
+! CHECK-SAME:        %[[VAL_1:.*]]: !fir.ref<f32>) {
+! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+! CHECK:         %[[VAL_3:.*]] = arith.constant 3 : index
+! CHECK:         %[[VAL_4:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_5:.*]] = fir.array_load %[[VAL_0]](%[[VAL_4]]) : (!fir.ref<!fir.array<3xi32>>, !fir.shape<1>) -> !fir.array<3xi32>
+! CHECK:         %[[VAL_6:.*]] = arith.constant 3 : i32
+! CHECK:         %[[VAL_7:.*]] = fir.embox %[[VAL_1]] : (!fir.ref<f32>) -> !fir.box<f32>
+! CHECK:         %[[VAL_8:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_9:.*]] = fir.embox %[[VAL_0]](%[[VAL_8]]) : (!fir.ref<!fir.array<3xi32>>, !fir.shape<1>) -> !fir.box<!fir.array<3xi32>>
+! CHECK:         %[[VAL_10:.*]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+! CHECK:         %[[VAL_11:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_12:.*]] = fir.shape %[[VAL_11]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_13:.*]] = fir.embox %[[VAL_10]](%[[VAL_12]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+! CHECK:         fir.store %[[VAL_13]] to %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! CHECK:         %[[VAL_14:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,
+! CHECK:         %[[VAL_15:.*]] = arith.constant {{.*}} : i32
+! CHECK:         %[[VAL_16:.*]] = fir.convert %[[VAL_2]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) -> !fir.ref<!fir.box<none>>
+! CHECK:         %[[VAL_17:.*]] = fir.convert %[[VAL_7]] : (!fir.box<f32>) -> !fir.box<none>
+! CHECK:         %[[VAL_18:.*]] = fir.convert %[[VAL_9]] : (!fir.box<!fir.array<3xi32>>) -> !fir.box<none>
+! CHECK:         %[[VAL_19:.*]] = fir.convert %[[VAL_14]] : (!fir.ref<!fir.char<1,{{.*}}>>) -> !fir.ref<i8>
+! CHECK:         %[[VAL_20:.*]] = fir.convert %[[VAL_6]] : (i32) -> i64
+! CHECK:         %[[VAL_21:.*]] = fir.call @_FortranATransferSize(%[[VAL_16]], %[[VAL_17]], %[[VAL_18]], %[[VAL_19]], %[[VAL_15]], %[[VAL_20]]) : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.box<none>, !fir.ref<i8>, i32, i64) -> none
+! CHECK:         %[[VAL_22:.*]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+! CHECK:         %[[VAL_23:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_24:.*]]:3 = fir.box_dims %[[VAL_22]], %[[VAL_23]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
+! CHECK:         %[[VAL_25:.*]] = fir.box_addr %[[VAL_22]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
+! CHECK:         %[[VAL_26:.*]] = fir.shape_shift %[[VAL_24]]#0, %[[VAL_24]]#1 : (index, index) -> !fir.shapeshift<1>
+! CHECK:         %[[VAL_27:.*]] = fir.array_load %[[VAL_25]](%[[VAL_26]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
+! CHECK:         %[[VAL_28:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_29:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_30:.*]] = arith.subi %[[VAL_3]], %[[VAL_28]] : index
+! CHECK:         %[[VAL_31:.*]] = fir.do_loop %[[VAL_32:.*]] = %[[VAL_29]] to %[[VAL_30]] step %[[VAL_28]] unordered iter_args(%[[VAL_33:.*]] = %[[VAL_5]]) -> (!fir.array<3xi32>) {
+! CHECK:           %[[VAL_34:.*]] = fir.array_fetch %[[VAL_27]], %[[VAL_32]] : (!fir.array<?xi32>, index) -> i32
+! CHECK:           %[[VAL_35:.*]] = fir.array_update %[[VAL_33]], %[[VAL_34]], %[[VAL_32]] : (!fir.array<3xi32>, i32, index) -> !fir.array<3xi32>
+! CHECK:           fir.result %[[VAL_35]] : !fir.array<3xi32>
+! CHECK:         }
+! CHECK:         fir.array_merge_store %[[VAL_5]], %[[VAL_36:.*]] to %[[VAL_0]] : !fir.array<3xi32>, !fir.array<3xi32>, !fir.ref<!fir.array<3xi32>>
+! CHECK:         fir.freemem %[[VAL_25]] : !fir.heap<!fir.array<?xi32>>
+! CHECK:         return
+! CHECK:       }
+
 subroutine trans_test2(store, word)
-  ! CHECK-LABEL: func @_QPtrans_test2(
-  ! CHECK-SAME:                       %[[VAL_0:.*]]: !fir.ref<!fir.array<3xi32>>,
-  ! CHECK-SAME:                       %[[VAL_1:.*]]: !fir.ref<f32>) {
-  ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
-  ! CHECK:         %[[VAL_3:.*]] = arith.constant 3 : index
-  ! CHECK:         %[[VAL_4:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-  ! CHECK:         %[[VAL_5:.*]] = fir.array_load %[[VAL_0]](%[[VAL_4]]) : (!fir.ref<!fir.array<3xi32>>, !fir.shape<1>) -> !fir.array<3xi32>
-  ! CHECK:         %[[VAL_6:.*]] = arith.constant 3 : i64
-  ! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
-  ! CHECK:         %[[VAL_8:.*]] = arith.constant 3 : i32
-  ! CHECK:         %[[VAL_9:.*]] = fir.embox %[[VAL_1]] : (!fir.ref<f32>) -> !fir.box<f32>
-  ! CHECK:         %[[VAL_10:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
-  ! CHECK:         %[[VAL_11:.*]] = fir.embox %[[VAL_0]](%[[VAL_10]]) : (!fir.ref<!fir.array<3xi32>>, !fir.shape<1>) -> !fir.box<!fir.array<3xi32>>
-  ! CHECK:         %[[VAL_12:.*]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
-  ! CHECK:         %[[VAL_13:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_14:.*]] = fir.shape %[[VAL_13]] : (index) -> !fir.shape<1>
-  ! CHECK:         %[[VAL_15:.*]] = fir.embox %[[VAL_12]](%[[VAL_14]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
-  ! CHECK:         fir.store %[[VAL_15]] to %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-  ! CHECK:         %[[VAL_16:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,{{.*}}>>
-  ! CHECK:         %[[VAL_17:.*]] = arith.constant {{.*}} : i32
-  ! CHECK:         %[[VAL_18:.*]] = fir.convert %[[VAL_2]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>) -> !fir.ref<!fir.box<none>>
-  ! CHECK:         %[[VAL_19:.*]] = fir.convert %[[VAL_9]] : (!fir.box<f32>) -> !fir.box<none>
-  ! CHECK:         %[[VAL_20:.*]] = fir.convert %[[VAL_11]] : (!fir.box<!fir.array<3xi32>>) -> !fir.box<none>
-  ! CHECK:         %[[VAL_21:.*]] = fir.convert %[[VAL_16]] : (!fir.ref<!fir.char<1,{{.*}}>>) -> !fir.ref<i8>
-  ! CHECK:         %[[VAL_22:.*]] = fir.convert %[[VAL_8]] : (i32) -> i64
-  ! CHECK:         %[[VAL_23:.*]] = fir.call @_FortranATransferSize(%[[VAL_18]], %[[VAL_19]], %[[VAL_20]], %[[VAL_21]], %[[VAL_17]], %[[VAL_22]]) : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.box<none>, !fir.ref<i8>, i32, i64) -> none
-  ! CHECK:         %[[VAL_24:.*]] = fir.load %[[VAL_2]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
-  ! CHECK:         %[[VAL_25:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_26:.*]]:3 = fir.box_dims %[[VAL_24]], %[[VAL_25]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>, index) -> (index, index, index)
-  ! CHECK:         %[[VAL_27:.*]] = fir.box_addr %[[VAL_24]] : (!fir.box<!fir.heap<!fir.array<?xi32>>>) -> !fir.heap<!fir.array<?xi32>>
-  ! CHECK:         %[[VAL_28:.*]] = fir.shape_shift %[[VAL_26]]#0, %[[VAL_26]]#1 : (index, index) -> !fir.shapeshift<1>
-  ! CHECK:         %[[VAL_29:.*]] = fir.array_load %[[VAL_27]](%[[VAL_28]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shapeshift<1>) -> !fir.array<?xi32>
-  ! CHECK:         %[[VAL_30:.*]] = arith.constant 1 : index
-  ! CHECK:         %[[VAL_31:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_32:.*]] = arith.subi %[[VAL_7]], %[[VAL_30]] : index
-  ! CHECK:         %[[VAL_33:.*]] = fir.do_loop %[[VAL_34:.*]] = %[[VAL_31]] to %[[VAL_32]] step %[[VAL_30]] unordered iter_args(%[[VAL_35:.*]] = %[[VAL_5]]) -> (!fir.array<3xi32>) {
-  ! CHECK:           %[[VAL_36:.*]] = fir.array_fetch %[[VAL_29]], %[[VAL_34]] : (!fir.array<?xi32>, index) -> i32
-  ! CHECK:           %[[VAL_37:.*]] = fir.array_update %[[VAL_35]], %[[VAL_36]], %[[VAL_34]] : (!fir.array<3xi32>, i32, index) -> !fir.array<3xi32>
-  ! CHECK:           fir.result %[[VAL_37]] : !fir.array<3xi32>
-  ! CHECK:         }
-  ! CHECK:         fir.array_merge_store %[[VAL_5]], %[[VAL_38:.*]] to %[[VAL_0]] : !fir.array<3xi32>, !fir.array<3xi32>, !fir.ref<!fir.array<3xi32>>
-  ! CHECK:         fir.freemem %[[VAL_27]] : !fir.heap<!fir.array<?xi32>>
-  ! CHECK:         return
-  ! CHECK:       }
   integer :: store(3)
   real :: word
   store = transfer(word, store, 3)

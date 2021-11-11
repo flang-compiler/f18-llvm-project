@@ -58,7 +58,32 @@ contains
 
 end module components_test
 
-! CHECK-LABEL: @_QPsliced_base
+! CHECK-LABEL: func @_QPsliced_base() {
+! CHECK:         %[[VAL_0:.*]] = arith.constant 50 : index
+! CHECK:         %[[VAL_1:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_2:.*]] = arith.constant 42 : i32
+! CHECK:         %[[VAL_3:.*]] = arith.constant 0 : index
+! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
+! CHECK:         %[[VAL_5:.*]] = fir.alloca !fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>> {bindc_name = "a", uniq_name = "_QFsliced_baseEa"}
+! CHECK:         %[[VAL_6:.*]] = fir.field_index y, !fir.type<_QFsliced_baseTt{x:f32,y:i32}>
+! CHECK:         %[[VAL_7:.*]] = fir.shape %[[VAL_4]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_8:.*]] = fir.slice %[[VAL_1]], %[[VAL_0]], %[[VAL_1]] path %[[VAL_6]] : (index, index, index, !fir.field) -> !fir.slice<1>
+! CHECK:         br ^bb1(%[[VAL_3]], %[[VAL_0]] : index, index)
+! CHECK:       ^bb1(%[[VAL_9:.*]]: index, %[[VAL_10:.*]]: index):
+! CHECK:         %[[VAL_11:.*]] = arith.cmpi sgt, %[[VAL_10]], %[[VAL_3]] : index
+! CHECK:         cond_br %[[VAL_11]], ^bb2, ^bb3
+! CHECK:       ^bb2:
+! CHECK:         %[[VAL_12:.*]] = arith.addi %[[VAL_9]], %[[VAL_1]] : index
+! CHECK:         %[[VAL_13:.*]] = fir.array_coor %[[VAL_5]](%[[VAL_7]]) {{\[}}%[[VAL_8]]] %[[VAL_12]] : (!fir.ref<!fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<i32>
+! CHECK:         fir.store %[[VAL_2]] to %[[VAL_13]] : !fir.ref<i32>
+! CHECK:         %[[VAL_14:.*]] = arith.subi %[[VAL_10]], %[[VAL_1]] : index
+! CHECK:         br ^bb1(%[[VAL_12]], %[[VAL_14]] : index, index)
+! CHECK:       ^bb3:
+! CHECK:         %[[VAL_15:.*]] = fir.embox %[[VAL_5]](%[[VAL_7]]) {{\[}}%[[VAL_8]]] : (!fir.ref<!fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xi32>>
+! CHECK:         fir.call @_QPtakes_int_array(%[[VAL_15]]) : (!fir.box<!fir.array<?xi32>>) -> ()
+! CHECK:         return
+! CHECK:       }
+
 subroutine sliced_base()
   interface
     subroutine takes_int_array(i)
@@ -70,32 +95,7 @@ subroutine sliced_base()
     integer :: y
   end type
   type(t) :: a(100)
-  ! CHECK-DAG:  %[[VAL_0:.*]] = arith.constant 100 : index
-  ! CHECK-DAG:  %[[VAL_1:.*]] = arith.constant 42 : i32
-  ! CHECK-DAG:  %[[VAL_2:.*]] = arith.constant 50 : i64
-  ! CHECK-DAG:  %[[VAL_3:.*]] = arith.constant 1 : i64
-  ! CHECK-DAG:  %[[VAL_4:.*]] = arith.constant 50 : index
-  ! CHECK-DAG:  %[[VAL_5:.*]] = arith.constant 0 : index
-  ! CHECK-DAG:  %[[VAL_6:.*]] = arith.constant 1 : index
-  ! CHECK:  %[[VAL_7:.*]] = fir.alloca !fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>> {bindc_name = "a", uniq_name = "_QFsliced_baseEa"}
-  ! CHECK:  %[[VAL_8:.*]] = fir.field_index y, !fir.type<_QFsliced_baseTt{x:f32,y:i32}>
-  ! CHECK:  %[[VAL_9:.*]] = fir.shape %[[VAL_0]] : (index) -> !fir.shape<1>
-  ! CHECK:  %[[VAL_10:.*]] = fir.slice %[[VAL_3]], %[[VAL_2]], %[[VAL_3]] path %[[VAL_8]] : (i64, i64, i64, !fir.field) -> !fir.slice<1>
-  ! CHECK:  br ^bb1(%[[VAL_5]], %[[VAL_4]] : index, index)
-  ! CHECK:^bb1(%[[VAL_11:.*]]: index, %[[VAL_12:.*]]: index):
-  ! CHECK:  %[[VAL_13:.*]] = arith.cmpi sgt, %[[VAL_12]], %[[VAL_5]] : index
-  ! CHECK:  cond_br %[[VAL_13]], ^bb2, ^bb3
-  ! CHECK:^bb2:
-  ! CHECK:  %[[VAL_14:.*]] = arith.addi %[[VAL_11]], %[[VAL_6]] : index
-  ! CHECK:  %[[VAL_15:.*]] = fir.array_coor %[[VAL_7]](%[[VAL_9]]) {{\[}}%[[VAL_10]]] %[[VAL_14]] : (!fir.ref<!fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>>>, !fir.shape<1>, !fir.slice<1>, index) -> !fir.ref<i32>
-  ! CHECK:  fir.store %[[VAL_1]] to %[[VAL_15]] : !fir.ref<i32>
-  ! CHECK:  %[[VAL_16:.*]] = arith.subi %[[VAL_12]], %[[VAL_6]] : index
-  ! CHECK:  br ^bb1(%[[VAL_14]], %[[VAL_16]] : index, index)
   a(1:50)%y = 42
-
-  ! CHECK:^bb3:
-  ! CHECK:  %[[VAL_17:.*]] = fir.embox %[[VAL_7]](%[[VAL_9]]) {{\[}}%[[VAL_10]]] : (!fir.ref<!fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xi32>>
-  ! CHECK:  fir.call @_QPtakes_int_array(%[[VAL_17]]) : (!fir.box<!fir.array<?xi32>>) -> ()
   call takes_int_array(a(1:50)%y)
 end subroutine
 

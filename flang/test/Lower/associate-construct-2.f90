@@ -1,18 +1,25 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest1(
-! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[i:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[j:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[k:[^:]+]]: !fir.ref<i32>)
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>, %[[VAL_1:.*]]: !fir.ref<i32>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.ref<i32>) {
+! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
+! CHECK:         %[[VAL_5:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:         %[[VAL_6:.*]] = fir.convert %[[VAL_5]] : (i32) -> i64
+! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
+! CHECK:         %[[VAL_8:.*]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]] : (i32) -> i64
+! CHECK:         %[[VAL_10:.*]] = fir.convert %[[VAL_9]] : (i64) -> index
+! CHECK:         %[[VAL_11:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_11]] : (i32) -> i64
+! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_12]] : (i64) -> index
+! CHECK:         %[[VAL_14:.*]] = fir.shape %[[VAL_4]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_15:.*]] = fir.slice %[[VAL_7]], %[[VAL_13]], %[[VAL_10]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_16:.*]] = fir.embox %[[VAL_0]](%[[VAL_14]]) {{\[}}%[[VAL_15]]] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         fir.call @_QPbob(%[[VAL_16]]) : (!fir.box<!fir.array<?xf32>>) -> ()
+! CHECK:         return
+! CHECK:       }
+
 subroutine test1(a,i,j,k)
-  ! CHECK-DAG: %[[c:.*]] = arith.constant 100 : index
-  ! CHECK-DAG: %[[ii:.*]] = fir.load %[[i]] : !fir.ref<i32>
-  ! CHECK-DAG: %[[iv:.*]] = fir.convert %[[ii]] : (i32) -> i64
-  ! CHECK-DAG: %[[jj:.*]] = fir.load %[[j]] : !fir.ref<i32>
-  ! CHECK-DAG: %[[jv:.*]] = fir.convert %[[jj]] : (i32) -> i64
-  ! CHECK-DAG: %[[kk:.*]] = fir.load %[[k]] : !fir.ref<i32>
-  ! CHECK-DAG: %[[kv:.*]] = fir.convert %[[kk]] : (i32) -> i64
 
   real a(100)
   integer i, j, k
@@ -21,11 +28,6 @@ subroutine test1(a,i,j,k)
       real :: a(:)
     end subroutine bob
   end interface
-
-  ! CHECK: %[[shape:.*]] = fir.shape %[[c]] : (index) -> !fir.shape<1>
-  ! CHECK: %[[slice:.*]] = fir.slice %[[iv]], %[[jv]], %[[kv]] : (i64, i64, i64) -> !fir.slice<1>
-  ! CHECK: %[[box:.*]] = fir.embox %[[a]](%[[shape]]) [%[[slice]]] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: fir.call @_QPbob(%[[box]]) : (!fir.box<!fir.array<?xf32>>) -> ()
 
   associate (name => a(i:j:k))
     call bob(name)

@@ -159,16 +159,26 @@ subroutine test_array_non_contig_rhs_lbs(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array_non_contig_rhs2(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<200xf32>> {fir.target})
+! CHECK-SAME:                                      %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
+! CHECK-SAME:                                      %[[VAL_1:.*]]: !fir.ref<!fir.array<200xf32>> {fir.target}) {
+! CHECK:         %[[VAL_2:.*]] = arith.constant 200 : index
+! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : i64
+! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i64) -> index
+! CHECK:         %[[VAL_5:.*]] = arith.constant 3 : i64
+! CHECK:         %[[VAL_6:.*]] = fir.convert %[[VAL_5]] : (i64) -> index
+! CHECK:         %[[VAL_7:.*]] = arith.constant 160 : i64
+! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_7]] : (i64) -> index
+! CHECK:         %[[VAL_9:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_10:.*]] = fir.slice %[[VAL_4]], %[[VAL_8]], %[[VAL_6]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_11:.*]] = fir.embox %[[VAL_1]](%[[VAL_9]]) {{\[}}%[[VAL_10]]] : (!fir.ref<!fir.array<200xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         %[[VAL_12:.*]] = fir.rebox %[[VAL_11]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
+! CHECK:         fir.store %[[VAL_12]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
+! CHECK:         return
+! CHECK:       }
+
 subroutine test_array_non_contig_rhs2(p, x)
   real, target :: x(200)
   real, pointer :: p(:)
-  ! CHECK: %[[shape:.*]] = fir.shape %c200{{.*}} : (index) -> !fir.shape<1>
-  ! CHECK: %[[slice:.*]] = fir.slice %c10{{.*}}, %c160{{.*}}, %c3{{.*}}
-  ! CHECK: %[[box:.*]] = fir.embox %[[x]](%[[shape]]) {{.}}%[[slice]]{{.}} : (!fir.ref<!fir.array<200xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-  ! CHECK: %[[rebox:.*]] = fir.rebox %[[box]] : (!fir.box<!fir.array<?xf32>>) -> !fir.box<!fir.ptr<!fir.array<?xf32>>>
-  ! CHECK: fir.store %[[rebox]] to %[[p]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
   p => x(10:160:3)
 end subroutine
 
@@ -210,19 +220,43 @@ subroutine test_array_non_contig_remap(p, x)
 end subroutine
 
 ! Test remapping a slice
+
 ! CHECK-LABEL: func @_QPtest_array_non_contig_remap_slice(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<400xf32>> {fir.target})
+! CHECK-SAME:                                             %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>,
+! CHECK-SAME:                                             %[[VAL_1:.*]]: !fir.ref<!fir.array<400xf32>> {fir.target}) {
+! CHECK:         %[[VAL_2:.*]] = arith.constant 400 : index
+! CHECK:         %[[VAL_3:.*]] = arith.constant 2 : i64
+! CHECK:         %[[VAL_4:.*]] = arith.constant 11 : i64
+! CHECK:         %[[VAL_5:.*]] = arith.constant 3 : i64
+! CHECK:         %[[VAL_6:.*]] = arith.constant 12 : i64
+! CHECK:         %[[VAL_7:.*]] = arith.constant 51 : i64
+! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_7]] : (i64) -> index
+! CHECK:         %[[VAL_9:.*]] = arith.constant 3 : i64
+! CHECK:         %[[VAL_10:.*]] = fir.convert %[[VAL_9]] : (i64) -> index
+! CHECK:         %[[VAL_11:.*]] = arith.constant 350 : i64
+! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_11]] : (i64) -> index
+! CHECK:         %[[VAL_13:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_14:.*]] = fir.slice %[[VAL_8]], %[[VAL_12]], %[[VAL_10]] : (index, index, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_15:.*]] = fir.embox %[[VAL_1]](%[[VAL_13]]) {{\[}}%[[VAL_14]]] : (!fir.ref<!fir.array<400xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
+! CHECK:         %[[VAL_16:.*]] = arith.constant 1 : index
+! CHECK:         %[[VAL_17:.*]] = fir.convert %[[VAL_3]] : (i64) -> index
+! CHECK:         %[[VAL_18:.*]] = fir.convert %[[VAL_4]] : (i64) -> index
+! CHECK:         %[[VAL_19:.*]] = arith.subi %[[VAL_18]], %[[VAL_17]] : index
+! CHECK:         %[[VAL_20:.*]] = arith.addi %[[VAL_19]], %[[VAL_16]] : index
+! CHECK:         %[[VAL_21:.*]] = fir.convert %[[VAL_5]] : (i64) -> index
+! CHECK:         %[[VAL_22:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
+! CHECK:         %[[VAL_23:.*]] = arith.subi %[[VAL_22]], %[[VAL_21]] : index
+! CHECK:         %[[VAL_24:.*]] = arith.addi %[[VAL_23]], %[[VAL_16]] : index
+! CHECK:         %[[VAL_25:.*]] = fir.convert %[[VAL_3]] : (i64) -> index
+! CHECK:         %[[VAL_26:.*]] = fir.convert %[[VAL_5]] : (i64) -> index
+! CHECK:         %[[VAL_27:.*]] = fir.shape_shift %[[VAL_25]], %[[VAL_20]], %[[VAL_26]], %[[VAL_24]] : (index, index, index, index) -> !fir.shapeshift<2>
+! CHECK:         %[[VAL_28:.*]] = fir.rebox %[[VAL_15]](%[[VAL_27]]) : (!fir.box<!fir.array<?xf32>>, !fir.shapeshift<2>) -> !fir.box<!fir.ptr<!fir.array<?x?xf32>>>
+! CHECK:         fir.store %[[VAL_28]] to %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>
+! CHECK:         return
+! CHECK:       }
 subroutine test_array_non_contig_remap_slice(p, x)
   real, target :: x(400)
   real, pointer :: p(:, :)
-  ! CHECK-DAG: %[[shape:.*]] = fir.shape %c400{{.*}}
-  ! CHECK-DAG: %[[slice:.*]] = fir.slice %c51{{.*}}, %c350{{.*}}, %c3{{.*}}
-  ! CHECK: %[[box:.*]] = fir.embox %[[x]](%[[shape]]) {{.}}%[[slice]]{{.}} : (!fir.ref<!fir.array<400xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.box<!fir.array<?xf32>>
-
-  ! CHECK: %[[reshape:.*]] = fir.shape_shift %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}
-  ! CHECK: %[[rebox:.*]] = fir.rebox %[[box]](%[[reshape]]) : (!fir.box<!fir.array<?xf32>>, !fir.shapeshift<2>) -> !fir.box<!fir.ptr<!fir.array<?x?xf32>>>
-  ! CHECK: fir.store %[[rebox]] to %[[p]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>
   p(2:11, 3:12) => x(51:350:3)
 end subroutine
 
