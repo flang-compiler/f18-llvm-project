@@ -2364,7 +2364,7 @@ static constexpr const FastmathFlags FastmathFlagsList[] = {
     // clang-format on
 };
 
-void FMFAttr::print(DialectAsmPrinter &printer) const {
+void FMFAttr::print(AsmPrinter &printer) const {
   printer << "fastmath<";
   auto flags = llvm::make_filter_range(FastmathFlagsList, [&](auto flag) {
     return bitEnumContains(this->getFlags(), flag);
@@ -2374,7 +2374,7 @@ void FMFAttr::print(DialectAsmPrinter &printer) const {
   printer << ">";
 }
 
-Attribute FMFAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute FMFAttr::parse(AsmParser &parser, Type type) {
   if (failed(parser.parseLess()))
     return {};
 
@@ -2402,7 +2402,7 @@ Attribute FMFAttr::parse(DialectAsmParser &parser, Type type) {
   return FMFAttr::get(parser.getContext(), flags);
 }
 
-void LinkageAttr::print(DialectAsmPrinter &printer) const {
+void LinkageAttr::print(AsmPrinter &printer) const {
   printer << "linkage<";
   if (static_cast<uint64_t>(getLinkage()) <= getMaxEnumValForLinkage())
     printer << stringifyEnum(getLinkage());
@@ -2411,7 +2411,7 @@ void LinkageAttr::print(DialectAsmPrinter &printer) const {
   printer << ">";
 }
 
-Attribute LinkageAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute LinkageAttr::parse(AsmParser &parser, Type type) {
   StringRef elemName;
   if (parser.parseLess() || parser.parseKeyword(&elemName) ||
       parser.parseGreater())
@@ -2518,7 +2518,7 @@ LoopOptionsAttr LoopOptionsAttr::get(MLIRContext *context,
   return Base::get(context, optionBuilders.options);
 }
 
-void LoopOptionsAttr::print(DialectAsmPrinter &printer) const {
+void LoopOptionsAttr::print(AsmPrinter &printer) const {
   printer << getMnemonic() << "<";
   llvm::interleaveComma(getOptions(), printer, [&](auto option) {
     printer << stringifyEnum(option.first) << " = ";
@@ -2537,7 +2537,7 @@ void LoopOptionsAttr::print(DialectAsmPrinter &printer) const {
   printer << ">";
 }
 
-Attribute LoopOptionsAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute LoopOptionsAttr::parse(AsmParser &parser, Type type) {
   if (failed(parser.parseLess()))
     return {};
 

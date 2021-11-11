@@ -132,8 +132,8 @@ public:
 
   CombiningKind getKind() const;
 
-  void print(DialectAsmPrinter &p) const;
-  static Attribute parse(DialectAsmParser &parser);
+  void print(AsmPrinter &p) const;
+  static Attribute parse(AsmParser &parser, Type type);
 };
 
 /// Enum to control the lowering of `vector.contract` operations.

@@ -29,15 +29,14 @@ using namespace test;
 // AttrWithSelfTypeParamAttr
 //===----------------------------------------------------------------------===//
 
-Attribute AttrWithSelfTypeParamAttr::parse(DialectAsmParser &parser,
-                                           Type type) {
+Attribute AttrWithSelfTypeParamAttr::parse(AsmParser &parser, Type type) {
   Type selfType;
   if (parser.parseType(selfType))
     return Attribute();
   return get(parser.getContext(), selfType);
 }
 
-void AttrWithSelfTypeParamAttr::print(DialectAsmPrinter &printer) const {
+void AttrWithSelfTypeParamAttr::print(AsmPrinter &printer) const {
   printer << "attr_with_self_type_param " << getType();
 }
 
@@ -45,22 +44,27 @@ void AttrWithSelfTypeParamAttr::print(DialectAsmPrinter &printer) const {
 // AttrWithTypeBuilderAttr
 //===----------------------------------------------------------------------===//
 
-Attribute AttrWithTypeBuilderAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute AttrWithTypeBuilderAttr::parse(AsmParser &parser, Type type) {
   IntegerAttr element;
   if (parser.parseAttribute(element))
     return Attribute();
   return get(parser.getContext(), element);
 }
 
+<<<<<<< HEAD
 void AttrWithTypeBuilderAttr::print(DialectAsmPrinter &printer) const {
   printer << "attr_with_type_builder " << getAttr();
+=======
+void AttrWithTypeBuilderAttr::print(AsmPrinter &printer) const {
+  printer << " " << getAttr();
+>>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
 }
 
 //===----------------------------------------------------------------------===//
 // CompoundAAttr
 //===----------------------------------------------------------------------===//
 
-Attribute CompoundAAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute CompoundAAttr::parse(AsmParser &parser, Type type) {
   int widthOfSomething;
   Type oneType;
   SmallVector<int, 4> arrayOfInts;
@@ -81,9 +85,14 @@ Attribute CompoundAAttr::parse(DialectAsmParser &parser, Type type) {
   return get(parser.getContext(), widthOfSomething, oneType, arrayOfInts);
 }
 
+<<<<<<< HEAD
 void CompoundAAttr::print(DialectAsmPrinter &printer) const {
   printer << "cmpnd_a<" << getWidthOfSomething() << ", " << getOneType()
           << ", [";
+=======
+void CompoundAAttr::print(AsmPrinter &printer) const {
+  printer << "<" << getWidthOfSomething() << ", " << getOneType() << ", [";
+>>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
   llvm::interleaveComma(getArrayOfInts(), printer);
   printer << "]>";
 }
@@ -92,7 +101,7 @@ void CompoundAAttr::print(DialectAsmPrinter &printer) const {
 // CompoundAAttr
 //===----------------------------------------------------------------------===//
 
-Attribute TestI64ElementsAttr::parse(DialectAsmParser &parser, Type type) {
+Attribute TestI64ElementsAttr::parse(AsmParser &parser, Type type) {
   SmallVector<uint64_t> elements;
   if (parser.parseLess() || parser.parseLSquare())
     return Attribute();
@@ -109,8 +118,13 @@ Attribute TestI64ElementsAttr::parse(DialectAsmParser &parser, Type type) {
       parser.getContext(), type.cast<ShapedType>(), elements);
 }
 
+<<<<<<< HEAD
 void TestI64ElementsAttr::print(DialectAsmPrinter &printer) const {
   printer << "i64_elements<[";
+=======
+void TestI64ElementsAttr::print(AsmPrinter &printer) const {
+  printer << "<[";
+>>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
   llvm::interleaveComma(getElements(), printer);
   printer << "] : " << getType() << ">";
 }
@@ -142,7 +156,7 @@ TestAttrWithFormatAttr::verify(function_ref<InFlightDiagnostic()> emitError,
 // Utility Functions for Generated Attributes
 //===----------------------------------------------------------------------===//
 
-static FailureOr<SmallVector<int>> parseIntArray(DialectAsmParser &parser) {
+static FailureOr<SmallVector<int>> parseIntArray(AsmParser &parser) {
   SmallVector<int> ints;
   if (parser.parseLSquare() || parser.parseCommaSeparatedList([&]() {
         ints.push_back(0);
@@ -153,13 +167,66 @@ static FailureOr<SmallVector<int>> parseIntArray(DialectAsmParser &parser) {
   return ints;
 }
 
-static void printIntArray(DialectAsmPrinter &printer, ArrayRef<int> ints) {
+static void printIntArray(AsmPrinter &printer, ArrayRef<int> ints) {
   printer << '[';
   llvm::interleaveComma(ints, printer);
   printer << ']';
 }
 
 //===----------------------------------------------------------------------===//
+<<<<<<< HEAD
+=======
+// TestSubElementsAccessAttr
+//===----------------------------------------------------------------------===//
+
+Attribute TestSubElementsAccessAttr::parse(::mlir::AsmParser &parser,
+                                           ::mlir::Type type) {
+  Attribute first, second, third;
+  if (parser.parseLess() || parser.parseAttribute(first) ||
+      parser.parseComma() || parser.parseAttribute(second) ||
+      parser.parseComma() || parser.parseAttribute(third) ||
+      parser.parseGreater()) {
+    return {};
+  }
+  return get(parser.getContext(), first, second, third);
+}
+
+void TestSubElementsAccessAttr::print(::mlir::AsmPrinter &printer) const {
+  printer << "<" << getFirst() << ", " << getSecond() << ", " << getThird()
+          << ">";
+}
+
+void TestSubElementsAccessAttr::walkImmediateSubElements(
+    llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
+    llvm::function_ref<void(mlir::Type)> walkTypesFn) const {
+  walkAttrsFn(getFirst());
+  walkAttrsFn(getSecond());
+  walkAttrsFn(getThird());
+}
+
+SubElementAttrInterface TestSubElementsAccessAttr::replaceImmediateSubAttribute(
+    ArrayRef<std::pair<size_t, Attribute>> replacements) const {
+  Attribute first = getFirst();
+  Attribute second = getSecond();
+  Attribute third = getThird();
+  for (auto &it : replacements) {
+    switch (it.first) {
+    case 0:
+      first = it.second;
+      break;
+    case 1:
+      second = it.second;
+      break;
+    case 2:
+      third = it.second;
+      break;
+    }
+  }
+  return get(getContext(), first, second, third);
+}
+
+//===----------------------------------------------------------------------===//
+>>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
 // Tablegen Generated Definitions
 //===----------------------------------------------------------------------===//
 
