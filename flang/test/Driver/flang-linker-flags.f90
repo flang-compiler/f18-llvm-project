@@ -10,7 +10,6 @@
 
 ! RUN: %flang -### %S/Inputs/hello.f90 2>&1 | FileCheck %s
 
-! CHECK-LABEL: "/usr/bin/ld"
 ! CHECK: -lFortran_main
 ! CHECK: -lFortranRuntime
 ! CHECK: -lFortranDecimal
