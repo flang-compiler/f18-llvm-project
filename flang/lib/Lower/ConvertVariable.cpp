@@ -1211,6 +1211,15 @@ void Fortran::lower::mapSymbolAttributes(
     }
   };
 
+  // Lower length expression for non deferred and non dummy assumed length
+  // characters.
+  auto genExplicitCharLen =
+      [&](llvm::Optional<Fortran::lower::SomeExpr> charLen) -> mlir::Value {
+    if (!charLen)
+      fir::emitFatalError(loc, "expected explicit character length");
+    return genValue(*charLen);
+  };
+
   ba.match(
       //===--------------------------------------------------------------===//
       // Trivial case.
@@ -1292,11 +1301,7 @@ void Fortran::lower::mapSymbolAttributes(
           return;
         }
         // local CHARACTER variable
-        mlir::Value len;
-        if (charLen)
-          len = genValue(*charLen);
-        else
-          len = builder.createIntegerConstant(loc, idxTy, sym.size());
+        mlir::Value len = genExplicitCharLen(charLen);
         if (preAlloc) {
           symMap.addCharSymbol(sym, preAlloc, len);
           return;
@@ -1461,10 +1466,7 @@ void Fortran::lower::mapSymbolAttributes(
           }
         } else {
           // local CHARACTER variable
-          if (charLen)
-            len = genValue(*charLen);
-          else
-            len = builder.createIntegerConstant(loc, idxTy, sym.size());
+          len = genExplicitCharLen(*charLen);
         }
         llvm::SmallVector<mlir::Value> lengths = {len};
 
@@ -1599,10 +1601,7 @@ void Fortran::lower::mapSymbolAttributes(
           }
         } else {
           // local CHARACTER variable
-          if (charLen)
-            len = genValue(*charLen);
-          else
-            len = builder.createIntegerConstant(loc, idxTy, sym.size());
+          len = genExplicitCharLen(*charLen);
         }
         llvm::SmallVector<mlir::Value> lengths = {len};
 

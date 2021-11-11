@@ -80,7 +80,7 @@ subroutine dyn_array_cst_len_lb(n)
   ! CHECK: fir.alloca !fir.array<?x!fir.char<1,10>>, %[[extent]] {{{.*}}uniq_name = "_QFdyn_array_cst_len_lbEc"}
 end subroutine
 
-! CHECK: func @_QPdyn_array_dyn_len_lb
+! CHECK-LABEL: func @_QPdyn_array_dyn_len_lb
 ! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i64>, %[[arg1:.*]]: !fir.ref<i64>
 subroutine dyn_array_dyn_len_lb(l, n)
   integer(8) :: l, n
@@ -92,3 +92,16 @@ subroutine dyn_array_dyn_len_lb(l, n)
   ! CHECK: %[[extent:.*]] = arith.addi %[[ni]], %[[cm10]] : index
   ! CHECK: fir.alloca !fir.array<?x!fir.char<1,?>>(%[[l]] : i64), %[[extent]] {{{.*}}uniq_name = "_QFdyn_array_dyn_len_lbEc"}
 end subroutine
+
+! Test that the length of assumed length parameter is correctly deduced in lowering.
+! CHECK-LABEL: func @_QPassumed_length_param
+subroutine assumed_length_param(n)
+  character(*), parameter :: c(1)=(/"abcd"/)
+  integer :: n
+  ! CHECK: %[[c4:.*]] = arith.constant 4 : index
+  ! CHECK: %[[len:.*]] = fir.convert %[[c4]] : (index) -> i64
+  ! CHECK: fir.store %[[len]] to %[[tmp:.*]] : !fir.ref<i64>
+  ! CHECK: fir.call @_QPtake_int(%[[tmp]]) : (!fir.ref<i64>) -> ()
+  call take_int(len(c(n), kind=8))
+end
+
