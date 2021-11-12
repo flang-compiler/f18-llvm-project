@@ -357,9 +357,6 @@ public:
                                    mlir::Value ub, mlir::Value step,
                                    mlir::Type type);
 
-  llvm::SmallVector<mlir::Value> getExtents(const fir::ExtendedValue &exv,
-                                            mlir::Location loc);
-
   /// Dump the current function. (debug)
   LLVM_DUMP_METHOD void dumpFunc();
 
