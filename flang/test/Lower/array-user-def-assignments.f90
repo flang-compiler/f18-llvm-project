@@ -471,6 +471,64 @@ end subroutine
 ! CHECK:         return
 ! CHECK:       }
 
+
+
+subroutine test_in_forall_1(x, y)
+  use defined_assignments
+  logical :: x(10)
+  real :: y(10)
+  forall (i=1:10) x(i) = y(i)
+end subroutine
+
+subroutine test_in_forall_2(x, y)
+  use defined_assignments
+  logical :: x(10)
+  real :: y(10)
+  forall (i=1:10) y(i) = y(i).lt.0.
+end subroutine
+
+subroutine test_intrinsic_where_1(x, y, l)
+  use defined_assignments
+  logical :: x(10), l(10)
+  real :: y(10)
+  where(l) x = y
+end subroutine
+
+subroutine test_intrinsic_where_2(x, y, l)
+  use defined_assignments
+  logical :: x(10), l(10)
+  real :: y(10)
+  where(l) y = y.lt.0.
+end subroutine
+
+subroutine test_scalar_func_but_not_elemental(x, y)
+  interface assignment(=)
+    ! scalar, but not elemental
+    elemental subroutine assign_integer_to_logical(a,b)
+      logical, intent(out) :: a
+      integer, intent(in) :: b
+    end
+  end interface
+  logical :: x(100)
+  integer :: y(100)
+  ! Scalar assignment in forall should be treated just like elemental
+  ! functions.
+  forall(i=1:10) x(i) = y(i)
+end subroutine
+
+subroutine test_in_forall_with_cleanup(x, y)
+  use defined_assignments
+  interface
+    pure function returns_alloc(i)
+      integer, intent(in) :: i
+      real, allocatable :: returns_alloc
+    end function
+  end interface
+  logical :: x(10)
+  real :: y(10)
+  forall (i=1:10) x(i) = returns_alloc(i)
+end subroutine
+
 ! CHECK-LABEL: func @_QPtest_forall_array(
 ! CHECK-SAME:                             %[[VAL_0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>,
 ! CHECK-SAME:                             %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>) {
@@ -514,11 +572,11 @@ end subroutine
 ! CHECK:           %[[VAL_40:.*]] = arith.constant 0 : index
 ! CHECK:           %[[VAL_41:.*]] = arith.subi %[[VAL_31]], %[[VAL_39]] : index
 ! CHECK:           %[[VAL_42:.*]] = fir.do_loop %[[VAL_43:.*]] = %[[VAL_40]] to %[[VAL_41]] step %[[VAL_39]] unordered iter_args(%[[VAL_44:.*]] = %[[VAL_13]]) -> (!fir.array<?x?x!fir.logical<4>>) {
-! CHECK:             %[[VAL_45:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_45:.*]] = arith.subi %[[VAL_32]], %[[VAL_32]] : index
 ! CHECK:             %[[VAL_46:.*]] = arith.muli %[[VAL_43]], %[[VAL_38]] : index
 ! CHECK:             %[[VAL_47:.*]] = arith.addi %[[VAL_45]], %[[VAL_46]] : index
 ! CHECK:             %[[VAL_48:.*]] = fir.array_fetch %[[VAL_10]], %[[VAL_36]], %[[VAL_47]] : (!fir.array<?x?xf32>, index, index) -> f32
-! CHECK:             %[[VAL_49:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_49:.*]] = arith.subi %[[VAL_17]], %[[VAL_17]] : index
 ! CHECK:             %[[VAL_50:.*]] = arith.muli %[[VAL_43]], %[[VAL_23]] : index
 ! CHECK:             %[[VAL_51:.*]] = arith.addi %[[VAL_49]], %[[VAL_50]] : index
 ! CHECK:             %[[VAL_52:.*]]:2 = fir.array_modify %[[VAL_44]], %[[VAL_21]], %[[VAL_51]] : (!fir.array<?x?x!fir.logical<4>>, index, index) -> (!fir.ref<!fir.logical<4>>, !fir.array<?x?x!fir.logical<4>>)
@@ -531,6 +589,13 @@ end subroutine
 ! CHECK:         fir.array_merge_store %[[VAL_9]], %[[VAL_54:.*]] to %[[VAL_0]] : !fir.array<?x?x!fir.logical<4>>, !fir.array<?x?x!fir.logical<4>>, !fir.box<!fir.array<?x?x!fir.logical<4>>>
 ! CHECK:         return
 ! CHECK:       }
+
+subroutine test_forall_array(x, y)
+  use defined_assignments
+  logical :: x(:, :)
+  real :: y(:, :)
+  forall (i=1:10) x(i, :) = y(i, :)
+end subroutine
 
 ! CHECK-LABEL: func @_QPfrom_char_forall(
 ! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
@@ -604,6 +669,30 @@ end subroutine
 ! CHECK:         return
 ! CHECK:       }
 
+subroutine from_char_forall(i, c)
+  interface assignment(=)
+    elemental subroutine sfrom_char(a,b)
+      integer, intent(out) :: a
+      character(*),intent(in) :: b
+    end subroutine
+  end interface
+  integer :: i(:)
+  character(*) :: c(:)
+  forall (j=1:10) i(j) = c(j)
+end subroutine
+
+subroutine to_char_forall(i, c)
+  interface assignment(=)
+    elemental subroutine sto_char(a,b)
+      character(*), intent(out) :: a
+      integer,intent(in) :: b
+    end subroutine
+  end interface
+  integer :: i(:)
+  character(*) :: c(:)
+  forall (j=1:10) c(j) = i(j)
+end subroutine
+
 ! CHECK-LABEL: func @_QPfrom_char_forall_array(
 ! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xi32>>,
 ! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?x!fir.char<1,?>>>) {
@@ -646,12 +735,12 @@ end subroutine
 ! CHECK:           %[[VAL_39:.*]] = arith.constant 0 : index
 ! CHECK:           %[[VAL_40:.*]] = arith.subi %[[VAL_30]], %[[VAL_38]] : index
 ! CHECK:           %[[VAL_41:.*]] = fir.do_loop %[[VAL_42:.*]] = %[[VAL_39]] to %[[VAL_40]] step %[[VAL_38]] unordered iter_args(%[[VAL_43:.*]] = %[[VAL_12]]) -> (!fir.array<?x?xi32>) {
-! CHECK:             %[[VAL_44:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_44:.*]] = arith.subi %[[VAL_31]], %[[VAL_31]] : index
 ! CHECK:             %[[VAL_45:.*]] = arith.muli %[[VAL_42]], %[[VAL_37]] : index
 ! CHECK:             %[[VAL_46:.*]] = arith.addi %[[VAL_44]], %[[VAL_45]] : index
 ! CHECK:             %[[VAL_47:.*]] = fir.array_access %[[VAL_9]], %[[VAL_35]], %[[VAL_46]] : (!fir.array<?x?x!fir.char<1,?>>, index, index) -> !fir.ref<!fir.char<1,?>>
 ! CHECK:             %[[VAL_48:.*]] = fir.box_elesize %[[VAL_1]] : (!fir.box<!fir.array<?x?x!fir.char<1,?>>>) -> index
-! CHECK:             %[[VAL_49:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_49:.*]] = arith.subi %[[VAL_16]], %[[VAL_16]] : index
 ! CHECK:             %[[VAL_50:.*]] = arith.muli %[[VAL_42]], %[[VAL_22]] : index
 ! CHECK:             %[[VAL_51:.*]] = arith.addi %[[VAL_49]], %[[VAL_50]] : index
 ! CHECK:             %[[VAL_52:.*]]:2 = fir.array_modify %[[VAL_43]], %[[VAL_20]], %[[VAL_51]] : (!fir.array<?x?xi32>, index, index) -> (!fir.ref<i32>, !fir.array<?x?xi32>)
@@ -708,11 +797,11 @@ end subroutine
 ! CHECK:           %[[VAL_40:.*]] = arith.constant 0 : index
 ! CHECK:           %[[VAL_41:.*]] = arith.subi %[[VAL_31]], %[[VAL_39]] : index
 ! CHECK:           %[[VAL_42:.*]] = fir.do_loop %[[VAL_43:.*]] = %[[VAL_40]] to %[[VAL_41]] step %[[VAL_39]] unordered iter_args(%[[VAL_44:.*]] = %[[VAL_13]]) -> (!fir.array<?x?x!fir.char<1,?>>) {
-! CHECK:             %[[VAL_45:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_45:.*]] = arith.subi %[[VAL_32]], %[[VAL_32]] : index
 ! CHECK:             %[[VAL_46:.*]] = arith.muli %[[VAL_43]], %[[VAL_38]] : index
 ! CHECK:             %[[VAL_47:.*]] = arith.addi %[[VAL_45]], %[[VAL_46]] : index
 ! CHECK:             %[[VAL_48:.*]] = fir.array_fetch %[[VAL_10]], %[[VAL_36]], %[[VAL_47]] : (!fir.array<?x?xi32>, index, index) -> i32
-! CHECK:             %[[VAL_49:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_49:.*]] = arith.subi %[[VAL_17]], %[[VAL_17]] : index
 ! CHECK:             %[[VAL_50:.*]] = arith.muli %[[VAL_43]], %[[VAL_23]] : index
 ! CHECK:             %[[VAL_51:.*]] = arith.addi %[[VAL_49]], %[[VAL_50]] : index
 ! CHECK:             %[[VAL_52:.*]]:2 = fir.array_modify %[[VAL_44]], %[[VAL_21]], %[[VAL_51]] : (!fir.array<?x?x!fir.char<1,?>>, index, index) -> (!fir.ref<!fir.char<1,?>>, !fir.array<?x?x!fir.char<1,?>>)
@@ -727,93 +816,6 @@ end subroutine
 ! CHECK:         fir.array_merge_store %[[VAL_9]], %[[VAL_56:.*]] to %[[VAL_1]] : !fir.array<?x?x!fir.char<1,?>>, !fir.array<?x?x!fir.char<1,?>>, !fir.box<!fir.array<?x?x!fir.char<1,?>>>
 ! CHECK:         return
 ! CHECK:       }
-
-subroutine test_in_forall_1(x, y)
-  use defined_assignments
-  logical :: x(10)
-  real :: y(10)
-  forall (i=1:10) x(i) = y(i)
-end subroutine
-
-subroutine test_in_forall_2(x, y)
-  use defined_assignments
-  logical :: x(10)
-  real :: y(10)
-  forall (i=1:10) y(i) = y(i).lt.0.
-end subroutine
-
-subroutine test_intrinsic_where_1(x, y, l)
-  use defined_assignments
-  logical :: x(10), l(10)
-  real :: y(10)
-  where(l) x = y
-end subroutine
-
-subroutine test_intrinsic_where_2(x, y, l)
-  use defined_assignments
-  logical :: x(10), l(10)
-  real :: y(10)
-  where(l) y = y.lt.0.
-end subroutine
-
-subroutine test_scalar_func_but_not_elemental(x, y)
-  interface assignment(=)
-    ! scalar, but not elemental
-    elemental subroutine assign_integer_to_logical(a,b)
-      logical, intent(out) :: a
-      integer, intent(in) :: b
-    end
-  end interface
-  logical :: x(100)
-  integer :: y(100)
-  ! Scalar assignment in forall should be treated just like elemental
-  ! functions.
-  forall(i=1:10) x(i) = y(i)
-end subroutine
-
-subroutine test_in_forall_with_cleanup(x, y)
-  use defined_assignments
-  interface
-    pure function returns_alloc(i)
-      integer, intent(in) :: i
-      real, allocatable :: returns_alloc
-    end function
-  end interface
-  logical :: x(10)
-  real :: y(10)
-  forall (i=1:10) x(i) = returns_alloc(i)
-end subroutine
-
-subroutine test_forall_array(x, y)
-  use defined_assignments
-  logical :: x(:, :)
-  real :: y(:, :)
-  forall (i=1:10) x(i, :) = y(i, :)
-end subroutine
-
-subroutine from_char_forall(i, c)
-  interface assignment(=)
-    elemental subroutine sfrom_char(a,b)
-      integer, intent(out) :: a
-      character(*),intent(in) :: b
-    end subroutine
-  end interface
-  integer :: i(:)
-  character(*) :: c(:)
-  forall (j=1:10) i(j) = c(j)
-end subroutine
-
-subroutine to_char_forall(i, c)
-  interface assignment(=)
-    elemental subroutine sto_char(a,b)
-      character(*), intent(out) :: a
-      integer,intent(in) :: b
-    end subroutine
-  end interface
-  integer :: i(:)
-  character(*) :: c(:)
-  forall (j=1:10) c(j) = i(j)
-end subroutine
 
 subroutine from_char_forall_array(i, c)
   interface assignment(=)

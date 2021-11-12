@@ -4395,13 +4395,13 @@ private:
                   pc = [=](IterSpace iters) {
                     IterationSpace newIters = currentPC(iters);
                     auto impliedIter = newIters.iterValue(subsIndex);
-                    // FIXME: initial should be the lbound of this array. Use 1.
-                    // See getLBound().
-                    mlir::Value initial =
-                        builder.createIntegerConstant(loc, idxTy, 0);
-                    auto step = stride;
+                    // FIXME: must use the lower bound of this component.
+                    // auto arrLowerBound = getLBound(arrayExv, subsIndex, one);
+                    auto arrLowerBound = one;
+                    auto initial = builder.create<mlir::arith::SubIOp>(
+                        loc, lowerBound, arrLowerBound);
                     auto prod = builder.create<mlir::arith::MulIOp>(
-                        loc, impliedIter, step);
+                        loc, impliedIter, stride);
                     auto result =
                         builder.create<mlir::arith::AddIOp>(loc, initial, prod);
                     newIters.setIndexValue(subsIndex, result);
@@ -5414,14 +5414,12 @@ private:
                               // Lower scalar index expression, append it to
                               // subs.
                               auto subscriptVal = fir::getBase(asScalar(e));
-#if 0
                               // arrayExv is the base array. It needs to reflect
                               // the current array component instead.
-                              auto lb = fir::factory::readLowerBound(
-                                  builder, loc, arrayExv, ssIndex, one);
-#else
+                              // FIXME: must use lower bound of this component
+                              //auto lb = fir::factory::readLowerBound(
+                              //    builder, loc, arrayExv, ssIndex, one);
                               auto lb = one;
-#endif
                               mlir::Value val = builder.createConvert(
                                   loc, idxTy, subscriptVal);
                               mlir::Value ivAdj =

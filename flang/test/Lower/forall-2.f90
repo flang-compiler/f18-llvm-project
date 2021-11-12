@@ -107,7 +107,7 @@ end subroutine forall_pointer_assign
 ! CHECK:             %[[VAL_39:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! CHECK:             %[[VAL_40:.*]] = arith.constant 0 : i32
 ! CHECK:             %[[VAL_41:.*]] = arith.subi %[[VAL_40]], %[[VAL_39]] : i32
-! CHECK:             %[[VAL_42:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_42:.*]] = arith.subi %[[VAL_17]], %[[VAL_15]] : index
 ! CHECK:             %[[VAL_43:.*]] = arith.muli %[[VAL_37]], %[[VAL_19]] : index
 ! CHECK:             %[[VAL_44:.*]] = arith.addi %[[VAL_42]], %[[VAL_43]] : index
 ! CHECK:             %[[VAL_45:.*]] = fir.array_update %[[VAL_38]], %[[VAL_41]], %[[VAL_44]], %[[VAL_32]] : (!fir.array<10x10xi32>, i32, index, index) -> !fir.array<10x10xi32>

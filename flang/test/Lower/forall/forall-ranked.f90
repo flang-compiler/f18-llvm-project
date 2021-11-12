@@ -2,23 +2,6 @@
 
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-subroutine test_forall_with_ranked_dimension
-  interface
-     pure integer function f(i)
-       integer, intent(in) :: i
-     end function f
-  end interface
-  type t
-     !integer :: arr(5:15)
-     integer :: arr(11)
-  end type t
-  type(t) :: a(10,10)
-  
-  forall (i=1:5)
-     a(i,:)%arr(i+4) = f(i)
-  end forall
-end subroutine test_forall_with_ranked_dimension
-
 ! CHECK-LABEL: func @_QPtest_forall_with_ranked_dimension() {
 ! CHECK:         %[[VAL_0:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 10 : index
@@ -63,7 +46,7 @@ end subroutine test_forall_with_ranked_dimension
 ! CHECK:           %[[VAL_41:.*]] = arith.subi %[[VAL_31]], %[[VAL_39]] : index
 ! CHECK:           %[[VAL_42:.*]] = fir.do_loop %[[VAL_43:.*]] = %[[VAL_40]] to %[[VAL_41]] step %[[VAL_39]] unordered iter_args(%[[VAL_44:.*]] = %[[VAL_13]]) -> (!fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>) {
 ! CHECK:             %[[VAL_45:.*]] = fir.call @_QPf(%[[VAL_0]]) : (!fir.ref<i32>) -> i32
-! CHECK:             %[[VAL_46:.*]] = arith.constant 0 : index
+! CHECK:             %[[VAL_46:.*]] = arith.subi %[[VAL_17]], %[[VAL_17]] : index
 ! CHECK:             %[[VAL_47:.*]] = arith.muli %[[VAL_43]], %[[VAL_23]] : index
 ! CHECK:             %[[VAL_48:.*]] = arith.addi %[[VAL_46]], %[[VAL_47]] : index
 ! CHECK:             %[[VAL_49:.*]] = fir.array_update %[[VAL_44]], %[[VAL_45]], %[[VAL_21]], %[[VAL_48]], %[[VAL_32]], %[[VAL_38]] : (!fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>, i32, index, index, !fir.field, index) -> !fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>
@@ -74,4 +57,21 @@ end subroutine test_forall_with_ranked_dimension
 ! CHECK:         fir.array_merge_store %[[VAL_10]], %[[VAL_51:.*]] to %[[VAL_3]] : !fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>, !fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>, !fir.ref<!fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>>
 ! CHECK:         return
 ! CHECK:       }
+
+subroutine test_forall_with_ranked_dimension
+  interface
+     pure integer function f(i)
+       integer, intent(in) :: i
+     end function f
+  end interface
+  type t
+     !integer :: arr(5:15)
+     integer :: arr(11)
+  end type t
+  type(t) :: a(10,10)
+  
+  forall (i=1:5)
+     a(i,:)%arr(i+4) = f(i)
+  end forall
+end subroutine test_forall_with_ranked_dimension
 
