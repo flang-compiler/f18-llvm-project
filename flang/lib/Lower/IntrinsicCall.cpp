@@ -1731,8 +1731,7 @@ mlir::Value IntrinsicLibrary::genAbs(mlir::Type resultType,
   }
   if (fir::isa_complex(type)) {
     // Use HYPOT to fulfill the no underflow/overflow requirement.
-    auto parts =
-        fir::factory::ComplexExprHelper{builder, loc}.extractParts(arg);
+    auto parts = fir::factory::Complex{builder, loc}.extractParts(arg);
     llvm::SmallVector<mlir::Value> args = {parts.first, parts.second};
     return genRuntimeCall("hypot", resultType, args);
   }
@@ -1773,7 +1772,7 @@ IntrinsicLibrary::genAdjustRtCall(mlir::Type resultType,
 mlir::Value IntrinsicLibrary::genAimag(mlir::Type resultType,
                                        llvm::ArrayRef<mlir::Value> args) {
   assert(args.size() == 1);
-  return fir::factory::ComplexExprHelper{builder, loc}.extractComplexPart(
+  return fir::factory::Complex{builder, loc}.extractComplexPart(
       args[0], true /* isImagPart */);
 }
 
@@ -1974,10 +1973,10 @@ mlir::Value IntrinsicLibrary::genConjg(mlir::Type resultType,
     llvm_unreachable("argument type mismatch");
 
   mlir::Value cplx = args[0];
-  auto imag = fir::factory::ComplexExprHelper{builder, loc}.extractComplexPart(
+  auto imag = fir::factory::Complex{builder, loc}.extractComplexPart(
       cplx, /*isImagPart=*/true);
   auto negImag = builder.create<mlir::arith::NegFOp>(loc, imag);
-  return fir::factory::ComplexExprHelper{builder, loc}.insertComplexPart(
+  return fir::factory::Complex{builder, loc}.insertComplexPart(
       cplx, negImag, /*isImagPart=*/true);
 }
 

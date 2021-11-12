@@ -269,7 +269,7 @@ mlir::Value fir::FirOpBuilder::convertWithSemantics(mlir::Location loc,
   auto fromTy = val.getType();
   if (fromTy == toTy)
     return val;
-  fir::factory::ComplexExprHelper helper{*this, loc};
+  fir::factory::Complex helper{*this, loc};
   if ((fir::isa_real(fromTy) || fir::isa_integer(fromTy)) &&
       fir::isa_complex(toTy)) {
     // imaginary part is zero

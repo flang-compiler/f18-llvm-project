@@ -18,21 +18,21 @@
 namespace fir::factory {
 
 /// Helper to facilitate lowering of COMPLEX manipulations in FIR.
-class ComplexExprHelper {
+class Complex {
 public:
-  explicit ComplexExprHelper(FirOpBuilder &builder, mlir::Location loc)
+  explicit Complex(FirOpBuilder &builder, mlir::Location loc)
       : builder(builder), loc(loc) {}
-  ComplexExprHelper(const ComplexExprHelper &) = delete;
+  Complex(const Complex &) = delete;
 
   // The values of part enum members are meaningful for
   // InsertValueOp and ExtractValueOp so they are explicit.
   enum class Part { Real = 0, Imag = 1 };
 
-  /// Type helper. Determine the type. Do not create MLIR operations.
+  /// Get the Complex Type. Determine the type. Do not create MLIR operations.
   mlir::Type getComplexPartType(mlir::Value cplx);
   mlir::Type getComplexPartType(mlir::Type complexType);
 
-  /// Complex operation creation helper. They create MLIR operations.
+  /// Complex operation creation. They create MLIR operations.
   mlir::Value createComplex(fir::KindTy kind, mlir::Value real,
                             mlir::Value imag);
 

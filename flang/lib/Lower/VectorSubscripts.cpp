@@ -102,8 +102,7 @@ private:
         loc, i32Ty,
         complexPart.part() == Fortran::evaluate::ComplexPart::Part::RE ? 0 : 1);
     componentPath.emplace_back(offset);
-    return fir::factory::ComplexExprHelper{builder, loc}.getComplexPartType(
-        complexType);
+    return fir::factory::Complex{builder, loc}.getComplexPartType(complexType);
   }
 
   mlir::Type gen(const Fortran::evaluate::Component &component) {

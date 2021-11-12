@@ -477,8 +477,8 @@ genOutputItemList(Fortran::lower::AbstractConverter &converter,
       auto itemBox = converter.genExprValue(expr, stmtCtx, loc);
       auto itemValue = fir::getBase(itemBox);
       if (fir::isa_complex(itemTy)) {
-        auto parts = fir::factory::ComplexExprHelper{builder, loc}.extractParts(
-            itemValue);
+        auto parts =
+            fir::factory::Complex{builder, loc}.extractParts(itemValue);
         outputFuncArgs.push_back(parts.first);
         outputFuncArgs.push_back(parts.second);
       } else {
