@@ -5612,7 +5612,6 @@ private:
     if (components.applied)
       return result;
     if (atEnd) {
-      // components.reversePath.clear();
       return [=](IterSpace) { return asScalar(x); };
     }
     auto loc = getLoc();
@@ -5650,7 +5649,6 @@ private:
       return result;
     auto loc = getLoc();
     if (atEnd) {
-      // components.reversePath.clear();
       return [=](IterSpace) -> ExtValue {
         if (x.Rank() == 0)
           return asScalar(x);
