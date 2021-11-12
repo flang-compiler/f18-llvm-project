@@ -13,6 +13,26 @@
 #ifndef FORTRAN_OPTIMIZER_CODEGEN_TYPECONVERTER_H
 #define FORTRAN_OPTIMIZER_CODEGEN_TYPECONVERTER_H
 
+#include "DescriptorModel.h"
+#include "Target.h"
+#include "flang/Lower/Todo.h" // remove when TODO's are done
+#include "flang/Optimizer/Support/FIRContext.h"
+#include "flang/Optimizer/Support/KindMapping.h"
+#include "llvm/ADT/StringMap.h"
+#include "llvm/Support/Debug.h"
+
+// Position of the different values in a `fir.box`.
+static constexpr unsigned kAddrPosInBox = 0;
+static constexpr unsigned kElemLenPosInBox = 1;
+static constexpr unsigned kVersionPosInBox = 2;
+static constexpr unsigned kRankPosInBox = 3;
+static constexpr unsigned kTypePosInBox = 4;
+static constexpr unsigned kAttributePosInBox = 5;
+static constexpr unsigned kF18AddendumPosInBox = 6;
+static constexpr unsigned kDimsPosInBox = 7;
+static constexpr unsigned kOptTypePtrPosInBox = 8;
+static constexpr unsigned kOptRowTypePosInBox = 9;
+
 namespace fir {
 
 /// FIR type converter
@@ -139,11 +159,12 @@ public:
   // Magic value to indicate we do not know the rank of an entity, either
   // because it is assumed rank or because we have not determined it yet.
   static constexpr int unknownRank() { return -1; }
-  // This corresponds to the descriptor as defined ISO_Fortran_binding.h and the
-  // addendum defined in descriptor.h.
+
+  // This corresponds to the descriptor as defined in ISO_Fortran_binding.h and
+  // the addendum defined in descriptor.h.
   mlir::Type convertBoxType(BoxType box, int rank = unknownRank()) {
-    // (buffer*, ele-size, rank, type-descriptor, attribute, [dims])
-    SmallVector<mlir::Type> parts;
+    // (base_addr*, elem_len, version, rank, type, attribute, f18Addendum, [dim]
+    SmallVector<mlir::Type> descFields;
     mlir::Type ele = box.getEleTy();
     // remove fir.heap/fir.ref/fir.ptr
     if (auto removeIndirection = fir::dyn_cast_ptrEleTy(ele))
@@ -151,15 +172,27 @@ public:
     auto eleTy = convertType(ele);
     // buffer*
     if (ele.isa<SequenceType>() && eleTy.isa<mlir::LLVM::LLVMPointerType>())
-      parts.push_back(eleTy);
+      descFields.push_back(eleTy);
     else
-      parts.push_back(mlir::LLVM::LLVMPointerType::get(eleTy));
-    parts.push_back(getDescFieldTypeModel<1>()(&getContext()));
-    parts.push_back(getDescFieldTypeModel<2>()(&getContext()));
-    parts.push_back(getDescFieldTypeModel<3>()(&getContext()));
-    parts.push_back(getDescFieldTypeModel<4>()(&getContext()));
-    parts.push_back(getDescFieldTypeModel<5>()(&getContext()));
-    parts.push_back(getDescFieldTypeModel<6>()(&getContext()));
+      descFields.push_back(mlir::LLVM::LLVMPointerType::get(eleTy));
+    // elem_len
+    descFields.push_back(
+        getDescFieldTypeModel<kElemLenPosInBox>()(&getContext()));
+    // version
+    descFields.push_back(
+        getDescFieldTypeModel<kVersionPosInBox>()(&getContext()));
+    // rank
+    descFields.push_back(
+        getDescFieldTypeModel<kRankPosInBox>()(&getContext()));
+    // type
+    descFields.push_back(
+        getDescFieldTypeModel<kTypePosInBox>()(&getContext()));
+    // attribute
+    descFields.push_back(
+        getDescFieldTypeModel<kAttributePosInBox>()(&getContext()));
+    // f18Addendum
+    descFields.push_back(
+        getDescFieldTypeModel<kF18AddendumPosInBox>()(&getContext()));
     if (rank == unknownRank()) {
       if (auto seqTy = ele.dyn_cast<SequenceType>())
         rank = seqTy.getDimension();
@@ -167,14 +200,16 @@ public:
         rank = 0;
     }
     if (rank > 0) {
-      auto rowTy = getDescFieldTypeModel<7>()(&getContext());
-      parts.push_back(mlir::LLVM::LLVMArrayType::get(rowTy, rank));
+      auto rowTy = getDescFieldTypeModel<kDimsPosInBox>()(&getContext());
+      descFields.push_back(mlir::LLVM::LLVMArrayType::get(rowTy, rank));
     }
     // opt-type-ptr: i8* (see fir.tdesc)
     if (requiresExtendedDesc(ele)) {
-      parts.push_back(getExtendedDescFieldTypeModel<8>()(&getContext()));
-      auto rowTy = getExtendedDescFieldTypeModel<9>()(&getContext());
-      parts.push_back(mlir::LLVM::LLVMArrayType::get(rowTy, 1));
+      descFields.push_back(
+          getExtendedDescFieldTypeModel<kOptTypePtrPosInBox>()(&getContext()));
+      auto rowTy =
+          getExtendedDescFieldTypeModel<kOptRowTypePosInBox>()(&getContext());
+      descFields.push_back(mlir::LLVM::LLVMArrayType::get(rowTy, 1));
       if (auto recTy = fir::unwrapSequenceType(ele).dyn_cast<fir::RecordType>())
         if (recTy.getNumLenParams() > 0) {
           // The descriptor design needs to be clarified regarding the number of
@@ -183,11 +218,12 @@ public:
           // always possibly be placed in the addendum.
           TODO_NOLOC("extended descriptor derived with length parameters");
           unsigned numLenParams = recTy.getNumLenParams();
-          parts.push_back(mlir::LLVM::LLVMArrayType::get(rowTy, numLenParams));
+          descFields.push_back(
+              mlir::LLVM::LLVMArrayType::get(rowTy, numLenParams));
         }
     }
     return mlir::LLVM::LLVMPointerType::get(
-        mlir::LLVM::LLVMStructType::getLiteral(&getContext(), parts,
+        mlir::LLVM::LLVMStructType::getLiteral(&getContext(), descFields,
                                                /*isPacked=*/false));
   }
   /// Convert fir.box type to the corresponding llvm struct type instead of a
@@ -330,11 +366,13 @@ public:
         mlir::IntegerType::get(&getContext(), 8));
   }
 
-  /// Convert llvm::Type::TypeID to mlir::Type
+   /// Convert llvm::Type::TypeID to mlir::Type
   mlir::Type fromRealTypeID(llvm::Type::TypeID typeID, fir::KindTy kind) {
     switch (typeID) {
     case llvm::Type::TypeID::HalfTyID:
       return mlir::FloatType::getF16(&getContext());
+    case llvm::Type::TypeID::BFloatTyID:
+      return mlir::FloatType::getBF16(&getContext());
     case llvm::Type::TypeID::FloatTyID:
       return mlir::FloatType::getF32(&getContext());
     case llvm::Type::TypeID::DoubleTyID:
