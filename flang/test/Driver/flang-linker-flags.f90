@@ -8,9 +8,10 @@
 ! on Windows. Ideally we should find a more robust way of testing this.
 ! REQUIRES: shell
 
-! RUN: %flang -### %S/Inputs/hello.f90 2>&1 | FileCheck %s
+! RUN: %flang -### --ld-path=/usr/bin/ld %S/Inputs/hello.f90 2>&1 | FileCheck %s
 
-! CHECK: -lFortran_main
-! CHECK: -lFortranRuntime
-! CHECK: -lFortranDecimal
-! CHECK: -lm
+! CHECK-LABEL:  /usr/bin/ld
+! CHECK-SAME: -lFortran_main
+! CHECK-SAME: -lFortranRuntime
+! CHECK-SAME: -lFortranDecimal
+! CHECK-SAME: -lm
