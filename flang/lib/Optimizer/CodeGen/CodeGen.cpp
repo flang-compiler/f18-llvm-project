@@ -423,6 +423,17 @@ struct AllocaOpConversion : public FIROpConversion<fir::AllocaOp> {
 };
 } // namespace
 
+/// Construct an `llvm.extractvalue` instruction. It will return value at
+/// element \p x from  \p tuple.
+static mlir::LLVM::ExtractValueOp
+genExtractValueWithIndex(mlir::Location loc, mlir::Value tuple, mlir::Type ty,
+                         mlir::ConversionPatternRewriter &rewriter,
+                         mlir::MLIRContext *ctx, int x) {
+  auto cx = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(x));
+  auto xty = ty.cast<mlir::LLVM::LLVMStructType>().getBody()[x];
+  return rewriter.create<mlir::LLVM::ExtractValueOp>(loc, xty, tuple, cx);
+}
+
 namespace {
 /// Lower `fir.box_addr` to the sequence of operations to extract the first
 /// element of the box.
@@ -447,18 +458,25 @@ struct BoxAddrOpConversion : public FIROpConversion<fir::BoxAddrOp> {
   }
 };
 
-/// convert to an extractvalue for the 2nd part of the boxchar
+/// Convert `!fir.boxchar_len` to  `!llvm.extractvalue` for the 2nd part of the
+/// boxchar.
 struct BoxCharLenOpConversion : public FIROpConversion<fir::BoxCharLenOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::BoxCharLenOp boxchar, OperandTy operands,
+  matchAndRewrite(fir::BoxCharLenOp boxCharLen, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto a = operands[0];
-    auto ty = convertType(boxchar.getType());
-    auto *ctx = boxchar.getContext();
-    auto c1 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(1));
-    rewriter.replaceOpWithNewOp<mlir::LLVM::ExtractValueOp>(boxchar, ty, a, c1);
+    mlir::Value boxChar = adaptor.getOperands()[0];
+    mlir::Location loc = boxChar.getLoc();
+    mlir::MLIRContext *ctx = boxChar.getContext();
+    mlir::Type returnValTy = boxCharLen.getResult().getType();
+
+    constexpr int boxcharLenIdx = 1;
+    mlir::LLVM::ExtractValueOp len = genExtractValueWithIndex(
+        loc, boxChar, boxChar.getType(), rewriter, ctx, boxcharLenIdx);
+    mlir::Value lenAfterCast = integerCast(loc, rewriter, returnValTy, len);
+    rewriter.replaceOp(boxCharLen, lenAfterCast);
+
     return success();
   }
 };
@@ -2934,16 +2952,6 @@ struct StoreOpConversion : public FIROpConversion<fir::StoreOp> {
     return success();
   }
 };
-
-// cons an extractvalue on a tuple value, returning value at element `x`
-mlir::LLVM::ExtractValueOp
-genExtractValueWithIndex(mlir::Location loc, mlir::Value tuple, mlir::Type ty,
-                         mlir::ConversionPatternRewriter &rewriter,
-                         mlir::MLIRContext *ctx, int x) {
-  auto cx = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(x));
-  auto xty = ty.cast<mlir::LLVM::LLVMStructType>().getBody()[x];
-  return rewriter.create<mlir::LLVM::ExtractValueOp>(loc, xty, tuple, cx);
-}
 
 /// Convert `fir.unboxchar` into two `llvm.extractvalue` instructions. One for
 /// the character buffer and one for the buffer length.
