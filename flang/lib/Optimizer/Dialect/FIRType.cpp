@@ -509,19 +509,6 @@ void fir::LogicalType::print(mlir::DialectAsmPrinter &printer) const {
 }
 
 //===----------------------------------------------------------------------===//
-// LLVMPointerType
-//===----------------------------------------------------------------------===//
-
-// `llvm_ptr` `<` type `>`
-mlir::Type fir::LLVMPointerType::parse(mlir::DialectAsmParser &parser) {
-  return parseTypeSingleton<fir::LLVMPointerType>(parser);
-}
-
-void fir::LLVMPointerType::print(mlir::DialectAsmPrinter &printer) const {
-  printer << getMnemonic() << "<" << getEleTy() << '>';
-}
-
-//===----------------------------------------------------------------------===//
 // PointerType
 //===----------------------------------------------------------------------===//
 

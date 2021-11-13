@@ -237,13 +237,13 @@ def fir_LLVMPointerType : FIR_Type<"LLVMPointer", "llvm_ptr"> {
 
   let parameters = (ins "mlir::Type":$eleTy);
 
-  let skipDefaultBuilders = 1;
-
   let builders = [
     TypeBuilderWithInferredContext<(ins "mlir::Type":$elementType), [{
       return Base::get(elementType.getContext(), elementType);
     }]>,
   ];
+
+  let assemblyFormat = "`<` $eleTy `>`";
 }
 
 def fir_PointerType : FIR_Type<"Pointer", "ptr"> {
