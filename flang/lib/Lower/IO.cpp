@@ -1973,9 +1973,9 @@ mlir::Value Fortran::lower::genInquireStatement(
     return exprPair.first && exprPair.second;
   };
 
-  // Determine which BeginInquire call to make.
+  // Make one of three BeginInquire calls.
   if (inquireFileUnit()) {
-    // File unit call.
+    // Inquire by unit -- [UNIT=]file-unit-number.
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     beginArgs = {builder.createConvert(loc, beginFuncTy.getInput(0),
@@ -1984,7 +1984,7 @@ mlir::Value Fortran::lower::genInquireStatement(
                  locToFilename(converter, loc, beginFuncTy.getInput(1)),
                  locToLineNo(converter, loc, beginFuncTy.getInput(2))};
   } else if (inquireFileName()) {
-    // Filename call.
+    // Inquire by file -- FILE=file-name-expr.
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireFile)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     auto file = converter.genExprAddr(exprPair.first, stmtCtx, loc);
@@ -1994,24 +1994,40 @@ mlir::Value Fortran::lower::genInquireStatement(
         locToFilename(converter, loc, beginFuncTy.getInput(2)),
         locToLineNo(converter, loc, beginFuncTy.getInput(3))};
   } else {
-    // INQUIRE IOLENGTH call.
+    // Inquire by output list -- IOLENGTH=scalar-int-variable.
     const auto *ioLength =
         std::get_if<Fortran::parser::InquireStmt::Iolength>(&stmt.u);
-    assert(ioLength && "must have an io length");
+    assert(ioLength && "must have an IOLENGTH specifier");
     beginFunc = getIORuntimeFunc<mkIOKey(BeginInquireIoLength)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     beginArgs = {locToFilename(converter, loc, beginFuncTy.getInput(0)),
                  locToLineNo(converter, loc, beginFuncTy.getInput(1))};
-    // The IOLENGTH call is irregular enough to generate immediately here.
     auto cookie =
         builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);
-    genConditionHandlerCall(
-        converter, loc, cookie,
-        std::get<std::list<Fortran::parser::OutputItem>>(ioLength->t), csi);
+    mlir::Value ok;
+    genOutputItemList(
+        converter, cookie,
+        std::get<std::list<Fortran::parser::OutputItem>>(ioLength->t),
+        /*isFormatted=*/false, /*checkResult=*/false, ok, /*inLoop=*/false,
+        stmtCtx);
+    auto *ioLengthVar =
+        Fortran::semantics::GetExpr(
+            std::get<Fortran::parser::ScalarIntVariable>(ioLength->t));
+    auto ioLengthVarAddr =
+        fir::getBase(converter.genExprAddr(ioLengthVar, stmtCtx, loc));
+    llvm::SmallVector<mlir::Value> args = {cookie};
+    mlir::Value length =
+        builder
+            .create<fir::CallOp>(
+                loc, getIORuntimeFunc<mkIOKey(GetIoLength)>(loc, builder), args)
+            .getResult(0);
+    auto length1 =
+        builder.createConvert(loc, converter.genType(*ioLengthVar), length);
+    builder.create<fir::StoreOp>(loc, length1, ioLengthVarAddr);
     return genEndIO(converter, loc, cookie, csi, stmtCtx);
   }
 
-  // Common handling for file {unit|name} cases.
+  // Common handling for inquire by unit or file.
   assert(list && "inquire-spec list must be present");
   auto cookie =
       builder.create<fir::CallOp>(loc, beginFunc, beginArgs).getResult(0);

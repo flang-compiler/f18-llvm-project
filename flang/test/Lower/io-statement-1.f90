@@ -38,7 +38,6 @@
   read (8,*) i, f
 
   ! CHECK: call {{.*}}BeginExternalListOutput
-  ! Note that 32 bit integers are output as 64 bits in the runtime API
   ! CHECK: call {{.*}}OutputInteger32
   ! CHECK: call {{.*}}OutputReal32
   ! CHECK: call {{.*}}EndIoStatement
@@ -62,8 +61,9 @@
   inquire(FILE="fail.f90", EXIST=existsvar)
 
   ! CHECK: call {{.*}}BeginInquireIoLength
+  ! CHECK-COUNT-3: call {{.*}}OutputDescriptor
   ! CHECK: call {{.*}}EndIoStatement
-  inquire (iolength=length) a
+  inquire (iolength=length) existsvar, length, a
 end
 
 ! CHECK-LABEL: internalnamelistio
