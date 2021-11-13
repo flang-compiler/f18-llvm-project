@@ -1510,7 +1510,7 @@ void OmpAttributeVisitor::ResolveOmpName(
   } else if (ompFlag == Symbol::Flag::OmpCriticalLock) {
     // Create a new symbol.
     const auto pair{GetContext().scope.try_emplace(
-        name.source, Attrs{}, UnknownDetails{})};
+        name.source, Attrs{}, MiscDetails::Kind::ConstructName)};
     CHECK(pair.second);
     name.symbol = &pair.first->second.get();
   }
