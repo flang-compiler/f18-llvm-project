@@ -36,6 +36,8 @@ void genOpenMPConstruct(AbstractConverter &, pft::Evaluation &,
 void genOpenMPDeclarativeConstruct(AbstractConverter &, pft::Evaluation &,
                                    const parser::OpenMPDeclarativeConstruct &);
 
+void genOpenMPSectionsBlock(Fortran::lower::AbstractConverter &,
+                            pft::Evaluation &);
 int64_t getCollapseValue(const Fortran::parser::OmpClauseList &clauseList);
 
 } // namespace lower

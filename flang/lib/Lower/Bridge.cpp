@@ -1581,6 +1581,35 @@ private:
         curEval = &*std::next(curEval->getNestedEvaluations().begin());
       }
     }
+    // If a 'sections' construct is encountered, loop over all 'section'
+    // directives nested within and generate FIR for the same. The individual
+    // 'section' inside a 'sections' construct are not constructs rather
+    // 'Section Blocks'. Hence, nested handling of constructs doesn't apply and
+    // we need special handling
+    if (const auto &ompSections =
+            std::get_if<Fortran::parser::OpenMPSectionsConstruct>(&omp.u)) {
+      const auto &ompSectionBlocks =
+          std::get<Fortran::parser::OmpSectionBlocks>(ompSections->t);
+      auto &sectionsBlockEvaluationList = curEval->getNestedEvaluations();
+      std::list<Fortran::lower::pft::Evaluation>::iterator
+          sectionsBlockEvalIterator = sectionsBlockEvaluationList.begin();
+      for (const auto &block : ompSectionBlocks.v) {
+        auto insertPt = builder->saveInsertionPoint();
+        // create a 'section' operation for every 'Section Block'
+        genOpenMPSectionsBlock(*this, *curEval);
+        for (auto it = block.begin(); it != block.end(); it++) { 
+          // generate FIR for every 'ExecutionPartConstruct' and encapsulate it
+          // within the corresponding 'Section Block'
+          genFIR(*sectionsBlockEvalIterator);
+          sectionsBlockEvalIterator++;
+        }
+        builder->restoreInsertionPoint(insertPt);
+      }
+      if (--constructDepth == 0)
+        localSymbols.popScope();
+      builder->restoreInsertionPoint(insertPt);
+      return;
+    }
 
     for (Fortran::lower::pft::Evaluation &e : curEval->getNestedEvaluations())
       genFIR(e);
