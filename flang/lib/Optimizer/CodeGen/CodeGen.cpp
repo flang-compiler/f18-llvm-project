@@ -1003,6 +1003,18 @@ struct DTEntryOpConversion : public FIROpConversion<fir::DTEntryOp> {
   }
 };
 
+/// Lower `fir.global_len` operation.
+struct GlobalLenOpConversion : public FIROpConversion<fir::GlobalLenOp> {
+  using FIROpConversion::FIROpConversion;
+
+  mlir::LogicalResult
+  matchAndRewrite(fir::GlobalLenOp globalLen, OpAdaptor adaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    return rewriter.notifyMatchFailure(
+        globalLen, "fir.global_len codegen is not implemented yet");
+  }
+};
+
 /// Lower fir.len_param_index
 struct LenParamIndexOpConversion
     : public FIROpConversion<fir::LenParamIndexOp> {

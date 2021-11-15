@@ -163,3 +163,14 @@ func @emboxproc_test() {
 
 // Test that `fir.unboxproc` and `fir.boxproc_host` also fails to be legalized.
 // At the moment these cannot be tested since the `fir.boxproc` type does not have a conversion.
+
+// -----
+
+// Test `fir.global_len` conversion failure. Not implemented yet.
+
+fir.global @global_derived : !fir.type<minez(f:i32)> {
+  // expected-error@+1{{failed to legalize operation 'fir.global_len'}}
+  fir.global_len f, 1 : i32
+  %0 = fir.undefined !fir.type<minez>
+  fir.has_value %0 : !fir.type<minez>
+}
