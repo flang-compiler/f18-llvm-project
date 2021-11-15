@@ -2942,17 +2942,20 @@ public:
   /// An elemental subroutine is an exception and does not have copy-in/copy-out
   /// semantics. See 15.8.3.
   /// Do NOT use this for user defined assignments.
-  static void lowerElementalSubroutine(
-      Fortran::lower::AbstractConverter &converter,
-      Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx,
-      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &call) {
+  static void
+  lowerElementalSubroutine(Fortran::lower::AbstractConverter &converter,
+                           Fortran::lower::SymMap &symMap,
+                           Fortran::lower::StatementContext &stmtCtx,
+                           const Fortran::lower::SomeExpr &call) {
     ArrayExprLowering ael(converter, stmtCtx, symMap,
                           ConstituentSemantics::RefTransparent);
     ael.lowerElementalSubroutine(call);
   }
 
-  void lowerElementalSubroutine(
-      const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &call) {
+  // TODO: See the comment in genarr(const Fortran::lower::Parentheses<T>&).
+  // This is skipping generation of copy-in/copy-out code for analysis that is
+  // required when arguments are in parentheses.
+  void lowerElementalSubroutine(const Fortran::lower::SomeExpr &call) {
     auto f = genarr(call);
     auto shape = genIterationShape();
     auto [iterSpace, insPt] = genImplicitLoops(shape, /*innerArg=*/{});
@@ -3884,7 +3887,8 @@ private:
         };
   }
 
-  /// Generate a procedure reference.
+  /// Generate a procedure reference. This code is shared for both functions and
+  /// subroutines, the difference being reflected by `retTy`.
   CC genProcRef(const Fortran::evaluate::ProcedureRef &procRef,
                 llvm::Optional<mlir::Type> retTy) {
     auto loc = getLoc();
@@ -4015,9 +4019,17 @@ private:
           lhs, isImagPart);
     };
   }
+
   template <typename T>
   CC genarr(const Fortran::evaluate::Parentheses<T> &x) {
     auto loc = getLoc();
+    if (isReferentiallyOpaque()) {
+      // Context is a call argument in, for example, an elemental procedure
+      // call. TODO: all array arguments should use array_load, array_access,
+      // array_amend, and INTENT(OUT), INTENT(INOUT) arguments should have
+      // array_merge_store ops.
+      TODO(loc, "parentheses on argument in elemental call");
+    }
     auto f = genarr(x.left());
     return [=](IterSpace iters) -> ExtValue {
       auto val = f(iters);
@@ -4675,8 +4687,9 @@ private:
     if (isReferentiallyOpaque()) {
       // Semantics are an opaque reference to an array.
       // This case forwards a continuation that will generate the address
-      // arithmetic to the array element. No attempt to preserve the value at
-      // the address during the interpretation of Fortran statement is made.
+      // arithmetic to the array element. This does not have copy-in/copy-out
+      // semantics. No attempt to copy the array value will be made during the
+      // interpretation of the Fortran statement.
       auto refEleTy = builder.getRefType(eleTy);
       return [=](IterSpace iters) -> ExtValue {
         // ArrayCoorOp does not expect zero based indices.
@@ -5424,7 +5437,7 @@ private:
                               // arrayExv is the base array. It needs to reflect
                               // the current array component instead.
                               // FIXME: must use lower bound of this component
-                              //auto lb = fir::factory::readLowerBound(
+                              // auto lb = fir::factory::readLowerBound(
                               //    builder, loc, arrayExv, ssIndex, one);
                               auto lb = one;
                               mlir::Value val = builder.createConvert(
@@ -5867,8 +5880,8 @@ void Fortran::lower::createAllocatableArrayAssignment(
 
 fir::ExtendedValue Fortran::lower::createSomeArrayTempValue(
     Fortran::lower::AbstractConverter &converter,
-    const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
-    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx) {
+    const Fortran::lower::SomeExpr &expr, Fortran::lower::SymMap &symMap,
+    Fortran::lower::StatementContext &stmtCtx) {
   LLVM_DEBUG(expr.AsFortran(llvm::dbgs() << "array value: ") << '\n');
   return ArrayExprLowering::lowerNewArrayExpression(converter, symMap, stmtCtx,
                                                     expr);
@@ -5876,9 +5889,8 @@ fir::ExtendedValue Fortran::lower::createSomeArrayTempValue(
 
 void Fortran::lower::createLazyArrayTempValue(
     Fortran::lower::AbstractConverter &converter,
-    const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr,
-    mlir::Value raggedHeader, Fortran::lower::SymMap &symMap,
-    Fortran::lower::StatementContext &stmtCtx) {
+    const Fortran::lower::SomeExpr &expr, mlir::Value raggedHeader,
+    Fortran::lower::SymMap &symMap, Fortran::lower::StatementContext &stmtCtx) {
   LLVM_DEBUG(expr.AsFortran(llvm::dbgs() << "array value: ") << '\n');
   ArrayExprLowering::lowerLazyArrayExpression(converter, symMap, stmtCtx, expr,
                                               raggedHeader);
