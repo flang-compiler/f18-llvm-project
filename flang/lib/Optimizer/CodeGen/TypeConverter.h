@@ -16,8 +16,10 @@
 #include "DescriptorModel.h"
 #include "Target.h"
 #include "flang/Lower/Todo.h" // remove when TODO's are done
+#include "flang/Optimizer/Dialect/FIRType.h"
 #include "flang/Optimizer/Support/FIRContext.h"
 #include "flang/Optimizer/Support/KindMapping.h"
+#include "mlir/Conversion/LLVMCommon/TypeConverter.h"
 #include "llvm/ADT/StringMap.h"
 #include "llvm/Support/Debug.h"
 
@@ -162,7 +164,7 @@ public:
   // the addendum defined in descriptor.h.
   mlir::Type convertBoxType(BoxType box, int rank = unknownRank()) {
     // (base_addr*, elem_len, version, rank, type, attribute, f18Addendum, [dim]
-    SmallVector<mlir::Type> descFields;
+    llvm::SmallVector<mlir::Type> descFields;
     mlir::Type ele = box.getEleTy();
     // remove fir.heap/fir.ref/fir.ptr
     if (auto removeIndirection = fir::dyn_cast_ptrEleTy(ele))
@@ -380,7 +382,7 @@ public:
     case llvm::Type::TypeID::FP128TyID:
       return mlir::FloatType::getF128(&getContext());
     default:
-      emitError(UnknownLoc::get(&getContext()))
+      emitError(mlir::UnknownLoc::get(&getContext()))
           << "unsupported type: !fir.real<" << kind << ">";
       return {};
     }
@@ -391,7 +393,7 @@ public:
 private:
   KindMapping kindMapping;
   std::unique_ptr<CodeGenSpecifics> specifics;
-  static StringMap<mlir::Type> identStructCache;
+  static llvm::StringMap<mlir::Type> identStructCache;
 };
 
 } // namespace fir
