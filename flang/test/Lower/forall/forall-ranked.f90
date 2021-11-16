@@ -17,7 +17,6 @@
 ! CHECK:         %[[VAL_11:.*]] = fir.do_loop %[[VAL_12:.*]] = %[[VAL_5]] to %[[VAL_7]] step %[[VAL_8]] unordered iter_args(%[[VAL_13:.*]] = %[[VAL_10]]) -> (!fir.array<10x10x!fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>>) {
 ! CHECK:           %[[VAL_14:.*]] = fir.convert %[[VAL_12]] : (index) -> i32
 ! CHECK:           fir.store %[[VAL_14]] to %[[VAL_0]] : !fir.ref<i32>
-! CHECK:           %[[VAL_15:.*]] = arith.constant 10 : index
 ! CHECK:           %[[VAL_16:.*]] = arith.constant 1 : index
 ! CHECK:           %[[VAL_17:.*]] = arith.constant 1 : index
 ! CHECK:           %[[VAL_18:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
@@ -26,7 +25,7 @@
 ! CHECK:           %[[VAL_21:.*]] = arith.subi %[[VAL_20]], %[[VAL_17]] : index
 ! CHECK:           %[[VAL_22:.*]] = arith.constant 1 : i64
 ! CHECK:           %[[VAL_23:.*]] = fir.convert %[[VAL_22]] : (i64) -> index
-! CHECK:           %[[VAL_24:.*]] = arith.addi %[[VAL_17]], %[[VAL_15]] : index
+! CHECK:           %[[VAL_24:.*]] = arith.addi %[[VAL_17]], %[[VAL_2]] : index
 ! CHECK:           %[[VAL_25:.*]] = arith.subi %[[VAL_24]], %[[VAL_17]] : index
 ! CHECK:           %[[VAL_26:.*]] = arith.constant 0 : index
 ! CHECK:           %[[VAL_27:.*]] = arith.subi %[[VAL_25]], %[[VAL_17]] : index

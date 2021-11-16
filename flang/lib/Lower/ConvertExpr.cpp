@@ -248,35 +248,34 @@ arrayLoadExtValue(fir::FirOpBuilder &builder, mlir::Location loc,
     }
     arrTy = ty.cast<fir::SequenceType>();
   }
-  // Recycle componentToExtendedValue if it looks plausible.
-  if (!fir::hasDynamicSize(arrTy))
-    return fir::factory::componentToExtendedValue(builder, loc, newBase);
 
-  auto eleTy = fir::unwrapSequenceType(arrTy);
-  if (!load.shape()) {
-    // ???: The final argument is a BoxValue, but that's what we are trying to
-    // recover here.
-    auto exv = fir::factory::readBoxValue(builder, loc, load.memref());
+  // Use the shape op, if there is one.
+  if (mlir::Value shapeVal = load.shape()) {
+    mlir::Type eleTy = fir::unwrapSequenceType(arrTy);
+    std::vector<mlir::Value> extents = fir::factory::getExtents(shapeVal);
+    std::vector<mlir::Value> origins = fir::factory::getOrigins(shapeVal);
+    if (fir::isa_char(eleTy)) {
+      mlir::Value len = newLen;
+      if (!len)
+        len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+            load.memref());
+      if (!len) {
+        assert(load.typeparams().size() == 1 && "length must be in array_load");
+        len = load.typeparams()[0];
+      }
+      return fir::CharArrayBoxValue(newBase, len, extents, origins);
+    }
+    return fir::ArrayBoxValue(newBase, extents, origins);
+  }
+
+  // There is no shape, so the array must be a box. Extents and lower bounds
+  // must be read at runtime.
+  if (path.empty()) {
+    fir::ExtendedValue exv =
+        fir::factory::readBoxValue(builder, loc, load.memref());
     return fir::substBase(exv, newBase);
   }
-  auto extents = fir::factory::getExtents(load.shape());
-  auto lbounds = fir::factory::getOrigins(load.shape());
-  if (fir::isa_char(eleTy)) {
-    auto len = newLen;
-    if (!len)
-      len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
-          load.memref());
-    if (!len) {
-      assert(load.typeparams().size() == 1 && "length must be in array_load");
-      len = load.typeparams()[0];
-    }
-    return fir::CharArrayBoxValue{newBase, len, extents, lbounds};
-  }
-  if (load.typeparams().empty()) {
-    return fir::ArrayBoxValue{newBase, extents, lbounds};
-  }
-  TODO(loc, "should build a BoxValue, but there is no good way to know which "
-            "properties are explicit, assumed, deferred, or ?");
+  TODO(loc, "component is boxed, retreive its type parameters");
 }
 
 /// Is this a call to an elemental procedure with at least one array argument ?
@@ -5397,6 +5396,7 @@ private:
     };
     auto idxTy = builder.getIndexType();
     auto one = builder.createIntegerConstant(loc, idxTy, 1);
+    bool atBase = true;
     for (const auto &v : llvm::reverse(revPath)) {
       std::visit(
           Fortran::common::visitors{
@@ -5436,10 +5436,13 @@ private:
                               auto subscriptVal = fir::getBase(asScalar(e));
                               // arrayExv is the base array. It needs to reflect
                               // the current array component instead.
-                              // FIXME: must use lower bound of this component
-                              // auto lb = fir::factory::readLowerBound(
-                              //    builder, loc, arrayExv, ssIndex, one);
-                              auto lb = one;
+                              // FIXME: must use lower bound of this component,
+                              // not just the constant 1.
+                              mlir::Value lb =
+                                  atBase ? fir::factory::readLowerBound(
+                                               builder, loc, arrayExv, ssIndex,
+                                               one)
+                                         : one;
                               mlir::Value val = builder.createConvert(
                                   loc, idxTy, subscriptVal);
                               mlir::Value ivAdj =
@@ -5469,6 +5472,7 @@ private:
                 addComponent(fld);
               }},
           v);
+      atBase = false;
     }
     ty = fir::unwrapSequenceType(ty);
     components.applied = true;

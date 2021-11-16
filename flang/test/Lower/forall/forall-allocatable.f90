@@ -39,11 +39,10 @@ end subroutine forall_with_allocatable
 ! CHECK:           %[[VAL_25:.*]] = fir.convert %[[VAL_24]] : (i64) -> index
 ! CHECK:           %[[VAL_26:.*]] = arith.subi %[[VAL_25]], %[[VAL_22]] : index
 ! CHECK:           %[[VAL_27:.*]] = fir.array_fetch %[[VAL_17]], %[[VAL_26]] : (!fir.array<?xf32>, index) -> f32
-! CHECK:           %[[VAL_28:.*]] = arith.constant 1 : index
 ! CHECK:           %[[VAL_29:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
 ! CHECK:           %[[VAL_30:.*]] = fir.convert %[[VAL_29]] : (i32) -> i64
 ! CHECK:           %[[VAL_31:.*]] = fir.convert %[[VAL_30]] : (i64) -> index
-! CHECK:           %[[VAL_32:.*]] = arith.subi %[[VAL_31]], %[[VAL_28]] : index
+! CHECK:           %[[VAL_32:.*]] = arith.subi %[[VAL_31]], %[[VAL_12]] : index
 ! CHECK:           %[[VAL_33:.*]] = fir.array_update %[[VAL_20]], %[[VAL_27]], %[[VAL_32]] : (!fir.array<?xf32>, f32, index) -> !fir.array<?xf32>
 ! CHECK:           fir.result %[[VAL_33]] : !fir.array<?xf32>
 ! CHECK:         }
