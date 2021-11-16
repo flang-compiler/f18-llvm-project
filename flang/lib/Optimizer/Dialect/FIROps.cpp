@@ -1404,7 +1404,7 @@ void fir::FieldIndexOp::build(mlir::OpBuilder &builder,
 }
 
 llvm::SmallVector<mlir::Attribute> fir::FieldIndexOp::getAttributes() {
-  llvm::SmallVector<mlir::Attribute, 2> attrs;
+  llvm::SmallVector<mlir::Attribute> attrs;
   attrs.push_back(field_idAttr());
   attrs.push_back(on_typeAttr());
   return attrs;
