@@ -250,27 +250,33 @@ arrayLoadExtValue(fir::FirOpBuilder &builder, mlir::Location loc,
   }
 
   // Use the shape op, if there is one.
-  if (mlir::Value shapeVal = load.shape()) {
-    mlir::Type eleTy = fir::unwrapSequenceType(arrTy);
-    std::vector<mlir::Value> extents = fir::factory::getExtents(shapeVal);
-    std::vector<mlir::Value> origins = fir::factory::getOrigins(shapeVal);
-    if (fir::isa_char(eleTy)) {
-      mlir::Value len = newLen;
-      if (!len)
-        len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
-            load.memref());
-      if (!len) {
-        assert(load.typeparams().size() == 1 && "length must be in array_load");
-        len = load.typeparams()[0];
+  mlir::Value shapeVal = load.shape();
+  if (shapeVal) {
+    if (!mlir::isa<fir::ShiftOp>(shapeVal.getDefiningOp())) {
+      mlir::Type eleTy = fir::unwrapSequenceType(arrTy);
+      std::vector<mlir::Value> extents = fir::factory::getExtents(shapeVal);
+      std::vector<mlir::Value> origins = fir::factory::getOrigins(shapeVal);
+      if (fir::isa_char(eleTy)) {
+        mlir::Value len = newLen;
+        if (!len)
+          len = fir::factory::CharacterExprHelper{builder, loc}.getLength(
+              load.memref());
+        if (!len) {
+          assert(load.typeparams().size() == 1 &&
+                 "length must be in array_load");
+          len = load.typeparams()[0];
+        }
+        return fir::CharArrayBoxValue(newBase, len, extents, origins);
       }
-      return fir::CharArrayBoxValue(newBase, len, extents, origins);
+      return fir::ArrayBoxValue(newBase, extents, origins);
     }
-    return fir::ArrayBoxValue(newBase, extents, origins);
+    if (!fir::isa_box_type(load.memref().getType()))
+      fir::emitFatalError(loc, "shift op is invalid in this context");
   }
 
-  // There is no shape, so the array must be a box. Extents and lower bounds
-  // must be read at runtime.
-  if (path.empty()) {
+  // There is no shape or the array is in a box. Extents and lower bounds must
+  // be read at runtime.
+  if (path.empty() && !shapeVal) {
     fir::ExtendedValue exv =
         fir::factory::readBoxValue(builder, loc, load.memref());
     return fir::substBase(exv, newBase);
