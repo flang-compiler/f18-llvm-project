@@ -778,6 +778,12 @@ struct CallOpConversion : public FIROpConversion<fir::CallOp> {
   }
 };
 
+static mlir::Type getComplexEleTy(mlir::Type complex) {
+  if (auto cc = complex.dyn_cast<mlir::ComplexType>())
+    return cc.getElementType();
+  return complex.cast<fir::ComplexType>().getElementType();
+}
+
 /// Compare complex values
 ///
 /// Per 10.1, the only comparisons available are .EQ. (oeq) and .NE. (une).
@@ -789,23 +795,22 @@ struct CmpcOpConversion : public FIROpConversion<fir::CmpcOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::CmpcOp cmp, OperandTy operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto *ctxt = cmp.getContext();
-    auto kind = cmp.lhs().getType().cast<fir::ComplexType>().getFKind();
-    auto ty = convertType(fir::RealType::get(ctxt, kind));
-    auto resTy = convertType(cmp.getType());
-    auto loc = cmp.getLoc();
+    mlir::MLIRContext *ctxt = cmp.getContext();
+    mlir::Type eleTy = convertType(getComplexEleTy(cmp.lhs().getType()));
+    mlir::Type resTy = convertType(cmp.getType());
+    mlir::Location loc = cmp.getLoc();
     auto pos0 = mlir::ArrayAttr::get(ctxt, rewriter.getI32IntegerAttr(0));
-    SmallVector<mlir::Value, 2> rp{
-        rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, operands[0], pos0),
-        rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, operands[1],
-                                                    pos0)};
+    SmallVector<mlir::Value, 2> rp{rewriter.create<mlir::LLVM::ExtractValueOp>(
+                                       loc, eleTy, operands[0], pos0),
+                                   rewriter.create<mlir::LLVM::ExtractValueOp>(
+                                       loc, eleTy, operands[1], pos0)};
     auto rcp =
         rewriter.create<mlir::LLVM::FCmpOp>(loc, resTy, rp, cmp->getAttrs());
     auto pos1 = mlir::ArrayAttr::get(ctxt, rewriter.getI32IntegerAttr(1));
-    SmallVector<mlir::Value, 2> ip{
-        rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, operands[0], pos1),
-        rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, operands[1],
-                                                    pos1)};
+    SmallVector<mlir::Value, 2> ip{rewriter.create<mlir::LLVM::ExtractValueOp>(
+                                       loc, eleTy, operands[0], pos1),
+                                   rewriter.create<mlir::LLVM::ExtractValueOp>(
+                                       loc, eleTy, operands[1], pos1)};
     auto icp =
         rewriter.create<mlir::LLVM::FCmpOp>(loc, resTy, ip, cmp->getAttrs());
     SmallVector<mlir::Value, 2> cp{rcp, icp};
@@ -852,12 +857,6 @@ struct ConstcOpConversion : public FIROpConversion<fir::ConstcOp> {
     return attr.cast<fir::RealAttr>().getValue();
   }
 };
-
-static mlir::Type getComplexEleTy(mlir::Type complex) {
-  if (auto cc = complex.dyn_cast<mlir::ComplexType>())
-    return cc.getElementType();
-  return complex.cast<fir::ComplexType>().getElementType();
-}
 
 /// convert value of from-type to value of to-type
 struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
