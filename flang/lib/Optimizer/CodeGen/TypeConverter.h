@@ -58,8 +58,6 @@ public:
     addConversion(
         [&](fir::CharacterType charTy) { return convertCharType(charTy); });
     addConversion(
-        [&](mlir::ComplexType cmplx) { return convertComplexType(cmplx); });
-    addConversion(
         [&](fir::ComplexType cmplx) { return convertComplexType(cmplx); });
     addConversion(
         [&](fir::RecordType derived) { return convertRecordType(derived); });
