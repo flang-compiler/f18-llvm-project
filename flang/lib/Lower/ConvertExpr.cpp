@@ -4780,10 +4780,21 @@ private:
       auto eleTy = fir::applyPathToType(arrTy, iters.iterVec());
       if (isAdjustedArrayElementType(eleTy)) {
         auto eleRefTy = builder.getRefType(eleTy);
-        auto arrFetch = builder.create<fir::ArrayAccessOp>(
+        mlir::Value arrayOp = builder.create<fir::ArrayAccessOp>(
             loc, eleRefTy, arrLd, iters.iterVec(), arrLdTypeParams);
+        if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
+          llvm::SmallVector<mlir::Value> substringBounds;
+          populateBounds(substringBounds, components.substring);
+          if (!substringBounds.empty()) {
+            mlir::Value dstLen = fir::factory::genLenOfCharacter(
+                builder, loc, arrLoad, iters.iterVec(), substringBounds);
+            fir::CharBoxValue dstChar(arrayOp, dstLen);
+            return fir::factory::CharacterExprHelper{builder, loc}
+                .createSubstring(dstChar, substringBounds);
+          }
+        }
         return fir::factory::arraySectionElementToExtendedValue(
-            builder, loc, extMemref, arrFetch, slice);
+            builder, loc, extMemref, arrayOp, slice);
       }
       auto arrFetch = builder.create<fir::ArrayFetchOp>(
           loc, eleTy, arrLd, iters.iterVec(), arrLdTypeParams);
