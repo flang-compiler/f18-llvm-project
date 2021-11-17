@@ -886,8 +886,27 @@ public:
   }
 
   template <int KIND>
-  ExtValue genval(const Fortran::evaluate::SetLength<KIND> &) {
-    TODO(getLoc(), "evaluate::SetLength lowering");
+  ExtValue genval(const Fortran::evaluate::SetLength<KIND> &x) {
+    // Change the dynamic length information without actually changing the
+    // underlying character storage.
+    mlir::Location loc = getLoc();
+    mlir::Value newLenValue = genunbox(x.right());
+    fir::ExtendedValue lhs = gen(x.left());
+    const fir::CharBoxValue *lhsCharBox = lhs.getCharBox();
+    if (!lhsCharBox)
+      fir::emitFatalError(loc, "expected scalar character");
+    mlir::Value lhsAddr = lhsCharBox->getAddr();
+    auto charType =
+        fir::unwrapPassByRefType(lhsAddr.getType()).cast<fir::CharacterType>();
+    if (charType.hasConstantLen()) {
+      // Erase previous constant length from the base type.
+      fir::CharacterType::LenType newLen = fir::CharacterType::unknownLen();
+      mlir::Type newCharTy = fir::CharacterType::get(
+          builder.getContext(), charType.getFKind(), newLen);
+      mlir::Type newType = fir::ReferenceType::get(newCharTy);
+      lhsAddr = builder.createConvert(loc, newType, lhsAddr);
+    }
+    return fir::CharBoxValue{lhsAddr, newLenValue};
   }
 
   template <int KIND>
