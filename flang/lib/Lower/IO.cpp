@@ -1014,13 +1014,33 @@ mlir::Value genIOOption<Fortran::parser::IoControlSpec::Rec>(
   return genIntIOOption<mkIOKey(SetRec)>(converter, loc, cookie, stmtCtx, spec);
 }
 
-template <>
-mlir::Value genIOOption<Fortran::parser::IoControlSpec::Size>(
-    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-    mlir::Value cookie, Fortran::lower::StatementContext &,
-    const Fortran::parser::IoControlSpec::Size &) {
-  // Runtime GetSize is not implemented yet.
-  TODO(loc, "SIZE= specifier in a data transfer statement");
+/// Generate runtime call to query the read size after an input statement if
+/// the statement has SIZE control-spec.
+template <typename A>
+static void genIOReadSize(Fortran::lower::AbstractConverter &converter,
+                          mlir::Location loc, mlir::Value cookie,
+                          const A &specList, bool checkResult,
+                          Fortran::lower::StatementContext &stmtCtx) {
+  // This call is not conditional on the current IO status (ok) because the size
+  // needs to be filled even if some error condition (end-of-file...) was met
+  // during the input statement (in which case the runtime may return zero for
+  // the size read).
+  for (const auto &spec : specList)
+    if (const auto *size =
+            std::get_if<Fortran::parser::IoControlSpec::Size>(&spec.u)) {
+      auto &builder = converter.getFirOpBuilder();
+      mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(GetSize)>(loc, builder);
+      auto sizeValue =
+          builder.create<fir::CallOp>(loc, ioFunc, mlir::ValueRange{cookie})
+              .getResult(0);
+      fir::ExtendedValue var = converter.genExprAddr(
+          Fortran::semantics::GetExpr(size->v), stmtCtx, loc);
+      mlir::Value varAddr = fir::getBase(var);
+      mlir::Type varType = fir::unwrapPassByRefType(varAddr.getType());
+      mlir::Value sizeCast = builder.createConvert(loc, varType, sizeValue);
+      builder.create<fir::StoreOp>(loc, sizeCast, varAddr);
+      break;
+    }
 }
 
 //===----------------------------------------------------------------------===//
@@ -1058,10 +1078,17 @@ static void threadSpecs(Fortran::lower::AbstractConverter &converter,
   auto &builder = converter.getFirOpBuilder();
   for (const auto &spec : specList) {
     makeNextConditionalOn(builder, loc, checkResult, ok);
-    ok = std::visit(Fortran::common::visitors{[&](const auto &x) {
-                      return genIOOption(converter, loc, cookie, stmtCtx, x);
-                    }},
-                    spec.u);
+    ok = std::visit(
+        Fortran::common::visitors{
+            [&](const Fortran::parser::IoControlSpec::Size &x) -> mlir::Value {
+              // Size must be queried after the related READ runtime calls, not
+              // before.
+              return ok;
+            },
+            [&](const auto &x) {
+              return genIOOption(converter, loc, cookie, stmtCtx, x);
+            }},
+        spec.u);
   }
 }
 
@@ -1764,8 +1791,12 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
   }
   stmtCtx.finalize();
 
-  // Generate end statement call/s.
   builder.restoreInsertionPoint(insertPt);
+  if constexpr (hasIOCtrl) {
+    genIOReadSize(converter, loc, cookie, stmt.controls,
+                  csi.hasErrorConditionSpec(), stmtCtx);
+  }
+  // Generate end statement call/s.
   return genEndIO(converter, loc, cookie, csi, stmtCtx);
 }
 
@@ -2011,9 +2042,8 @@ mlir::Value Fortran::lower::genInquireStatement(
         std::get<std::list<Fortran::parser::OutputItem>>(ioLength->t),
         /*isFormatted=*/false, /*checkResult=*/false, ok, /*inLoop=*/false,
         stmtCtx);
-    auto *ioLengthVar =
-        Fortran::semantics::GetExpr(
-            std::get<Fortran::parser::ScalarIntVariable>(ioLength->t));
+    auto *ioLengthVar = Fortran::semantics::GetExpr(
+        std::get<Fortran::parser::ScalarIntVariable>(ioLength->t));
     auto ioLengthVarAddr =
         fir::getBase(converter.genExprAddr(ioLengthVar, stmtCtx, loc));
     llvm::SmallVector<mlir::Value> args = {cookie};
