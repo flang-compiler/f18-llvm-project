@@ -53,6 +53,16 @@ func @select_case_charachter(%arg0: !fir.char<2, 10>, %arg1: !fir.char<2, 10>, %
 
 // -----
 
+// Test `fir.len_param_index` conversion failure. Not implemented yet.
+
+func @lenparamindex() {
+  // expected-error@+1{{failed to legalize operation 'fir.len_param_index'}}
+  %0 = fir.len_param_index l1, !fir.type<twolens(l1:i32, l2:i32){i:i32, f:f32, l:i64}>
+  return
+}
+
+// -----
+
 // Test `fir.shape` conversion failure because the op has uses.
 
 func @shape_not_dead(%arg0: !fir.ref<!fir.array<?x?xf32>>, %i: index, %j: index) {

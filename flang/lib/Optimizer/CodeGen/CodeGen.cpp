@@ -1003,6 +1003,36 @@ struct DTEntryOpConversion : public FIROpConversion<fir::DTEntryOp> {
   }
 };
 
+/// Lower fir.len_param_index
+struct LenParamIndexOpConversion
+    : public FIROpConversion<fir::LenParamIndexOp> {
+  using FIROpConversion::FIROpConversion;
+
+  // FIXME: this should be specialized by the runtime target
+  // UpstreamDiff: We want to keep the current version for further development.
+  mlir::LogicalResult
+  matchAndRewrite(fir::LenParamIndexOp lenp, OpAdaptor,
+                  mlir::ConversionPatternRewriter &rewriter) const override {
+    auto ity = lowerTy().indexType();
+    auto onty = lenp.getOnType();
+    // size of portable descriptor
+    const unsigned boxsize = 24; // FIXME
+    unsigned offset = boxsize;
+    // add the size of the rows of triples
+    if (auto arr = onty.dyn_cast<fir::SequenceType>())
+      offset += 3 * arr.getDimension();
+
+    // advance over some addendum fields
+    const unsigned addendumOffset{sizeof(void *) + sizeof(uint64_t)};
+    offset += addendumOffset;
+    // add the offset into the LENs
+    offset += 0; // FIXME
+    auto attr = rewriter.getI64IntegerAttr(offset);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::ConstantOp>(lenp, ity, attr);
+    return success();
+  }
+};
+
 /// Convert `!fir.emboxchar<!fir.char<KIND, ?>, #n>` into a sequence of
 /// instructions that generate `!llvm.struct<(ptr<ik>, i64)>`. The 1st element
 /// in this struct is a pointer. Its type is determined from `KIND`. The 2nd
