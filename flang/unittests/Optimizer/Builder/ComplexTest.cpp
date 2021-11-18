@@ -33,14 +33,15 @@ public:
     helper = std::make_unique<fir::factory::Complex>(*firBuilder, loc);
 
     // Init commonly used types
-    realTy = mlir::FloatType::getF32(&context);
-    cType1 = fir::ComplexType::get(&context, 4);
+    realTy1 = mlir::FloatType::getF32(&context);
+    complexTy1 = fir::ComplexType::get(&context, 4);
+    integerTy1 = mlir::IntegerType::get(&context, 32);
 
-    // Init commonly used numbers
-    rOne = firBuilder->createRealConstant(loc, realTy, 1u);
-    rTwo = firBuilder->createRealConstant(loc, realTy, 2u);
-    rThree = firBuilder->createRealConstant(loc, realTy, 3u);
-    rFour = firBuilder->createRealConstant(loc, realTy, 4u);
+    // Create commonly used reals
+    rOne = firBuilder->createRealConstant(loc, realTy1, 1u);
+    rTwo = firBuilder->createRealConstant(loc, realTy1, 2u);
+    rThree = firBuilder->createRealConstant(loc, realTy1, 3u);
+    rFour = firBuilder->createRealConstant(loc, realTy1, 4u);
   }
 
   mlir::MLIRContext context;
@@ -48,9 +49,10 @@ public:
   std::unique_ptr<fir::FirOpBuilder> firBuilder;
   std::unique_ptr<fir::factory::Complex> helper;
 
-  // Commonly used real/complex types
-  mlir::FloatType realTy;
-  fir::ComplexType cType1;
+  // Commonly used real/complex/integer types
+  mlir::FloatType realTy1;
+  fir::ComplexType complexTy1;
+  mlir::IntegerType integerTy1;
 
   // Commonly used real numbers
   mlir::Value rOne;
@@ -60,7 +62,7 @@ public:
 };
 
 TEST_F(ComplexTest, verifyTypes) {
-  mlir::Value cVal1 = helper->createComplex(cType1, rOne, rTwo);
+  mlir::Value cVal1 = helper->createComplex(complexTy1, rOne, rTwo);
   mlir::Value cVal2 = helper->createComplex(4, rOne, rTwo);
   EXPECT_TRUE(fir::isa_complex(cVal1.getType()));
   EXPECT_TRUE(fir::isa_complex(cVal2.getType()));
@@ -71,10 +73,10 @@ TEST_F(ComplexTest, verifyTypes) {
   mlir::Value imag1 = helper->extractComplexPart(cVal1, /*isImagPart=*/true);
   mlir::Value real2 = helper->extractComplexPart(cVal2, /*isImagPart=*/false);
   mlir::Value imag2 = helper->extractComplexPart(cVal2, /*isImagPart=*/true);
-  EXPECT_EQ(realTy, real1.getType());
-  EXPECT_EQ(realTy, imag1.getType());
-  EXPECT_EQ(realTy, real2.getType());
-  EXPECT_EQ(realTy, imag2.getType());
+  EXPECT_EQ(realTy1, real1.getType());
+  EXPECT_EQ(realTy1, imag1.getType());
+  EXPECT_EQ(realTy1, real2.getType());
+  EXPECT_EQ(realTy1, imag2.getType());
 
   mlir::Value cVal3 =
       helper->insertComplexPart(cVal1, rThree, /*isImagPart=*/false);
@@ -82,4 +84,17 @@ TEST_F(ComplexTest, verifyTypes) {
       helper->insertComplexPart(cVal3, rFour, /*isImagPart=*/true);
   EXPECT_TRUE(fir::isa_complex(cVal4.getType()));
   EXPECT_TRUE(fir::isa_real(helper->getComplexPartType(cVal4)));
+}
+
+TEST_F(ComplexTest, verifyConvertWithSemantics) {
+  auto loc = firBuilder->getUnknownLoc();
+  rOne = firBuilder->createRealConstant(loc, realTy1, 1u);
+  // Convert real to complex
+  mlir::Value v1 = firBuilder->convertWithSemantics(loc, complexTy1, rOne);
+  EXPECT_TRUE(fir::isa_complex(v1.getType()));
+
+  // Convert complex to integer
+  mlir::Value v2 = firBuilder->convertWithSemantics(loc, integerTy1, v1);
+  EXPECT_TRUE(v2.getType().isa<mlir::IntegerType>());
+  EXPECT_TRUE(mlir::dyn_cast<fir::ConvertOp>(v2.getDefiningOp()));
 }

@@ -29,8 +29,8 @@ public:
   enum class Part { Real = 0, Imag = 1 };
 
   /// Get the Complex Type. Determine the type. Do not create MLIR operations.
-  mlir::Type getComplexPartType(mlir::Value cplx);
-  mlir::Type getComplexPartType(mlir::Type complexType);
+  mlir::Type getComplexPartType(mlir::Value cplx) const;
+  mlir::Type getComplexPartType(mlir::Type complexType) const;
 
   /// Complex operation creation. They create MLIR operations.
   mlir::Value createComplex(fir::KindTy kind, mlir::Value real,
@@ -40,6 +40,7 @@ public:
   mlir::Value createComplex(mlir::Type complexType, mlir::Value real,
                             mlir::Value imag);
 
+  /// Returns the Real/Imag part of \p cplx
   mlir::Value extractComplexPart(mlir::Value cplx, bool isImagPart) {
     return isImagPart ? extract<Part::Imag>(cplx) : extract<Part::Real>(cplx);
   }

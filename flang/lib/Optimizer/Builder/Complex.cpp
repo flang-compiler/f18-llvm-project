@@ -12,11 +12,12 @@
 // Complex Factory implementation
 //===----------------------------------------------------------------------===//
 
-mlir::Type fir::factory::Complex::getComplexPartType(mlir::Type complexType) {
+mlir::Type
+fir::factory::Complex::getComplexPartType(mlir::Type complexType) const {
   return builder.getRealType(complexType.cast<fir::ComplexType>().getFKind());
 }
 
-mlir::Type fir::factory::Complex::getComplexPartType(mlir::Value cplx) {
+mlir::Type fir::factory::Complex::getComplexPartType(mlir::Value cplx) const {
   return getComplexPartType(cplx.getType());
 }
 
@@ -24,8 +25,7 @@ mlir::Value fir::factory::Complex::createComplex(fir::KindTy kind,
                                                  mlir::Value real,
                                                  mlir::Value imag) {
   auto complexTy = fir::ComplexType::get(builder.getContext(), kind);
-  mlir::Value und = builder.create<fir::UndefOp>(loc, complexTy);
-  return insert<Part::Imag>(insert<Part::Real>(und, real), imag);
+  return createComplex(complexTy, real, imag);
 }
 
 mlir::Value fir::factory::Complex::createComplex(mlir::Type cplxTy,
