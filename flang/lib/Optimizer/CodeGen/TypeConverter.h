@@ -59,6 +59,7 @@ public:
       LLVM_DEBUG(llvm::dbgs() << "type convert: " << boxchar << '\n');
       return convertType(specifics->boxcharMemoryType(boxchar.getEleTy()));
     });
+    // UpstreamDiff: We want to retain the current code for further development.
     addConversion(
         [&](BoxProcType boxproc) { return convertBoxProcType(boxproc); });
     addConversion(

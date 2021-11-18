@@ -672,13 +672,17 @@ struct BoxRankOpConversion : public FIROpConversion<fir::BoxRankOp> {
   }
 };
 
+/// Lower `fir.boxproc_host` operation. Extracts the host pointer from the
+/// boxproc.
+/// TODO: Part of supporting Fortran 2003 procedure pointers.
+/// UpstreamDiff: want to retain the developer version for further work.
 struct BoxProcHostOpConversion : public FIROpConversion<fir::BoxProcHostOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::BoxProcHostOp boxprochost, OperandTy operands,
+  matchAndRewrite(fir::BoxProcHostOp boxprochost, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto a = operands[0];
+    auto a = adaptor.getOperands()[0];
     auto ty = convertType(boxprochost.getType());
     auto c1 = mlir::ArrayAttr::get(boxprochost.getContext(),
                                    rewriter.getI32IntegerAttr(1));
@@ -1786,11 +1790,12 @@ private:
 };
 
 /// create a procedure pointer box
+/// UpstreamDiff: want to retain the developer version for further work.
 struct EmboxProcOpConversion : public FIROpConversion<fir::EmboxProcOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::EmboxProcOp emboxproc, OperandTy operands,
+  matchAndRewrite(fir::EmboxProcOp emboxproc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto loc = emboxproc.getLoc();
     auto *ctx = emboxproc.getContext();
@@ -1799,9 +1804,9 @@ struct EmboxProcOpConversion : public FIROpConversion<fir::EmboxProcOp> {
     auto c1 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(1));
     auto un = rewriter.create<mlir::LLVM::UndefOp>(loc, ty);
     auto r = rewriter.create<mlir::LLVM::InsertValueOp>(loc, ty, un,
-                                                        operands[0], c0);
+                                                        adaptor.getOperands()[0], c0);
     rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(emboxproc, ty, r,
-                                                           operands[1], c1);
+                                                           adaptor.getOperands()[1], c1);
     return success();
   }
 };
@@ -2932,16 +2937,19 @@ struct UnboxCharOpConversion : public FIROpConversion<fir::UnboxCharOp> {
   }
 };
 
-// unbox a procedure box value, yielding its components
+/// Lower `fir.unboxproc` operation. Unbox a procedure box value, yielding its
+/// components.
+/// TODO: Part of supporting Fortran 2003 procedure pointers.
+/// UpstreamDiff: want to retain the developer version for further work.
 struct UnboxProcOpConversion : public FIROpConversion<fir::UnboxProcOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::UnboxProcOp unboxproc, OperandTy operands,
+  matchAndRewrite(fir::UnboxProcOp unboxproc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto *ctx = unboxproc.getContext();
     auto loc = unboxproc.getLoc();
-    auto tuple = operands[0];
+    auto tuple = adaptor.getOperands()[0];
     auto ty = tuple.getType();
     mlir::Value ptr =
         genExtractValueWithIndex(loc, tuple, ty, rewriter, ctx, 0);
@@ -3263,6 +3271,8 @@ struct ShiftOpConversion : public MustBeDeadConversion<fir::ShiftOp> {
 struct SliceOpConversion : public MustBeDeadConversion<fir::SliceOp> {
   using MustBeDeadConversion::MustBeDeadConversion;
 };
+
+} // namespace
 
 /// Convert FIR dialect to LLVM dialect
 ///
