@@ -778,6 +778,12 @@ struct CallOpConversion : public FIROpConversion<fir::CallOp> {
   }
 };
 
+static mlir::Type getComplexEleTy(mlir::Type complex) {
+  if (auto cc = complex.dyn_cast<mlir::ComplexType>())
+    return cc.getElementType();
+  return complex.cast<fir::ComplexType>().getElementType();
+}
+
 /// Compare complex values
 ///
 /// Per 10.1, the only comparisons available are .EQ. (oeq) and .NE. (une).
@@ -823,28 +829,30 @@ struct CmpcOpConversion : public FIROpConversion<fir::CmpcOp> {
     return success();
   }
 };
-
+/// Lower complex constants
 struct ConstcOpConversion : public FIROpConversion<fir::ConstcOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
   matchAndRewrite(fir::ConstcOp conc, OperandTy,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto loc = conc.getLoc();
-    auto *ctx = conc.getContext();
-    auto ty = convertType(conc.getType());
-    auto ct = conc.getType().cast<fir::ComplexType>();
-    auto ety = lowerTy().convertComplexPartType(ct.getFKind());
-    auto ri = mlir::FloatAttr::get(ety, getValue(conc.getReal()));
-    auto rp = rewriter.create<mlir::LLVM::ConstantOp>(loc, ety, ri);
-    auto ii = mlir::FloatAttr::get(ety, getValue(conc.getImaginary()));
-    auto ip = rewriter.create<mlir::LLVM::ConstantOp>(loc, ety, ii);
-    auto c0 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(0));
-    auto c1 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(1));
-    auto r = rewriter.create<mlir::LLVM::UndefOp>(loc, ty);
-    auto rr = rewriter.create<mlir::LLVM::InsertValueOp>(loc, ty, r, rp, c0);
-    rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(conc, ty, rr, ip,
-                                                           c1);
+    mlir::Location loc = conc.getLoc();
+    mlir::MLIRContext *ctx = conc.getContext();
+    mlir::Type ty = convertType(conc.getType());
+    mlir::Type ety = convertType(getComplexEleTy(conc.getType()));
+    auto realFloatAttr = mlir::FloatAttr::get(ety, getValue(conc.getReal()));
+    auto realPart =
+        rewriter.create<mlir::LLVM::ConstantOp>(loc, ety, realFloatAttr);
+    auto imFloatAttr = mlir::FloatAttr::get(ety, getValue(conc.getImaginary()));
+    auto imPart =
+        rewriter.create<mlir::LLVM::ConstantOp>(loc, ety, imFloatAttr);
+    auto realIndex = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(0));
+    auto imIndex = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(1));
+    auto undef = rewriter.create<mlir::LLVM::UndefOp>(loc, ty);
+    auto setReal = rewriter.create<mlir::LLVM::InsertValueOp>(
+        loc, ty, undef, realPart, realIndex);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(conc, ty, setReal,
+                                                           imPart, imIndex);
     return success();
   }
 
@@ -852,12 +860,6 @@ struct ConstcOpConversion : public FIROpConversion<fir::ConstcOp> {
     return attr.cast<fir::RealAttr>().getValue();
   }
 };
-
-static mlir::Type getComplexEleTy(mlir::Type complex) {
-  if (auto cc = complex.dyn_cast<mlir::ComplexType>())
-    return cc.getElementType();
-  return complex.cast<fir::ComplexType>().getElementType();
-}
 
 /// convert value of from-type to value of to-type
 struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
