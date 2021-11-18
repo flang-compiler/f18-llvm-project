@@ -3036,6 +3036,8 @@ public:
                                      const Fortran::lower::SomeExpr &lhs,
                                      const Fortran::lower::SomeExpr &rhs) {
     auto loc = getLoc();
+    if (rhs.Rank() > 0)
+      TODO(loc, "user-defined elemental assigment from expression with rank");
     // 1) Lower the rhs expression with array_fetch op(s).
     IterationSpace iters;
     iters.setElement(genarr(rhs)(iters));
@@ -3703,7 +3705,7 @@ private:
     return genarr(x)(IterationSpace{});
   }
 
-  /// Lower the expression in a scalar context to a (boxed) reference.
+  /// Lower the expression in a scalar context to a memory reference.
   template <typename A>
   ExtValue asScalarRef(const A &x) {
     return ScalarExprLowering{getLoc(), converter, symMap, stmtCtx}.gen(x);
@@ -5432,6 +5434,9 @@ private:
     auto idxTy = builder.getIndexType();
     auto one = builder.createIntegerConstant(loc, idxTy, 1);
     bool atBase = true;
+    auto saveSemant = semant;
+    if (isProjectedCopyInCopyOut())
+      semant = ConstituentSemantics::RefTransparent;
     for (const auto &v : llvm::reverse(revPath)) {
       std::visit(
           Fortran::common::visitors{
@@ -5509,6 +5514,7 @@ private:
           v);
       atBase = false;
     }
+    semant = saveSemant;
     ty = fir::unwrapSequenceType(ty);
     components.applied = true;
     return ty;
@@ -5634,6 +5640,33 @@ private:
     return genImplicitArrayAccess(x.GetComponent(), components);
   }
 
+  template <typename A>
+  CC genAsScalar(const A &x) {
+    auto loc = getLoc();
+    if (isProjectedCopyInCopyOut()) {
+      return [=, &x, builder = &converter.getFirOpBuilder()](
+                 IterSpace iters) -> ExtValue {
+        auto exv = asScalarRef(x);
+        auto val = fir::getBase(exv);
+        auto eleTy = fir::unwrapRefType(val.getType());
+        if (isAdjustedArrayElementType(eleTy)) {
+          if (fir::isa_char(eleTy)) {
+            fir::factory::CharacterExprHelper{*builder, loc}.createAssign(
+                exv, iters.elementExv());
+          } else if (fir::isa_derived(eleTy)) {
+            TODO(loc, "assignment of derived type");
+          } else {
+            fir::emitFatalError(loc, "array type not expected in scalar");
+          }
+        } else {
+          builder->create<fir::StoreOp>(loc, iters.getElement(), val);
+        }
+        return exv;
+      };
+    }
+    return [=, &x](IterSpace) { return asScalar(x); };
+  }
+
   CC genarr(const Fortran::semantics::Symbol &x, ComponentPath &components) {
     if (explicitSpaceIsActive()) {
       if (x.Rank() > 0)
@@ -5644,7 +5677,7 @@ private:
       return genImplicitArrayAccess(x, components);
     }
     if (pathIsEmpty(components))
-      return [=, &x](IterSpace) { return asScalar(x); };
+      return genAsScalar(x);
     auto loc = getLoc();
     return [=](IterSpace) -> ExtValue {
       fir::emitFatalError(loc, "reached symbol with path");
@@ -5668,9 +5701,8 @@ private:
     auto result = genarr(x.base(), components);
     if (components.applied)
       return result;
-    if (atEnd) {
-      return [=](IterSpace) { return asScalar(x); };
-    }
+    if (atEnd)
+      return genAsScalar(x);
     auto loc = getLoc();
     return [=](IterSpace) -> ExtValue {
       fir::emitFatalError(loc, "reached component with path");
@@ -5706,11 +5738,9 @@ private:
       return result;
     auto loc = getLoc();
     if (atEnd) {
-      return [=](IterSpace) -> ExtValue {
-        if (x.Rank() == 0)
-          return asScalar(x);
-        fir::emitFatalError(loc, "expected scalar");
-      };
+      if (x.Rank() == 0)
+        return genAsScalar(x);
+      fir::emitFatalError(loc, "expected scalar");
     }
     return [=](IterSpace) -> ExtValue {
       fir::emitFatalError(loc, "reached arrayref with path");
