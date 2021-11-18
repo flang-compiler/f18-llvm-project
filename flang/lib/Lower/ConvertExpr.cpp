@@ -3278,6 +3278,7 @@ private:
                       ? ccStoreToDest.getValue()
                       : defaultStoreToDestination(/*substring=*/nullptr);
     auto updVal = fir::getBase(lambda(iterSpace));
+    finalizeElementCtx();
     builder.create<fir::ResultOp>(loc, updVal);
     builder.restoreInsertionPoint(insPt);
     return abstractArrayExtValue(iterSpace.outerResult());
@@ -3729,6 +3730,25 @@ private:
     return x.Rank() != 0;
   }
 
+  /// Some temporaries are allocated on an element-by-element basis during the
+  /// array expression evaluation. Collect the cleanups here so the resources
+  /// can be freed before the next loop iteration, avoiding memory leaks. etc.
+  Fortran::lower::StatementContext &getElementCtx() {
+    if (!elementCtx)
+      elementCtx = new Fortran::lower::StatementContext;
+    return *elementCtx;
+  }
+
+  /// If there were temporaries created for this element evaluation, finalize
+  /// and deallocate the resources now. This should be done just prior the the
+  /// fir::ResultOp at the end of the innermost loop.
+  void finalizeElementCtx() {
+    if (elementCtx) {
+      elementCtx->finalize();
+      elementCtx = nullptr;
+    }
+  }
+
   // A procedure reference to a Fortran elemental intrinsic procedure.
   CC genElementalIntrinsicProcRef(
       const Fortran::evaluate::ProcedureRef &procRef,
@@ -3787,7 +3807,7 @@ private:
       for (const auto &cc : operands)
         args.push_back(cc(iters));
       return Fortran::lower::genIntrinsicCall(builder, loc, name, retTy, args,
-                                              stmtCtx);
+                                              getElementCtx());
     };
   }
 
@@ -5838,6 +5858,7 @@ private:
   Fortran::lower::AbstractConverter &converter;
   fir::FirOpBuilder &builder;
   Fortran::lower::StatementContext &stmtCtx;
+  Fortran::lower::StatementContext *elementCtx = nullptr;
   Fortran::lower::SymMap &symMap;
   /// The continuation to generate code to update the destination.
   llvm::Optional<CC> ccStoreToDest;

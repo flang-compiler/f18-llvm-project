@@ -63,7 +63,8 @@ namespace Fortran::lower {
 
 /// Abstraction of the iteration space for building the elemental compute loop
 /// of an array(-like) statement.
-struct IterationSpace {
+class IterationSpace {
+public:
   IterationSpace() = default;
 
   template <typename A>
