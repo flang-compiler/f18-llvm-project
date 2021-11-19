@@ -92,8 +92,8 @@ contains
     integer :: zi
     ! CHECK: %[[equiv:.*]] = fir.alloca !fir.array<4xi8>
     ! CHECK: %[[xcoor:.*]] = fir.coordinate_of %[[equiv]], %c0{{.*}} : (!fir.ref<!fir.array<4xi8>>, index) -> !fir.ref<i8>
-    ! CHECK: %[[x:.*]] = fir.convert %[[xcoor]] : (!fir.ref<i8>) -> !fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>
-    ! CHECK: %[[xbox:.*]] = fir.embox %[[x]] : (!fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[x:.*]] = fir.convert %[[xcoor]] : (!fir.ref<i8>) -> !fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[xbox:.*]] = fir.embox %[[x]] : (!fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
     ! CHECK: %[[xboxNone:.*]] = fir.convert %[[xbox]]
     ! CHECK: fir.call @_FortranAInitialize(%[[xboxNone]], %{{.*}}, %{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
     equivalence (x, zi)
@@ -110,15 +110,15 @@ contains
     type(tseq) :: y
     ! CHECK: %[[equiv:.*]] = fir.alloca !fir.array<4xi8>
     ! CHECK: %[[xcoor:.*]] = fir.coordinate_of %[[equiv]], %c0{{.*}} : (!fir.ref<!fir.array<4xi8>>, index) -> !fir.ref<i8>
-    ! CHECK: %[[x:.*]] = fir.convert %[[xcoor]] : (!fir.ref<i8>) -> !fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>
-    ! CHECK: %[[xbox:.*]] = fir.embox %[[x]] : (!fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[x:.*]] = fir.convert %[[xcoor]] : (!fir.ref<i8>) -> !fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[xbox:.*]] = fir.embox %[[x]] : (!fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
     ! CHECK: %[[xboxNone:.*]] = fir.convert %[[xbox]]
     ! CHECK: fir.call @_FortranAInitialize(%[[xboxNone]], %{{.*}}, %{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
 
   
     ! CHECK: %[[ycoor:.*]] = fir.coordinate_of %[[equiv]], %c0{{.*}} : (!fir.ref<!fir.array<4xi8>>, index) -> !fir.ref<i8>
-    ! CHECK: %[[y:.*]] = fir.convert %[[ycoor]] : (!fir.ref<i8>) -> !fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>
-    ! CHECK: %[[ybox:.*]] = fir.embox %[[y]] : (!fir.ref<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[y:.*]] = fir.convert %[[ycoor]] : (!fir.ref<i8>) -> !fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>
+    ! CHECK: %[[ybox:.*]] = fir.embox %[[y]] : (!fir.ptr<!fir.type<_QMtest_dinitTtseq{i:i32}>>) -> !fir.box<!fir.type<_QMtest_dinitTtseq{i:i32}>>
     ! CHECK: %[[yboxNone:.*]] = fir.convert %[[ybox]]
     ! CHECK: fir.call @_FortranAInitialize(%[[yboxNone]], %{{.*}}, %{{.*}}) : (!fir.box<none>, !fir.ref<i8>, i32) -> none
     equivalence (x, y)
