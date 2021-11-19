@@ -42,7 +42,7 @@ program main
   A(2) = 2
   A(3) = 3
   print *, A
-  ! CHECK: %[[A:.*]] = fir.address_of(@_QEa)
+  ! CHECK: %[[A:.*]] = fir.address_of(@_QFEa)
   ! CHECK: %[[shape:.*]] = fir.shape %c10
   ! CHECK: %[[slice:.*]] = fir.slice %
   ! CHECK: fir.embox %[[A]](%[[shape]]) [%[[slice]]] :

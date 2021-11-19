@@ -5,11 +5,11 @@ program test1
   ! CHECK-DAG: %[[TMP:.*]] = fir.alloca
   ! CHECK-DAG: %[[TEN:.*]] = arith.constant
   ! CHECK: fir.store %[[TEN]] to %[[TMP]]
-  ! CHECK-NEXT: fir.call @_QPfoo
+  ! CHECK-NEXT: fir.call @_QFPfoo
   call foo(10)
 contains
 
-! CHECK-LABEL: func @_QPfoo
+! CHECK-LABEL: func @_QFPfoo
 subroutine foo(avar1)
   integer :: avar1
 !  integer :: my_data, my_data2

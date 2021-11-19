@@ -119,10 +119,19 @@ contains
   end procedure
 end submodule
 
+! CHECK-LABEL: func @_QPshould_not_collide() {
+subroutine should_not_collide()
+! CHECK: }
+end subroutine
 
 ! CHECK-LABEL: func @_QQmain() {
 program test
 ! CHECK: }
+contains
+! CHECK-LABEL: func @_QFPshould_not_collide() {
+subroutine should_not_collide()
+! CHECK: }
+end subroutine
 end program
 
 ! CHECK-LABEL: func @omp_get_num_threads() -> f32 attributes {fir.sym_name = "_QPomp_get_num_threads"} {

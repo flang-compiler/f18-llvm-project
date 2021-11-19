@@ -13,13 +13,13 @@ program wsloop_collapse
   integer :: i, j, k
   integer :: a, b, c
   integer :: x
-! FIRDialect:         %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "a", uniq_name = "_QEa"}
-! FIRDialect:         %[[VAL_1:.*]] = fir.alloca i32 {bindc_name = "b", uniq_name = "_QEb"}
-! FIRDialect:         %[[VAL_2:.*]] = fir.alloca i32 {bindc_name = "c", uniq_name = "_QEc"}
-! FIRDialect:         %[[VAL_3:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QEi"}
-! FIRDialect:         %[[VAL_4:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QEj"}
-! FIRDialect:         %[[VAL_5:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QEk"}
-! FIRDialect:         %[[VAL_6:.*]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QEx"}
+! FIRDialect:         %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "a", uniq_name = "_QFEa"}
+! FIRDialect:         %[[VAL_1:.*]] = fir.alloca i32 {bindc_name = "b", uniq_name = "_QFEb"}
+! FIRDialect:         %[[VAL_2:.*]] = fir.alloca i32 {bindc_name = "c", uniq_name = "_QFEc"}
+! FIRDialect:         %[[VAL_3:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:         %[[VAL_4:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! FIRDialect:         %[[VAL_5:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
+! FIRDialect:         %[[VAL_6:.*]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! LLVMIRDialect:           %[[VAL_4:.*]] = llvm.mlir.constant(1 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_3:.*]] = llvm.mlir.constant(0 : i32) : i32
 ! LLVMIRDialect:           %[[VAL_2:.*]] = llvm.mlir.constant(5 : i32) : i32
@@ -38,19 +38,19 @@ program wsloop_collapse
   x=0
 ! FIRDialect:         %[[VAL_10:.*]] = arith.constant 0 : i32
 ! FIRDialect:         fir.store %[[VAL_10]] to %[[VAL_6]] : !fir.ref<i32>
-! LLVMIRDialect:           %[[VAL_8:.*]] = llvm.alloca %[[VAL_7]] x i32 {{{.*}} uniq_name = "_QEa"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_8:.*]] = llvm.alloca %[[VAL_7]] x i32 {{{.*}} uniq_name = "_QFEa"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_9:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_10:.*]] = llvm.alloca %[[VAL_9]] x i32 {{{.*}} uniq_name = "_QEb"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_10:.*]] = llvm.alloca %[[VAL_9]] x i32 {{{.*}} uniq_name = "_QFEb"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_11:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_12:.*]] = llvm.alloca %[[VAL_11]] x i32 {{{.*}} uniq_name = "_QEc"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_12:.*]] = llvm.alloca %[[VAL_11]] x i32 {{{.*}} uniq_name = "_QFEc"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_13:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_14:.*]] = llvm.alloca %[[VAL_13]] x i32 {{{.*}} uniq_name = "_QEi"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_14:.*]] = llvm.alloca %[[VAL_13]] x i32 {{{.*}} uniq_name = "_QFEi"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_15:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_16:.*]] = llvm.alloca %[[VAL_15]] x i32 {{{.*}} uniq_name = "_QEj"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_16:.*]] = llvm.alloca %[[VAL_15]] x i32 {{{.*}} uniq_name = "_QFEj"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_17:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_18:.*]] = llvm.alloca %[[VAL_17]] x i32 {{{.*}} uniq_name = "_QEk"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_18:.*]] = llvm.alloca %[[VAL_17]] x i32 {{{.*}} uniq_name = "_QFEk"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           %[[VAL_19:.*]] = llvm.mlir.constant(1 : i64) : i64
-! LLVMIRDialect:           %[[VAL_20:.*]] = llvm.alloca %[[VAL_19]] x i32 {{{.*}} uniq_name = "_QEx"} : (i64) -> !llvm.ptr<i32>
+! LLVMIRDialect:           %[[VAL_20:.*]] = llvm.alloca %[[VAL_19]] x i32 {{{.*}} uniq_name = "_QFEx"} : (i64) -> !llvm.ptr<i32>
 ! LLVMIRDialect:           llvm.store %[[VAL_0]], %[[VAL_8]] : !llvm.ptr<i32>
 ! LLVMIRDialect:           llvm.store %[[VAL_1]], %[[VAL_10]] : !llvm.ptr<i32>
 ! LLVMIRDialect:           llvm.store %[[VAL_2]], %[[VAL_12]] : !llvm.ptr<i32>

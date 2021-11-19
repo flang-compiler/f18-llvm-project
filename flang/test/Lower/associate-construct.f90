@@ -2,8 +2,8 @@
 
 ! CHECK-LABEL: func @_QQmain
 program p
-  ! CHECK: [[N:%[0-9]+]] = fir.alloca i32 {{{.*}}uniq_name = "_QEn"}
-  ! CHECK: [[T:%[0-9]+]] = fir.address_of(@_QEt) : !fir.ref<!fir.array<3xi32>>
+  ! CHECK: [[N:%[0-9]+]] = fir.alloca i32 {{{.*}}uniq_name = "_QFEn"}
+  ! CHECK: [[T:%[0-9]+]] = fir.address_of(@_QFEt) : !fir.ref<!fir.array<3xi32>>
   integer :: n, foo, t(3)
   ! CHECK: [[N]]
   ! CHECK-COUNT-3: fir.coordinate_of [[T]]

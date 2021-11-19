@@ -154,6 +154,11 @@ TEST(InternalNamesTest, doVariableTest) {
       {"mod1", "mod2"}, {}, "intVariable"); // Function is not present.
   std::string expectedMangledName2 = "_QMmod1Smod2Eintvariable";
   ASSERT_EQ(actual2, expectedMangledName2);
+
+  std::string actual3 = NameUniquer::doVariable(
+      {}, {""}, "intvar"); // Function is present and is blank
+  std::string expectedMangledName3 = "_QFEintvar";
+  ASSERT_EQ(actual3, expectedMangledName3);
 }
 
 TEST(InternalNamesTest, doProgramEntry) {
@@ -218,6 +223,12 @@ TEST(InternalNamesTest, complexdeconstructTest) {
   actual = NameUniquer::deconstruct("_QFmstartGmpitop");
   expectedNameKind = NameKind::NAMELIST_GROUP;
   expectedComponents = {{}, {"mstart"}, "mpitop", {}};
+  validateDeconstructedName(actual, expectedNameKind, expectedComponents);
+
+  // Empty host name represents the main program.
+  actual = NameUniquer::deconstruct("_QFPfoo");
+  expectedNameKind = NameKind::PROCEDURE;
+  expectedComponents = {{}, {""}, "foo", {}};
   validateDeconstructedName(actual, expectedNameKind, expectedComponents);
 }
 

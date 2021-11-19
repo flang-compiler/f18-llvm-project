@@ -17,13 +17,13 @@
 ! CHECK-DAG:         %[[VAL_22:.*]] = arith.constant 4 : index
 ! CHECK-DAG:         %[[VAL_23:.*]] = arith.constant 1 : i32
 ! CHECK-DAG:         %[[VAL_24:.*]] = arith.constant 0 : i32
-! CHECK-DAG:         %[[VAL_25:.*]] = fir.address_of(@_QEa1) : !fir.ref<!fir.array<10x10xf32>>
-! CHECK-DAG:         %[[VAL_26:.*]] = fir.address_of(@_QEa2) : !fir.ref<!fir.array<3xf32>>
-! CHECK-DAG:         %[[VAL_27:.*]] = fir.address_of(@_QEa3) : !fir.ref<!fir.array<10xf32>>
-! CHECK-DAG:         %[[VAL_28:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QEi"}
-! CHECK-DAG:         %[[VAL_29:.*]] = fir.address_of(@_QEiv) : !fir.ref<!fir.array<3xi32>>
-! CHECK-DAG:         %[[VAL_30:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QEj"}
-! CHECK-DAG:         %[[VAL_31:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QEk"}
+! CHECK-DAG:         %[[VAL_25:.*]] = fir.address_of(@_QFEa1) : !fir.ref<!fir.array<10x10xf32>>
+! CHECK-DAG:         %[[VAL_26:.*]] = fir.address_of(@_QFEa2) : !fir.ref<!fir.array<3xf32>>
+! CHECK-DAG:         %[[VAL_27:.*]] = fir.address_of(@_QFEa3) : !fir.ref<!fir.array<10xf32>>
+! CHECK-DAG:         %[[VAL_28:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! CHECK-DAG:         %[[VAL_29:.*]] = fir.address_of(@_QFEiv) : !fir.ref<!fir.array<3xi32>>
+! CHECK-DAG:         %[[VAL_30:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! CHECK-DAG:         %[[VAL_31:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
 ! CHECK:         fir.store %[[VAL_24]] to %[[VAL_31]] : !fir.ref<i32>
 ! CHECK:         br ^bb1(%[[VAL_5]], %[[VAL_0]] : index, index)
 ! CHECK:       ^bb1(%[[VAL_32:.*]]: index, %[[VAL_33:.*]]: index):
