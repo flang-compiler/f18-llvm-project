@@ -84,7 +84,7 @@ real function test_stmt_no_args(x, y)
   ! CHECK: addf
   test_stmt_no_args = func() + a
 end function
-  
+
 ! Test statement function with character arguments
 ! CHECK-LABEL: @_QPtest_stmt_character
 integer function test_stmt_character(c, j)
@@ -92,12 +92,29 @@ integer function test_stmt_character(c, j)
    character(10) :: c, argc
    ! CHECK-DAG: %[[unboxed:.*]]:2 = fir.unboxchar %arg0 :
    ! CHECK-DAG: %[[c10:.*]] = arith.constant 10 :
-   ! CHECK: %[[c:.*]] = fir.emboxchar %[[unboxed]]#0, %[[c10]] 
+   ! CHECK: %[[c10_cast:.*]] = fir.convert %[[c10]] : (i32) -> index
+   ! CHECK: %[[c:.*]] = fir.emboxchar %[[unboxed]]#0, %[[c10_cast]]
 
    func(argc, argj) = len_trim(argc, 4) + argj
    ! CHECK: addi %{{.*}}, %{{.*}} : i
    test_stmt_character = func(c, j)
-end function  
+end function
+
+! Test statement function with a character actual argument whose
+! length may be different than the dummy length (the dummy length
+! must be used inside the statement function).
+! CHECK-LABEL: @_QPtest_stmt_character_with_different_length
+integer function test_stmt_character_with_different_length(c)
+   integer :: func
+   character(10) :: argc
+   character(*) :: c
+   ! CHECK-DAG: %[[unboxed:.*]]:2 = fir.unboxchar %arg0 :
+   ! CHECK-DAG: %[[c10:.*]] = arith.constant 10 :
+   ! CHECK: %[[c10_cast:.*]] = fir.convert %[[c10]] : (i32) -> index
+   ! CHECK: %[[c:.*]] = fir.emboxchar %[[unboxed]]#0, %[[c10_cast]]
+   func(argc) = len_trim(argc, 4)
+   test_stmt_character = func(c)
+end function
 
 ! issue #247
 ! CHECK-LABEL: @_QPbug247

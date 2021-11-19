@@ -885,28 +885,35 @@ public:
     llvm_unreachable("unknown ordering");
   }
 
-  template <int KIND>
-  ExtValue genval(const Fortran::evaluate::SetLength<KIND> &x) {
-    // Change the dynamic length information without actually changing the
-    // underlying character storage.
+  // Change the dynamic length information without actually changing the
+  // underlying character storage.
+  fir::ExtendedValue
+  replaceScalarCharacterLength(const fir::ExtendedValue &scalarChar,
+                               mlir::Value newLenValue) {
     mlir::Location loc = getLoc();
-    mlir::Value newLenValue = genunbox(x.right());
-    fir::ExtendedValue lhs = gen(x.left());
-    const fir::CharBoxValue *lhsCharBox = lhs.getCharBox();
-    if (!lhsCharBox)
+    const fir::CharBoxValue *charBox = scalarChar.getCharBox();
+    if (!charBox)
       fir::emitFatalError(loc, "expected scalar character");
-    mlir::Value lhsAddr = lhsCharBox->getAddr();
+    mlir::Value charAddr = charBox->getAddr();
     auto charType =
-        fir::unwrapPassByRefType(lhsAddr.getType()).cast<fir::CharacterType>();
+        fir::unwrapPassByRefType(charAddr.getType()).cast<fir::CharacterType>();
     if (charType.hasConstantLen()) {
       // Erase previous constant length from the base type.
       fir::CharacterType::LenType newLen = fir::CharacterType::unknownLen();
       mlir::Type newCharTy = fir::CharacterType::get(
           builder.getContext(), charType.getFKind(), newLen);
       mlir::Type newType = fir::ReferenceType::get(newCharTy);
-      lhsAddr = builder.createConvert(loc, newType, lhsAddr);
+      charAddr = builder.createConvert(loc, newType, charAddr);
+      return fir::CharBoxValue{charAddr, newLenValue};
     }
-    return fir::CharBoxValue{lhsAddr, newLenValue};
+    return fir::CharBoxValue{charAddr, newLenValue};
+  }
+
+  template <int KIND>
+  ExtValue genval(const Fortran::evaluate::SetLength<KIND> &x) {
+    mlir::Value newLenValue = genunbox(x.right());
+    fir::ExtendedValue lhs = gen(x.left());
+    return replaceScalarCharacterLength(lhs, newLenValue);
   }
 
   template <int KIND>
@@ -1740,7 +1747,18 @@ public:
       // gfortran/ifort compiles this.
       assert(expr && "assumed type used as statement function argument");
       // As per Fortran 2018 C1580, statement function arguments can only be
-      // scalars, so just pass the box with the address.
+      // scalars, so just pass the box with the address. The only care is to
+      // to use the dummy character explicit length if any instead of the
+      // actual argument length (that can be bigger).
+      if (const Fortran::semantics::DeclTypeSpec *type = arg->GetType())
+        if (type->category() == Fortran::semantics::DeclTypeSpec::Character)
+          if (const Fortran::semantics::MaybeIntExpr &lenExpr =
+                  type->characterTypeSpec().length().GetExplicit()) {
+            mlir::Value len = fir::getBase(genval(*lenExpr));
+            symMap.addSymbol(*arg,
+                             replaceScalarCharacterLength(gen(*expr), len));
+            continue;
+          }
       symMap.addSymbol(*arg, gen(*expr));
     }
 
