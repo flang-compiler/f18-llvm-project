@@ -78,6 +78,11 @@ struct IncrementLoopInfo {
 
   bool isStructured() const { return !headerBlock; }
 
+  mlir::Type getLoopVariableType() const {
+    assert(loopVariable && "must be set");
+    return fir::unwrapRefType(loopVariable.getType());
+  }
+
   // Data members common to both structured and unstructured loops.
   const Fortran::semantics::Symbol &loopVariableSym;
   const Fortran::semantics::SomeExpr *lowerExpr;
@@ -517,14 +522,19 @@ private:
         [&sb](auto &) { return sb.toExtendedValue(); });
   }
 
-  mlir::Value createTemp(mlir::Location loc,
-                         const Fortran::semantics::Symbol &sym,
-                         llvm::ArrayRef<mlir::Value> shape = {}) {
-    // FIXME: should return fir::ExtendedValue
-    if (Fortran::lower::SymbolBox v = lookupSymbol(sym))
-      return v.getAddr();
-    mlir::Value newVal = builder->createTemporary(
-        loc, genType(sym), toStringRef(sym.name()), shape);
+  /// Generate the address of loop variable \p sym.
+  /// If \p sym is not mapped yet, allocate local storage for it.
+  mlir::Value genLoopVariableAddress(mlir::Location loc,
+                                     const Fortran::semantics::Symbol &sym) {
+    if (lookupSymbol(sym)) {
+      Fortran::lower::StatementContext stmtCtx;
+      return fir::getBase(
+          genExprAddr(Fortran::evaluate::AsGenericExpr(sym).value(), stmtCtx));
+    }
+    // Do concurrent loop variables are not mapped yet since they are local to
+    // the Do concurrent scope (same for OpenMP loops).
+    mlir::Value newVal =
+        builder->createTemporary(loc, genType(sym), toStringRef(sym.name()));
     addSymbol(sym, newVal);
     return newVal;
   }
@@ -992,17 +1002,15 @@ private:
   void genFIRIncrementLoopBegin(IncrementLoopNestInfo &incrementLoopNestInfo) {
     assert(!incrementLoopNestInfo.empty() && "empty loop nest");
     mlir::Location loc = toLocation();
-    mlir::Type controlType =
-        incrementLoopNestInfo[0].isStructured()
-            ? builder->getIndexType()
-            : genType(incrementLoopNestInfo[0].loopVariableSym);
-    bool hasRealControl = incrementLoopNestInfo[0].hasRealControl;
-    auto genControlValue = [&](const Fortran::semantics::SomeExpr *expr) {
+    auto genControlValue = [&](const Fortran::semantics::SomeExpr *expr,
+                               const IncrementLoopInfo &info) {
+      mlir::Type controlType = info.isStructured() ? builder->getIndexType()
+                                                   : info.getLoopVariableType();
       Fortran::lower::StatementContext stmtCtx;
       if (expr)
         return builder->createConvert(loc, controlType,
                                       createFIRExpr(loc, expr, stmtCtx));
-      if (hasRealControl)
+      if (info.hasRealControl)
         return builder->createRealConstant(loc, controlType, 1u);
       return builder->createIntegerConstant(loc, controlType, 1); // step
     };
@@ -1027,10 +1035,10 @@ private:
       }
     };
     for (IncrementLoopInfo &info : incrementLoopNestInfo) {
-      info.loopVariable = createTemp(loc, info.loopVariableSym);
-      mlir::Value lowerValue = genControlValue(info.lowerExpr);
-      mlir::Value upperValue = genControlValue(info.upperExpr);
-      info.stepValue = genControlValue(info.stepExpr);
+      info.loopVariable = genLoopVariableAddress(loc, info.loopVariableSym);
+      mlir::Value lowerValue = genControlValue(info.lowerExpr, info);
+      mlir::Value upperValue = genControlValue(info.upperExpr, info);
+      info.stepValue = genControlValue(info.stepExpr, info);
 
       // Structured loop - generate fir.do_loop.
       if (info.isStructured()) {
@@ -1040,7 +1048,7 @@ private:
         builder->setInsertionPointToStart(info.doLoop.getBody());
         // Update the loop variable value, as it may have non-index references.
         mlir::Value value = builder->createConvert(
-            loc, genType(info.loopVariableSym), info.doLoop.getInductionVar());
+            loc, info.getLoopVariableType(), info.doLoop.getInductionVar());
         builder->create<fir::StoreOp>(loc, value, info.loopVariable);
         if (info.maskExpr) {
           Fortran::lower::StatementContext stmtCtx;
@@ -1065,8 +1073,8 @@ private:
             builder->create<mlir::arith::AddFOp>(loc, diff1, info.stepValue);
         tripCount =
             builder->create<mlir::arith::DivFOp>(loc, diff2, info.stepValue);
-        controlType = builder->getIndexType();
-        tripCount = builder->createConvert(loc, controlType, tripCount);
+        tripCount =
+            builder->createConvert(loc, builder->getIndexType(), tripCount);
       } else {
         auto diff1 =
             builder->create<mlir::arith::SubIOp>(loc, upperValue, lowerValue);
@@ -1076,12 +1084,13 @@ private:
             builder->create<mlir::arith::DivSIOp>(loc, diff2, info.stepValue);
       }
       if (forceLoopToExecuteOnce) { // minimum tripCount is 1
-        mlir::Value one = builder->createIntegerConstant(loc, controlType, 1);
+        mlir::Value one =
+            builder->createIntegerConstant(loc, tripCount.getType(), 1);
         auto cond = builder->create<mlir::arith::CmpIOp>(
             loc, mlir::arith::CmpIPredicate::slt, tripCount, one);
         tripCount = builder->create<mlir::SelectOp>(loc, cond, one, tripCount);
       }
-      info.tripVariable = builder->createTemporary(loc, controlType);
+      info.tripVariable = builder->createTemporary(loc, tripCount.getType());
       builder->create<fir::StoreOp>(loc, tripCount, info.tripVariable);
       builder->create<fir::StoreOp>(loc, lowerValue, info.loopVariable);
 
@@ -1089,7 +1098,8 @@ private:
       // Note - Currently there is no way to tag a loop as a concurrent loop.
       startBlock(info.headerBlock);
       tripCount = builder->create<fir::LoadOp>(loc, info.tripVariable);
-      mlir::Value zero = builder->createIntegerConstant(loc, controlType, 0);
+      mlir::Value zero =
+          builder->createIntegerConstant(loc, tripCount.getType(), 0);
       auto cond = builder->create<mlir::arith::CmpIOp>(
           loc, mlir::arith::CmpIPredicate::sgt, tripCount, zero);
       if (info.maskExpr) {
@@ -1136,7 +1146,7 @@ private:
           continue;
         // The loop control variable may be used after loop execution.
         mlir::Value lcv = builder->createConvert(
-            loc, genType(info.loopVariableSym), info.doLoop.getResult(0));
+            loc, info.getLoopVariableType(), info.doLoop.getResult(0));
         builder->create<fir::StoreOp>(loc, lcv, info.loopVariable);
         continue;
       }
@@ -1144,10 +1154,8 @@ private:
       // Unstructured loop - decrement tripVariable and step loopVariable.
       mlir::Value tripCount =
           builder->create<fir::LoadOp>(loc, info.tripVariable);
-      mlir::Type tripVarType = info.hasRealControl
-                                   ? builder->getIndexType()
-                                   : genType(info.loopVariableSym);
-      mlir::Value one = builder->createIntegerConstant(loc, tripVarType, 1);
+      mlir::Value one =
+          builder->createIntegerConstant(loc, tripCount.getType(), 1);
       tripCount = builder->create<mlir::arith::SubIOp>(loc, tripCount, one);
       builder->create<fir::StoreOp>(loc, tripCount, info.tripVariable);
       mlir::Value value = builder->create<fir::LoadOp>(loc, info.loopVariable);
