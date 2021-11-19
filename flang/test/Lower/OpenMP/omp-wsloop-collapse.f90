@@ -20,12 +20,12 @@ program wsloop_collapse
 ! FIRDialect:         %[[VAL_4:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QEj"}
 ! FIRDialect:         %[[VAL_5:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QEk"}
 ! FIRDialect:         %[[VAL_6:.*]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QEx"}
-! LLVMIRDialect:           %[[VAL_4:.*]] = llvm.mlir.constant(1 : i32) : i32
-! LLVMIRDialect:           %[[VAL_3:.*]] = llvm.mlir.constant(0 : i32) : i32
-! LLVMIRDialect:           %[[VAL_2:.*]] = llvm.mlir.constant(5 : i32) : i32
-! LLVMIRDialect:           %[[VAL_1:.*]] = llvm.mlir.constant(2 : i32) : i32
-! LLVMIRDialect:           %[[VAL_0:.*]] = llvm.mlir.constant(3 : i32) : i32
-! LLVMIRDialect:           %[[VAL_7:.*]] = llvm.mlir.constant(1 : i64) : i64
+! LLVMIRDialect-DAG:       %[[VAL_4:.*]] = llvm.mlir.constant(1 : i32) : i32
+! LLVMIRDialect-DAG:       %[[VAL_3:.*]] = llvm.mlir.constant(0 : i32) : i32
+! LLVMIRDialect-DAG:       %[[VAL_2:.*]] = llvm.mlir.constant(5 : i32) : i32
+! LLVMIRDialect-DAG:       %[[VAL_1:.*]] = llvm.mlir.constant(2 : i32) : i32
+! LLVMIRDialect-DAG:       %[[VAL_0:.*]] = llvm.mlir.constant(3 : i32) : i32
+! LLVMIRDialect-DAG:       %[[VAL_7:.*]] = llvm.mlir.constant(1 : i64) : i64
   a=3
 ! FIRDialect:         %[[VAL_7:.*]] = arith.constant 3 : i32
 ! FIRDialect:         fir.store %[[VAL_7]] to %[[VAL_0]] : !fir.ref<i32>

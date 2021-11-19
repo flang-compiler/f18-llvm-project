@@ -18,9 +18,9 @@ contains
 ! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>,
 ! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>) {
 subroutine test_simple_copy(t1, t2)
-  ! CHECK:         %[[VAL_2:.*]] = arith.constant 10 : index
-  ! CHECK:         %[[VAL_3:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : index
+  ! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 10 : index
+  ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 0 : index
+  ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 1 : index
   ! CHECK:         %[[VAL_5:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
   ! CHECK:         br ^bb1(%[[VAL_3]], %[[VAL_2]] : index, index)
   ! CHECK:       ^bb1(%[[VAL_6:.*]]: index, %[[VAL_7:.*]]: index):
@@ -45,9 +45,9 @@ end subroutine
 ! CHECK-SAME:                                               %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>,
 ! CHECK-SAME:                                               %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>) {
 subroutine test_deep_copy(t1, t2)
-  ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
-  ! CHECK:         %[[VAL_4:.*]] = arith.constant 0 : index
-  ! CHECK:         %[[VAL_5:.*]] = arith.constant 1 : index
+  ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 10 : index
+  ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 0 : index
+  ! CHECK-DAG:     %[[VAL_5:.*]] = arith.constant 1 : index
   ! CHECK:         %[[VAL_6:.*]] = fir.alloca !fir.box<!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>
   ! CHECK:         %[[VAL_7:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
   ! CHECK:         br ^bb1(%[[VAL_4]], %[[VAL_3]] : index, index)

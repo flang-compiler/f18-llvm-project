@@ -76,9 +76,9 @@ subroutine s(i,j,k,ii,jj,kk,a1,a2,a3,a4,a5,a6,a7)
 end subroutine s
 
 ! CHECK-LABEL: fir.global @_QBblock
-! CHECK: %[[VAL_1:.*]] = arith.constant 1.000000e+00 : f32
-! CHECK: %[[VAL_2:.*]] = arith.constant 2.400000e+00 : f32
-! CHECK: %[[VAL_3:.*]] = arith.constant 0.000000e+00 : f32
+! CHECK-DAG: %[[VAL_1:.*]] = arith.constant 1.000000e+00 : f32
+! CHECK-DAG: %[[VAL_2:.*]] = arith.constant 2.400000e+00 : f32
+! CHECK-DAG: %[[VAL_3:.*]] = arith.constant 0.000000e+00 : f32
 ! CHECK: %[[VAL_4:.*]] = fir.undefined tuple<!fir.array<5x5xf32>>
 ! CHECK: %[[VAL_5:.*]] = fir.undefined !fir.array<5x5xf32>
 ! CHECK: %[[VAL_6:.*]] = fir.insert_on_range %[[VAL_5]], %[[VAL_1]], [0 : index, 1 : index, 0 : index, 0 : index] : (!fir.array<5x5xf32>, f32) -> !fir.array<5x5xf32>

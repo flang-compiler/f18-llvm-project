@@ -385,12 +385,12 @@ end program p
 
 ! CHECK-LABEL: func @_QPsub(
 ! CHECK-SAME:               %[[VAL_0:.*]]: !fir.boxchar<1>) {
-! CHECK:         %[[VAL_1:.*]] = arith.constant 5 : index
-! CHECK:         %[[VAL_2:.*]] = arith.constant 2 : index
-! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant 4 : index
-! CHECK:         %[[VAL_6:.*]] = arith.constant -1 : i32
-! CHECK:         %[[VAL_7:.*]] = arith.constant 10 : index
+! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant 5 : index
+! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
+! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 1 : index
+! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 4 : index
+! CHECK-DAG:     %[[VAL_6:.*]] = arith.constant -1 : i32
+! CHECK-DAG:     %[[VAL_7:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_8:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<10x!fir.char<1>>>
 ! CHECK:         %[[VAL_10:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,

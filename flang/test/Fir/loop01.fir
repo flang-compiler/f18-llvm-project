@@ -7,12 +7,11 @@ func @x(%lb : index, %ub : index, %step : index, %b : i1, %addr : !fir.ref<index
   // CHECK: %[[COND:.*]] = icmp sgt i64 %{{.*}}, 0
   // CHECK: br i1 %[[COND]]
   fir.do_loop %iv = %lb to %ub step %step unordered {
-    // expect following conditional blocks to get fused
-    // CHECK: select i1 %
     fir.if %b {
       // CHECK: store i64
       fir.store %iv to %addr : !fir.ref<index>
     } else {
+      // CHECK: store i64 0
       %zero = arith.constant 0 : index
       fir.store %zero to %addr : !fir.ref<index>
     }

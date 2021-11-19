@@ -12,6 +12,7 @@ add_flang_library(FIRTransforms
   MemDataFlowOpt.cpp
   MemToReg.cpp
   RewriteLoop.cpp
+  SimplifyRegionLite.cpp
 
   DEPENDS
   FIRAnalysis
@@ -26,6 +27,7 @@ add_flang_library(FIRTransforms
   FIRDialect
   MLIRAffineToStandard
   MLIRLLVMIR
+  MLIRTransformUtils
   MLIROpenACC
   MLIROpenMP
   FIRSupport

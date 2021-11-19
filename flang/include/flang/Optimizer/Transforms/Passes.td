@@ -197,4 +197,12 @@ def ExternalNameConversion : Pass<"external-name-interop", "mlir::ModuleOp"> {
   ];
 }
 
+def SimplifyRegionLite : Pass<"simplify-region-lite", "mlir::ModuleOp"> {
+  let summary = "Region simplification";
+  let description = [{
+    Run region DCE and erase unreachable blocks on regions.
+  }];
+  let constructor = "::fir::createSimplifyRegionLitePass()";
+}
+
 #endif // FORTRAN_OPTIMIZER_TRANSFORMS_FIR_PASSES

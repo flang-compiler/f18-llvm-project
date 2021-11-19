@@ -8,23 +8,20 @@ subroutine formatAssign(flag1, flag2, flag3)
 
     ! CHECK-DAG: %[[ONE:.*]] = arith.constant 100 : i32
     ! CHECK-DAG: %[[TWO:.*]] = arith.constant 200 : i32
-    ! CHECK: %{{.*}} = select %{{.*}}, %[[ONE]], %[[TWO]] : i32
     if (flag1) then
        assign 100 to label
     else
        assign 200 to label
     end if
 
-    ! CHECK: fir.select %{{.*}} [100, ^bb[[BLK1:.*]], 200, ^bb[[BLK2:.*]], unit, ^bb[[BLK3:.*]]]
+    ! CHECK: cond_br %{{.*}}, ^bb[[BLK1:.*]], ^bb[[BLK2:.*]]
     ! CHECK: ^bb[[BLK1]]:
-    ! CHECK: fir.address_of(@_QQcl
-    ! CHECK: br ^bb[[END_BLOCK:.*]](
+    ! CHECK: fir.store %[[ONE]]
+    ! CHECK: br ^bb[[END_BLOCK:.*]]
     ! CHECK: ^bb[[BLK2]]:
-    ! CHECK: fir.address_of(@_QQcl
-    ! CHECK: br ^bb[[END_BLOCK]](
-    ! CHECK: ^bb[[BLK3]]:
-    ! CHECK-NEXT: fir.unreachable
-    ! CHECK: ^bb[[END_BLOCK]](
+    ! CHECK: fir.store %[[TWO]]
+    ! CHECK: br ^bb[[END_BLOCK]]
+    ! CHECK: ^bb[[END_BLOCK]]
     ! CHECK: fir.call @{{.*}}BeginExternalFormattedOutput
     ! CHECK: fir.call @{{.*}}OutputAscii
     ! CHECK: fir.call @{{.*}}OutputReal32

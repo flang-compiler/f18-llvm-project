@@ -59,11 +59,11 @@ contains
 end module components_test
 
 ! CHECK-LABEL: func @_QPsliced_base() {
-! CHECK:         %[[VAL_0:.*]] = arith.constant 50 : index
-! CHECK:         %[[VAL_1:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_2:.*]] = arith.constant 42 : i32
-! CHECK:         %[[VAL_3:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
+! CHECK-DAG:     %[[VAL_0:.*]] = arith.constant 50 : index
+! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant 1 : index
+! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 42 : i32
+! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 0 : index
+! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_5:.*]] = fir.alloca !fir.array<100x!fir.type<_QFsliced_baseTt{x:f32,y:i32}>> {bindc_name = "a", uniq_name = "_QFsliced_baseEa"}
 ! CHECK:         %[[VAL_6:.*]] = fir.field_index y, !fir.type<_QFsliced_baseTt{x:f32,y:i32}>
 ! CHECK:         %[[VAL_7:.*]] = fir.shape %[[VAL_4]] : (index) -> !fir.shape<1>
