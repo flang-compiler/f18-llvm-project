@@ -2636,7 +2636,7 @@ struct LoadOpConversion : public FIROpConversion<fir::LoadOp> {
       rewriter.replaceOp(load, adaptor.getOperands()[0]);
     } else {
       mlir::Type ty = convertType(load.getType());
-      ArrayRef<NamedAttribute> at = load->getAttrs();
+      llvm::ArrayRef<NamedAttribute> at = load->getAttrs();
       rewriter.replaceOpWithNewOp<mlir::LLVM::LoadOp>(
           load, ty, adaptor.getOperands(), at);
     }
