@@ -65,8 +65,6 @@ public:
         [&](fir::CharacterType charTy) { return convertCharType(charTy); });
     addConversion(
         [&](fir::ComplexType cmplx) { return convertComplexType(cmplx); });
-    addConversion(
-        [&](fir::RecordType derived) { return convertRecordType(derived); });
     addConversion([&](fir::FieldType field) {
       return mlir::IntegerType::get(field.getContext(), 32);
     });
@@ -188,11 +186,9 @@ public:
     descFields.push_back(
         getDescFieldTypeModel<kVersionPosInBox>()(&getContext()));
     // rank
-    descFields.push_back(
-        getDescFieldTypeModel<kRankPosInBox>()(&getContext()));
+    descFields.push_back(getDescFieldTypeModel<kRankPosInBox>()(&getContext()));
     // type
-    descFields.push_back(
-        getDescFieldTypeModel<kTypePosInBox>()(&getContext()));
+    descFields.push_back(getDescFieldTypeModel<kTypePosInBox>()(&getContext()));
     // attribute
     descFields.push_back(
         getDescFieldTypeModel<kAttributePosInBox>()(&getContext()));
@@ -373,7 +369,7 @@ public:
         mlir::IntegerType::get(&getContext(), 8));
   }
 
-   /// Convert llvm::Type::TypeID to mlir::Type
+  /// Convert llvm::Type::TypeID to mlir::Type
   mlir::Type fromRealTypeID(llvm::Type::TypeID typeID, fir::KindTy kind) {
     switch (typeID) {
     case llvm::Type::TypeID::HalfTyID:
