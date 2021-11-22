@@ -71,8 +71,10 @@ public:
       return mlir::IntegerType::get(
           &getContext(), kindMapping.getIntegerBitsize(intTy.getFKind()));
     });
-    addConversion([&](LenType field) {
-      return mlir::IntegerType::get(field.getContext(), 32);
+    addConversion([&](fir::LenType field) {
+      // Get size of len paramter from the descriptor.
+      return getModel<Fortran::runtime::typeInfo::TypeParameterValue>()(
+          &getContext());
     });
     addConversion([&](fir::LogicalType boolTy) {
       return mlir::IntegerType::get(
@@ -359,7 +361,7 @@ public:
   }
 
   // fir.tdesc<any>  -->  llvm<"i8*">
-  // FIXME: for now use a void*, however pointer identity is not sufficient for
+  // TODO: for now use a void*, however pointer identity is not sufficient for
   // the f18 object v. class distinction
   mlir::Type convertTypeDescType(mlir::MLIRContext *ctx) {
     return mlir::LLVM::LLVMPointerType::get(

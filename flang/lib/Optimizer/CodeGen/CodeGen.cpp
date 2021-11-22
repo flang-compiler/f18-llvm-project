@@ -324,18 +324,6 @@ static Block *createBlock(mlir::ConversionPatternRewriter &rewriter,
                               mlir::Region::iterator(insertBefore));
 }
 
-/// Create an LLVM dialect global
-static void createGlobal(mlir::Location loc, mlir::ModuleOp mod, StringRef name,
-                         mlir::Type type,
-                         mlir::ConversionPatternRewriter &rewriter) {
-  if (mod.lookupSymbol<mlir::LLVM::GlobalOp>(name))
-    return;
-  mlir::OpBuilder modBuilder(mod.getBodyRegion());
-  modBuilder.create<mlir::LLVM::GlobalOp>(loc, type, /*isConstant=*/true,
-                                          mlir::LLVM::Linkage::Weak, name,
-                                          mlir::Attribute{});
-}
-
 namespace {
 /// Lower `fir.address_of` operation to `llvm.address_of` operation.
 struct AddrOfOpConversion : public FIROpConversion<fir::AddrOfOp> {
@@ -694,33 +682,32 @@ struct BoxProcHostOpConversion : public FIROpConversion<fir::BoxProcHostOp> {
   }
 };
 
+/// Lower `fir.box_tdesc` to the sequence of operations to extract the type
+/// descriptor from the box.
 struct BoxTypeDescOpConversion : public FIROpConversion<fir::BoxTypeDescOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::BoxTypeDescOp boxtypedesc, OperandTy operands,
+  matchAndRewrite(fir::BoxTypeDescOp boxtypedesc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto a = operands[0];
+    mlir::Value box = adaptor.getOperands()[0];
     auto loc = boxtypedesc.getLoc();
-    auto ty = convertType(boxtypedesc.getType());
-    auto c0 = genConstantOffset(loc, rewriter, 0);
-    auto c4 = genConstantOffset(loc, rewriter, 4);
-    auto pty = mlir::LLVM::LLVMPointerType::get(ty);
-    auto p = rewriter.create<mlir::LLVM::GEPOp>(loc, pty,
-                                                mlir::ValueRange{a, c0, c4});
-    auto ld = rewriter.create<mlir::LLVM::LoadOp>(loc, ty, p);
-    auto i8ptr = mlir::LLVM::LLVMPointerType::get(
-        mlir::IntegerType::get(boxtypedesc.getContext(), 8));
-    rewriter.replaceOpWithNewOp<mlir::LLVM::IntToPtrOp>(boxtypedesc, i8ptr, ld);
+    mlir::Type typeTy =
+        fir::getDescFieldTypeModel<kTypePosInBox>()(boxtypedesc.getContext());
+    auto result = getValueFromBox(loc, box, typeTy, rewriter, kTypePosInBox);
+    auto typePtrTy = mlir::LLVM::LLVMPointerType::get(typeTy);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::IntToPtrOp>(boxtypedesc, typePtrTy,
+                                                        result);
     return success();
   }
 };
 
+/// Lower `fir.string_lit` to LLVM IR dialect operation.
 struct StringLitOpConversion : public FIROpConversion<fir::StringLitOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::StringLitOp constop, OperandTy operands,
+  matchAndRewrite(fir::StringLitOp constop, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto ty = convertType(constop.getType());
     auto attr = constop.getValue();
@@ -2483,46 +2470,27 @@ struct FirEndOpConversion : public FIROpConversion<fir::FirEndOp> {
   }
 };
 
-/// lower a type descriptor to a global constant
+/// Lower `fir.gentypedesc` to a global constant.
 struct GenTypeDescOpConversion : public FIROpConversion<fir::GenTypeDescOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::GenTypeDescOp gentypedesc, OperandTy operands,
+  matchAndRewrite(fir::GenTypeDescOp gentypedesc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto loc = gentypedesc.getLoc();
-    auto inTy = gentypedesc.getInType();
-    auto name = consName(rewriter, inTy);
-    auto gty = convertType(inTy);
-    auto pty = mlir::LLVM::LLVMPointerType::get(gty);
-    auto module = gentypedesc->getParentOfType<mlir::ModuleOp>();
-    createGlobal(loc, module, name, gty, rewriter);
-    rewriter.replaceOpWithNewOp<mlir::LLVM::AddressOfOp>(gentypedesc, pty,
-                                                         name);
-    return success();
-  }
-
-  std::string consName(mlir::ConversionPatternRewriter &rewriter,
-                       mlir::Type type) const {
-    if (auto d = type.dyn_cast<fir::RecordType>()) {
-      auto name = d.getName();
-      auto pair = fir::NameUniquer::deconstruct(name);
-      return fir::NameUniquer::doTypeDescriptor(
-          pair.second.modules, pair.second.host, pair.second.name,
-          pair.second.kinds);
-    }
-    llvm_unreachable("no name found");
+    TODO(gentypedesc.getLoc(), "fir.gentypedesc codegen");
+    return failure();
   }
 };
 
+/// Lower `fir.global_len` operation.
 struct GlobalLenOpConversion : public FIROpConversion<fir::GlobalLenOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::GlobalLenOp globalLen, OperandTy operands,
+  matchAndRewrite(fir::GlobalLenOp globalLen, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    TODO(globalLen.getLoc(), "GlobalLenOp codegen");
-    return success();
+    TODO(globalLen.getLoc(), "fir.global_len codegen");
+    return failure();
   }
 };
 
@@ -2644,15 +2612,16 @@ struct LoadOpConversion : public FIROpConversion<fir::LoadOp> {
   }
 };
 
-// FIXME: how do we want to enforce this in LLVM-IR? Can we manipulate the fast
-// math flags?
+/// Lower `fir.no_reassoc` to LLVM IR dialect.
+/// TODO: how do we want to enforce this in LLVM-IR? Can we manipulate the fast
+/// math flags?
 struct NoReassocOpConversion : public FIROpConversion<fir::NoReassocOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::NoReassocOp noreassoc, OperandTy operands,
+  matchAndRewrite(fir::NoReassocOp noreassoc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(noreassoc, operands[0]);
+    rewriter.replaceOp(noreassoc, adaptor.getOperands()[0]);
     return success();
   }
 };
@@ -2845,14 +2814,14 @@ struct SelectRankOpConversion : public FIROpConversion<fir::SelectRankOp> {
   }
 };
 
+/// Lower `fir.select_type` to LLVM IR dialect.
 struct SelectTypeOpConversion : public FIROpConversion<fir::SelectTypeOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::SelectTypeOp select, OperandTy operands,
+  matchAndRewrite(fir::SelectTypeOp select, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    mlir::emitError(select.getLoc(),
-                    "fir.select_type should have already been converted");
+    TODO(select.getLoc(), "fir.select_type codegen");
     return failure();
   }
 };
@@ -3215,6 +3184,10 @@ struct NegcOpConversion : public FIROpConversion<fir::NegcOp> {
   }
 };
 
+/// Conversion pattern for operation that must be dead. The information in these
+/// operations is used by other operation. At this point they should not have
+/// anymore uses.
+/// These operations are normally dead after the pre-codegen pass.
 template <typename OP>
 struct MustBeDeadConversion : public FIROpConversion<OP> {
   explicit MustBeDeadConversion(mlir::MLIRContext *ctx,
@@ -3225,7 +3198,7 @@ struct MustBeDeadConversion : public FIROpConversion<OP> {
   matchAndRewrite(OP op, OperandTy operands,
                   mlir::ConversionPatternRewriter &rewriter) const final {
     if (!op->getUses().empty())
-      return mlir::emitError(op.getLoc(), "op must be dead");
+      return rewriter.notifyMatchFailure(op, "op must be dead");
     rewriter.eraseOp(op);
     return success();
   }

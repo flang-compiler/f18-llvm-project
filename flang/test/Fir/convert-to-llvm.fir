@@ -790,6 +790,25 @@ func @insert_tuple(%a : tuple<i32, f32>) {
 // CHECK-LABEL: func @insert_tuple(
 // CHECK-SAME:                     %[[TUPLE:.*]]: !llvm.struct<(i32, f32)>
 // CHECK:         %{{.*}} = llvm.insertvalue %{{.*}}, %[[TUPLE]][1 : index] : !llvm.struct<(i32, f32)>
+
+// -----
+
+// Check `fir.no_reassoc` conversion to LLVM IR dialect
+
+func @no_reassoc(%arg0: !fir.ref<i32>) {
+  %0 = fir.alloca i32
+  %1 = fir.load %arg0 : !fir.ref<i32>
+  %2 = fir.no_reassoc %1 : i32
+  fir.store %2 to %0 : !fir.ref<i32>
+  return
+}
+
+// CHECK-LABEL: llvm.func @no_reassoc(
+// CHECK-SAME:                        %[[ARG0:.*]]: !llvm.ptr<i32>) {
+// CHECK:         %[[C1:.*]] = llvm.mlir.constant(1 : i64) : i64
+// CHECK:         %[[ALLOC:.*]] = llvm.alloca %[[C1]] x i32 {in_type = i32, operand_segment_sizes = dense<0> : vector<2xi32>} : (i64) -> !llvm.ptr<i32>
+// CHECK:         %[[LOAD:.*]] = llvm.load %[[ARG0]] : !llvm.ptr<i32>
+// CHECK:         llvm.store %[[LOAD]], %[[ALLOC]] : !llvm.ptr<i32>
 // CHECK:         llvm.return
 
 // -----
@@ -941,3 +960,20 @@ func @test_load_box(%addr : !fir.ref<!fir.box<!fir.array<10xf32>>>) {
 // CHECK-SAME: (%{{.*}}: !llvm.ptr<struct<(ptr<array<10 x f{{.*}}>>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<1 x array<3 x i{{.*}}>>)>>) {
 // CHECK-NEXT:  llvm.return
 // CHECK-NEXT:  }
+
+// -----
+
+// Test `fir.box_tdesc` conversion.
+
+func @box_tdesc(%arg0: !fir.box<f64>) {
+  %0 = fir.box_tdesc %arg0 : (!fir.box<f64>) -> !fir.tdesc<f64>
+  return
+}
+
+// CHECK-LABEL: llvm.func @box_tdesc(
+// CHECK-SAME:                       %[[ARG0:.*]]: !llvm.ptr<struct<(ptr<f64>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}})>>) {
+// CHECK:         %[[C0:.*]] = llvm.mlir.constant(0 : i32) : i32
+// CHECK:         %[[TYPE_POS:.*]] = llvm.mlir.constant(4 : i32) : i32
+// CHECK:         %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][%[[C0]], %[[TYPE_POS]]] : (!llvm.ptr<struct<(ptr<f64>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}})>>, i32, i32) -> !llvm.ptr<i8>
+// CHECK:         %[[LOAD:.*]] = llvm.load %[[GEP]] : !llvm.ptr<i{{.*}}>
+// CHECK:         %{{.*}} = llvm.inttoptr %[[LOAD]] : i{{.*}} to !llvm.ptr<i{{.*}}>
