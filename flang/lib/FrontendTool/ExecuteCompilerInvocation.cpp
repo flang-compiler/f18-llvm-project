@@ -38,7 +38,11 @@ static std::unique_ptr<FrontendAction> CreateFrontendBaseAction(
   case EmitLLVM:
     return std::make_unique<EmitLLVMAction>();
   case EmitObj:
-    return std::make_unique<EmitObjAction>();
+    return std::make_unique<BackendAction>(
+        BackendAction::BackendAct::Backend_EmitObj);
+  case EmitAssembly:
+    return std::make_unique<BackendAction>(
+        BackendAction::BackendAct::Backend_EmitAssembly);
   case DebugUnparse:
     return std::make_unique<DebugUnparseAction>();
   case DebugUnparseNoSema:

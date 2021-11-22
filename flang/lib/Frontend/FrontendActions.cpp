@@ -517,7 +517,7 @@ void EmitLLVMAction::ExecuteAction() {
   return;
 }
 
-void EmitObjAction::ExecuteAction() {
+void BackendAction::ExecuteAction() {
   CompilerInstance &ci = this->instance();
   GenerateLLVMIR();
 
@@ -535,6 +535,39 @@ void EmitObjAction::ExecuteAction() {
   llvmModule_->setDataLayout(TM->createDataLayout());
   assert(TM && "Failed to create TargetMachine");
 
+  // If the output stream is a file, generate it and define the corresponding
+  // output stream. If a pre-defined output stream is available, we will use
+  // that instead.
+  //
+  // NOTE: `os` is a smart pointer that will be destroyed at the end of this
+  // method. However, it won't be written to until `CodeGenPasses` is
+  // destroyed. By defining `os` before `CodeGenPasses`, we make sure that the
+  // output stream won't be destroyed before it is written to. This only
+  // applies when an output file is used (i.e. there is no pre-defined output
+  // stream).
+  // TODO: Revisit once the new PM is ready (i.e. when `CodeGenPasses` is
+  // updated to use it).
+  std::unique_ptr<llvm::raw_pwrite_stream> os;
+  if (ci.IsOutputStreamNull()) {
+    // Get the output buffer/file
+    switch (_act) {
+    case BackendAct::Backend_EmitAssembly:
+      os = ci.CreateDefaultOutputFile(
+          /*Binary=*/false, /*InFile=*/GetCurrentFileOrBufferName(), "s");
+      break;
+    case BackendAct::Backend_EmitObj:
+      os = ci.CreateDefaultOutputFile(
+          /*Binary=*/true, /*InFile=*/GetCurrentFileOrBufferName(), "o");
+      break;
+    }
+    if (!os) {
+      unsigned diagID = ci.diagnostics().getCustomDiagID(
+          clang::DiagnosticsEngine::Error, "failed to create the output file");
+      ci.diagnostics().Report(diagID);
+      return;
+    }
+  }
+
   // Create an LLVM code-gen pass pipeline. Currently only the legacy pass
   // manager is supported.
   // TODO: Switch to the new PM once it's available in the backend.
@@ -545,27 +578,12 @@ void EmitObjAction::ExecuteAction() {
       std::make_unique<llvm::TargetLibraryInfoImpl>(triple);
   CodeGenPasses.add(new TargetLibraryInfoWrapperPass(*TLII));
 
-  // Get the output buffer/file
-  std::unique_ptr<llvm::raw_pwrite_stream> os{ci.CreateDefaultOutputFile(
-      /*Binary=*/true, /*InFile=*/GetCurrentFileOrBufferName(), "o")};
-  if (!os) {
-    unsigned diagID = ci.diagnostics().getCustomDiagID(
-        clang::DiagnosticsEngine::Error, "failed to create the output file");
-    ci.diagnostics().Report(diagID);
-    return;
-  }
-
-  if (TM->addPassesToEmitFile(CodeGenPasses, *os, nullptr,
-          /*CodeGenFileType*/ llvm::CodeGenFileType::CGFT_ObjectFile))
+  llvm::CodeGenFileType cgft = (_act == BackendAct::Backend_EmitAssembly)
+      ? llvm::CodeGenFileType::CGFT_AssemblyFile
+      : llvm::CodeGenFileType::CGFT_ObjectFile;
+  if (TM->addPassesToEmitFile(CodeGenPasses,
+          ci.IsOutputStreamNull() ? *os : ci.GetOutputStream(), nullptr, cgft))
     assert(false && "Something went wrong");
-  // The output stream, `os`, is a smart pointer that will be destroyed at the
-  // end of this method. However, it won't be written to until `CodeGenPasses`
-  // is destroyed. Hence, we need to release `as` here as otherwise it will be
-  // destroyed before it is written to. This pointer is later wrapped into a
-  // smart pointer inside `LLVMTargetMachine::createMCStreamer`, so no
-  // resources are leaked.
-  // TODO: Implement a safer way to pass `os` around.
-  os.release();
 
   // Run the code-gen passes
   CodeGenPasses.run(*llvmModule_);

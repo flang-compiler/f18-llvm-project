@@ -168,8 +168,19 @@ class EmitLLVMAction : public CodeGenAction {
   void ExecuteAction() override;
 };
 
-class EmitObjAction : public CodeGenAction {
+class BackendAction : public CodeGenAction {
+  public:
+  enum class BackendAct {
+    Backend_EmitAssembly,  ///< Emit native assembly files
+    Backend_EmitObj        ///< Emit native object files
+  };
+
+  BackendAction(BackendAct act) : _act{act} {};
+
+  private:
   void ExecuteAction() override;
+
+  BackendAct _act;
 };
 
 } // namespace Fortran::frontend
