@@ -2821,7 +2821,8 @@ struct SelectTypeOpConversion : public FIROpConversion<fir::SelectTypeOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::SelectTypeOp select, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    TODO(select.getLoc(), "fir.select_type codegen");
+    mlir::emitError(select.getLoc(),
+                    "fir.select_type should have already been converted");
     return failure();
   }
 };

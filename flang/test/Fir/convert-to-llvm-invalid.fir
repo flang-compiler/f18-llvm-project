@@ -98,3 +98,27 @@ func @shape_shift_not_dead(%arg0: !fir.ref<!fir.array<?x?xf32>>, %i: index, %j: 
   %1 = fir.array_coor %arg0(%0) %i, %j : (!fir.ref<!fir.array<?x?xf32>>, !fir.shapeshift<2>, index, index) -> !fir.ref<f32>
   return
 }
+
+// -----
+
+
+// Test `fir.select_type` conversion to llvm.
+// Should have been converted.
+
+func @bar_select_type(%arg : !fir.box<!fir.ref<f32>>) -> i32 {
+  %0 = arith.constant 1 : i32
+  %2 = arith.constant 3 : i32
+  // expected-error@+2{{fir.select_type should have already been converted}}
+  // expected-error@+1{{failed to legalize operation 'fir.select_type'}}
+  fir.select_type %arg : !fir.box<!fir.ref<f32>> [
+    #fir.instance<!fir.int<4>>,^bb1(%0:i32),
+    #fir.instance<!fir.int<8>>,^bb2(%2:i32),
+    unit,^bb5 ]
+^bb1(%a : i32) :
+  return %a : i32
+^bb2(%b : i32) :
+  return %b : i32
+^bb5 :
+  %zero = arith.constant 0 : i32
+  return %zero : i32
+}
