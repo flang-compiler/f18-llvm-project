@@ -1267,7 +1267,8 @@ bool Fortran::lower::symbolIsGlobal(const semantics::Symbol &sym) {
         return true;
     }
   }
-  return semantics::IsSaved(sym) || lower::definedInCommonBlock(sym);
+  return semantics::IsSaved(sym) || lower::definedInCommonBlock(sym) ||
+         semantics::IsNamedConstant(sym);
 }
 
 namespace {
