@@ -139,6 +139,24 @@ void createEmptyRegionBlocks(
   }
 }
 
+static mlir::Type getLoopVarType(Fortran::lower::AbstractConverter &converter,
+                                 std::uint64_t loopVarTypeSize) {
+  // OpenMP runtime requires 32-bit or 64-bit loop variables.
+  loopVarTypeSize = loopVarTypeSize * 8;
+  if (loopVarTypeSize < 32) {
+    loopVarTypeSize = 32;
+  } else if (loopVarTypeSize == 128) {
+    loopVarTypeSize = 64;
+    mlir::emitWarning(converter.getCurrentLocation(),
+                      "OpenMP loop iteration variable cannot have more than 64 "
+                      "bits size and will be narrowed into 64 bits.");
+  }
+  assert((loopVarTypeSize == 32 || loopVarTypeSize == 64) &&
+         "OpenMP loop iteration variable size must be transformed into 32-bit "
+         "or 64-bit");
+  return converter.getFirOpBuilder().getIntegerType(loopVarTypeSize);
+}
+
 template <typename Op>
 static void createBodyOfOp(
     Op &op, Fortran::lower::AbstractConverter &converter, mlir::Location &loc,
@@ -151,12 +169,15 @@ static void createBodyOfOp(
   // e.g. For loops the argument is the induction variable. And all further
   // uses of the induction variable should use this mlir value.
   if (args.size()) {
+    std::uint64_t loopVarTypeSize = 0;
+    for (auto &arg : args)
+      loopVarTypeSize = std::max(loopVarTypeSize, arg->GetUltimate().size());
+    mlir::Type loopVarType = getLoopVarType(converter, loopVarTypeSize);
     SmallVector<Type> tiv;
-    int argIndex = 0;
-    for (auto &arg : args) {
-      tiv.push_back(converter.genType(*arg));
-    }
+    for (int i = 0; i < (int)args.size(); i++)
+      tiv.push_back(loopVarType);
     firOpBuilder.createBlock(&op.getRegion(), {}, tiv);
+    int argIndex = 0;
     for (auto &arg : args) {
       fir::ExtendedValue exval = op.getRegion().front().getArgument(argIndex);
       [[maybe_unused]] bool success = converter.bindSymbol(*arg, exval);
@@ -499,7 +520,6 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     }
   }
 
-  int64_t collapseValue = Fortran::lower::getCollapseValue(wsLoopOpClauseList);
   for (const auto &clause : wsLoopOpClauseList.v) {
     if (const auto &scheduleClause =
             std::get_if<Fortran::parser::OmpClause::Schedule>(&clause.u)) {
@@ -518,6 +538,9 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
   // Collect the loops to collapse.
   auto *doConstructEval = &eval.getFirstNestedEvaluation();
 
+  std::int64_t collapseValue =
+      Fortran::lower::getCollapseValue(wsLoopOpClauseList);
+  std::uint64_t loopVarTypeSize = 0;
   SmallVector<const Fortran::semantics::Symbol *> iv;
   do {
     auto *doLoop = &doConstructEval->getFirstNestedEvaluation();
@@ -543,12 +566,26 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
             currentLocation, firOpBuilder.getIntegerType(32), 1));
       }
       iv.push_back(bounds->name.thing.symbol);
+      loopVarTypeSize = std::max(
+          loopVarTypeSize, bounds->name.thing.symbol->GetUltimate().size());
     }
 
     collapseValue--;
     doConstructEval =
         &*std::next(doConstructEval->getNestedEvaluations().begin());
   } while (collapseValue > 0);
+
+  // The types of lower bound, upper bound, and step are converted into the
+  // type of the loop variable if necessary.
+  mlir::Type loopVarType = getLoopVarType(converter, loopVarTypeSize);
+  for (unsigned it = 0; it < (unsigned)lowerBound.size(); it++) {
+    lowerBound[it] = firOpBuilder.createConvert(currentLocation, loopVarType,
+                                                lowerBound[it]);
+    upperBound[it] = firOpBuilder.createConvert(currentLocation, loopVarType,
+                                                upperBound[it]);
+    step[it] =
+        firOpBuilder.createConvert(currentLocation, loopVarType, step[it]);
+  }
 
   // FIXME: Add support for following clauses:
   // 1. linear
