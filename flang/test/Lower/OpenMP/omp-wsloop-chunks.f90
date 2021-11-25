@@ -7,8 +7,6 @@
 program wsloop
         integer :: i
         integer :: chunk
-!FIRDialect: func @_QQmain()
-!LLVMIRDialect: func @_QQmain()
 
 !LLVMIR: define void @_QQmain()
 !LLVMIR:call i32 @__kmpc_global_thread_num{{.*}}

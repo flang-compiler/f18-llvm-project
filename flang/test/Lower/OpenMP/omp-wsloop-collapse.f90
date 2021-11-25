@@ -75,6 +75,9 @@ program wsloop_collapse
 ! LLVMIRDialect:             %[[VAL_21:.*]] = llvm.load %[[VAL_8]] : !llvm.ptr<i32>
 ! LLVMIRDialect:             %[[VAL_22:.*]] = llvm.load %[[VAL_10]] : !llvm.ptr<i32>
 ! LLVMIRDialect:             %[[VAL_23:.*]] = llvm.load %[[VAL_12]] : !llvm.ptr<i32>
+! FIRDialect:           %[[ALLOCA_IV1:.*]] = fir.alloca i32 {{{.*}}, pinned}
+! FIRDialect:           %[[ALLOCA_IV2:.*]] = fir.alloca i32 {{{.*}}, pinned}
+! FIRDialect:           %[[ALLOCA_IV3:.*]] = fir.alloca i32 {{{.*}}, pinned}
 ! FIRDialect:           %[[VAL_20:.*]] = arith.constant 1 : i32
 ! FIRDialect:           %[[VAL_21:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! FIRDialect:           %[[VAL_22:.*]] = arith.constant 1 : i32
@@ -104,60 +107,60 @@ program wsloop_collapse
 ! LLVMIR:       omp.par.region:                                   ; preds = %[[VAL_23:.*]]
 ! LLVMIR:         br label %[[VAL_24:.*]]
 ! LLVMIR:       omp.par.region1:                                  ; preds = %[[VAL_21]]
-! LLVMIR:         %[[VAL_25:.*]] = load i32, i32* %[[VAL_26:.*]], align 4, !dbg !23
-! LLVMIR:         %[[VAL_27:.*]] = load i32, i32* %[[VAL_28:.*]], align 4, !dbg !24
-! LLVMIR:         %[[VAL_29:.*]] = load i32, i32* %[[VAL_30:.*]], align 4, !dbg !25
-! LLVMIR:         %[[VAL_31:.*]] = select i1 false, i32 %[[VAL_25]], i32 1, !dbg !26
-! LLVMIR:         %[[VAL_32:.*]] = select i1 false, i32 1, i32 %[[VAL_25]], !dbg !26
-! LLVMIR:         %[[VAL_33:.*]] = sub nsw i32 %[[VAL_32]], %[[VAL_31]], !dbg !26
-! LLVMIR:         %[[VAL_34:.*]] = icmp slt i32 %[[VAL_32]], %[[VAL_31]], !dbg !26
-! LLVMIR:         %[[VAL_35:.*]] = udiv i32 %[[VAL_33]], 1, !dbg !26
-! LLVMIR:         %[[VAL_36:.*]] = add i32 %[[VAL_35]], 1, !dbg !26
-! LLVMIR:         %[[VAL_37:.*]] = select i1 %[[VAL_34]], i32 0, i32 %[[VAL_36]], !dbg !26
+! LLVMIR:         %[[VAL_25:.*]] = load i32, i32* %[[VAL_26:.*]], align 4, !dbg
+! LLVMIR:         %[[VAL_27:.*]] = load i32, i32* %[[VAL_28:.*]], align 4, !dbg
+! LLVMIR:         %[[VAL_29:.*]] = load i32, i32* %[[VAL_30:.*]], align 4, !dbg
+! LLVMIR:         %[[VAL_31:.*]] = select i1 false, i32 %[[VAL_25]], i32 1, !dbg
+! LLVMIR:         %[[VAL_32:.*]] = select i1 false, i32 1, i32 %[[VAL_25]], !dbg
+! LLVMIR:         %[[VAL_33:.*]] = sub nsw i32 %[[VAL_32]], %[[VAL_31]], !dbg
+! LLVMIR:         %[[VAL_34:.*]] = icmp slt i32 %[[VAL_32]], %[[VAL_31]], !dbg
+! LLVMIR:         %[[VAL_35:.*]] = udiv i32 %[[VAL_33]], 1, !dbg
+! LLVMIR:         %[[VAL_36:.*]] = add i32 %[[VAL_35]], 1, !dbg
+! LLVMIR:         %[[VAL_37:.*]] = select i1 %[[VAL_34]], i32 0, i32 %[[VAL_36]], !dbg
 ! LLVMIR:         br label %[[VAL_38:.*]]
 ! LLVMIR:       omp_loop.preheader:                               ; preds = %[[VAL_24]]
-! LLVMIR:         %[[VAL_39:.*]] = select i1 false, i32 %[[VAL_27]], i32 1, !dbg !26
-! LLVMIR:         %[[VAL_40:.*]] = select i1 false, i32 1, i32 %[[VAL_27]], !dbg !26
-! LLVMIR:         %[[VAL_41:.*]] = sub nsw i32 %[[VAL_40]], %[[VAL_39]], !dbg !26
-! LLVMIR:         %[[VAL_42:.*]] = icmp slt i32 %[[VAL_40]], %[[VAL_39]], !dbg !26
-! LLVMIR:         %[[VAL_43:.*]] = udiv i32 %[[VAL_41]], 1, !dbg !26
-! LLVMIR:         %[[VAL_44:.*]] = add i32 %[[VAL_43]], 1, !dbg !26
-! LLVMIR:         %[[VAL_45:.*]] = select i1 %[[VAL_42]], i32 0, i32 %[[VAL_44]], !dbg !26
-! LLVMIR:         %[[VAL_46:.*]] = select i1 false, i32 %[[VAL_29]], i32 1, !dbg !26
-! LLVMIR:         %[[VAL_47:.*]] = select i1 false, i32 1, i32 %[[VAL_29]], !dbg !26
-! LLVMIR:         %[[VAL_48:.*]] = sub nsw i32 %[[VAL_47]], %[[VAL_46]], !dbg !26
-! LLVMIR:         %[[VAL_49:.*]] = icmp slt i32 %[[VAL_47]], %[[VAL_46]], !dbg !26
-! LLVMIR:         %[[VAL_50:.*]] = udiv i32 %[[VAL_48]], 1, !dbg !26
-! LLVMIR:         %[[VAL_51:.*]] = add i32 %[[VAL_50]], 1, !dbg !26
-! LLVMIR:         %[[VAL_52:.*]] = select i1 %[[VAL_49]], i32 0, i32 %[[VAL_51]], !dbg !26
+! LLVMIR:         %[[VAL_39:.*]] = select i1 false, i32 %[[VAL_27]], i32 1, !dbg
+! LLVMIR:         %[[VAL_40:.*]] = select i1 false, i32 1, i32 %[[VAL_27]], !dbg
+! LLVMIR:         %[[VAL_41:.*]] = sub nsw i32 %[[VAL_40]], %[[VAL_39]], !dbg
+! LLVMIR:         %[[VAL_42:.*]] = icmp slt i32 %[[VAL_40]], %[[VAL_39]], !dbg
+! LLVMIR:         %[[VAL_43:.*]] = udiv i32 %[[VAL_41]], 1, !dbg
+! LLVMIR:         %[[VAL_44:.*]] = add i32 %[[VAL_43]], 1, !dbg
+! LLVMIR:         %[[VAL_45:.*]] = select i1 %[[VAL_42]], i32 0, i32 %[[VAL_44]], !dbg
+! LLVMIR:         %[[VAL_46:.*]] = select i1 false, i32 %[[VAL_29]], i32 1, !dbg
+! LLVMIR:         %[[VAL_47:.*]] = select i1 false, i32 1, i32 %[[VAL_29]], !dbg
+! LLVMIR:         %[[VAL_48:.*]] = sub nsw i32 %[[VAL_47]], %[[VAL_46]], !dbg
+! LLVMIR:         %[[VAL_49:.*]] = icmp slt i32 %[[VAL_47]], %[[VAL_46]], !dbg
+! LLVMIR:         %[[VAL_50:.*]] = udiv i32 %[[VAL_48]], 1, !dbg
+! LLVMIR:         %[[VAL_51:.*]] = add i32 %[[VAL_50]], 1, !dbg
+! LLVMIR:         %[[VAL_52:.*]] = select i1 %[[VAL_49]], i32 0, i32 %[[VAL_51]], !dbg
 ! LLVMIR:         %[[VAL_53:.*]] = mul nuw i32 %[[VAL_37]], %[[VAL_45]]
 ! LLVMIR:         %[[VAL_54:.*]] = mul nuw i32 %[[VAL_53]], %[[VAL_52]]
 ! LLVMIR:         br label %[[VAL_55:.*]]
 ! LLVMIR:       omp_collapsed.preheader:                          ; preds = %[[VAL_38]]
-! LLVMIR:         store i32 0, i32* %[[VAL_18]], align 4, !dbg !26
-! LLVMIR:         %[[VAL_56:.*]] = sub i32 %[[VAL_54]], 1, !dbg !26
-! LLVMIR:         store i32 %[[VAL_56]], i32* %[[VAL_19]], align 4, !dbg !26
-! LLVMIR:         store i32 1, i32* %[[VAL_20]], align 4, !dbg !26
-! LLVMIR:         %[[VAL_57:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58:.*]]* @3), !dbg !26
-! LLVMIR:         call void @__kmpc_for_static_init_4u(%[[VAL_58]]* @3, i32 %[[VAL_57]], i32 34, i32* %[[VAL_17]], i32* %[[VAL_18]], i32* %[[VAL_19]], i32* %[[VAL_20]], i32 1, i32 1), !dbg !26
-! LLVMIR:         %[[VAL_59:.*]] = load i32, i32* %[[VAL_18]], align 4, !dbg !26
-! LLVMIR:         %[[VAL_60:.*]] = load i32, i32* %[[VAL_19]], align 4, !dbg !26
-! LLVMIR:         %[[VAL_61:.*]] = sub i32 %[[VAL_60]], %[[VAL_59]], !dbg !26
-! LLVMIR:         %[[VAL_62:.*]] = add i32 %[[VAL_61]], 1, !dbg !26
-! LLVMIR:         br label %[[VAL_63:.*]], !dbg !26
+! LLVMIR:         store i32 0, i32* %[[VAL_18]], align 4, !dbg
+! LLVMIR:         %[[VAL_56:.*]] = sub i32 %[[VAL_54]], 1, !dbg
+! LLVMIR:         store i32 %[[VAL_56]], i32* %[[VAL_19]], align 4, !dbg
+! LLVMIR:         store i32 1, i32* %[[VAL_20]], align 4, !dbg
+! LLVMIR:         %[[VAL_57:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58:.*]]* @3), !dbg
+! LLVMIR:         call void @__kmpc_for_static_init_4u(%[[VAL_58]]* @3, i32 %[[VAL_57]], i32 34, i32* %[[VAL_17]], i32* %[[VAL_18]], i32* %[[VAL_19]], i32* %[[VAL_20]], i32 1, i32 1), !dbg
+! LLVMIR:         %[[VAL_59:.*]] = load i32, i32* %[[VAL_18]], align 4, !dbg
+! LLVMIR:         %[[VAL_60:.*]] = load i32, i32* %[[VAL_19]], align 4, !dbg
+! LLVMIR:         %[[VAL_61:.*]] = sub i32 %[[VAL_60]], %[[VAL_59]], !dbg
+! LLVMIR:         %[[VAL_62:.*]] = add i32 %[[VAL_61]], 1, !dbg
+! LLVMIR:         br label %[[VAL_63:.*]], !dbg
 ! LLVMIR:       omp_collapsed.header:                             ; preds = %[[VAL_64:.*]], %[[VAL_55]]
-! LLVMIR:         %[[VAL_65:.*]] = phi i32 [ 0, %[[VAL_55]] ], [ %[[VAL_66:.*]], %[[VAL_64]] ], !dbg !26
-! LLVMIR:         br label %[[VAL_67:.*]], !dbg !26
+! LLVMIR:         %[[VAL_65:.*]] = phi i32 [ 0, %[[VAL_55]] ], [ %[[VAL_66:.*]], %[[VAL_64]] ], !dbg
+! LLVMIR:         br label %[[VAL_67:.*]], !dbg
 ! LLVMIR:       omp_collapsed.cond:                               ; preds = %[[VAL_63]]
-! LLVMIR:         %[[VAL_68:.*]] = icmp ult i32 %[[VAL_65]], %[[VAL_62]], !dbg !26
-! LLVMIR:         br i1 %[[VAL_68]], label %[[VAL_69:.*]], label %[[VAL_70:.*]], !dbg !26
+! LLVMIR:         %[[VAL_68:.*]] = icmp ult i32 %[[VAL_65]], %[[VAL_62]], !dbg
+! LLVMIR:         br i1 %[[VAL_68]], label %[[VAL_69:.*]], label %[[VAL_70:.*]], !dbg
 ! LLVMIR:       omp_collapsed.exit:                               ; preds = %[[VAL_67]]
-! LLVMIR:         call void @__kmpc_for_static_fini(%[[VAL_58]]* @3, i32 %[[VAL_57]]), !dbg !26
-! LLVMIR:         %[[VAL_71:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58]]* @3), !dbg !26
-! LLVMIR:         call void @__kmpc_barrier(%[[VAL_58]]* @4, i32 %[[VAL_71]]), !dbg !26
-! LLVMIR:         br label %[[VAL_72:.*]], !dbg !26
+! LLVMIR:         call void @__kmpc_for_static_fini(%[[VAL_58]]* @3, i32 %[[VAL_57]]), !dbg
+! LLVMIR:         %[[VAL_71:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58]]* @3), !dbg
+! LLVMIR:         call void @__kmpc_barrier(%[[VAL_58]]* @4, i32 %[[VAL_71]]), !dbg
+! LLVMIR:         br label %[[VAL_72:.*]], !dbg
 ! LLVMIR:       omp_collapsed.after:                              ; preds = %[[VAL_70]]
-! LLVMIR:         br label %[[VAL_73:.*]], !dbg !26
+! LLVMIR:         br label %[[VAL_73:.*]], !dbg
 ! LLVMIR:       omp_loop.after:                                   ; preds = %[[VAL_72]]
 ! LLVMIR:       omp.par.pre_finalize:                             ; preds = %[[VAL_73]]
 ! LLVMIR:         br label %[[VAL_74:.*]]
@@ -165,28 +168,40 @@ program wsloop_collapse
      do j= 1, b
         do k = 1, c
 ! FIRDialect:           omp.wsloop (%[[VAL_9:.*]], %[[VAL_10:.*]], %[[VAL_11:.*]]) : i32 = (%[[VAL_20]], %[[VAL_23]], %[[VAL_26]]) to (%[[VAL_21]], %[[VAL_24]], %[[VAL_27]]) inclusive step (%[[VAL_22]], %[[VAL_25]], %[[VAL_28]]) collapse(3) {
+! FIRDialect:             fir.store %[[VAL_9]] to %[[ALLOCA_IV1:.*]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_10]] to %[[ALLOCA_IV2:.*]] : !fir.ref<i32>
+! FIRDialect:             fir.store %[[VAL_11]] to %[[ALLOCA_IV3:.*]] : !fir.ref<i32>
 ! FIRDialect:             %[[VAL_12:.*]] = fir.load %[[VAL_6]] : !fir.ref<i32>
-! FIRDialect:             %[[VAL_13:.*]] = arith.addi %[[VAL_12]], %[[VAL_9]] : i32
-! FIRDialect:             %[[VAL_14:.*]] = arith.addi %[[VAL_13]], %[[VAL_10]] : i32
-! FIRDialect:             %[[VAL_15:.*]] = arith.addi %[[VAL_14]], %[[VAL_11]] : i32
+! FIRDialect:             %[[LOAD_1:.*]] = fir.load %[[ALLOCA_IV1]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_13:.*]] = arith.addi %[[VAL_12]], %[[LOAD_1]] : i32
+! FIRDialect:             %[[LOAD_2:.*]] = fir.load %[[ALLOCA_IV2]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_14:.*]] = arith.addi %[[VAL_13]], %[[LOAD_2]] : i32
+! FIRDialect:             %[[LOAD_3:.*]] = fir.load %[[ALLOCA_IV3]] : !fir.ref<i32>
+! FIRDialect:             %[[VAL_15:.*]] = arith.addi %[[VAL_14]], %[[LOAD_3]] : i32
 ! FIRDialect:             fir.store %[[VAL_15]] to %[[VAL_6]] : !fir.ref<i32>
 ! FIRDialect:             omp.yield
 ! FIRDialect:           }
 ! LLVMIRDialect:             omp.wsloop (%[[VAL_24:.*]], %[[VAL_25:.*]], %[[VAL_26:.*]]) : i32 = (%[[VAL_4]], %[[VAL_4]], %[[VAL_4]]) to (%[[VAL_21]], %[[VAL_22]], %[[VAL_23]]) inclusive step (%[[VAL_4]], %[[VAL_4]], %[[VAL_4]]) collapse(3) {
+! LLVMIRDialect:               llvm.store %[[VAL_24]], %[[STORE_1:.*]] : !llvm.ptr<i32>
+! LLVMIRDialect:               llvm.store %[[VAL_25]], %[[STORE_2:.*]] : !llvm.ptr<i32>
+! LLVMIRDialect:               llvm.store %[[VAL_26]], %[[STORE_3:.*]] : !llvm.ptr<i32>
 ! LLVMIRDialect:               %[[VAL_27:.*]] = llvm.load %[[VAL_20]] : !llvm.ptr<i32>
-! LLVMIRDialect:               %[[VAL_28:.*]] = llvm.add %[[VAL_27]], %[[VAL_24]]  : i32
-! LLVMIRDialect:               %[[VAL_29:.*]] = llvm.add %[[VAL_28]], %[[VAL_25]]  : i32
-! LLVMIRDialect:               %[[VAL_30:.*]] = llvm.add %[[VAL_29]], %[[VAL_26]]  : i32
+! LLVMIRDialect:               %[[LOAD_1:.*]] = llvm.load %[[STORE_1]] : !llvm.ptr<i32>
+! LLVMIRDialect:               %[[VAL_28:.*]] = llvm.add %[[VAL_27]], %[[LOAD_1]]  : i32
+! LLVMIRDialect:               %[[LOAD_2:.*]] = llvm.load %[[STORE_2]] : !llvm.ptr<i32>
+! LLVMIRDialect:               %[[VAL_29:.*]] = llvm.add %[[VAL_28]], %[[LOAD_2]]  : i32
+! LLVMIRDialect:               %[[LOAD_3:.*]] = llvm.load %[[STORE_3]] : !llvm.ptr<i32>
+! LLVMIRDialect:               %[[VAL_30:.*]] = llvm.add %[[VAL_29]], %[[LOAD_3]]  : i32
 ! LLVMIRDialect:               llvm.store %[[VAL_30]], %[[VAL_20]] : !llvm.ptr<i32>
 ! LLVMIRDialect:               omp.yield
 ! LLVMIRDialect:             }
 ! LLVMIR:       omp_collapsed.body:                               ; preds = %[[VAL_67]]
-! LLVMIR:         %[[VAL_75:.*]] = add i32 %[[VAL_65]], %[[VAL_59]], !dbg !26
-! LLVMIR:         %[[VAL_76:.*]] = urem i32 %[[VAL_75]], %[[VAL_52]], !dbg !26
-! LLVMIR:         %[[VAL_77:.*]] = udiv i32 %[[VAL_75]], %[[VAL_52]], !dbg !26
-! LLVMIR:         %[[VAL_78:.*]] = urem i32 %[[VAL_77]], %[[VAL_45]], !dbg !26
-! LLVMIR:         %[[VAL_79:.*]] = udiv i32 %[[VAL_77]], %[[VAL_45]], !dbg !26
-! LLVMIR:         br label %[[VAL_80:.*]], !dbg !26
+! LLVMIR:         %[[VAL_75:.*]] = add i32 %[[VAL_65]], %[[VAL_59]], !dbg
+! LLVMIR:         %[[VAL_76:.*]] = urem i32 %[[VAL_75]], %[[VAL_52]], !dbg
+! LLVMIR:         %[[VAL_77:.*]] = udiv i32 %[[VAL_75]], %[[VAL_52]], !dbg
+! LLVMIR:         %[[VAL_78:.*]] = urem i32 %[[VAL_77]], %[[VAL_45]], !dbg
+! LLVMIR:         %[[VAL_79:.*]] = udiv i32 %[[VAL_77]], %[[VAL_45]], !dbg
+! LLVMIR:         br label %[[VAL_80:.*]], !dbg
 ! LLVMIR:       omp_loop.body:                                    ; preds = %[[VAL_69]]
 ! LLVMIR:         %[[VAL_81:.*]] = mul i32 %[[VAL_79]], 1
 ! LLVMIR:         %[[VAL_82:.*]] = add i32 %[[VAL_81]], 1
@@ -204,12 +219,18 @@ program wsloop_collapse
 ! LLVMIR:         %[[VAL_90:.*]] = add i32 %[[VAL_89]], 1
 ! LLVMIR:         br label %[[VAL_91:.*]]
 ! LLVMIR:       omp.wsloop.region:                                ; preds = %[[VAL_88]]
-! LLVMIR:         %[[VAL_92:.*]] = load i32, i32* %[[VAL_93:.*]], align 4, !dbg !28
-! LLVMIR:         %[[VAL_94:.*]] = add i32 %[[VAL_92]], %[[VAL_82]], !dbg !29
-! LLVMIR:         %[[VAL_95:.*]] = add i32 %[[VAL_94]], %[[VAL_86]], !dbg !30
-! LLVMIR:         %[[VAL_96:.*]] = add i32 %[[VAL_95]], %[[VAL_90]], !dbg !31
-! LLVMIR:         store i32 %[[VAL_96]], i32* %[[VAL_93]], align 4, !dbg !32
-! LLVMIR:         br label %[[VAL_97:.*]], !dbg !33
+! LLVMIR:         store i32 %[[VAL_82]], i32* %[[STORE_1:.*]], align 4, !dbg
+! LLVMIR:         store i32 %[[VAL_86]], i32* %[[STORE_2:.*]], align 4, !dbg
+! LLVMIR:         store i32 %[[VAL_90]], i32* %[[STORE_3:.*]], align 4, !dbg
+! LLVMIR:         %[[VAL_92:.*]] = load i32, i32* %[[VAL_93:.*]], align 4, !dbg
+! LLVMIR:         %[[LOAD_1:.*]] = load i32, i32* %[[STORE_1]], align 4, !dbg
+! LLVMIR:         %[[VAL_94:.*]] = add i32 %[[VAL_92]], %[[LOAD_1]], !dbg
+! LLVMIR:         %[[LOAD_2:.*]] = load i32, i32* %[[STORE_2]], align 4, !dbg
+! LLVMIR:         %[[VAL_95:.*]] = add i32 %[[VAL_94]], %[[LOAD_2]], !dbg
+! LLVMIR:         %[[LOAD_3:.*]] = load i32, i32* %[[STORE_3]], align 4, !dbg
+! LLVMIR:         %[[VAL_96:.*]] = add i32 %[[VAL_95]], %[[LOAD_3]], !dbg
+! LLVMIR:         store i32 %[[VAL_96]], i32* %[[VAL_93]], align 4, !dbg
+! LLVMIR:         br label %[[VAL_97:.*]], !dbg
 ! LLVMIR:       omp.wsloop.exit:                                  ; preds = %[[VAL_91]]
 ! LLVMIR:         br label %[[VAL_98:.*]]
 ! LLVMIR:       omp_loop.after20:                                 ; preds = %[[VAL_97]]
@@ -217,8 +238,8 @@ program wsloop_collapse
 ! LLVMIR:       omp_loop.after9:                                  ; preds = %[[VAL_98]]
 ! LLVMIR:         br label %[[VAL_64]]
 ! LLVMIR:       omp_collapsed.inc:                                ; preds = %[[VAL_99]]
-! LLVMIR:         %[[VAL_66]] = add nuw i32 %[[VAL_65]], 1, !dbg !26
-! LLVMIR:         br label %[[VAL_63]], !dbg !26
+! LLVMIR:         %[[VAL_66]] = add nuw i32 %[[VAL_65]], 1, !dbg
+! LLVMIR:         br label %[[VAL_63]], !dbg
            x = x + i + j + k
         enddo
      enddo

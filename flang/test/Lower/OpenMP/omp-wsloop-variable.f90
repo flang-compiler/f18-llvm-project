@@ -23,7 +23,11 @@ program wsloop_variable
 ! FIRDialect:  [[TMP6:%.*]] = fir.convert [[TMP1]] : (i32) -> i64
 ! FIRDialect:  [[TMP7:%.*]] = fir.convert %{{.*}} : (i32) -> i64
 ! FIRDialect:  omp.wsloop ([[TMP8:%.*]], [[TMP9:%.*]]) : i64 = ([[TMP2]], [[TMP5]]) to ([[TMP3]], [[TMP6]]) inclusive step ([[TMP4]], [[TMP7]]) collapse(2)  {
-! FIRDialect:    [[TMP10:%.*]] = arith.addi [[TMP8]], [[TMP9]] : i64
+! FIRDialect:    fir.store [[TMP8]] to [[STORE1:%.*]] : !fir.ref<i64>
+! FIRDialect:    fir.store [[TMP9]] to [[STORE2:%.*]] : !fir.ref<i64>
+! FIRDialect:    [[LOAD1:%.*]] = fir.load [[STORE1:%.*]] : !fir.ref<i64>
+! FIRDialect:    [[LOAD2:%.*]] = fir.load [[STORE2:%.*]] : !fir.ref<i64>
+! FIRDialect:    [[TMP10:%.*]] = arith.addi [[LOAD1]], [[LOAD2]] : i64
 ! FIRDialect:    [[TMP11:%.*]] = fir.convert [[TMP10]] : (i64) -> f32
 ! FIRDialect:    fir.store [[TMP11]] to %{{.*}} : !fir.ref<f32>
 ! FIRDialect:    omp.yield
@@ -40,7 +44,9 @@ program wsloop_variable
 ! FIRDialect:  [[TMP13:%.*]] = fir.convert %{{.*}} : (i8) -> i32
 ! FIRDialect:  [[TMP14:%.*]] = fir.convert %{{.*}} : (i64) -> i32
 ! FIRDialect:  omp.wsloop ([[TMP15:%.*]]) : i32 = ([[TMP12]]) to ([[TMP13]]) inclusive step ([[TMP14]])  {
-! FIRDialect:    [[TMP16:%.*]] = fir.convert [[TMP15]] : (i32) -> f32
+! FIRDialect:    fir.store [[TMP15]] to [[STORE3:%.*]] : !fir.ref<i32>
+! FIRDialect:    [[LOAD3:%.*]] = fir.load [[STORE3:%.*]] : !fir.ref<i32>
+! FIRDialect:    [[TMP16:%.*]] = fir.convert [[LOAD3]] : (i32) -> f32
 ! FIRDialect:    fir.store [[TMP16]] to %{{.*}} : !fir.ref<f32>
 ! FIRDialect:    omp.yield
 ! FIRDialect:  }
@@ -54,7 +60,9 @@ program wsloop_variable
 ! FIRDialect:  [[TMP18:%.*]] = fir.convert %{{.*}} : (i16) -> i64
 ! FIRDialect:  [[TMP19:%.*]] = fir.convert %{{.*}} : (i32) -> i64
 ! FIRDialect:  omp.wsloop ([[TMP20:%.*]]) : i64 = ([[TMP17]]) to ([[TMP18]]) inclusive step ([[TMP19]])  {
-! FIRDialect:    [[TMP21:%.*]] = fir.convert [[TMP20]] : (i64) -> f32
+! FIRDialect:    fir.store [[TMP20]] to [[STORE4:%.*]] : !fir.ref<i64>
+! FIRDialect:    [[LOAD4:%.*]] = fir.load [[STORE4:%.*]] : !fir.ref<i64>
+! FIRDialect:    [[TMP21:%.*]] = fir.convert [[LOAD4]] : (i64) -> f32
 ! FIRDialect:    fir.store [[TMP21]] to %{{.*}} : !fir.ref<f32>
 ! FIRDialect:    omp.yield
 ! FIRDialect:  }

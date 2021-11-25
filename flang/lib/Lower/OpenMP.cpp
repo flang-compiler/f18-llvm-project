@@ -13,6 +13,7 @@
 #include "flang/Lower/OpenMP.h"
 #include "flang/Common/idioms.h"
 #include "flang/Lower/Bridge.h"
+#include "flang/Lower/ConvertExpr.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/StatementContext.h"
 #include "flang/Lower/Todo.h"
@@ -170,6 +171,7 @@ static void createBodyOfOp(
   // argument. Also update the symbol's address with the mlir argument value.
   // e.g. For loops the argument is the induction variable. And all further
   // uses of the induction variable should use this mlir value.
+  mlir::Operation *storeOp = nullptr;
   if (args.size()) {
     std::size_t loopVarTypeSize = 0;
     for (const Fortran::semantics::Symbol *arg : args)
@@ -180,9 +182,17 @@ static void createBodyOfOp(
       tiv.push_back(loopVarType);
     firOpBuilder.createBlock(&op.getRegion(), {}, tiv);
     int argIndex = 0;
+    // The argument is not currently in memory, so make a temporary for the
+    // argument, and store it there, then bind that location to the argument.
     for (const Fortran::semantics::Symbol *arg : args) {
-      fir::ExtendedValue exval = op.getRegion().front().getArgument(argIndex);
-      [[maybe_unused]] bool success = converter.bindSymbol(*arg, exval);
+      mlir::Value val =
+          fir::getBase(op.getRegion().front().getArgument(argIndex));
+      mlir::Value temp = firOpBuilder.createTemporary(
+          loc, loopVarType,
+          llvm::ArrayRef<mlir::NamedAttribute>{
+              Fortran::lower::getAdaptToByRefAttr(firOpBuilder)});
+      storeOp = firOpBuilder.create<fir::StoreOp>(loc, val, temp);
+      [[maybe_unused]] bool success = converter.bindSymbol(*arg, temp);
       assert(success && "Existing binding prevents setting MLIR value for the "
                         "index variable");
       argIndex++;
@@ -190,8 +200,11 @@ static void createBodyOfOp(
   } else {
     firOpBuilder.createBlock(&op.getRegion());
   }
+  // Set the insert for the terminator operation to go at the end of the
+  // block - this is either empty or the block with the stores above,
+  // the end of the block works for both.
   mlir::Block &block = op.getRegion().back();
-  firOpBuilder.setInsertionPointToStart(&block);
+  firOpBuilder.setInsertionPointToEnd(&block);
   if (eval.lowerAsUnstructured())
     createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
   // Ensure the block is well-formed by inserting terminators.
@@ -201,8 +214,11 @@ static void createBodyOfOp(
   } else {
     firOpBuilder.create<mlir::omp::TerminatorOp>(loc);
   }
-  // Reset the insertion point to the start of the first block.
-  firOpBuilder.setInsertionPointToStart(&block);
+  // Reset the insert point to before the terminator.
+  if (storeOp)
+    firOpBuilder.setInsertionPointAfter(storeOp);
+  else
+    firOpBuilder.setInsertionPointToStart(&block);
   if (clauses)
     privatizeVars(converter, *clauses);
 }

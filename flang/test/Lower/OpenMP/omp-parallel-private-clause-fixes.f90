@@ -14,6 +14,7 @@
 ! CHECK:           %[[VAL_3:.*]] = fir.load %[[VAL_4:.*]] : !fir.ref<i32>
 ! CHECK:           %[[VAL_5:.*]] = arith.constant 1 : i32
 ! CHECK:           omp.wsloop (%[[VAL_6:.*]]) : i32 = (%[[VAL_2]]) to (%[[VAL_3]]) inclusive step (%[[VAL_5]]) {
+! CHECK:             fir.store %[[VAL_6]] to %[[STORE:.*]] : !fir.ref<i32>
 ! CHECK:             %[[VAL_7:.*]] = arith.constant 1 : i32
 ! CHECK:             %[[VAL_8:.*]] = fir.convert %[[VAL_7]] : (i32) -> index
 ! CHECK:             %[[VAL_9:.*]] = fir.load %[[VAL_4]] : !fir.ref<i32>
@@ -22,8 +23,9 @@
 ! CHECK:             %[[VAL_12:.*]] = fir.do_loop %[[VAL_13:.*]] = %[[VAL_8]] to %[[VAL_10]] step %[[VAL_11]] -> index {
 ! CHECK:               %[[VAL_14:.*]] = fir.convert %[[VAL_13]] : (index) -> i32
 ! CHECK:               fir.store %[[VAL_14]] to %[[VAL_0]] : !fir.ref<i32>
+! CHECK:               %[[LOAD:.*]] = fir.load %[[STORE]] : !fir.ref<i32>
 ! CHECK:               %[[VAL_15:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! CHECK:               %[[VAL_16:.*]] = arith.addi %[[VAL_6]], %[[VAL_15]] : i32
+! CHECK:               %[[VAL_16:.*]] = arith.addi %[[LOAD]], %[[VAL_15]] : i32
 ! CHECK:               fir.store %[[VAL_16]] to %[[VAL_1]] : !fir.ref<i32>
 ! CHECK:               %[[VAL_17:.*]] = arith.addi %[[VAL_13]], %[[VAL_11]] : index
 ! CHECK:               fir.result %[[VAL_17]] : index

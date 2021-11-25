@@ -28,6 +28,7 @@ program wsloop_dynamic
 !FIRDialect:     %[[WS_UB:.*]] = arith.constant 9 : i32
 !FIRDialect:     %[[WS_STEP:.*]] = arith.constant 1 : i32
 !FIRDialect:     omp.wsloop (%[[I:.*]]) : i32 = (%[[WS_LB]]) to (%[[WS_UB]]) inclusive step (%[[WS_STEP]]) schedule(dynamic) nowait
+!FIRDialect:       fir.store %[[I]] to %[[STORE:.*]] : !fir.ref<i32>
 
 !LLVMIRDialect-DAG:  %[[WS_UB:.*]] = llvm.mlir.constant(9 : i32) : i32
 !LLVMIRDialect-DAG:  %[[WS_LB_STEP:.*]] = llvm.mlir.constant(1 : i32) : i32
@@ -58,7 +59,8 @@ program wsloop_dynamic
 do i=1, 9
 print*, i
 !FIRDialect:    %[[RTBEGIN:.*]] = fir.call @_FortranAioBeginExternalListOutput
-!FIRDialect:    fir.call @_FortranAioOutputInteger32(%[[RTBEGIN]], %[[I]]) : (!fir.ref<i8>, i32) -> i1
+!FIRDialect:    %[[LOAD:.*]] = fir.load %[[STORE]] : !fir.ref<i32>
+!FIRDialect:    fir.call @_FortranAioOutputInteger32(%[[RTBEGIN]], %[[LOAD]]) : (!fir.ref<i8>, i32) -> i1
 !FIRDialect:    fir.call @_FortranAioEndIoStatement(%[[RTBEGIN]]) : (!fir.ref<i8>) -> i32
 
 
@@ -68,7 +70,7 @@ print*, i
 
 !LLVMIR:   br label %omp_loop.cond
 !LLVMIR: omp_loop.cond:                                    ; preds = %omp_loop.header
-!LLVMIR    %{{.*}} = load i32, i32* %{{.*}}, aling {{.*}}
+!LLVMIR:   %{{.*}} = load i32, i32* %{{.*}}, align 4
 !LLVMIR:   %omp_loop.cmp = icmp ult i32 %{{.*}}, %{{.*}}
 !LLVMIR:   br i1 %omp_loop.cmp, label %omp_loop.body, label %omp_loop.preheader.outer.cond
 !LLVMIR: omp_loop.body:                                    ; preds = %omp_loop.cond
