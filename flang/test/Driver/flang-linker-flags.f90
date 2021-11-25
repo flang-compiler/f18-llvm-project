@@ -10,7 +10,13 @@
 
 ! RUN: %flang -### --ld-path=/usr/bin/ld %S/Inputs/hello.f90 2>&1 | FileCheck %s
 
-! CHECK-LABEL:  /usr/bin/ld
+! Compiler invocation to generate the object file
+! CHECK-LABEL: {{.*}} "-emit-obj"
+! CHECK-SAME:  "-o" "[[object_file:.*]]" {{.*}}Inputs/hello.f90
+
+! Linker invocation to generate the executable
+! CHECK-LABEL:  "/usr/bin/ld"
+! CHECK-SAME: "[[object_file]]"
 ! CHECK-SAME: -lFortran_main
 ! CHECK-SAME: -lFortranRuntime
 ! CHECK-SAME: -lFortranDecimal
