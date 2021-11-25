@@ -471,7 +471,8 @@ private:
       bool isCycleStmt = false;
     };
     llvm::SmallVector<T> ifCandidateStack;
-    auto *doStmt = evaluationList.begin()->getIf<parser::NonLabelDoStmt>();
+    const auto *doStmt =
+        evaluationList.begin()->getIf<parser::NonLabelDoStmt>();
     std::string doName = doStmt ? getConstructName(*doStmt) : std::string{};
     for (auto it = evaluationList.begin(), end = evaluationList.end();
          it != end; ++it) {
@@ -483,10 +484,10 @@ private:
       auto firstStmt = [](lower::pft::Evaluation *e) {
         return e->isConstruct() ? &*e->evaluationList->begin() : e;
       };
-      auto &targetEval = *firstStmt(&eval);
+      const auto &targetEval = *firstStmt(&eval);
       bool targetEvalIsEndDoStmt = targetEval.isA<parser::EndDoStmt>();
       auto branchTargetMatch = [&]() {
-        if (auto targetLabel = ifCandidateStack.back().ifTargetLabel)
+        if (const auto targetLabel = ifCandidateStack.back().ifTargetLabel)
           if (targetLabel == *targetEval.label)
             return true; // goto target match
         if (targetEvalIsEndDoStmt && ifCandidateStack.back().isCycleStmt)
@@ -518,11 +519,11 @@ private:
         }
       }
       if (eval.isA<parser::IfConstruct>() && eval.evaluationList->size() == 3) {
-        auto bodyEval = std::next(eval.evaluationList->begin());
-        if (auto *gotoStmt = bodyEval->getIf<parser::GotoStmt>()) {
+        const auto bodyEval = std::next(eval.evaluationList->begin());
+        if (const auto *gotoStmt = bodyEval->getIf<parser::GotoStmt>()) {
           ifCandidateStack.push_back({it, gotoStmt->v});
         } else if (doStmt) {
-          if (auto *cycleStmt = bodyEval->getIf<parser::CycleStmt>()) {
+          if (const auto *cycleStmt = bodyEval->getIf<parser::CycleStmt>()) {
             std::string cycleName = getConstructName(*cycleStmt);
             if (cycleName.empty() || cycleName == doName)
               // This candidate will match doStmt's EndDoStmt.
