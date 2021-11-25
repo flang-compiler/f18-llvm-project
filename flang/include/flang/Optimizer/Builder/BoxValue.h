@@ -272,6 +272,11 @@ public:
   // TODO: check contiguous attribute of addr
   bool isContiguous() const { return false; }
 
+  // Replace the fir.box, keeping any non-deferred parameters.
+  BoxValue clone(mlir::Value newBox) const {
+    return {newBox, lbounds, explicitParams, extents};
+  }
+
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &, const BoxValue &);
   LLVM_DUMP_METHOD void dump() const { llvm::errs() << *this; }
 
@@ -347,6 +352,10 @@ public:
   /// Is this an allocatable ?
   bool isAllocatable() const {
     return getBoxTy().getEleTy().isa<fir::HeapType>();
+  }
+  // Replace the fir.ref<fir.box>, keeping any non-deferred parameters.
+  MutableBoxValue clone(mlir::Value newBox) const {
+    return {newBox, lenParams, mutableProperties};
   }
   /// Does this entity has any non deferred length parameters ?
   bool hasNonDeferredLenParams() const { return !lenParams.empty(); }
