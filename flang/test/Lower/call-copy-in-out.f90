@@ -90,6 +90,7 @@ subroutine test_parenthesis(x)
 ! CHECK:  fir.call @_QPbar(%[[cast]]) : (!fir.ref<!fir.array<?xf32>>) -> ()
   call bar((x))
 ! CHECK-NOT:  fir.array_merge_store
+! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK: return
 end subroutine
 
@@ -110,6 +111,7 @@ subroutine test_intent_out(x)
 ! CHECK:  fir.call @_QPbar_intent_out(%[[cast]]) : (!fir.ref<!fir.array<100xf32>>) -> ()
   call bar_intent_out(x)
 ! CHECK:  fir.array_merge_store %{{.*}}, %{{.*}} to %[[x]]
+! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK: return
 end subroutine
 
@@ -130,6 +132,7 @@ subroutine test_intent_in(x)
 ! CHECK:  fir.call @_QPbar_intent_in(%[[cast]]) : (!fir.ref<!fir.array<100xf32>>) -> ()
   call bar_intent_in(x)
 ! CHECK-NOT:  fir.array_merge_store
+! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK: return
 end subroutine
 
@@ -150,6 +153,7 @@ subroutine test_intent_inout(x)
 ! CHECK:  fir.call @_QPbar_intent_inout(%[[cast]]) : (!fir.ref<!fir.array<100xf32>>) -> ()
   call bar_intent_inout(x)
 ! CHECK:  fir.array_merge_store %{{.*}}, %{{.*}} to %[[x]]
+! CHECK: fir.freemem %[[temp]] : !fir.heap<!fir.array<?xf32>>
 ! CHECK: return
 end subroutine
 

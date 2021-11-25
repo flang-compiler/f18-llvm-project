@@ -1822,25 +1822,30 @@ public:
   }
 
   /// Create a contiguous temporary array with the same shape,
-  /// length parameters and type as mold
+  /// length parameters and type as mold. It is up to the caller to deallocate
+  /// the temporary.
   ExtValue genTempFromMold(const ExtValue &mold, llvm::StringRef tempName) {
-    auto type = fir::dyn_cast_ptrOrBoxEleTy(fir::getBase(mold).getType());
+    mlir::Type type = fir::dyn_cast_ptrOrBoxEleTy(fir::getBase(mold).getType());
     assert(type && "expected descriptor or memory type");
     auto loc = getLoc();
     auto extents = fir::factory::getExtents(builder, loc, mold);
-    auto typeParams = fir::getTypeParams(mold);
-    mlir::Value temp = builder.create<fir::AllocMemOp>(loc, type, tempName,
-                                                       typeParams, extents);
-    auto *bldr = &converter.getFirOpBuilder();
-    // TODO: call finalizer if needed.
-    stmtCtx.attachCleanup(
-        [bldr, loc, temp]() { bldr->create<fir::FreeMemOp>(loc, temp); });
-    if (fir::unwrapSequenceType(type).isa<fir::CharacterType>()) {
-      auto len = typeParams.empty()
-                     ? fir::factory::readCharLen(builder, loc, mold)
-                     : typeParams[0];
-      return fir::CharArrayBoxValue{temp, len, extents};
+    auto allocMemTypeParams = fir::getTypeParams(mold);
+    mlir::Value charLen;
+    mlir::Type elementType = fir::unwrapSequenceType(type);
+    if (auto charType = elementType.dyn_cast<fir::CharacterType>()) {
+      charLen = allocMemTypeParams.empty()
+                    ? fir::factory::readCharLen(builder, loc, mold)
+                    : allocMemTypeParams[0];
+      if (charType.hasDynamicLen() && allocMemTypeParams.empty())
+        allocMemTypeParams.push_back(charLen);
+    } else if (fir::hasDynamicSize(elementType)) {
+      TODO(loc, "Creating temporary for derived type with length parameters");
     }
+
+    mlir::Value temp = builder.create<fir::AllocMemOp>(
+        loc, type, tempName, allocMemTypeParams, extents);
+    if (fir::unwrapSequenceType(type).isa<fir::CharacterType>())
+      return fir::CharArrayBoxValue{temp, charLen, extents};
     return fir::ArrayBoxValue{temp, extents};
   }
 
@@ -2114,6 +2119,94 @@ public:
         });
   }
 
+  /// Helper structure to track potential copy-in of non contiguous variable
+  /// argument into a contiguous temp. It is used to deallocate the temp that
+  /// may have been created as well as to the copy-out from the temp to the
+  /// variable after the call.
+  struct CopyOutPair {
+    ExtValue var;
+    ExtValue temp;
+    // Flag to indicate if the argument may have been modified by the
+    // callee, in which case it must be copied-out to the variable.
+    bool argMayBeModifiedByCall;
+    // Optional boolean value that, if present and false, prevents
+    // the copy-out and temp deallocation.
+    llvm::Optional<mlir::Value> restrictCopyAndFreeAtRuntime;
+  };
+  using CopyOutPairs = llvm::SmallVector<CopyOutPair, 4>;
+
+  /// Helper to read any fir::BoxValue into other fir::ExtendedValue categories
+  /// not based on fir.box.
+  /// This will lose any non contiguous stride information and dynamic type and
+  /// should only be called if \p exv is known to be contiguous or if its base
+  /// address will be replaced by a contiguous one. If \p exv is not a
+  /// fir::BoxValue, this is a no-op.
+  ExtValue readIfBoxValue(const ExtValue &exv) {
+    if (const auto *box = exv.getBoxOf<fir::BoxValue>())
+      return fir::factory::readBoxValue(builder, getLoc(), *box);
+    return exv;
+  }
+
+  /// Generate a contiguous temp to pass \p actualArg as argument \p arg. The
+  /// creation of the temp and copy-in can be made conditional at runtime by
+  /// providing a runtime boolean flag \p restrictCopyAtRuntime (in which case
+  /// the temp and copy will only be made if the value is true at runtmime).
+  ExtValue genCopyIn(const ExtValue &actualArg,
+                     const Fortran::lower::CallerInterface::PassedEntity &arg,
+                     CopyOutPairs &copyOutPairs,
+                     llvm::Optional<mlir::Value> restrictCopyAtRuntime) {
+    if (!restrictCopyAtRuntime) {
+      auto temp = genTempFromMold(actualArg, ".copyinout");
+      if (arg.mayBeReadByCall())
+        genArrayCopy(temp, actualArg);
+      copyOutPairs.emplace_back(CopyOutPair{
+          actualArg, temp, arg.mayBeModifiedByCall(), restrictCopyAtRuntime});
+      return temp;
+    }
+    // Otherwise, need to be careful to only copy-in if allowed at runtime.
+    auto loc = getLoc();
+    auto addrType = fir::HeapType::get(
+        fir::unwrapPassByRefType(fir::getBase(actualArg).getType()));
+    auto addr = builder
+                    .genIfOp(loc, {addrType}, *restrictCopyAtRuntime,
+                             /*withElseRegion=*/true)
+                    .genThen([&]() {
+                      auto temp = genTempFromMold(actualArg, ".copyinout");
+                      if (arg.mayBeReadByCall())
+                        genArrayCopy(temp, actualArg);
+                      builder.create<fir::ResultOp>(loc, fir::getBase(temp));
+                    })
+                    .genElse([&]() {
+                      auto nullPtr = builder.createNullConstant(loc, addrType);
+                      builder.create<fir::ResultOp>(loc, nullPtr);
+                    })
+                    .getResults()[0];
+    // Associate the temp address with actualArg lengths and extents.
+    auto temp = fir::substBase(readIfBoxValue(actualArg), addr);
+    copyOutPairs.emplace_back(CopyOutPair{
+        actualArg, temp, arg.mayBeModifiedByCall(), restrictCopyAtRuntime});
+    return temp;
+  }
+
+  /// Generate copy-out if needed and free the temporary for an argument that
+  /// has been copied-in into a contiguous temp.
+  void genCopyOut(const CopyOutPair &copyOutPair) {
+    auto loc = getLoc();
+    if (!copyOutPair.restrictCopyAndFreeAtRuntime) {
+      if (copyOutPair.argMayBeModifiedByCall)
+        genArrayCopy(copyOutPair.var, copyOutPair.temp);
+      builder.create<fir::FreeMemOp>(loc, fir::getBase(copyOutPair.temp));
+      return;
+    }
+    builder.genIfThen(loc, *copyOutPair.restrictCopyAndFreeAtRuntime)
+        .genThen([&]() {
+          if (copyOutPair.argMayBeModifiedByCall)
+            genArrayCopy(copyOutPair.var, copyOutPair.temp);
+          builder.create<fir::FreeMemOp>(loc, fir::getBase(copyOutPair.temp));
+        })
+        .end();
+  }
+
   /// Lower a non-elemental procedure reference.
   ExtValue genRawProcedureRef(const Fortran::evaluate::ProcedureRef &procRef,
                               llvm::Optional<mlir::Type> resultType) {
@@ -2132,7 +2225,7 @@ public:
 
     llvm::SmallVector<fir::MutableBoxValue> mutableModifiedByCall;
     // List of <var, temp> where temp must be copied into var after the call.
-    llvm::SmallVector<std::pair<ExtValue, ExtValue>, 4> copyOutPairs;
+    CopyOutPairs copyOutPairs;
 
     auto callSiteType = caller.genFunctionType();
 
@@ -2188,43 +2281,85 @@ public:
       }
       const bool actualArgIsVariable = Fortran::evaluate::IsVariable(*expr);
       if (arg.passBy == PassBy::BaseAddress || arg.passBy == PassBy::BoxChar) {
+        const bool actualIsSimplyContiguous =
+            !actualArgIsVariable || Fortran::evaluate::IsSimplyContiguous(
+                                        *expr, converter.getFoldingContext());
         auto argAddr = [&]() -> ExtValue {
           ExtValue baseAddr;
+          if (actualArgIsVariable && arg.isOptional()) {
+            if (isAllocatableOrPointer(*expr, converter)) {
+              // Fortran 2018 15.5.2.12 point 1: If unallocated/disassociated,
+              // it is as if the argument was absent. The main care here is to
+              // not do a copy-in/copy-out because the temp address, even though
+              // pointing to a null size storage, would not be a nullptr and
+              // therefore the argument would not be considered absent on the
+              // callee side. Note: if wholeSymbol is optional, it cannot be
+              // absent as per 15.5.2.12 point 7. and 8. We rely on this to
+              // un-conditionally read the allocatable/pointer descriptor here.
+              if (actualIsSimplyContiguous)
+                return genBoxArg(*expr);
+              fir::MutableBoxValue mutableBox = genMutableBoxValue(*expr);
+              auto isAssociated = fir::factory::genIsAllocatedOrAssociatedTest(
+                  builder, loc, mutableBox);
+              auto actualExv =
+                  fir::factory::genMutableBoxRead(builder, loc, mutableBox);
+              return genCopyIn(actualExv, arg, copyOutPairs, isAssociated);
+            }
+            if (const Fortran::semantics::Symbol *wholeSymbol =
+                    Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(
+                        *expr))
+              if (Fortran::semantics::IsOptional(*wholeSymbol)) {
+                auto actualArg = gen(*expr);
+                auto actualArgBase = fir::getBase(actualArg);
+                if (!actualArgBase.getType().isa<fir::BoxType>())
+                  return actualArg;
+                // Do not read wholeSymbol descriptor that may be a nullptr in
+                // case wholeSymbol is absent.
+                // Absent descriptor cannot be read. To avoid any issue in
+                // copy-in/copy-out, and when retrieving the address/length
+                // create an descriptor pointing to a null address here if the
+                // fir.box is absent.
+                mlir::Value isPresent = builder.create<fir::IsPresentOp>(
+                    loc, builder.getI1Type(), actualArgBase);
+                auto boxType = actualArgBase.getType();
+                auto emptyBox = fir::factory::createUnallocatedBox(
+                    builder, loc, boxType, llvm::None);
+                auto safeToReadBox = builder.create<mlir::SelectOp>(
+                    loc, isPresent, actualArgBase, emptyBox);
+                auto safeToReadExv = fir::substBase(actualArg, safeToReadBox);
+                if (actualIsSimplyContiguous)
+                  return safeToReadExv;
+                return genCopyIn(safeToReadExv, arg, copyOutPairs, isPresent);
+              }
+            // Fall through: The actual argument can safely be
+            // copied-in/copied-out without any care if needed.
+          }
           if (actualArgIsVariable && expr->Rank() > 0) {
             auto box = genBoxArg(*expr);
-            if (!Fortran::evaluate::IsSimplyContiguous(
-                    *expr, converter.getFoldingContext())) {
-              // Non contiguous variable need to be copied into a contiguous
-              // temp, and the temp need to be copied back after the call in
-              // case it was modified.
-              auto temp = genTempFromMold(box, ".copyinout");
-              if (arg.mayBeReadByCall())
-                genArrayCopy(temp, box);
-              if (arg.mayBeModifiedByCall())
-                copyOutPairs.emplace_back(box, temp);
-              return temp;
-            }
+            if (!actualIsSimplyContiguous)
+              return genCopyIn(box, arg, copyOutPairs,
+                               /*restrictCopyAtRuntime=*/llvm::None);
             // Contiguous: just use the box we created above!
             // This gets "unboxed" below, if needed.
-            baseAddr = box;
-          } else if (actualArgIsVariable) {
-            baseAddr = genExtAddr(*expr);
-          } else {
-            // Make sure a variable address is not passed.
-            baseAddr = genTempExtAddr(*expr);
+            return box;
           }
-
-          // Scalar and contiguous expressions may be lowered to a fir.box,
-          // either to account for potential polymorphism, or because lowering
-          // did not account for some contiguity hints.
-          // Here, polymorphism does not matter (an entity of the declared type
-          // is passed, not one of the dynamic type), and the expr is known to
-          // be simply contiguous, so it is safe to unbox it and pass the
-          // address without making a copy.
-          if (const auto *box = baseAddr.getBoxOf<fir::BoxValue>())
-            return fir::factory::readBoxValue(builder, loc, *box);
-          return baseAddr;
+          // Actual argument is a non optional/non pointer/non allocatable
+          // scalar.
+          if (actualArgIsVariable)
+            return genExtAddr(*expr);
+          // Actual argument is not a variable. Make sure a variable address is
+          // not passed.
+          return genTempExtAddr(*expr);
         }();
+        // Scalar and contiguous expressions may be lowered to a fir.box,
+        // either to account for potential polymorphism, or because lowering
+        // did not account for some contiguity hints.
+        // Here, polymorphism does not matter (an entity of the declared type
+        // is passed, not one of the dynamic type), and the expr is known to
+        // be simply contiguous, so it is safe to unbox it and pass the
+        // address without making a copy.
+        argAddr = readIfBoxValue(argAddr);
+
         if (arg.passBy == PassBy::BaseAddress) {
           caller.placeInput(arg, fir::getBase(argAddr));
         } else {
@@ -2293,8 +2428,8 @@ public:
 
     // Copy-out temps that were created for non contiguous variable arguments if
     // needed.
-    for (auto [var, temp] : copyOutPairs)
-      genArrayCopy(var, temp);
+    for (const auto &copyOutPair : copyOutPairs)
+      genCopyOut(copyOutPair);
 
     return result;
   }
