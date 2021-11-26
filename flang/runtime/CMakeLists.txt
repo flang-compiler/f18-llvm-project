@@ -65,6 +65,7 @@ add_flang_library(FortranRuntime PARTIAL_SOURCES_INTENDED
   stat.cpp
   stop.cpp
   sum.cpp
+  support.cpp
   terminator.cpp
   time-intrinsic.cpp
   tools.cpp
