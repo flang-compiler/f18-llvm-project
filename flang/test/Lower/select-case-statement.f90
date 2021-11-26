@@ -158,6 +158,58 @@
     print*, nn
   end
 
+  ! CHECK-LABEL: func @_QPtest_char_temp_selector
+  subroutine test_char_temp_selector()
+    ! Test that character selector that are temps are deallocated
+    ! only after they have been used in the select case comparisons.
+    interface
+      function gen_char_temp_selector()
+        character(:), allocatable :: gen_char_temp_selector
+      end function
+    end interface
+    select case (gen_char_temp_selector())
+    case ('case1')
+      call foo1()
+    case ('case2')
+      call foo2()
+    case ('case3')
+      call foo3()
+    case default
+      call foo_default()
+    end select
+    ! CHECK:   %[[VAL_0:.*]] = fir.alloca !fir.box<!fir.heap<!fir.char<1,?>>> {bindc_name = ".result"}
+    ! CHECK:   %[[VAL_1:.*]] = fir.call @_QPgen_char_temp_selector() : () -> !fir.box<!fir.heap<!fir.char<1,?>>>
+    ! CHECK:   fir.save_result %[[VAL_1]] to %[[VAL_0]] : !fir.box<!fir.heap<!fir.char<1,?>>>, !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>
+    ! CHECK:   cond_br %{{.*}}, ^bb2, ^bb1
+    ! CHECK: ^bb1:
+    ! CHECK:   cond_br %{{.*}}, ^bb4, ^bb3
+    ! CHECK: ^bb2:
+    ! CHECK:   fir.call @_QPfoo1() : () -> ()
+    ! CHECK:   br ^bb8
+    ! CHECK: ^bb3:
+    ! CHECK:   cond_br %{{.*}}, ^bb6, ^bb5
+    ! CHECK: ^bb4:
+    ! CHECK:   fir.call @_QPfoo2() : () -> ()
+    ! CHECK:   br ^bb8
+    ! CHECK: ^bb5:
+    ! CHECK:   br ^bb7
+    ! CHECK: ^bb6:
+    ! CHECK:   fir.call @_QPfoo3() : () -> ()
+    ! CHECK:   br ^bb8
+    ! CHECK: ^bb7:
+    ! CHECK:   fir.call @_QPfoo_default() : () -> ()
+    ! CHECK:   br ^bb8
+    ! CHECK: ^bb8:
+    ! CHECK:   %[[VAL_36:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>
+    ! CHECK:   %[[VAL_37:.*]] = fir.box_addr %[[VAL_36]] : (!fir.box<!fir.heap<!fir.char<1,?>>>) -> !fir.heap<!fir.char<1,?>>
+    ! CHECK:   %[[VAL_38:.*]] = fir.convert %[[VAL_37]] : (!fir.heap<!fir.char<1,?>>) -> i64
+    ! CHECK:   %[[VAL_39:.*]] = arith.constant 0 : i64
+    ! CHECK:   %[[VAL_40:.*]] = arith.cmpi ne, %[[VAL_38]], %[[VAL_39]] : i64
+    ! CHECK:   fir.if %[[VAL_40]] {
+    ! CHECK:     fir.freemem %[[VAL_37]] : !fir.heap<!fir.char<1,?>>
+    ! CHECK:   }
+  end subroutine
+
   ! CHECK-LABEL: main
   program p
     integer sinteger, v(10)

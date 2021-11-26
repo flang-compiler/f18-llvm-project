@@ -1586,7 +1586,6 @@ private:
       defaultBlock = eval.parentConstruct->constructExit->block;
     attrList.push_back(mlir::UnitAttr::get(context));
     blockList.push_back(defaultBlock);
-    stmtCtx.finalize();
 
     // Generate a fir::SelectCaseOp.
     // Explicit branch code is better for the LOGICAL type.  The CHARACTER type
@@ -1594,6 +1593,10 @@ private:
     // The -no-structured-fir option can be used to force generation of INTEGER
     // type branch code.
     if (!isLogicalSelector && !isCharSelector && eval.lowerAsStructured()) {
+      // Numeric selector is a ssa register, all temps that may have
+      // been generated while evaluating it can be cleaned-up before the
+      // fir.select_case.
+      stmtCtx.finalize();
       builder->create<fir::SelectCaseOp>(loc, selector, attrList, valueList,
                                          blockList);
       return;
@@ -1651,6 +1654,12 @@ private:
     }
     assert(caseValue == valueList.end() && caseBlock == blockList.end() &&
            "select case list mismatch");
+    // Clean-up the selector at the end of the construct if it is a temporary
+    // (which is possible with characters).
+    mlir::OpBuilder::InsertPoint insertPt = builder->saveInsertionPoint();
+    builder->setInsertionPointToEnd(eval.parentConstruct->constructExit->block);
+    stmtCtx.finalize();
+    builder->restoreInsertionPoint(insertPt);
   }
 
   fir::ExtendedValue
