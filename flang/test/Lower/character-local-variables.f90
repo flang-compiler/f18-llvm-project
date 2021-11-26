@@ -13,7 +13,9 @@ end subroutine
 subroutine scalar_dyn_len(l)
   integer :: l
   character(l) :: c
-  ! CHECK: %[[l:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK: %[[lexpr:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK: %[[is_positive:.*]] = arith.cmpi sgt, %[[lexpr]], %c0{{.*}} : i32
+  ! CHECK: %[[l:.*]] = select %[[is_positive]], %[[lexpr]], %c0{{.*}} : i32
   ! CHECK: fir.alloca !fir.char<1,?>(%[[l]] : i32) {{{.*}}uniq_name = "_QFscalar_dyn_lenEc"}
 end subroutine
 
@@ -28,7 +30,9 @@ end subroutine
 subroutine cst_array_dyn_len(l)
   integer :: l
   character(l) :: c(10)
-  ! CHECK: %[[l:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK: %[[lexpr:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK: %[[is_positive:.*]] = arith.cmpi sgt, %[[lexpr]], %c0{{.*}} : i32
+  ! CHECK: %[[l:.*]] = select %[[is_positive]], %[[lexpr]], %c0{{.*}} : i32
   ! CHECK: fir.alloca !fir.array<10x!fir.char<1,?>>(%[[l]] : i32) {{{.*}}uniq_name = "_QFcst_array_dyn_lenEc"}
 end subroutine
 
@@ -47,7 +51,9 @@ end subroutine
 subroutine dyn_array_dyn_len(l, n)
   integer :: l, n
   character(l) :: c(n)
-  ! CHECK-DAG: %[[l:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK-DAG: %[[lexpr:.*]] = fir.load %[[arg0]] : !fir.ref<i32>
+  ! CHECK-DAG: %[[is_positive:.*]] = arith.cmpi sgt, %[[lexpr]], %c0{{.*}} : i32
+  ! CHECK-DAG: %[[l:.*]] = select %[[is_positive]], %[[lexpr]], %c0{{.*}} : i32
   ! CHECK-DAG: %[[n:.*]] = fir.load %[[arg1]] : !fir.ref<i32>
   ! CHECK: %[[ni:.*]] = fir.convert %[[n]] : (i32) -> index
   ! CHECK: fir.alloca !fir.array<?x!fir.char<1,?>>(%[[l]] : i32), %[[ni]] {{{.*}}uniq_name = "_QFdyn_array_dyn_lenEc"}
@@ -64,7 +70,9 @@ end subroutine
 subroutine cst_array_dyn_len_lb(l)
   integer(8) :: l
   character(l) :: c(11:20)
-  ! CHECK: %[[l:.*]] = fir.load %[[arg0]] : !fir.ref<i64>
+  ! CHECK: %[[lexpr:.*]] = fir.load %[[arg0]] : !fir.ref<i64>
+  ! CHECK: %[[is_positive:.*]] = arith.cmpi sgt, %[[lexpr]], %c0{{.*}} : i64
+  ! CHECK: %[[l:.*]] = select %[[is_positive]], %[[lexpr]], %c0{{.*}} : i64
   ! CHECK: fir.alloca !fir.array<10x!fir.char<1,?>>(%[[l]] : i64) {{{.*}}uniq_name = "_QFcst_array_dyn_len_lbEc"}
 end subroutine
 
@@ -86,7 +94,9 @@ subroutine dyn_array_dyn_len_lb(l, n)
   integer(8) :: l, n
   character(l) :: c(11:n)
   ! CHECK-DAG: %[[cm10:.*]] = arith.constant -10 : index
-  ! CHECK-DAG: %[[l:.*]] = fir.load %[[arg0]] : !fir.ref<i64>
+  ! CHECK-DAG: %[[lexpr:.*]] = fir.load %[[arg0]] : !fir.ref<i64>
+  ! CHECK-DAG: %[[is_positive:.*]] = arith.cmpi sgt, %[[lexpr]], %c0{{.*}} : i64
+  ! CHECK-DAG: %[[l:.*]] = select %[[is_positive]], %[[lexpr]], %c0{{.*}} : i64
   ! CHECK-DAG: %[[n:.*]] = fir.load %[[arg1]] : !fir.ref<i64>
   ! CHECK-DAG: %[[ni:.*]] = fir.convert %[[n]] : (i64) -> index
   ! CHECK: %[[extent:.*]] = arith.addi %[[ni]], %[[cm10]] : index
@@ -105,3 +115,8 @@ subroutine assumed_length_param(n)
   call take_int(len(c(n), kind=8))
 end
 
+! CHECK-LABEL: func @_QPscalar_cst_neg_len
+subroutine scalar_cst_neg_len()
+  character(-1) :: c
+  ! CHECK: fir.alloca !fir.char<1,0> {{{.*}}uniq_name = "_QFscalar_cst_neg_lenEc"}
+end subroutine

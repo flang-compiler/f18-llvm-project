@@ -16,6 +16,7 @@
 #include "flang/Lower/BoxAnalyzer.h"
 #include "flang/Lower/CallInterface.h"
 #include "flang/Lower/ConvertExpr.h"
+#include "flang/Lower/IntrinsicCall.h"
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/StatementContext.h"
@@ -1233,7 +1234,12 @@ void Fortran::lower::mapSymbolAttributes(
       [&](llvm::Optional<Fortran::lower::SomeExpr> charLen) -> mlir::Value {
     if (!charLen)
       fir::emitFatalError(loc, "expected explicit character length");
-    return genValue(*charLen);
+    auto rawLen = genValue(*charLen);
+    // If the length expression is negative, the length is zero. See
+    // F2018 7.4.4.2 point 5.
+    auto zero = builder.createIntegerConstant(loc, rawLen.getType(), 0);
+    return Fortran::lower::genMax(builder, loc,
+                                  llvm::SmallVector<mlir::Value>{rawLen, zero});
   };
 
   ba.match(

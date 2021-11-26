@@ -471,8 +471,12 @@ private:
   charLenConstant(const Fortran::semantics::Symbol &sym) {
     if (llvm::Optional<Fortran::semantics::SomeExpr> expr =
             charLenVariable(sym))
-      if (std::optional<int64_t> asInt = Fortran::evaluate::ToInt64(*expr))
-        return {*asInt};
+      if (std::optional<int64_t> asInt = Fortran::evaluate::ToInt64(*expr)) {
+        // Length is max(0, *asInt) (F2018 7.4.4.2 point 5.).
+        if (*asInt < 0)
+          return 0;
+        return *asInt;
+      }
     return llvm::None;
   }
 
