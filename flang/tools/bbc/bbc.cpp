@@ -276,7 +276,9 @@ static mlir::LogicalResult convertFortranSourceToMLIR(
     pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
     pm.addPass(mlir::createCanonicalizerPass());
     fir::addCSE(pm);
-    pm.addPass(mlir::createInlinerPass());
+    llvm::StringMap<mlir::OpPassManager> pipelines;
+    pm.addPass(mlir::createInlinerPass(
+        pipelines, fir::defaultFlangInlinerOptPipeline));
     pm.addPass(mlir::createCSEPass());
 
     // convert control flow to CFG form
