@@ -10,20 +10,17 @@
 #include <cstdlib>
 
 namespace Fortran::runtime {
-namespace {
-struct RaggedArrayHeader {
-  std::uint64_t flags{0u};
-  void *bufferPointer{nullptr};
-  std::int64_t *extentPointer{nullptr};
 
-  bool isIndirection() const { return flags & 1; }
-  std::size_t rank() const { return flags >> 1; }
-};
-} // namespace
+inline bool isIndirection(const RaggedArrayHeader *const header) {
+  return header->flags & 1;
+}
 
-static RaggedArrayHeader *RaggedArrayAllocate(RaggedArrayHeader *header,
-    bool isHeader, std::int64_t rank, std::int64_t elementSize,
-    std::int64_t *extentVector) {
+inline std::size_t rank(const RaggedArrayHeader *const header) {
+  return header->flags >> 1;
+}
+
+RaggedArrayHeader *RaggedArrayAllocate(RaggedArrayHeader *header, bool isHeader,
+    std::int64_t rank, std::int64_t elementSize, std::int64_t *extentVector) {
   if (header && rank) {
     std::int64_t size = 1;
     for (std::int64_t counter{0}; counter < rank; ++counter) {
@@ -47,10 +44,10 @@ static RaggedArrayHeader *RaggedArrayAllocate(RaggedArrayHeader *header,
 }
 
 // Deallocate a ragged array from the heap.
-static void RaggedArrayDeallocate(RaggedArrayHeader *raggedArrayHeader) {
+void RaggedArrayDeallocate(RaggedArrayHeader *raggedArrayHeader) {
   if (raggedArrayHeader) {
-    if (std::size_t end{raggedArrayHeader->rank()}) {
-      if (raggedArrayHeader->isIndirection()) {
+    if (std::size_t end{rank(raggedArrayHeader)}) {
+      if (isIndirection(raggedArrayHeader)) {
         std::size_t linearExtent{1u};
         for (std::size_t counter{0u}; counter < end && linearExtent > 0;
              ++counter) {
