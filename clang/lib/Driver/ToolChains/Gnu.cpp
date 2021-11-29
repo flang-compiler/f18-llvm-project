@@ -569,7 +569,6 @@ void tools::gnutools::Linker::ConstructJob(Compilation &C, const JobAction &JA,
     CmdArgs.push_back("-lFortran_main");
     CmdArgs.push_back("-lFortranRuntime");
     CmdArgs.push_back("-lFortranDecimal");
-    CmdArgs.push_back("-lFortranRuntime");
     CmdArgs.push_back("-lm");
   }
 
