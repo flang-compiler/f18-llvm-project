@@ -41,43 +41,53 @@
   ! CHECK:   15 PrintStmt: print*
   print*
 
-  ! CHECK:   <<DoConstruct>> -> 25
-  ! CHECK:     16 NonLabelDoStmt -> 24: abc: do i = 1, 5
-  ! CHECK:     <<IfConstruct>> -> 24
-  ! CHECK:       17 ^IfStmt [negate] -> 24: if(i <= 1 .or. i >= 5) cycle abc
-  ! CHECK:       <<IfConstruct>> -> 24
-  ! CHECK:         20 ^IfStmt [negate] -> 24: if(i == 3) goto 3
-  ! CHECK:         23 ^PrintStmt: print*, i
-  ! CHECK:         22 EndIfStmt
-  ! CHECK:       <<End IfConstruct>>
-  ! CHECK:       19 EndIfStmt
-  ! CHECK:     <<End IfConstruct>>
-  ! CHECK:     24 EndDoStmt -> 16: 3 end do abc
-  ! CHECK:   <<End DoConstruct>>
-  abc: do i = 1, 5
-     if (i <= 1 .or. i >= 5) cycle abc
-     if (i == 3) goto 3
-     print*, i
-3 end do abc
+  ! CHECK:<<DoConstruct!>> -> 30
+  ! CHECK:  16 NonLabelDoStmt -> 29: outer: do i = 1, 3
+  ! CHECK:  <<DoConstruct!>> -> 29
+  ! CHECK:    17 ^NonLabelDoStmt -> 28: inner: do j = 1, 5
+  ! CHECK:    <<IfConstruct!>> -> 28
+  ! CHECK:      18 ^IfStmt [negate] -> 28: if(j <= 1 .or. j >= 5) cycle inner
+  ! CHECK:      <<IfConstruct!>> -> 28
+  ! CHECK:        21 ^IfStmt [negate] -> 28: if(j == 3) goto 3
+  ! CHECK:        <<IfConstruct!>> -> 27
+  ! CHECK:          24 ^IfStmt -> 27: if(j == 4) cycle outer
+  ! CHECK:          25 ^CycleStmt! -> 29: cycle outer
+  ! CHECK:          26 EndIfStmt
+  ! CHECK:        <<End IfConstruct!>>
+  ! CHECK:        27 ^PrintStmt: print*, j
+  ! CHECK:        23 EndIfStmt
+  ! CHECK:      <<End IfConstruct!>>
+  ! CHECK:      20 EndIfStmt
+  ! CHECK:    <<End IfConstruct!>>
+  ! CHECK:    28 ^EndDoStmt -> 17: 3 end do inner
+  ! CHECK:  <<End DoConstruct!>>
+  ! CHECK:  29 ^EndDoStmt -> 16: end do outer
+  ! CHECK:<<End DoConstruct!>>
+  outer: do i = 1, 3
+    inner: do j = 1, 5
+             if (j <= 1 .or. j >= 5) cycle inner
+             if (j == 3) goto 3
+             if (j == 4) cycle outer
+             print*, j
+  3        end do inner
+         end do outer
 
-  ! CHECK:   25 PrintStmt: print*
+  ! CHECK:   30 ^PrintStmt: print*
   print*
 
-  ! CHECK:   <<DoConstruct>> -> 35
-  ! CHECK:     26 NonLabelDoStmt -> 34: do i = 1, 5
-  ! CHECK:     <<IfConstruct>> -> 34
-  ! CHECK:       27 ^IfStmt [negate] -> 34: if(i == 3) goto 4
-  ! CHECK:       <<IfConstruct>> -> 34
-  ! CHECK:         30 ^IfStmt [negate] -> 34: if(i <= 1 .or. i >= 5) cycle
-  ! CHECK:         33 ^PrintStmt: print*, i
-  ! CHECK:         32 EndIfStmt
-  ! CHECK:       <<End IfConstruct>>
-  ! CHECK:       29 EndIfStmt
-  ! CHECK:     <<End IfConstruct>>
-  ! CHECK:     34 EndDoStmt -> 26: 4 end do
-  ! CHECK:   <<End DoConstruct>>
-  ! CHECK:   35 EndProgramStmt: end
-  ! CHECK: End Program <anonymous>
+  ! CHECK:<<DoConstruct>> -> 40
+  ! CHECK:  31 NonLabelDoStmt -> 39: do i = 1, 5
+  ! CHECK:  <<IfConstruct>> -> 39
+  ! CHECK:    32 ^IfStmt [negate] -> 39: if(i == 3) goto 4
+  ! CHECK:    <<IfConstruct>> -> 39
+  ! CHECK:      35 ^IfStmt [negate] -> 39: if(i <= 1 .or. i >= 5) cycle
+  ! CHECK:      38 ^PrintStmt: print*, i
+  ! CHECK:      37 EndIfStmt
+  ! CHECK:    <<End IfConstruct>>
+  ! CHECK:    34 EndIfStmt
+  ! CHECK:  <<End IfConstruct>>
+  ! CHECK:  39 EndDoStmt -> 31: 4 end do
+  ! CHECK:<<End DoConstruct>>
   do i = 1, 5
      if (i == 3) goto 4
      if (i <= 1 .or. i >= 5) cycle

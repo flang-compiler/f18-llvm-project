@@ -1,9 +1,9 @@
   ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
   ! CHECK-LABEL: func @_QQmain() {
-  ! CHECK:         %[[VAL_0:.*]] = fir.address_of(@_QEa) : !fir.ref<!fir.array<10xf32>>
+  ! CHECK:         %[[VAL_0:.*]] = fir.address_of(@_QFEa) : !fir.ref<!fir.array<10xf32>>
   ! CHECK:         %[[VAL_1:.*]] = arith.constant 10 : index
-  ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QEb) : !fir.ref<!fir.array<10xf32>>
+  ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QFEb) : !fir.ref<!fir.array<10xf32>>
   ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
   ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : i64
   ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i64) -> index

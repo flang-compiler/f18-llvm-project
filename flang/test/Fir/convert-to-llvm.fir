@@ -3,6 +3,10 @@
 // RUN: fir-opt --split-input-file --fir-to-llvm-ir="target=i386-unknown-linux-gnu" %s | FileCheck %s
 // RUN: fir-opt --split-input-file --fir-to-llvm-ir="target=powerpc64le-unknown-linux-gn" %s | FileCheck %s
 
+//=============================================================================
+// SUMMARY: Tests for FIR --> LLVM MLIR conversion independent of the target
+//=============================================================================
+
 // Test `fir.select` operation conversion pattern.
 // Check that the if-then-else ladder is correctly constructed and that we
 // branch to the correct block.
@@ -723,3 +727,253 @@ func @box_isptr(%arg0: !fir.box<!fir.array<*:f64>>) -> i1 {
 // CHECK:         %[[CMP_C0:.*]] = llvm.mlir.constant(0 : i32) : i32
 // CHECK:         %[[IS_ALLOC:.*]] = llvm.icmp "ne" %[[AND]], %[[CMP_C0]] : i32
 // CHECK:         llvm.return %[[IS_ALLOC]] : i1
+
+// -----
+
+// Test fir.extract_value operation conversion with derived type.
+
+func @extract_derived_type() -> f32 {
+  %0 = fir.undefined !fir.type<derived{f:f32}>
+  %1 = fir.extract_value %0, ["f", !fir.type<derived{f:f32}>] : (!fir.type<derived{f:f32}>) -> f32
+  return %1 : f32
+}
+
+// CHECK-LABEL: llvm.func @extract_derived_type
+// CHECK:         %[[STRUCT:.*]] = llvm.mlir.undef : !llvm.struct<"derived", (f32)>
+// CHECK:         %[[VALUE:.*]] = llvm.extractvalue %[[STRUCT]][0 : i32] : !llvm.struct<"derived", (f32)>
+// CHECK:         llvm.return %[[VALUE]] : f32
+
+// -----
+
+// Test fir.extract_value operation conversion with a multi-dimensional array
+// of tuple.
+
+func @extract_array(%a : !fir.array<10x10xtuple<i32, f32>>) -> f32 {
+  %0 = fir.extract_value %a, [5 : index, 4 : index, 1 : index] : (!fir.array<10x10xtuple<i32, f32>>) -> f32
+  return %0 : f32
+}
+
+// CHECK-LABEL: llvm.func @extract_array(
+// CHECK-SAME:                           %[[ARR:.*]]: !llvm.array<10 x array<10 x struct<(i32, f32)>>>
+// CHECK:         %[[VALUE:.*]] = llvm.extractvalue %[[ARR]][4 : index, 5 : index, 1 : index] : !llvm.array<10 x array<10 x struct<(i32, f32)>>>
+// CHECK:         llvm.return %[[VALUE]] : f32
+
+// -----
+
+// Test fir.insert_value operation conversion with a multi-dimensional array
+// of tuple.
+
+func @extract_array(%a : !fir.array<10x10xtuple<i32, f32>>) {
+  %f = arith.constant 2.0 : f32
+  %i = arith.constant 1 : i32
+  %0 = fir.insert_value %a, %i, [5 : index, 4 : index, 0 : index] : (!fir.array<10x10xtuple<i32, f32>>, i32) -> !fir.array<10x10xtuple<i32, f32>>
+  %1 = fir.insert_value %a, %f, [5 : index, 4 : index, 1 : index] : (!fir.array<10x10xtuple<i32, f32>>, f32) -> !fir.array<10x10xtuple<i32, f32>>
+  return
+}
+
+// CHECK-LABEL: llvm.func @extract_array(
+// CHECK-SAME:                           %[[ARR:.*]]: !llvm.array<10 x array<10 x struct<(i32, f32)>>>
+// CHECK:         %{{.*}} = llvm.insertvalue %{{.*}}, %[[ARR]][4 : index, 5 : index, 0 : index] : !llvm.array<10 x array<10 x struct<(i32, f32)>>>
+// CHECK:         %{{.*}} = llvm.insertvalue %{{.*}}, %[[ARR]][4 : index, 5 : index, 1 : index] : !llvm.array<10 x array<10 x struct<(i32, f32)>>>
+// CHECK:         llvm.return
+
+// -----
+
+// Test fir.insert_value operation conversion with derived type.
+
+func @insert_tuple(%a : tuple<i32, f32>) {
+  %f = arith.constant 2.0 : f32
+  %1 = fir.insert_value %a, %f, [1 : index] : (tuple<i32, f32>, f32) -> tuple<i32, f32>
+  return
+}
+
+// CHECK-LABEL: func @insert_tuple(
+// CHECK-SAME:                     %[[TUPLE:.*]]: !llvm.struct<(i32, f32)>
+// CHECK:         %{{.*}} = llvm.insertvalue %{{.*}}, %[[TUPLE]][1 : index] : !llvm.struct<(i32, f32)>
+
+// -----
+
+// Check `fir.no_reassoc` conversion to LLVM IR dialect
+
+func @no_reassoc(%arg0: !fir.ref<i32>) {
+  %0 = fir.alloca i32
+  %1 = fir.load %arg0 : !fir.ref<i32>
+  %2 = fir.no_reassoc %1 : i32
+  fir.store %2 to %0 : !fir.ref<i32>
+  return
+}
+
+// CHECK-LABEL: llvm.func @no_reassoc(
+// CHECK-SAME:                        %[[ARG0:.*]]: !llvm.ptr<i32>) {
+// CHECK:         %[[C1:.*]] = llvm.mlir.constant(1 : i64) : i64
+// CHECK:         %[[ALLOC:.*]] = llvm.alloca %[[C1]] x i32 {in_type = i32, operand_segment_sizes = dense<0> : vector<2xi32>} : (i64) -> !llvm.ptr<i32>
+// CHECK:         %[[LOAD:.*]] = llvm.load %[[ARG0]] : !llvm.ptr<i32>
+// CHECK:         llvm.store %[[LOAD]], %[[ALLOC]] : !llvm.ptr<i32>
+// CHECK:         llvm.return
+
+// -----
+
+// Test `fir.is_present`
+
+func @test_is_present_i64(%arg0: !fir.ref<i64>) -> () {
+  %0 = fir.is_present %arg0 : (!fir.ref<i64>) -> i1
+  return
+}
+
+// CHECK-LABEL: @test_is_present_i64
+// CHECK-SAME: (%[[arg:.*]]: !llvm.ptr<i64>)
+// CHECK-NEXT:  %[[constant:.*]] = llvm.mlir.constant(0 : i64) : i64
+// CHECK-NEXT:  %[[ptr:.*]] = llvm.ptrtoint %[[arg]] : !llvm.ptr<i64> to i64
+// CHECK-NEXT:  %{{.*}} = llvm.icmp "ne" %[[ptr]], %[[constant]] : i64
+// CHECK-NEXT:  llvm.return
+// CHECK-NEXT: }
+
+func @test_is_present_box(%arg0: !fir.box<!fir.ref<i64>>) -> () {
+  %0 = fir.is_present %arg0 : (!fir.box<!fir.ref<i64>>) -> i1
+  return
+}
+
+// CHECK-LABEL: @test_is_present_box
+// CHECK-SAME: (%[[arg:.*]]: !llvm.ptr<struct<(ptr<i64>, i64, i32, i8, i8, i8, i8)>>)
+// CHECK-NEXT: %[[constant:.*]] = llvm.mlir.constant(0 : i64) : i64
+// CHECK-NEXT: %[[ptr:.*]] = llvm.ptrtoint %[[arg]] : !llvm.ptr<struct<(ptr<i64>, i64, i32, i8, i8, i8, i8)>> to i64
+// CHECK-NEXT: %{{.*}} = llvm.icmp "ne" %[[ptr]], %[[constant]] : i64
+// CHECK-NEXT: llvm.return
+// CHECK-NEXT: }
+
+
+// -----
+
+// Test `fir.absent`
+
+func @test_absent_i64() -> () {
+  %0 = fir.absent !fir.ref<i64>
+  return
+}
+
+// CHECK-LABEL: @test_absent_i64
+// CHECK-NEXT:  %{{.*}} = llvm.mlir.null : !llvm.ptr<i64>
+// CHECK-NEXT:  llvm.return
+// CHECK-NEXT:  }
+
+func @test_absent_box() -> () {
+  %0 = fir.absent !fir.box<!fir.array<?xf32>>
+  return
+}
+// CHECK-LABEL: @test_absent_box
+// CHECK-NEXT:  %{{.*}} = llvm.mlir.null : !llvm.ptr<struct<(ptr<f32>, i64, i32, i8, i8, i8, i8, array<1 x array<3 x i64>>)>>
+// CHECK-NEXT:  llvm.return
+// CHECK-NEXT:  }
+
+// -----
+
+// This is a bit more comprehensive test for `fir.is_present` and `fir.absent`
+// when used together
+
+func @is_present(%arg0: !fir.ref<i64>) -> i1 {
+  %0 = fir.is_present %arg0 : (!fir.ref<i64>) -> i1
+  return %0 : i1
+}
+
+// CHECK-LABEL: @is_present
+// CHECK-SAME: (%[[arg:.*]]: !llvm.ptr<i64>) -> i1
+// CHECK-NEXT:  %[[constant:.*]] = llvm.mlir.constant(0 : i64) : i64
+// CHECK-NEXT:  %[[ptr:.*]] = llvm.ptrtoint %[[arg]] : !llvm.ptr<i64> to i64
+// CHECK-NEXT:  %[[ret_val:.*]] = llvm.icmp "ne" %[[ptr]], %[[constant]] : i64
+// CHECK-NEXT:  llvm.return %[[ret_val]] : i1
+// CHECK-NEXT: }
+
+func @absent() -> i1 {
+  %0 = fir.absent !fir.ref<i64>
+  %1 = fir.call @is_present(%0) : (!fir.ref<i64>) -> i1
+  return %1 : i1
+}
+
+// CHECK-LABEL: @absent
+// CHECK-SAME:  () -> i1
+// CHECK-NEXT:  %[[ptr:.*]] = llvm.mlir.null : !llvm.ptr<i64>
+// CHECK-NEXT:  %[[ret_val:.*]] = llvm.call @is_present(%[[ptr]]) : (!llvm.ptr<i64>) -> i1
+// CHECK-NEXT:  llvm.return %[[ret_val]] : i1
+
+// -----
+
+// Verify that fir.unreachable is transformed to llvm.unreachable
+
+// CHECK:  llvm.func @test_unreachable() {
+// CHECK-NEXT:    llvm.unreachable
+// CHECK-NEXT:  }
+
+func @test_unreachable() {
+  fir.unreachable
+}
+
+// -----
+
+// Test `fir.store` --> `llvm.store` conversion
+
+func @test_store_index(%val_to_store : index, %addr : !fir.ref<index>) {
+  fir.store %val_to_store to %addr : !fir.ref<index>
+  return
+}
+
+// CHECK-LABEL:   llvm.func @test_store_index
+// CHECK-SAME:    (%[[arg0:.*]]: i64, %[[arg1:.*]]: !llvm.ptr<i64>) {
+// CHECK-NEXT:    llvm.store %[[arg0]], %[[arg1]] : !llvm.ptr<i64>
+// CHECK-NEXT:    llvm.return
+// CHECK-NEXT:  }
+
+func @test_store_box(%array : !fir.ref<!fir.box<!fir.array<?x?xf32>>>, %box : !fir.box<!fir.array<?x?xf32>>) {
+  fir.store %box to %array : !fir.ref<!fir.box<!fir.array<?x?xf32>>>
+  return
+}
+
+// CHECK-LABEL:  llvm.func @test_store_box
+// CHECK-SAME:  (%[[arg0:.*]]: !llvm.ptr<struct<(ptr<f{{.*}}>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<2 x array<3 x i{{.*}}>>)>>,
+// CHECK-SAME:  %[[arg1:.*]]: !llvm.ptr<struct<(ptr<f{{.*}}>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<2 x array<3 x i{{.*}}>>)>>) {
+// CHECK-NEXT:  %[[box_to_store:.*]] = llvm.load %arg1 : !llvm.ptr<struct<(ptr<f{{.*}}>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<2 x array<3 x i{{.*}}>>)>>
+// CHECK-NEXT:  llvm.store %[[box_to_store]], %[[arg0]] : !llvm.ptr<struct<(ptr<f{{.*}}>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<2 x array<3 x i{{.*}}>>)>>
+// CHECK-NEXT:  llvm.return
+// CHECK-NEXT:  }
+
+// -----
+
+// Test `fir.load` --> `llvm.load` conversion
+
+func @test_load_index(%addr : !fir.ref<index>) {
+  %0 = fir.load %addr : !fir.ref<index>
+  return
+}
+
+// CHECK-LABEL: llvm.func @test_load_index(
+// CHECK-SAME:  %[[arg1:.*]]: !llvm.ptr<i64>) {
+// CHECK-NEXT:    %0 = llvm.load %[[arg1]] : !llvm.ptr<i64>
+// CHECK-NEXT:    llvm.return
+// CHECK-NEXT:  }
+
+func @test_load_box(%addr : !fir.ref<!fir.box<!fir.array<10xf32>>>) {
+  %0 = fir.load %addr : !fir.ref<!fir.box<!fir.array<10xf32>>>
+  return
+}
+
+// Loading a `fir.ref<!fir.box>> is a no-op
+// CHECK-LABEL: llvm.func @test_load_box
+// CHECK-SAME: (%{{.*}}: !llvm.ptr<struct<(ptr<array<10 x f{{.*}}>>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, array<1 x array<3 x i{{.*}}>>)>>) {
+// CHECK-NEXT:  llvm.return
+// CHECK-NEXT:  }
+
+// -----
+
+// Test `fir.box_tdesc` conversion.
+
+func @box_tdesc(%arg0: !fir.box<f64>) {
+  %0 = fir.box_tdesc %arg0 : (!fir.box<f64>) -> !fir.tdesc<f64>
+  return
+}
+
+// CHECK-LABEL: llvm.func @box_tdesc(
+// CHECK-SAME:                       %[[ARG0:.*]]: !llvm.ptr<struct<(ptr<f64>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}})>>) {
+// CHECK:         %[[C0:.*]] = llvm.mlir.constant(0 : i32) : i32
+// CHECK:         %[[TYPE_POS:.*]] = llvm.mlir.constant(4 : i32) : i32
+// CHECK:         %[[GEP:.*]] = llvm.getelementptr %[[ARG0]][%[[C0]], %[[TYPE_POS]]] : (!llvm.ptr<struct<(ptr<f64>, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}}, i{{.*}})>>, i32, i32) -> !llvm.ptr<i8>
+// CHECK:         %[[LOAD:.*]] = llvm.load %[[GEP]] : !llvm.ptr<i{{.*}}>
+// CHECK:         %{{.*}} = llvm.inttoptr %[[LOAD]] : i{{.*}} to !llvm.ptr<i{{.*}}>

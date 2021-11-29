@@ -46,8 +46,14 @@ hostName(const Fortran::semantics::Symbol &symbol) {
   const auto &scope = symbol.owner();
   if (scope.kind() == Fortran::semantics::Scope::Kind::Subprogram) {
     assert(scope.symbol() && "subprogram scope must have a symbol");
-    return {toStringRef(scope.symbol()->name())};
+    return toStringRef(scope.symbol()->name());
   }
+  if (scope.kind() == Fortran::semantics::Scope::Kind::MainProgram)
+    // Do not use the main program name, if any, because it may lead to name
+    // collision with procedures with the same name in other compilation units
+    // (technically illegal, but all compilers are able to compile and link
+    // properly these programs).
+    return llvm::StringRef("");
   return {};
 }
 

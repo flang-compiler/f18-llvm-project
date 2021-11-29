@@ -8,11 +8,11 @@ program nested_where
   ! CHECK:  %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
   ! CHECK:  %[[VAL_3:.*]] = fir.alloca tuple<i64, !fir.heap<!fir.array<?xi8>>, !fir.heap<!fir.array<?xi64>>>
   ! CHECK:  %[[VAL_4:.*]] = fir.alloca tuple<i64, !fir.heap<!fir.array<?xi8>>, !fir.heap<!fir.array<?xi64>>>
-  ! CHECK:  %[[VAL_5:.*]] = fir.address_of(@_QEa) : !fir.ref<!fir.array<3xi32>>
+  ! CHECK:  %[[VAL_5:.*]] = fir.address_of(@_QFEa) : !fir.ref<!fir.array<3xi32>>
   ! CHECK:  %[[VAL_6:.*]] = arith.constant 3 : index
-  ! CHECK:  %[[VAL_7:.*]] = fir.address_of(@_QEmask1) : !fir.ref<!fir.array<3x!fir.logical<4>>>
+  ! CHECK:  %[[VAL_7:.*]] = fir.address_of(@_QFEmask1) : !fir.ref<!fir.array<3x!fir.logical<4>>>
   ! CHECK:  %[[VAL_8:.*]] = arith.constant 3 : index
-  ! CHECK:  %[[VAL_9:.*]] = fir.address_of(@_QEmask2) : !fir.ref<!fir.array<3x!fir.logical<4>>>
+  ! CHECK:  %[[VAL_9:.*]] = fir.address_of(@_QFEmask2) : !fir.ref<!fir.array<3x!fir.logical<4>>>
   ! CHECK:  %[[VAL_10:.*]] = arith.constant 3 : index
   ! CHECK:  %[[VAL_11:.*]] = arith.constant 0 : i32
   ! CHECK:  %[[VAL_12:.*]] = arith.constant 0 : i64

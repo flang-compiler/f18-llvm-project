@@ -462,13 +462,18 @@ private:
   /// not significant, but could be changed.
   ///
   void rewriteIfGotos() {
+    auto &evaluationList = *evaluationListStack.back();
+    if (!evaluationList.size())
+      return;
     struct T {
       lower::pft::EvaluationList::iterator ifConstructIt;
       parser::Label ifTargetLabel;
       bool isCycleStmt = false;
     };
     llvm::SmallVector<T> ifCandidateStack;
-    auto &evaluationList = *evaluationListStack.back();
+    const auto *doStmt =
+        evaluationList.begin()->getIf<parser::NonLabelDoStmt>();
+    std::string doName = doStmt ? getConstructName(*doStmt) : std::string{};
     for (auto it = evaluationList.begin(), end = evaluationList.end();
          it != end; ++it) {
       auto &eval = *it;
@@ -479,22 +484,14 @@ private:
       auto firstStmt = [](lower::pft::Evaluation *e) {
         return e->isConstruct() ? &*e->evaluationList->begin() : e;
       };
-      auto &targetEval = *firstStmt(&eval);
+      const auto &targetEval = *firstStmt(&eval);
       bool targetEvalIsEndDoStmt = targetEval.isA<parser::EndDoStmt>();
       auto branchTargetMatch = [&]() {
-        if (auto targetLabel = ifCandidateStack.back().ifTargetLabel)
+        if (const auto targetLabel = ifCandidateStack.back().ifTargetLabel)
           if (targetLabel == *targetEval.label)
             return true; // goto target match
-        if (targetEvalIsEndDoStmt && ifCandidateStack.back().isCycleStmt) {
-          auto cycleName = ifCandidateStack.back().ifConstructIt->visit(
-              [&](const auto &stmt) { return getConstructName(stmt); });
-          if (cycleName.empty())
-            return true; // anonymous cycle target match
-          auto doName = eval.visit(
-              [&](const auto &stmt) { return getConstructName(stmt); });
-          if (cycleName == doName)
-            return true; // named cycle target match
-        }
+        if (targetEvalIsEndDoStmt && ifCandidateStack.back().isCycleStmt)
+          return true; // cycle target match
         return false;
       };
       if (targetEval.label || targetEvalIsEndDoStmt) {
@@ -522,12 +519,17 @@ private:
         }
       }
       if (eval.isA<parser::IfConstruct>() && eval.evaluationList->size() == 3) {
-        if (auto *gotoStmt = std::next(eval.evaluationList->begin())
-                                 ->getIf<parser::GotoStmt>())
+        const auto bodyEval = std::next(eval.evaluationList->begin());
+        if (const auto *gotoStmt = bodyEval->getIf<parser::GotoStmt>()) {
           ifCandidateStack.push_back({it, gotoStmt->v});
-        else if (std::next(eval.evaluationList->begin())
-                     ->isA<parser::CycleStmt>())
-          ifCandidateStack.push_back({it, {}, true});
+        } else if (doStmt) {
+          if (const auto *cycleStmt = bodyEval->getIf<parser::CycleStmt>()) {
+            std::string cycleName = getConstructName(*cycleStmt);
+            if (cycleName.empty() || cycleName == doName)
+              // This candidate will match doStmt's EndDoStmt.
+              ifCandidateStack.push_back({it, {}, true});
+          }
+        }
       }
     }
   }
@@ -659,18 +661,18 @@ private:
         parser::MaskedElsewhereStmt, parser::NonLabelDoStmt,
         parser::SelectCaseStmt, parser::SelectRankCaseStmt,
         parser::TypeGuardStmt, parser::WhereConstructStmt>;
-
     if constexpr (common::HasMember<A, MaybeConstructNameInTuple>) {
       if (auto name = std::get<std::optional<parser::Name>>(stmt.t))
         return name->ToString();
     }
 
-    // These statements have several std::optional<parser::Name>
+    // These statements have multiple std::optional<parser::Name> elements.
     if constexpr (std::is_same_v<A, parser::SelectRankStmt> ||
                   std::is_same_v<A, parser::SelectTypeStmt>) {
       if (auto name = std::get<0>(stmt.t))
         return name->ToString();
     }
+
     return {};
   }
 
@@ -1267,7 +1269,8 @@ bool Fortran::lower::symbolIsGlobal(const semantics::Symbol &sym) {
         return true;
     }
   }
-  return semantics::IsSaved(sym) || lower::definedInCommonBlock(sym);
+  return semantics::IsSaved(sym) || lower::definedInCommonBlock(sym) ||
+         semantics::IsNamedConstant(sym);
 }
 
 namespace {

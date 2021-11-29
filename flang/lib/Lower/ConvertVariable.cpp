@@ -702,6 +702,18 @@ instantiateAggregateStore(Fortran::lower::AbstractConverter &converter,
   insertAggregateStore(storeMap, var, local);
 }
 
+/// Cast an alias address (variable part of an equivalence) to fir.ptr so that
+/// the optimizer is conservative and avoids doing copy elision in assignment
+/// involving equivalenced variables.
+/// TODO: Represent the equivalence aliasing constraint in another way to avoid
+/// pessimizing array assignments involving equivalenced variables.
+static mlir::Value castAliasToPointer(fir::FirOpBuilder &builder,
+                                      mlir::Location loc, mlir::Type aliasType,
+                                      mlir::Value aliasAddr) {
+  return builder.createConvert(loc, fir::PointerType::get(aliasType),
+                               aliasAddr);
+}
+
 /// Instantiate a member of an equivalence. Compute its address in its
 /// aggregate storage and lower its attributes.
 static void instantiateAlias(Fortran::lower::AbstractConverter &converter,
@@ -721,8 +733,7 @@ static void instantiateAlias(Fortran::lower::AbstractConverter &converter,
       loc, idxTy, sym.GetUltimate().offset() - aliasOffset);
   auto ptr = builder.create<fir::CoordinateOp>(loc, i8Ptr, store,
                                                mlir::ValueRange{offset});
-  auto preAlloc = builder.createConvert(
-      loc, builder.getRefType(converter.genType(sym)), ptr);
+  auto preAlloc = castAliasToPointer(builder, loc, converter.genType(sym), ptr);
   Fortran::lower::StatementContext stmtCtx;
   mapSymbolAttributes(converter, var, symMap, stmtCtx, preAlloc);
   // Default initialization is possible for equivalence members: see
@@ -932,8 +943,12 @@ static void instantiateCommon(Fortran::lower::AbstractConverter &converter,
       builder.createIntegerConstant(loc, builder.getIndexType(), byteOffset);
   auto varAddr = builder.create<fir::CoordinateOp>(loc, i8Ptr, base,
                                                    mlir::ValueRange{offs});
-  auto localTy = builder.getRefType(converter.genType(var.getSymbol()));
-  mlir::Value local = builder.createConvert(loc, localTy, varAddr);
+  mlir::Type symType = converter.genType(var.getSymbol());
+  mlir::Value local;
+  if (Fortran::semantics::FindEquivalenceSet(var.getSymbol()) != nullptr)
+    local = castAliasToPointer(builder, loc, symType, varAddr);
+  else
+    local = builder.createConvert(loc, builder.getRefType(symType), varAddr);
   Fortran::lower::StatementContext stmtCtx;
   mapSymbolAttributes(converter, var, symMap, stmtCtx, local);
 }

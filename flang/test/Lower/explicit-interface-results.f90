@@ -299,8 +299,8 @@ subroutine test_result_depends_on_equiv_sym()
   use m_with_equiv, only : result_depends_on_equiv_sym
   ! CHECK: %[[equiv:.*]] = fir.address_of(@_QMm_with_equivEarray) : !fir.ref<!fir.array<24xi8>>
   ! CHECK: %[[coor:.*]] = fir.coordinate_of %[[equiv]], %c{{.*}} : (!fir.ref<!fir.array<24xi8>>, index) -> !fir.ref<i8>
-  ! CHECK: %[[l:.*]] = fir.convert %[[coor]] : (!fir.ref<i8>) -> !fir.ref<i64>
-  ! CHECK: %[[load:.*]] = fir.load %[[l]] : !fir.ref<i64>
+  ! CHECK: %[[l:.*]] = fir.convert %[[coor]] : (!fir.ref<i8>) -> !fir.ptr<i64>
+  ! CHECK: %[[load:.*]] = fir.load %[[l]] : !fir.ptr<i64>
   ! CHECK: %[[lcast:.*]] = fir.convert %[[load]] : (i64) -> index
   ! CHECK: fir.alloca !fir.char<1,?>(%[[lcast]] : index)
   print *, result_depends_on_equiv_sym()

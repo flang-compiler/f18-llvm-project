@@ -1,6 +1,7 @@
 // Test lowering of select_type for FIR to LLVM IR
 
 // RUN: fir-opt %s | tco | FileCheck %s
+// XFAIL:*
 
 // CHECK-LABEL: @f
 func @f(%a : !fir.box<none>) -> i32 {

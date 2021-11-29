@@ -89,7 +89,7 @@ subroutine pass_vector_subscript_write(x, j)
   integer :: j(10)
   real :: x(100)
   ! CHECK: %[[jload:.*]] = fir.array_load %[[j]](%{{.*}}) : (!fir.ref<!fir.array<10xi32>>, !fir.shape<1>) -> !fir.array<10xi32>
-  ! CHECK: %[[xload:.*]] = fir.array_load %[[x]](%{{.*}}) [%{{.*}}] : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>, !fir.slice<1>) -> !fir.array<100xf32>
+  ! CHECK: %[[xload:.*]] = fir.array_load %[[x]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
   ! CHECK: %[[temp:.*]] = fir.allocmem !fir.array<10xf32>
   ! CHECK: %[[tempload:.*]] = fir.array_load %[[temp]](%{{.*}}) : (!fir.heap<!fir.array<10xf32>>, !fir.shape<1>) -> !fir.array<10xf32>
   ! CHECK: %[[copy:.*]] = fir.do_loop

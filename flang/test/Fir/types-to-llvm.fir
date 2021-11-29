@@ -1,6 +1,6 @@
 // Test FIR types conversion.
 
-// RUN: fir-opt --split-input-file --fir-to-llvm-ir %s | FileCheck %s
+// RUN: fir-opt --split-input-file --fir-to-llvm-ir="target=x86_64-unknown-linux-gnu" %s | FileCheck %s
 
 
 // Test sequence types `!fir.array`
@@ -208,3 +208,43 @@ func private @foo16(%arg0: !fir.vector<2:!fir.real<16>>)
 func private @foo0(%arg0: !fir.field)
 // CHECK-LABEL: foo0
 // CHECK-SAME: i32
+
+// -----
+
+// Test `!fir.boxchar<n>` conversion
+
+func private @foo0(%arg0: !fir.boxchar<1>)
+// CHECK-LABEL: foo0
+// CHECK-SAME: !llvm.struct<(ptr<i8>, i64)>
+
+func private @foo1(%arg0: !fir.boxchar<2>)
+// CHECK-LABEL: foo1
+// CHECK-SAME: !llvm.struct<(ptr<i16>, i64)>
+
+// -----
+
+// Test `!fir.tdesc` conversion.
+
+func private @foo0(%arg0: !fir.tdesc<!fir.type<x>>)
+// CHECK-LABEL: foo0
+// CHECK-SAME:  !llvm.ptr<i8>
+
+func private @foo1(%arg : !fir.tdesc<!fir.array<100xf32>>)
+// CHECK-LABEL: foo1
+// CHECK-SAME:  !llvm.ptr<i8>
+
+func private @foo2(%arg : !fir.tdesc<f32>)
+// CHECK-LABEL: foo2
+// CHECK-SAME:  !llvm.ptr<i8>
+
+func private @foo3(%arg : !fir.tdesc<!fir.type<derived7{f1:f32,f2:f32}>>)
+// CHECK-LABEL: foo3
+// CHECK-SAME:  !llvm.ptr<i8>
+
+// -----
+
+// Test `!fir.len` conversion.
+
+func private @foo0(%arg0: !fir.len)
+// CHECK-LABEL: foo0
+// CHECK-SAME: i64
