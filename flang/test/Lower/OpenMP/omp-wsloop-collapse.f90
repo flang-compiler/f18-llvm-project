@@ -13,13 +13,13 @@ program wsloop_collapse
   integer :: i, j, k
   integer :: a, b, c
   integer :: x
-! FIRDialect:         %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "a", uniq_name = "_QEa"}
-! FIRDialect:         %[[VAL_1:.*]] = fir.alloca i32 {bindc_name = "b", uniq_name = "_QEb"}
-! FIRDialect:         %[[VAL_2:.*]] = fir.alloca i32 {bindc_name = "c", uniq_name = "_QEc"}
-! FIRDialect:         %[[VAL_3:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QEi"}
-! FIRDialect:         %[[VAL_4:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QEj"}
-! FIRDialect:         %[[VAL_5:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QEk"}
-! FIRDialect:         %[[VAL_6:.*]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QEx"}
+! FIRDialect:         %[[VAL_0:.*]] = fir.alloca i32 {bindc_name = "a", uniq_name = "_QFEa"}
+! FIRDialect:         %[[VAL_1:.*]] = fir.alloca i32 {bindc_name = "b", uniq_name = "_QFEb"}
+! FIRDialect:         %[[VAL_2:.*]] = fir.alloca i32 {bindc_name = "c", uniq_name = "_QFEc"}
+! FIRDialect:         %[[VAL_3:.*]] = fir.alloca i32 {bindc_name = "i", uniq_name = "_QFEi"}
+! FIRDialect:         %[[VAL_4:.*]] = fir.alloca i32 {bindc_name = "j", uniq_name = "_QFEj"}
+! FIRDialect:         %[[VAL_5:.*]] = fir.alloca i32 {bindc_name = "k", uniq_name = "_QFEk"}
+! FIRDialect:         %[[VAL_6:.*]] = fir.alloca i32 {bindc_name = "x", uniq_name = "_QFEx"}
 ! LLVMIRDialect-DAG:       %[[VAL_4:.*]] = llvm.mlir.constant(1 : i32) : i32
 ! LLVMIRDialect-DAG:       %[[VAL_3:.*]] = llvm.mlir.constant(0 : i32) : i32
 ! LLVMIRDialect-DAG:       %[[VAL_2:.*]] = llvm.mlir.constant(5 : i32) : i32
