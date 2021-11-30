@@ -24,12 +24,7 @@
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/MD5.h"
 
-static llvm::cl::opt<std::size_t>
-    nameLengthHashSize("length-to-hash-string-literal",
-                       llvm::cl::desc("string literals that exceed this length"
-                                      " will use a hash value as their symbol "
-                                      "name"),
-                       llvm::cl::init(32));
+static constexpr std::size_t nameLengthHashSize = 32;
 
 mlir::FuncOp fir::FirOpBuilder::createFunction(mlir::Location loc,
                                                mlir::ModuleOp module,
@@ -442,21 +437,23 @@ mlir::Value fir::FirOpBuilder::createSlice(mlir::Location loc,
 
 mlir::Value fir::FirOpBuilder::createBox(mlir::Location loc,
                                          const fir::ExtendedValue &exv) {
-  auto itemAddr = fir::getBase(exv);
+  mlir::Value itemAddr = fir::getBase(exv);
   if (itemAddr.getType().isa<fir::BoxType>())
     return itemAddr;
   auto elementType = fir::dyn_cast_ptrEleTy(itemAddr.getType());
-  if (!elementType)
+  if (!elementType) {
     mlir::emitError(loc, "internal: expected a memory reference type ")
         << itemAddr.getType();
-  auto boxTy = fir::BoxType::get(elementType);
+    llvm_unreachable("not a memory reference type");
+  }
+  mlir::Type boxTy = fir::BoxType::get(elementType);
   return exv.match(
       [&](const fir::ArrayBoxValue &box) -> mlir::Value {
-        auto s = createShape(loc, exv);
+        mlir::Value s = createShape(loc, exv);
         return create<fir::EmboxOp>(loc, boxTy, itemAddr, s);
       },
       [&](const fir::CharArrayBoxValue &box) -> mlir::Value {
-        auto s = createShape(loc, exv);
+        mlir::Value s = createShape(loc, exv);
         if (fir::factory::CharacterExprHelper::hasConstantLengthInType(exv))
           return create<fir::EmboxOp>(loc, boxTy, itemAddr, s);
 
@@ -477,6 +474,7 @@ mlir::Value fir::FirOpBuilder::createBox(mlir::Location loc,
         return create<fir::LoadOp>(
             loc, fir::factory::getMutableIRBox(*this, loc, x));
       },
+      // UnboxedValue, ProcBoxValue or BoxValue.
       [&](const auto &) -> mlir::Value {
         return create<fir::EmboxOp>(loc, boxTy, itemAddr);
       });

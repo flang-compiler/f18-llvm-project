@@ -66,7 +66,7 @@ public:
   using AmendAccessSetT = llvm::SmallPtrSet<mlir::Operation *, 4>;
 
   ArrayCopyAnalysis(mlir::Operation *op) : operation{op} {
-    construct(op->getRegions());
+    construct(op);
   }
 
   mlir::Operation *getOperation() const { return operation; }
@@ -102,7 +102,7 @@ public:
                      ArrayLoadOp load);
 
 private:
-  void construct(mlir::MutableArrayRef<mlir::Region> regions);
+  void construct(mlir::Operation *topLevelOp);
 
   mlir::Operation *operation; // operation that analysis ran upon
   ConflictSetT conflicts;     // set of conflicts (loads and merge stores)
@@ -115,6 +115,8 @@ private:
 /// Helper class to collect all array operations that produced an array value.
 class ReachCollector {
 public:
+  // If provided, the `loopRegion` is the body of a loop that produces the array
+  // of interest.
   ReachCollector(llvm::SmallVectorImpl<mlir::Operation *> &reach,
                  mlir::Region *loopRegion)
       : reach{reach}, loopRegion{loopRegion} {}
@@ -124,7 +126,7 @@ public:
       collectArrayMentionFrom(op, mlir::Value{});
       return;
     }
-    for (auto v : range)
+    for (mlir::Value v : range)
       collectArrayMentionFrom(v);
   }
 
@@ -166,18 +168,8 @@ public:
       popFn(rop);
       return;
     }
-    if (auto rop = mlir::dyn_cast<IterWhileOp>(op)) {
-      popFn(rop);
-      return;
-    }
     if (auto rop = mlir::dyn_cast<fir::IfOp>(op)) {
       popFn(rop);
-      return;
-    }
-    if (auto box = mlir::dyn_cast<EmboxOp>(op)) {
-      for (auto *user : box.memref().getUsers())
-        if (user != op)
-          collectArrayMentionFrom(user, user->getResults());
       return;
     }
     if (auto mergeStore = mlir::dyn_cast<ArrayMergeStoreOp>(op)) {
@@ -189,7 +181,7 @@ public:
     if (mlir::isa<AllocaOp, AllocMemOp>(op)) {
       // Look for any stores inside the loops, and collect an array operation
       // that produced the value being stored to it.
-      for (auto *user : op->getUsers())
+      for (mlir::Operation *user : op->getUsers())
         if (auto store = mlir::dyn_cast<fir::StoreOp>(user))
           if (opIsInsideLoops(store))
             collectArrayMentionFrom(store.value());
@@ -214,7 +206,7 @@ public:
 
     // Include all array_access ops using an array_load.
     if (auto arrLd = mlir::dyn_cast<ArrayLoadOp>(op))
-      for (auto *user : arrLd.getResult().getUsers())
+      for (mlir::Operation *user : arrLd.getResult().getUsers())
         if (mlir::isa<ArrayAccessOp>(user)) {
           LLVM_DEBUG(llvm::dbgs() << "add " << *user << " to reachable set\n");
           reach.push_back(user);
@@ -223,7 +215,7 @@ public:
     // Array modify assignment is performed on the result. So the analysis must
     // look at the what is done with the result.
     if (mlir::isa<ArrayModifyOp>(op))
-      for (auto *user : op->getResult(0).getUsers())
+      for (mlir::Operation *user : op->getResult(0).getUsers())
         followUsers(user);
 
     if (mlir::isa<fir::CallOp>(op)) {
@@ -271,7 +263,7 @@ public:
     }
 
     // Process an Op.
-    if (auto *op = val.getDefiningOp()) {
+    if (mlir::Operation *op = val.getDefiningOp()) {
       collectArrayMentionFrom(op, val);
       return;
     }
@@ -279,6 +271,28 @@ public:
     emitFatalError(val.getLoc(), "unhandled value");
   }
 
+  /// Is \op inside the loop nest region ?
+  /// FIXME: replace this structural dependence with graph properties.
+  bool opIsInsideLoops(mlir::Operation *op) const {
+    return loopRegion && loopRegion->isAncestor(op->getParentRegion());
+  }
+
+  /// Recursively trace the use of an operation results, calling
+  /// collectArrayMentionFrom on the direct and indirect user operands.
+  void followUsers(mlir::Operation *op) {
+    for (auto userOperand : op->getOperands())
+      collectArrayMentionFrom(userOperand);
+    // Go through potential converts/coordinate_op.
+    for (mlir::Operation *indirectUser : op->getUsers())
+      followUsers(indirectUser);
+  }
+
+  llvm::SmallVectorImpl<mlir::Operation *> &reach;
+  llvm::SmallPtrSet<mlir::Value, 16> visited;
+  /// Region of the loops nest that produced the array value.
+  mlir::Region *loopRegion;
+
+public:
   /// Return all ops that produce the array value that is stored into the
   /// `array_merge_store`.
   static void reachingValues(llvm::SmallVectorImpl<mlir::Operation *> &reach,
@@ -290,34 +304,6 @@ public:
     ReachCollector collector(reach, loopRegion);
     collector.collectArrayMentionFrom(seq);
   }
-
-private:
-  /// Is \op inside the loop nest region ?
-  /// FIXME: replace this structural dependence with graph properties.
-  bool opIsInsideLoops(mlir::Operation *op) const {
-    auto *region = op->getParentRegion();
-    while (region) {
-      if (region == loopRegion)
-        return true;
-      region = region->getParentRegion();
-    }
-    return false;
-  }
-
-  /// Recursively trace the use of an operation results, calling
-  /// collectArrayMentionFrom on the direct and indirect user operands.
-  void followUsers(mlir::Operation *op) {
-    for (auto userOperand : op->getOperands())
-      collectArrayMentionFrom(userOperand);
-    // Go through potential converts/coordinate_op.
-    for (auto indirectUser : op->getUsers())
-      followUsers(indirectUser);
-  }
-
-  llvm::SmallVectorImpl<mlir::Operation *> &reach;
-  llvm::SmallPtrSet<mlir::Value, 16> visited;
-  /// Region of the loops nest that produced the array value.
-  mlir::Region *loopRegion;
 };
 } // namespace
 
@@ -328,8 +314,8 @@ void ArrayCopyAnalysis::arrayMentions(
   mentions.clear();
   auto lmIter = loadMapSets.find(load);
   if (lmIter != loadMapSets.end()) {
-    for (auto *opnd : lmIter->second) {
-      auto *owner = opnd->getOwner();
+    for (mlir::OpOperand *opnd : lmIter->second) {
+      mlir::Operation *owner = opnd->getOwner();
       if (mlir::isa<ArrayAccessOp, ArrayAmendOp, ArrayFetchOp, ArrayUpdateOp,
                     ArrayModifyOp>(owner))
         mentions.push_back(owner);
@@ -341,7 +327,7 @@ void ArrayCopyAnalysis::arrayMentions(
   llvm::SmallVector<mlir::OpOperand *> queue; // uses of ArrayLoad[orig]
 
   auto appendToQueue = [&](mlir::Value val) {
-    for (auto &use : val.getUses())
+    for (mlir::OpOperand &use : val.getUses())
       if (!visited.count(&use)) {
         visited.insert(&use);
         queue.push_back(&use);
@@ -354,24 +340,30 @@ void ArrayCopyAnalysis::arrayMentions(
 
   // Process the worklist until done.
   while (!queue.empty()) {
-    auto *operand = queue.pop_back_val();
-    auto *owner = operand->getOwner();
-    if (!owner)
-      continue;
+    mlir::OpOperand *operand = queue.pop_back_val();
+    mlir::Operation *owner = operand->getOwner();
     auto structuredLoop = [&](auto ro) {
       if (auto blockArg = ro.iterArgToBlockArg(operand->get())) {
-        auto arg = blockArg.getArgNumber();
-        auto output = ro.getResult(ro.finalValue() ? arg : arg - 1);
+        int64_t arg = blockArg.getArgNumber();
+        mlir::Value output = ro.getResult(ro.finalValue() ? arg : arg - 1);
         appendToQueue(output);
         appendToQueue(blockArg);
       }
     };
-    auto branchOp = [&](mlir::Block *dest, auto operands) {
-      for (auto i : llvm::enumerate(operands))
-        if (operand->get() == i.value()) {
-          auto blockArg = dest->getArgument(i.index());
-          appendToQueue(blockArg);
-        }
+    auto branchOp = [&](mlir::Block *dest, mlir::OperandRange operands) {
+      if (operands.empty())
+        return;
+
+      // Check if this operand is within the range.
+      unsigned operandIndex = operand->getOperandNumber();
+      unsigned operandsStart = operands.getBeginOperandIndex();
+      if (operandIndex < operandsStart ||
+          operandIndex >= (operandsStart + operands.size()))
+        return;
+
+      // Index the successor.
+      unsigned argIndex = operandIndex - operandsStart;
+      appendToQueue(dest->getArgument(argIndex));
     };
     // Thread uses into structured loop bodies and return value uses.
     if (auto ro = mlir::dyn_cast<DoLoopOp>(owner)) {
@@ -380,8 +372,7 @@ void ArrayCopyAnalysis::arrayMentions(
       structuredLoop(ro);
     } else if (auto rs = mlir::dyn_cast<ResultOp>(owner)) {
       // Thread any uses of fir.if that return the marked array value.
-      auto *parent = rs->getParentRegion()->getParentOp();
-      if (auto ifOp = mlir::dyn_cast<fir::IfOp>(parent))
+      if (auto ifOp = rs->getParentOfType<fir::IfOp>())
         appendToQueue(ifOp.getResult(operand->getOperandNumber()));
     } else if (mlir::isa<ArrayFetchOp>(owner)) {
       // Keep track of array value fetches.
@@ -553,12 +544,14 @@ static bool conflictOnLoad(llvm::ArrayRef<mlir::Operation *> reach,
         return true;
       }
     }
+  }
   return false;
 }
 
-/// Is there an access vector conflict on the array being merged into? If the
-/// access vectors diverge, then assume that there are potentially overlapping
-/// loop-carried references.
+/// Check if there is any potential conflict in the chained update operations
+/// (ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp) while merging back to the
+/// array. A potential conflict is detected if two operations work on the same
+/// indices.
 static bool conflictOnMerge(llvm::ArrayRef<mlir::Operation *> mentions) {
   if (mentions.size() < 2)
     return false;
@@ -568,6 +561,8 @@ static bool conflictOnMerge(llvm::ArrayRef<mlir::Operation *> mentions) {
   bool valSeen = false;
   bool refSeen = false;
   for (auto *op : mentions) {
+    assert((mlir::isa<ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp, ArrayAccessOp, ArrayAmendOp>(op)) &&
+           "unexpected operation in analysis");
     llvm::SmallVector<mlir::Value> compareVector;
     if (auto u = mlir::dyn_cast<ArrayUpdateOp>(op)) {
       valSeen = true;
@@ -600,13 +595,8 @@ static bool conflictOnMerge(llvm::ArrayRef<mlir::Operation *> mentions) {
     } else if (mlir::isa<ArrayAmendOp>(op)) {
       refSeen = true;
       continue;
-    } else {
-      mlir::emitError(op->getLoc(), "unexpected operation in analysis");
     }
-    if (compareVector.size() != indices.size() ||
-        llvm::any_of(llvm::zip(compareVector, indices), [&](auto pair) {
-          return std::get<0>(pair) != std::get<1>(pair);
-        }))
+    if (compareVector != indices)
       return true;
     LLVM_DEBUG(llvm::dbgs() << "vectors compare equal\n");
   }
@@ -676,58 +666,51 @@ conservativeCallConflict(llvm::ArrayRef<mlir::Operation *> reaches) {
 
 /// Constructor of the array copy analysis.
 /// This performs the analysis and saves the intermediate results.
-void ArrayCopyAnalysis::construct(mlir::MutableArrayRef<mlir::Region> regions) {
-  for (auto &region : regions)
-    for (auto &block : region.getBlocks())
-      for (auto &op : block.getOperations()) {
-        if (op.getNumRegions())
-          construct(op.getRegions());
-        if (auto st = mlir::dyn_cast<ArrayMergeStoreOp>(op)) {
-          llvm::SmallVector<mlir::Operation *> values;
-          ReachCollector::reachingValues(values, st.sequence());
-          bool callConflict = conservativeCallConflict(values);
-          llvm::SmallVector<mlir::Operation *> mentions;
-          arrayMentions(mentions,
-                        mlir::cast<ArrayLoadOp>(st.original().getDefiningOp()));
-          bool conflict = conflictDetected(values, mentions, st);
-          bool refConflict = conflictOnReference(mentions);
-          if (callConflict || conflict || refConflict) {
-            LLVM_DEBUG(llvm::dbgs()
-                       << "CONFLICT: copies required for " << st << '\n'
-                       << "   adding conflicts on: " << op << " and "
-                       << st.original() << '\n');
-            conflicts.insert(&op);
-            conflicts.insert(st.original().getDefiningOp());
-            if (auto *access = amendingAccess(mentions))
-              amendAccesses.insert(access);
-          }
-          auto *ld = st.original().getDefiningOp();
-          LLVM_DEBUG(llvm::dbgs()
-                     << "map: adding {" << *ld << " -> " << st << "}\n");
-          useMap.insert({ld, &op});
-        } else if (auto load = mlir::dyn_cast<ArrayLoadOp>(op)) {
-          llvm::SmallVector<mlir::Operation *> mentions;
-          arrayMentions(mentions, load);
-          LLVM_DEBUG(llvm::dbgs() << "process load: " << load
-                                  << ", mentions: " << mentions.size() << '\n');
-          for (auto *acc : mentions) {
-            LLVM_DEBUG(llvm::dbgs() << " mention: " << *acc << '\n');
-            if (mlir::isa<ArrayAccessOp, ArrayAmendOp, ArrayFetchOp,
-                          ArrayUpdateOp, ArrayModifyOp>(acc)) {
-              if (useMap.count(acc)) {
-                mlir::emitError(
-                    load.getLoc(),
-                    "The parallel semantics of multiple array_merge_stores per "
-                    "array_load are not supported.");
-                continue;
-              }
-              LLVM_DEBUG(llvm::dbgs() << "map: adding {" << *acc << "} -> {"
-                                      << load << "}\n");
-              useMap.insert({acc, &op});
-            }
-          }
-        }
+void ArrayCopyAnalysis::construct(mlir::Operation *topLevelOp) {
+  topLevelOp->walk([&](Operation *op) {
+    if (auto st = mlir::dyn_cast<ArrayMergeStoreOp>(op)) {
+      llvm::SmallVector<Operation *> values;
+      ReachCollector::reachingValues(values, st.sequence());
+      auto callConflict = conservativeCallConflict(values);
+      llvm::SmallVector<Operation *> mentions;
+      arrayMentions(mentions,
+                    mlir::cast<ArrayLoadOp>(st.original().getDefiningOp()));
+      auto conflict = conflictDetected(values, mentions, st);
+      auto refConflict = conflictOnReference(mentions);
+      if (callConflict || conflict || refConflict) {
+        LLVM_DEBUG(llvm::dbgs()
+                   << "CONFLICT: copies required for " << st << '\n'
+                   << "   adding conflicts on: " << op << " and "
+                   << st.original() << '\n');
+        conflicts.insert(op);
+        conflicts.insert(st.original().getDefiningOp());
+        if (auto *access = amendingAccess(mentions))
+          amendAccesses.insert(access);
       }
+      auto *ld = st.original().getDefiningOp();
+      LLVM_DEBUG(llvm::dbgs()
+                 << "map: adding {" << *ld << " -> " << st << "}\n");
+      useMap.insert({ld, op});
+    } else if (auto load = mlir::dyn_cast<ArrayLoadOp>(op)) {
+      llvm::SmallVector<mlir::Operation *> mentions;
+      arrayMentions(mentions, load);
+      LLVM_DEBUG(llvm::dbgs() << "process load: " << load
+                              << ", mentions: " << mentions.size() << '\n');
+      for (auto *acc : mentions) {
+        LLVM_DEBUG(llvm::dbgs() << " access: " << *acc << '\n');
+        assert((mlir::isa<ArrayAccessOp, ArrayAmendOp, ArrayFetchOp, ArrayUpdateOp, ArrayModifyOp>(acc)));
+        if (!useMap.insert({acc, op}).second) {
+          mlir::emitError(
+              load.getLoc(),
+              "The parallel semantics of multiple array_merge_stores per "
+              "array_load are not supported.");
+          return;
+        }
+        LLVM_DEBUG(llvm::dbgs()
+                   << "map: adding {" << *acc << "} -> {" << load << "}\n");
+      }
+    }
+  });
 }
 
 //===----------------------------------------------------------------------===//
@@ -1063,10 +1046,10 @@ public:
   std::pair<mlir::Value, mlir::Value>
   materializeAssignment(mlir::Location loc, mlir::PatternRewriter &rewriter,
                         ArrayOp update,
-                        const std::function<void(mlir::Value)> &assignElement,
+                        llvm::function_ref<void(mlir::Value)> assignElement,
                         mlir::Type lhsEltRefType) const {
     auto *op = update.getOperation();
-    auto *loadOp = useMap.lookup(op);
+    mlir::Operation *loadOp = useMap.lookup(op);
     auto load = mlir::cast<ArrayLoadOp>(loadOp);
     LLVM_DEBUG(llvm::outs() << "does " << load << " have a conflict?\n");
     if (analysis.hasPotentialConflict(loadOp)) {
@@ -1088,13 +1071,13 @@ public:
       genArrayCopy</*copyIn=*/true>(load.getLoc(), rewriter, allocmem,
                                     load.memref(), shapeOp, load.slice(), load);
       rewriter.setInsertionPoint(op);
-      auto coor = genCoorOp(
+      mlir::Value coor = genCoorOp(
           rewriter, loc, getEleTy(load.getType()), lhsEltRefType, allocmem,
           shapeOp, copyUsingSlice ? mlir::Value{} : load.slice(),
           update.indices(), load.typeparams(),
           update->hasAttr(factory::attrFortranArrayOffsets()));
       assignElement(coor);
-      auto *storeOp = useMap.lookup(loadOp);
+      mlir::Operation *storeOp = useMap.lookup(loadOp);
       auto store = mlir::cast<ArrayMergeStoreOp>(storeOp);
       rewriter.setInsertionPoint(storeOp);
       // Copy out.
@@ -1108,7 +1091,7 @@ public:
     LLVM_DEBUG(llvm::outs() << "No, conflict wasn't found\n");
     rewriter.setInsertionPoint(op);
     auto coorTy = getEleTy(load.getType());
-    auto coor = genCoorOp(rewriter, loc, coorTy, lhsEltRefType, load.memref(),
+    mlir::Value coor = genCoorOp(rewriter, loc, coorTy, lhsEltRefType, load.memref(),
                           load.shape(), load.slice(), update.indices(),
                           load.typeparams(),
                           update->hasAttr(factory::attrFortranArrayOffsets()));
@@ -1133,7 +1116,7 @@ public:
                   mlir::PatternRewriter &rewriter) const override {
     auto loc = update.getLoc();
     auto assignElement = [&](mlir::Value coor) {
-      auto input = update.merge();
+      mlir::Value input = update.merge();
       if (auto inEleTy = dyn_cast_ptrEleTy(input.getType())) {
         emitFatalError(loc, "array_update on references not supported");
       } else {
@@ -1185,7 +1168,7 @@ public:
     rewriter.setInsertionPoint(op);
     auto load = mlir::cast<ArrayLoadOp>(useMap.lookup(op));
     auto loc = fetch.getLoc();
-    auto coor = genCoorOp(
+    mlir::Value coor = genCoorOp(
         rewriter, loc, getEleTy(load.getType()), toRefType(fetch.getType()),
         load.memref(), load.shape(), load.slice(), fetch.indices(),
         load.typeparams(), fetch->hasAttr(factory::attrFortranArrayOffsets()));
@@ -1267,6 +1250,10 @@ public:
     const auto &analysis = getAnalysis<ArrayCopyAnalysis>();
     const auto &useMap = analysis.getUseMap();
 
+    // Phase 1 is performing a rewrite on the array accesses. Once all the
+    // array accesses are rewritten we can go on phase 2.
+    // Phase 2 gets rid of the useless copy-in/copyout operations. The copy-in
+    // /copy-out refers the Fortran copy-in/copy-out semantics on statements.
     mlir::RewritePatternSet patterns1(context);
     patterns1.insert<ArrayFetchConversion>(context, useMap);
     patterns1.insert<ArrayUpdateConversion>(context, analysis, useMap);

@@ -518,6 +518,8 @@ static mlir::LogicalResult verify(fir::ArrayAccessOp op) {
 //===----------------------------------------------------------------------===//
 
 static mlir::LogicalResult verify(fir::ArrayUpdateOp op) {
+  if (fir::isa_ref_type(op.merge().getType()))
+    return op.emitOpError("does not support reference type for merge");
   auto arrTy = op.sequence().getType().cast<fir::SequenceType>();
   auto indSize = op.indices().size();
   if (indSize < arrTy.getDimension())
