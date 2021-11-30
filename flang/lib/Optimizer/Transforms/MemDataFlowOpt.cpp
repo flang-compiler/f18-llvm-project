@@ -26,7 +26,7 @@ namespace {
 template <typename OpT>
 static std::vector<OpT> getSpecificUsers(mlir::Value v) {
   std::vector<OpT> ops;
-  for (auto *user : v.getUsers())
+  for (mlir::Operation *user : v.getUsers())
     if (auto op = dyn_cast<OpT>(user))
       ops.push_back(op);
   return ops;
@@ -45,11 +45,11 @@ public:
                                              std::vector<WriteOp> &&storeOps) {
     llvm::SmallVector<WriteOp> candidateSet;
 
-    for (auto &storeOp : storeOps)
+    for (auto storeOp : storeOps)
       if (domInfo->dominates(storeOp, loadOp))
         candidateSet.push_back(storeOp);
 
-    if (candidateSet.size() == 0)
+    if (candidateSet.empty())
       return {};
 
     llvm::Optional<WriteOp> nearestStore;
@@ -57,7 +57,7 @@ public:
       auto nearerThan = [&](WriteOp otherStore) {
         if (candidate == otherStore)
           return false;
-        auto rv = domInfo->properlyDominates(candidate, otherStore);
+        bool rv = domInfo->properlyDominates(candidate, otherStore);
         if (rv) {
           LLVM_DEBUG(llvm::dbgs()
                      << "candidate " << candidate << " is not the nearest to "

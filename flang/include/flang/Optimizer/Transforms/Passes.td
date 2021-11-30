@@ -76,7 +76,7 @@ def MemRefDataFlowOpt : FunctionPass<"fir-memref-dataflow-opt"> {
   }];
   let constructor = "::fir::createMemDataFlowOptPass()";
   let dependentDialects = [
-    "fir::FIROpsDialect", "mlir::StandardOpsDialect", "mlir::AffineDialect"
+    "fir::FIROpsDialect", "mlir::StandardOpsDialect"
   ];
 }
 
