@@ -2304,7 +2304,10 @@ public:
   genval(const Fortran::evaluate::FunctionRef<Fortran::evaluate::Type<TC, KIND>>
              &funRef) {
     auto retTy = converter.genType(TC, KIND);
-    return genProcedureRef(funRef, {retTy});
+    ExtValue result = genProcedureRef(funRef, {retTy});
+    if (result.rank() == 0 && fir::isa_ref_type(fir::getBase(result).getType()))
+      return genLoad(result);
+    return result;
   }
 
   ExtValue genval(const Fortran::evaluate::ProcedureRef &procRef) {

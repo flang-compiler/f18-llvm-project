@@ -161,3 +161,20 @@ subroutine arr_contig_ptr_target_write(p)
   real :: x(100)
   p(2:601:6) = x
 end subroutine
+
+! CHECK-LABEL: func @_QPpointer_result_as_value
+subroutine pointer_result_as_value()
+  ! Test that function pointer results used as values are correctly loaded.
+  interface
+    function returns_int_pointer()
+      integer, pointer :: returns_int_pointer
+    end function
+  end interface
+! CHECK:  %[[VAL_0:.*]] = fir.alloca !fir.box<!fir.ptr<i32>> {bindc_name = ".result"}
+! CHECK:  %[[VAL_6:.*]] = fir.call @_QPreturns_int_pointer() : () -> !fir.box<!fir.ptr<i32>>
+! CHECK:  fir.save_result %[[VAL_6]] to %[[VAL_0]] : !fir.box<!fir.ptr<i32>>, !fir.ref<!fir.box<!fir.ptr<i32>>>
+! CHECK:  %[[VAL_7:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<i32>>>
+! CHECK:  %[[VAL_8:.*]] = fir.box_addr %[[VAL_7]] : (!fir.box<!fir.ptr<i32>>) -> !fir.ptr<i32>
+! CHECK:  fir.load %[[VAL_8]] : !fir.ptr<i32>
+  print *, returns_int_pointer()
+end subroutine
