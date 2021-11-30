@@ -112,7 +112,8 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
       return mlir::failure();
     });
   } else {
-    fir::createMLIRToLLVMPassPipeline(pm);
+    fir::createBasicFirPassPipeline(pm);
+    fir::addCodeGenPasses(pm);
     fir::addLLVMDialectToLLVMPass(pm, out.os());
   }
 

@@ -70,6 +70,37 @@ inline void addCSE(mlir::PassManager &pm) {
       pm, disableFirCse, fir::createCSEPass);
 }
 
+/// Create a basic pass pipeline for simplyfing the FIR dialect
+///
+/// \param pm - MLIR pass manager that will hold the pipeline definition
+inline void createBasicFirPassPipeline(mlir::PassManager &pm)
+{
+  // simplify the IR
+  fir::addCSE(pm);
+  pm.addNestedPass<mlir::FuncOp>(fir::createArrayValueCopyPass());
+  pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
+  pm.addPass(mlir::createCanonicalizerPass());
+  fir::addCSE(pm);
+  // The default inliner pass adds the canonicalizer pass with the default
+  // configuration. Create the inliner pass with tco config.
+  llvm::StringMap<mlir::OpPassManager> pipelines;
+  pm.addPass(
+      mlir::createInlinerPass(pipelines, defaultFlangInlinerOptPipeline));
+  pm.addPass(mlir::createCSEPass());
+
+  // convert control flow to CFG form
+  fir::addCfgConversionPass(pm);
+  pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
+  pm.addPass(mlir::createLowerToCFGPass());
+
+  mlir::GreedyRewriteConfig config;
+  config.enableRegionSimplification = false;
+  pm.addPass(mlir::createCanonicalizerPass(config));
+  pm.addPass(fir::createSimplifyRegionLitePass());
+  fir::addCSE(pm);
+}
+
+
 #if !defined(FLANG_EXCLUDE_CODEGEN)
 inline void addCodeGenRewritePass(mlir::PassManager &pm) {
   addPassConditionally(
@@ -92,35 +123,8 @@ inline void addLLVMDialectToLLVMPass(
       [&]() { return fir::createLLVMDialectToLLVMPass(output); });
 }
 
-/// Create a pass pipeline for lowering from MLIR to LLVM IR
-///
-/// \param pm - MLIR pass manager that will hold the pipeline definition
-inline void createMLIRToLLVMPassPipeline(mlir::PassManager &pm)
+inline void addCodeGenPasses(mlir::PassManager &pm)
 {
-  // simplify the IR
-  mlir::GreedyRewriteConfig config;
-  config.enableRegionSimplification = false;
-  fir::addCSE(pm);
-  pm.addNestedPass<mlir::FuncOp>(fir::createArrayValueCopyPass());
-  pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
-  pm.addPass(mlir::createCanonicalizerPass(config));
-  fir::addCSE(pm);
-  // The default inliner pass adds the canonicalizer pass with the default
-  // configuration. Create the inliner pass with tco config.
-  llvm::StringMap<mlir::OpPassManager> pipelines;
-  pm.addPass(
-      mlir::createInlinerPass(pipelines, defaultFlangInlinerOptPipeline));
-  pm.addPass(mlir::createCSEPass());
-
-  // convert control flow to CFG form
-  fir::addCfgConversionPass(pm);
-  pm.addNestedPass<mlir::FuncOp>(fir::createControlFlowLoweringPass());
-  pm.addPass(mlir::createLowerToCFGPass());
-
-  pm.addPass(mlir::createCanonicalizerPass(config));
-  pm.addPass(fir::createSimplifyRegionLitePass());
-  fir::addCSE(pm);
-
   pm.addNestedPass<mlir::FuncOp>(fir::createAbstractResultOptPass());
   fir::addCodeGenRewritePass(pm);
   fir::addTargetRewritePass(pm);

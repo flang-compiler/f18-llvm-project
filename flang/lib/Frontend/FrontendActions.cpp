@@ -465,7 +465,8 @@ void CodeGenAction::GenerateLLVMIR() {
   mlir::PassPipelineCLParser passPipeline("", "Compiler passes to run");
 
   // Create the pass pipeline
-  fir::createMLIRToLLVMPassPipeline(pm);
+  fir::createBasicFirPassPipeline(pm);
+  fir::addCodeGenPasses(pm);
 
   // Run the pass manager
   if (!mlir::succeeded(pm.run(mlirMod))) {
