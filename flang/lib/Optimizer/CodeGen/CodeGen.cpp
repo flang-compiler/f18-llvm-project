@@ -971,8 +971,8 @@ struct DispatchOpConversion : public FIROpConversion<fir::DispatchOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::DispatchOp dispatch, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        dispatch, "fir.dispatch codegen is not implemented yet");
+    TODO(dispatch.getLoc(), "fir.dispatch codegen");
+    return failure();
   }
 };
 
@@ -985,8 +985,8 @@ struct DispatchTableOpConversion
   mlir::LogicalResult
   matchAndRewrite(fir::DispatchTableOp dispTab, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        dispTab, "fir.dispatch_table codegen is not implemented yet");
+    TODO(dispTab.getLoc(), "fir.dispatch_table codegen");
+    return failure();
   }
 };
 
@@ -998,8 +998,8 @@ struct DTEntryOpConversion : public FIROpConversion<fir::DTEntryOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::DTEntryOp dtEnt, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        dtEnt, "fir.dt_entry codegen is not implemented yet");
+    TODO(dtEnt.getLoc(), "fir.dt_entry codegen");
+    return failure();
   }
 };
 
@@ -1010,8 +1010,7 @@ struct GlobalLenOpConversion : public FIROpConversion<fir::GlobalLenOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::GlobalLenOp globalLen, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    return rewriter.notifyMatchFailure(
-        globalLen, "fir.global_len codegen is not implemented yet");
+    TODO(globalLen.getLoc(), "fir.global_len codegen");
   }
 };
 
@@ -1041,6 +1040,7 @@ struct LenParamIndexOpConversion
     offset += 0; // FIXME
     auto attr = rewriter.getI64IntegerAttr(offset);
     rewriter.replaceOpWithNewOp<mlir::LLVM::ConstantOp>(lenp, ity, attr);
+    TODO(lenp.getLoc(), "fir.len_param_index codegen");
     return success();
   }
 };
@@ -2520,42 +2520,14 @@ struct FieldIndexOpConversion : public FIROpConversion<fir::FieldIndexOp> {
   }
 };
 
-struct LenParamIndexOpConversion
-    : public FIROpConversion<fir::LenParamIndexOp> {
-  using FIROpConversion::FIROpConversion;
-
-  // FIXME: this should be specialized by the runtime target
-  mlir::LogicalResult
-  matchAndRewrite(fir::LenParamIndexOp lenp, OperandTy operands,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    auto ity = lowerTy().indexType();
-    auto onty = lenp.getOnType();
-    // size of portable descriptor
-    const unsigned boxsize = 24; // FIXME
-    unsigned offset = boxsize;
-    // add the size of the rows of triples
-    if (auto arr = onty.dyn_cast<fir::SequenceType>())
-      offset += 3 * arr.getDimension();
-
-    // advance over some addendum fields
-    const unsigned addendumOffset{sizeof(void *) + sizeof(uint64_t)};
-    offset += addendumOffset;
-    // add the offset into the LENs
-    offset += 0; // FIXME
-    auto attr = rewriter.getI64IntegerAttr(offset);
-    rewriter.replaceOpWithNewOp<mlir::LLVM::ConstantOp>(lenp, ity, attr);
-    return success();
-  }
-};
-
 /// lower the fir.end operation to a null (erasing it)
 struct FirEndOpConversion : public FIROpConversion<fir::FirEndOp> {
   using FIROpConversion::FIROpConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::FirEndOp op, OperandTy operands,
+  matchAndRewrite(fir::FirEndOp firEnd, OperandTy operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    rewriter.replaceOp(op, {});
+    rewriter.eraseOp(firEnd);
     return success();
   }
 };
@@ -2568,18 +2540,6 @@ struct GenTypeDescOpConversion : public FIROpConversion<fir::GenTypeDescOp> {
   matchAndRewrite(fir::GenTypeDescOp gentypedesc, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     TODO(gentypedesc.getLoc(), "fir.gentypedesc codegen");
-    return failure();
-  }
-};
-
-/// Lower `fir.global_len` operation.
-struct GlobalLenOpConversion : public FIROpConversion<fir::GlobalLenOp> {
-  using FIROpConversion::FIROpConversion;
-
-  mlir::LogicalResult
-  matchAndRewrite(fir::GlobalLenOp globalLen, OpAdaptor adaptor,
-                  mlir::ConversionPatternRewriter &rewriter) const override {
-    TODO(globalLen.getLoc(), "fir.global_len codegen");
     return failure();
   }
 };
@@ -2775,11 +2735,11 @@ struct SelectCaseOpConversion : public FIROpConversion<fir::SelectCaseOp> {
     unsigned conds = caseOp.getNumConditions();
     llvm::ArrayRef<mlir::Attribute> cases = caseOp.getCases().getValue();
     // Type can be CHARACTER, INTEGER, or LOGICAL (C1145)
-    LLVM_ATTRIBUTE_UNUSED auto ty = caseOp.getSelector().getType();
-    if (ty.isa<fir::CharacterType>())
-      return rewriter.notifyMatchFailure(caseOp,
-                                         "conversion of fir.select_case with "
-                                         "character type not implemented yet");
+    auto ty = caseOp.getSelector().getType();
+    if (ty.isa<fir::CharacterType>()) {
+      TODO(caseOp.getLoc(), "fir.select_case codegen with character type");
+      return failure();
+    }
     mlir::Value selector = caseOp.getSelector(operands);
     auto loc = caseOp.getLoc();
     for (unsigned t = 0; t != conds; ++t) {
@@ -3313,8 +3273,6 @@ struct ShiftOpConversion : public MustBeDeadConversion<fir::ShiftOp> {
 struct SliceOpConversion : public MustBeDeadConversion<fir::SliceOp> {
   using MustBeDeadConversion::MustBeDeadConversion;
 };
-
-} // namespace
 
 /// Convert FIR dialect to LLVM dialect
 ///
