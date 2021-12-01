@@ -103,16 +103,36 @@ end function
 ! Test statement function with a character actual argument whose
 ! length may be different than the dummy length (the dummy length
 ! must be used inside the statement function).
-! CHECK-LABEL: @_QPtest_stmt_character_with_different_length
+! CHECK-LABEL: @_QPtest_stmt_character_with_different_length(
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>
 integer function test_stmt_character_with_different_length(c)
-   integer :: func
+   integer :: func, ifoo
    character(10) :: argc
    character(*) :: c
-   ! CHECK-DAG: %[[unboxed:.*]]:2 = fir.unboxchar %arg0 :
+   ! CHECK-DAG: %[[unboxed:.*]]:2 = fir.unboxchar %[[arg0]] :
    ! CHECK-DAG: %[[c10:.*]] = arith.constant 10 :
    ! CHECK: %[[c10_cast:.*]] = fir.convert %[[c10]] : (i32) -> index
-   ! CHECK: %[[c:.*]] = fir.emboxchar %[[unboxed]]#0, %[[c10_cast]]
-   func(argc) = len_trim(argc, 4)
+   ! CHECK: %[[argc:.*]] = fir.emboxchar %[[unboxed]]#0, %[[c10_cast]]
+   ! CHECK: fir.call @_QPifoo(%[[argc]]) : (!fir.boxchar<1>) -> i32
+   func(argc) = ifoo(argc)
+   test_stmt_character = func(c)
+end function
+
+! CHECK-LABEL: @_QPtest_stmt_character_with_different_length_2
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>, %[[arg1:.*]]: !fir.ref<i32>
+integer function test_stmt_character_with_different_length_2(c, n)
+   integer :: func, ifoo
+   character(n) :: argc
+   character(*) :: c
+   ! CHECK: %[[unboxed:.*]]:2 = fir.unboxchar %[[arg0]] :
+   ! CHECK: fir.load %[[arg1]] : !fir.ref<i32>
+   ! CHECK: %[[n:.*]] = fir.load %[[arg1]] : !fir.ref<i32>
+   ! CHECK: %[[n_is_positive:.*]] = arith.cmpi sgt, %[[n]], %c0{{.*}} : i32
+   ! CHECK: %[[len:.*]] = select %[[n_is_positive]], %[[n]], %c0{{.*}} : i32
+   ! CHECK: %[[lenCast:.*]] = fir.convert %[[len]] : (i32) -> index
+   ! CHECK: %[[argc:.*]] = fir.emboxchar %[[unboxed]]#0, %[[lenCast]] : (!fir.ref<!fir.char<1,?>>, index) -> !fir.boxchar<1>
+   ! CHECK: fir.call @_QPifoo(%[[argc]]) : (!fir.boxchar<1>) -> i32
+   func(argc) = ifoo(argc)
    test_stmt_character = func(c)
 end function
 

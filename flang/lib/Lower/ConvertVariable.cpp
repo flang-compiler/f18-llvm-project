@@ -1237,9 +1237,7 @@ void Fortran::lower::mapSymbolAttributes(
     auto rawLen = genValue(*charLen);
     // If the length expression is negative, the length is zero. See
     // F2018 7.4.4.2 point 5.
-    auto zero = builder.createIntegerConstant(loc, rawLen.getType(), 0);
-    return Fortran::lower::genMax(builder, loc,
-                                  llvm::SmallVector<mlir::Value>{rawLen, zero});
+    return genMaxWithZero(builder, loc, rawLen);
   };
 
   ba.match(
@@ -1318,7 +1316,7 @@ void Fortran::lower::mapSymbolAttributes(
           }
           // Override LEN with an expression
           if (charLen)
-            len = genValue(*charLen);
+            len = genExplicitCharLen(charLen);
           symMap.addCharSymbol(sym, boxAddr, len, true);
           return;
         }
@@ -1480,7 +1478,7 @@ void Fortran::lower::mapSymbolAttributes(
           addr = unboxchar.first;
           if (charLen) {
             // Set/override LEN with an expression
-            len = genValue(*charLen);
+            len = genExplicitCharLen(charLen);
           } else {
             // LEN is from the boxchar
             len = unboxchar.second;
@@ -1488,7 +1486,7 @@ void Fortran::lower::mapSymbolAttributes(
           }
         } else {
           // local CHARACTER variable
-          len = genExplicitCharLen(*charLen);
+          len = genExplicitCharLen(charLen);
         }
         llvm::SmallVector<mlir::Value> lengths = {len};
 
@@ -1606,7 +1604,7 @@ void Fortran::lower::mapSymbolAttributes(
             addr = builder.create<fir::BoxAddrOp>(loc, refTy, argBox);
             if (charLen)
               // Set/override LEN with an expression.
-              len = genValue(*charLen);
+              len = genExplicitCharLen(charLen);
             else
               // Get the length from the actual arguments.
               len = charHelp.readLengthFromBox(argBox);
@@ -1615,7 +1613,7 @@ void Fortran::lower::mapSymbolAttributes(
             addr = unboxchar.first;
             if (charLen) {
               // Set/override LEN with an expression
-              len = genValue(*charLen);
+              len = genExplicitCharLen(charLen);
             } else {
               // Get the length from the actual arguments.
               len = unboxchar.second;
@@ -1623,7 +1621,7 @@ void Fortran::lower::mapSymbolAttributes(
           }
         } else {
           // local CHARACTER variable
-          len = genExplicitCharLen(*charLen);
+          len = genExplicitCharLen(charLen);
         }
         llvm::SmallVector<mlir::Value> lengths = {len};
 

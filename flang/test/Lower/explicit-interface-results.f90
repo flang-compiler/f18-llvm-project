@@ -337,8 +337,10 @@ subroutine test_symbol_indirection(n)
   character(n) :: c
   ! CHECK: BeginExternalListOutput
   ! CHECK: %[[nload:.*]] = fir.load %[[n]] : !fir.ref<i64>
-  ! CHECK: %[[ncast:.*]] = fir.convert %[[nload]] : (i64) -> index
-  ! CHECK: fir.alloca !fir.char<1,?>(%[[ncast]] : index)
+  ! CHECK: %[[n_is_positive:.*]] = arith.cmpi sgt, %[[nload]], %c0{{.*}} : i64
+  ! CHECK: %[[len:.*]] = select %[[n_is_positive]], %[[nload]], %c0{{.*}} : i64
+  ! CHECK: %[[len_cast:.*]] = fir.convert %[[len]] : (i64) -> index
+  ! CHECK: fir.alloca !fir.char<1,?>(%[[len_cast]] : index)
   print *, symbol_indirection(c, n)
 end subroutine
 
