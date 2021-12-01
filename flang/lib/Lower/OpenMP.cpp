@@ -410,6 +410,21 @@ genOMP(Fortran::lower::AbstractConverter &converter,
     auto currentLocation = converter.getCurrentLocation();
     auto masterOp = firOpBuilder.create<mlir::omp::MasterOp>(currentLocation);
     createBodyOfOp<omp::MasterOp>(masterOp, converter, currentLocation, eval);
+  } else if (blockDirective.v == llvm::omp::OMPD_ordered) {
+    auto &firOpBuilder = converter.getFirOpBuilder();
+    auto currentLocation = converter.getCurrentLocation();
+    mlir::Attribute simdClauseOperand;
+    auto orderedOp = firOpBuilder.create<mlir::omp::OrderedRegionOp>(
+        currentLocation, simdClauseOperand.dyn_cast_or_null<UnitAttr>());
+    const auto &clauseList =
+        std::get<Fortran::parser::OmpClauseList>(beginBlockDirective.t);
+    for (const auto &clause : clauseList.v) {
+      if (std::get_if<Fortran::parser::OmpClause::Simd>(&clause.u)) {
+        TODO(currentLocation, "OpenMP ORDERED SIMD");
+      }
+    }
+    createBodyOfOp<omp::OrderedRegionOp>(orderedOp, converter, currentLocation,
+                                         eval);
   }
 }
 
