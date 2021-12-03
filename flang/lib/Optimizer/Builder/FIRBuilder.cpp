@@ -442,9 +442,7 @@ mlir::Value fir::FirOpBuilder::createBox(mlir::Location loc,
     return itemAddr;
   auto elementType = fir::dyn_cast_ptrEleTy(itemAddr.getType());
   if (!elementType) {
-    mlir::emitError(loc, "internal: expected a memory reference type ")
-        << itemAddr.getType();
-    llvm_unreachable("not a memory reference type");
+    fir::emitFatalError(loc, "internal: expected a memory reference type");
   }
   mlir::Type boxTy = fir::BoxType::get(elementType);
   return exv.match(
