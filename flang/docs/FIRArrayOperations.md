@@ -217,7 +217,7 @@ introduce a dependence.
 
 `array_amend` may be a partial update to an element, such as a substring. In
 that case, there is no dependence if all the other `array_access` ops are
-referencing other arrays. In this case, we conservatively assume there may be an
+referencing other arrays. We conservatively assume there may be an
 overlap like in s(:)(1:4) = s(:)(3:6) where s is an array of characters.
 
 If none of the array values overlap in storage and the accesses are not
