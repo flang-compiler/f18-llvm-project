@@ -199,7 +199,7 @@ reference. The reference into the array value is obtained via a
 One of the main purpose of the array operations present in FIR is to be able to
 perform the dependence analysis and elide copies where possible with a MLIR
 pass. This pass is called the `array-value-copy` pass.
-The analysis detects if there are any conflicts. A conflicts is when on  of th
+The analysis detects if there are any conflicts. A conflicts is when one of the
 following cases occurs:
 
 1. There is an `array_update`/`array_amend` to an array value/reference, a_j,
