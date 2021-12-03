@@ -46,7 +46,7 @@ static void genObjectList(const Fortran::parser::AccObjectList &objectList,
         operands.push_back(converter.getSymbolAddress(details->symbol()));
     }
   };
-  for (const auto &accObject : objectList.v) {
+  for (const Fortran::parser::AccObject &accObject : objectList.v) {
     std::visit(Fortran::common::visitors{
                    [&](const Fortran::parser::Designator &designator) {
                      if (const auto *name =
@@ -106,7 +106,7 @@ static Op createRegionOp(fir::FirOpBuilder &builder, mlir::Location loc,
   llvm::ArrayRef<mlir::Type> argTy;
   Op op = builder.create<Op>(loc, argTy, operands);
   builder.createBlock(&op.getRegion());
-  auto &block = op.getRegion().back();
+  mlir::Block &block = op.getRegion().back();
   builder.setInsertionPointToStart(&block);
   builder.create<Terminator>(loc);
 
@@ -156,7 +156,7 @@ static void genDeviceTypeClause(
       operands.push_back(expr);
     }
   } else {
-    auto &firOpBuilder = converter.getFirOpBuilder();
+    fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
     // * was passed as value and will be represented as a special constant.
     mlir::Value star = firOpBuilder.createIntegerConstant(
         converter.getCurrentLocation(), firOpBuilder.getIndexType(), starCst);
@@ -168,7 +168,7 @@ static void genIfClause(Fortran::lower::AbstractConverter &converter,
                         const Fortran::parser::AccClause::If *ifClause,
                         mlir::Value &ifCond,
                         Fortran::lower::StatementContext &stmtCtx) {
-  auto &firOpBuilder = converter.getFirOpBuilder();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
   Value cond = fir::getBase(converter.genExprValue(
       *Fortran::semantics::GetExpr(ifClause->v), stmtCtx));
   ifCond = firOpBuilder.createConvert(converter.getCurrentLocation(),
@@ -204,8 +204,8 @@ static void genWaitClause(Fortran::lower::AbstractConverter &converter,
 static mlir::acc::LoopOp
 createLoopOp(Fortran::lower::AbstractConverter &converter,
              const Fortran::parser::AccClauseList &accClauseList) {
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   mlir::Value workerNum;
@@ -215,7 +215,7 @@ createLoopOp(Fortran::lower::AbstractConverter &converter,
   SmallVector<mlir::Value, 2> tileOperands, privateOperands, reductionOperands;
   std::int64_t executionMapping = mlir::acc::OpenACCExecMapping::NONE;
 
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *gangClause =
             std::get_if<Fortran::parser::AccClause::Gang>(&clause.u)) {
       if (gangClause->v) {
@@ -302,11 +302,12 @@ createLoopOp(Fortran::lower::AbstractConverter &converter,
                   firOpBuilder.getI64IntegerAttr(executionMapping));
 
   // Lower clauses mapped to attributes
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *collapseClause =
             std::get_if<Fortran::parser::AccClause::Collapse>(&clause.u)) {
       const auto *expr = Fortran::semantics::GetExpr(collapseClause->v);
-      const auto collapseValue = Fortran::evaluate::ToInt64(*expr);
+      const std::optional<int64_t> collapseValue =
+          Fortran::evaluate::ToInt64(*expr);
       if (collapseValue) {
         loopOp->setAttr(mlir::acc::LoopOp::getCollapseAttrName(),
                         firOpBuilder.getI64IntegerAttr(*collapseValue));
@@ -367,14 +368,14 @@ createParallelOp(Fortran::lower::AbstractConverter &converter,
   bool addWaitAttr = false;
   bool addSelfAttr = false;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *asyncClause =
             std::get_if<Fortran::parser::AccClause::Async>(&clause.u)) {
       genAsyncClause(converter, asyncClause, async, addAsyncAttr, stmtCtx);
@@ -407,7 +408,7 @@ createParallelOp(Fortran::lower::AbstractConverter &converter,
               std::get_if<std::optional<Fortran::parser::ScalarLogicalExpr>>(
                   &accSelfClause.u)) {
         if (*optCondition) {
-          auto cond = fir::getBase(converter.genExprValue(
+          mlir::Value cond = fir::getBase(converter.genExprValue(
               *Fortran::semantics::GetExpr(*optCondition), stmtCtx));
           selfCond = firOpBuilder.createConvert(currentLocation,
                                                 firOpBuilder.getI1Type(), cond);
@@ -503,7 +504,8 @@ createParallelOp(Fortran::lower::AbstractConverter &converter,
   addOperands(operands, operandSegments, privateOperands);
   addOperands(operands, operandSegments, firstprivateOperands);
 
-  auto parallelOp = createRegionOp<mlir::acc::ParallelOp, mlir::acc::YieldOp>(
+  mlir::acc::ParallelOp parallelOp =
+      createRegionOp<mlir::acc::ParallelOp, mlir::acc::YieldOp>(
       firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
@@ -533,14 +535,14 @@ static void genACCDataOp(Fortran::lower::AbstractConverter &converter,
       createOperands, createZeroOperands, noCreateOperands, presentOperands,
       deviceptrOperands, attachOperands;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -667,14 +669,14 @@ genACCEnterDataOp(Fortran::lower::AbstractConverter &converter,
   bool addAsyncAttr = false;
   bool addWaitAttr = false;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -719,7 +721,7 @@ genACCEnterDataOp(Fortran::lower::AbstractConverter &converter,
   addOperands(operands, operandSegments, createZeroOperands);
   addOperands(operands, operandSegments, attachOperands);
 
-  auto enterDataOp = createSimpleOp<mlir::acc::EnterDataOp>(
+  mlir::acc::EnterDataOp enterDataOp = createSimpleOp<mlir::acc::EnterDataOp>(
       firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
@@ -742,14 +744,14 @@ genACCExitDataOp(Fortran::lower::AbstractConverter &converter,
   bool addWaitAttr = false;
   bool addFinalizeAttr = false;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -790,7 +792,7 @@ genACCExitDataOp(Fortran::lower::AbstractConverter &converter,
   addOperands(operands, operandSegments, deleteOperands);
   addOperands(operands, operandSegments, detachOperands);
 
-  auto exitDataOp = createSimpleOp<mlir::acc::ExitDataOp>(
+  mlir::acc::ExitDataOp exitDataOp = createSimpleOp<mlir::acc::ExitDataOp>(
       firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
@@ -808,14 +810,14 @@ genACCInitShutdownOp(Fortran::lower::AbstractConverter &converter,
   mlir::Value ifCond, deviceNum;
   SmallVector<mlir::Value, 2> deviceTypeOperands;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -856,14 +858,14 @@ genACCUpdateOp(Fortran::lower::AbstractConverter &converter,
   bool addWaitAttr = false;
   bool addIfPresentAttr = false;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -899,7 +901,7 @@ genACCUpdateOp(Fortran::lower::AbstractConverter &converter,
   addOperands(operands, operandSegments, hostOperands);
   addOperands(operands, operandSegments, deviceOperands);
 
-  auto updateOp = createSimpleOp<mlir::acc::UpdateOp>(
+  mlir::acc::UpdateOp updateOp = createSimpleOp<mlir::acc::UpdateOp>(
       firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
@@ -952,8 +954,8 @@ static void genACC(Fortran::lower::AbstractConverter &converter,
   // represent the clause.
   bool addAsyncAttr = false;
 
-  auto &firOpBuilder = converter.getFirOpBuilder();
-  auto currentLocation = converter.getCurrentLocation();
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
   Fortran::lower::StatementContext stmtCtx;
 
   if (waitArgument) { // wait has a value.
@@ -976,7 +978,7 @@ static void genACC(Fortran::lower::AbstractConverter &converter,
   // Lower clauses values mapped to operands.
   // Keep track of each group of operands separatly as clauses can appear
   // more than once.
-  for (const auto &clause : accClauseList.v) {
+  for (const Fortran::parser::AccClause &clause : accClauseList.v) {
     if (const auto *ifClause =
             std::get_if<Fortran::parser::AccClause::If>(&clause.u)) {
       genIfClause(converter, ifClause, ifCond, stmtCtx);
@@ -994,7 +996,7 @@ static void genACC(Fortran::lower::AbstractConverter &converter,
   addOperand(operands, operandSegments, waitDevnum);
   addOperand(operands, operandSegments, ifCond);
 
-  auto waitOp = createSimpleOp<mlir::acc::WaitOp>(firOpBuilder, currentLocation,
+  mlir::acc::WaitOp waitOp = createSimpleOp<mlir::acc::WaitOp>(firOpBuilder, currentLocation,
                                                   operands, operandSegments);
 
   if (addAsyncAttr)
