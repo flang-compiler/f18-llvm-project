@@ -397,7 +397,7 @@ public:
                 shapes.push_back(extent < 0 ? 0 : extent);
                 continue;
               }
-            } else if (subs.ubound().isAssumed()) {
+            } else if (subs.ubound().isStar()) {
               shapes.push_back(fir::SequenceType::getUnknownExtent());
               continue;
             }

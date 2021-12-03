@@ -1012,7 +1012,7 @@ static void lowerExplicitLowerBounds(
       auto lb = builder.createConvert(
           loc, idxTy, genScalarValue(converter, loc, expr, symMap, stmtCtx));
       result.emplace_back(lb);
-    } else if (!spec->lbound().isDeferred()) {
+    } else if (!spec->lbound().isColon()) {
       // Implicit lower bound is 1 (Fortran 2018 section 8.5.8.3 point 3.)
       result.emplace_back(builder.createIntegerConstant(loc, idxTy, 1));
     }
@@ -1049,8 +1049,8 @@ static void lowerExplicitExtents(Fortran::lower::AbstractConverter &converter,
       else
         result.emplace_back(
             computeExtent(builder, loc, lowerBounds[spec.index()], ub));
-    } else if (spec.value()->ubound().isAssumed()) {
-      // Column extent is undefined. Must be provided by user's code.
+    } else if (spec.value()->ubound().isStar()) {
+      // Assumed extent is undefined. Must be provided by user's code.
       result.emplace_back(builder.create<fir::UndefOp>(loc, idxTy));
     }
   }
@@ -1179,13 +1179,13 @@ void Fortran::lower::mapSymbolAttributes(
         Fortran::semantics::SomeExpr highEx{*high};
         auto ub = genValue(highEx);
         shapes.emplace_back(builder.createConvert(loc, idxTy, ub));
-      } else if (spec->ubound().isDeferred()) {
-        assert(box && "deferred bounds require a descriptor");
+      } else if (spec->ubound().isColon()) {
+        assert(box && "assumed bounds require a descriptor");
         auto dim = builder.createIntegerConstant(loc, idxTy, iter.index());
         auto dimInfo =
             builder.create<fir::BoxDimsOp>(loc, idxTy, idxTy, idxTy, box, dim);
         shapes.emplace_back(dimInfo.getResult(1));
-      } else if (spec->ubound().isAssumed()) {
+      } else if (spec->ubound().isStar()) {
         shapes.emplace_back(builder.create<fir::UndefOp>(loc, idxTy));
       } else {
         llvm::report_fatal_error("unknown bound category");
@@ -1200,7 +1200,7 @@ void Fortran::lower::mapSymbolAttributes(
       auto *spec = iter.value();
       fir::BoxDimsOp dimInfo;
       mlir::Value ub, lb;
-      if (spec->lbound().isDeferred() || spec->ubound().isDeferred()) {
+      if (spec->lbound().isColon() || spec->ubound().isColon()) {
         // This is an assumed shape because allocatables and pointers extents
         // are not constant in the scope and are not read here.
         assert(box && "deferred bounds require a descriptor");
@@ -1231,7 +1231,7 @@ void Fortran::lower::mapSymbolAttributes(
           extents.emplace_back(computeExtent(builder, loc, lb, ub));
         } else {
           // An assumed size array. The extent is not computed.
-          assert(spec->ubound().isAssumed() && "expected assumed size");
+          assert(spec->ubound().isStar() && "expected assumed size");
           lbounds.emplace_back(lb);
           extents.emplace_back(builder.create<fir::UndefOp>(loc, idxTy));
         }
