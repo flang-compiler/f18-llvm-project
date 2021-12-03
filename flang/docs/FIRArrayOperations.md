@@ -210,6 +210,16 @@ following cases occurs:
    `array_update`/`array_amend` of a_j with a different set of index values.
    [Possible loop-carried dependence.]
 
+`array_update` writes an entire element in the loaded array value. So an 
+`array_update` that does not change any of the arrays fetched from or updates 
+the exact same element that was read on the current iteration does not
+introduce a dependence.
+
+`array_amend` may be a partial update to an element, such as a substring. In
+that case, there is no dependence if all the other `array_access` ops are
+referencing other arrays. In this case, we conservatively assume there may be an
+overlap like in s(:)(1:4) = s(:)(3:6) where s is an array of characters.
+
 If none of the array values overlap in storage and the accesses are not
 loop-carried, then the arrays are conflict-free and no copies are required.
 
