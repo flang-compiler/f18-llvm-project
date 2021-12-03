@@ -63,7 +63,7 @@ void genCountDim(fir::FirOpBuilder &builder, mlir::Location loc,
                  mlir::Value resultBox, mlir::Value maskBox, mlir::Value dim,
                  mlir::Value kind);
 
-/// Generate call to `dot_product` intrinsic runtime routine.
+/// Generate call to DotProduct intrinsic runtime routine.
 mlir::Value genDotProduct(fir::FirOpBuilder &builder, mlir::Location loc,
                           mlir::Value vectorABox, mlir::Value vectorBBox,
                           mlir::Value resultBox);
