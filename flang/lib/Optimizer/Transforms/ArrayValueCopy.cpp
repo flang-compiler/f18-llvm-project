@@ -168,8 +168,18 @@ public:
       popFn(rop);
       return;
     }
+    if (auto rop = mlir::dyn_cast<IterWhileOp>(op)) {
+      popFn(rop);
+      return;
+    }
     if (auto rop = mlir::dyn_cast<fir::IfOp>(op)) {
       popFn(rop);
+      return;
+    }
+    if (auto box = mlir::dyn_cast<EmboxOp>(op)) {
+      for (auto *user : box.memref().getUsers())
+        if (user != op)
+          collectArrayMentionFrom(user, user->getResults());
       return;
     }
     if (auto mergeStore = mlir::dyn_cast<ArrayMergeStoreOp>(op)) {
