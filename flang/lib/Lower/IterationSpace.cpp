@@ -63,19 +63,20 @@ public:
   }
   static unsigned getHashValue(const Fortran::evaluate::ArrayRef &x) {
     unsigned subs = 1u;
-    for (const auto &v : x.subscript())
+    for (const Fortran::evaluate::Subscript &v : x.subscript())
       subs -= getHashValue(v);
     return getHashValue(x.base()) * 89u - subs;
   }
   static unsigned getHashValue(const Fortran::evaluate::CoarrayRef &x) {
     unsigned subs = 1u;
-    for (const auto &v : x.subscript())
+    for (const Fortran::evaluate::Subscript &v : x.subscript())
       subs -= getHashValue(v);
     unsigned cosubs = 3u;
-    for (const auto &v : x.cosubscript())
+    for (const Fortran::evaluate::Expr<Fortran::evaluate::SubscriptInteger> &v :
+         x.cosubscript())
       cosubs -= getHashValue(v);
     unsigned syms = 7u;
-    for (const auto &v : x.base())
+    for (const Fortran::evaluate::SymbolRef &v : x.base())
       syms += getHashValue(v);
     return syms * 97u - subs - cosubs + getHashValue(x.stat()) + 257u +
            getHashValue(x.team());
@@ -196,7 +197,7 @@ public:
     return 103u;
   }
   static unsigned getHashValue(const Fortran::evaluate::ActualArgument &x) {
-    if (const auto *sym = x.GetAssumedTypeDummy())
+    if (const Fortran::evaluate::Symbol *sym = x.GetAssumedTypeDummy())
       return getHashValue(*sym);
     return getHashValue(*x.UnwrapExpr());
   }
@@ -206,7 +207,8 @@ public:
   }
   static unsigned getHashValue(const Fortran::evaluate::ProcedureRef &x) {
     unsigned args = 13u;
-    for (const auto &v : x.arguments())
+    for (const std::optional<Fortran::evaluate::ActualArgument> &v :
+         x.arguments())
       args -= getHashValue(v);
     return getHashValue(x.proc()) * 101u - args;
   }
@@ -313,7 +315,7 @@ public:
   static bool isEqual(const std::vector<A> &x, const std::vector<A> &y) {
     if (x.size() != y.size())
       return false;
-    const auto size = x.size();
+    const size_t size = x.size();
     for (std::remove_const_t<decltype(size)> i = 0; i < size; ++i)
       if (!isEqual(x[i], y[i]))
         return false;
@@ -462,8 +464,8 @@ public:
   }
   static bool isEqual(const Fortran::evaluate::ActualArgument &x,
                       const Fortran::evaluate::ActualArgument &y) {
-    if (const auto *xs = x.GetAssumedTypeDummy()) {
-      if (const auto *ys = y.GetAssumedTypeDummy())
+    if (const Fortran::evaluate::Symbol *xs = x.GetAssumedTypeDummy()) {
+      if (const Fortran::evaluate::Symbol *ys = y.GetAssumedTypeDummy())
         return isEqual(*xs, *ys);
       return false;
     }
@@ -799,7 +801,8 @@ void Fortran::lower::ExplicitIterSpace::exprBase(Fortran::lower::FrontEndExpr x,
                                                  bool lhs) {
   ArrayBaseFinder finder(collectAllSymbols());
   finder(*x);
-  auto bases = finder.getBases();
+  llvm::ArrayRef<Fortran::lower::ExplicitIterSpace::ArrayBases> bases =
+      finder.getBases();
   if (rhsBases.empty())
     endAssign();
   if (lhs) {
@@ -858,7 +861,7 @@ Fortran::lower::ExplicitIterSpace::findArgPosition(fir::ArrayLoadOp load) {
 llvm::SmallVector<Fortran::lower::FrontEndSymbol>
 Fortran::lower::ExplicitIterSpace::collectAllSymbols() {
   llvm::SmallVector<Fortran::lower::FrontEndSymbol> result;
-  for (auto vec : symbolStack)
+  for (llvm::SmallVector<FrontEndSymbol> vec : symbolStack)
     result.append(vec.begin(), vec.end());
   return result;
 }
@@ -866,9 +869,11 @@ Fortran::lower::ExplicitIterSpace::collectAllSymbols() {
 llvm::raw_ostream &
 Fortran::lower::operator<<(llvm::raw_ostream &s,
                            const Fortran::lower::ImplicitIterSpace &e) {
-  for (auto &xs : e.getMasks()) {
+  for (const llvm::SmallVector<
+           Fortran::lower::ImplicitIterSpace::FrontEndMaskExpr> &xs :
+       e.getMasks()) {
     s << "{ ";
-    for (auto &x : xs)
+    for (const Fortran::lower::ImplicitIterSpace::FrontEndMaskExpr &x : xs)
       x->AsFortran(s << '(') << "), ";
     s << "}\n";
   }
@@ -897,12 +902,14 @@ Fortran::lower::operator<<(llvm::raw_ostream &s,
                u);
   };
   s << "LHS bases:\n";
-  for (auto &u : e.lhsBases)
+  for (const llvm::Optional<Fortran::lower::ExplicitIterSpace::ArrayBases> &u :
+       e.lhsBases)
     if (u.hasValue())
       dump(u.getValue());
   s << "RHS bases:\n";
-  for (auto &bases : e.rhsBases) {
-    for (auto &u : bases)
+  for (const llvm::SmallVector<Fortran::lower::ExplicitIterSpace::ArrayBases>
+           &bases : e.rhsBases) {
+    for (const Fortran::lower::ExplicitIterSpace::ArrayBases &u : bases)
       dump(u);
     s << '\n';
   }
