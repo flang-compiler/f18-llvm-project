@@ -918,46 +918,46 @@ static constexpr RuntimeFunction pgmathPrecise[] = {
 };
 
 static mlir::FunctionType genF32F32FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF32(context);
+  auto t = mlir::FloatType::getF32(context);
   return mlir::FunctionType::get(context, {t}, {t});
 }
 
 static mlir::FunctionType genF64F64FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF64(context);
+  auto t = mlir::FloatType::getF64(context);
   return mlir::FunctionType::get(context, {t}, {t});
 }
 
 static mlir::FunctionType genF32F32F32FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF32(context);
+  auto t = mlir::FloatType::getF32(context);
   return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
 static mlir::FunctionType genF64F64F64FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF64(context);
+  auto t = mlir::FloatType::getF64(context);
   return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
 static mlir::FunctionType genF80F80F80FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF80(context);
+  auto t = mlir::FloatType::getF80(context);
   return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
 static mlir::FunctionType genF128F128F128FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF128(context);
+  auto t = mlir::FloatType::getF128(context);
   return mlir::FunctionType::get(context, {t, t}, {t});
 }
 
 template <int Bits>
 static mlir::FunctionType genIntF64FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF64(context);
-  mlir::IntegerType r = mlir::IntegerType::get(context, Bits);
+  auto t = mlir::FloatType::getF64(context);
+  auto r = mlir::IntegerType::get(context, Bits);
   return mlir::FunctionType::get(context, {t}, {r});
 }
 
 template <int Bits>
 static mlir::FunctionType genIntF32FuncType(mlir::MLIRContext *context) {
-  mlir::FloatType t = mlir::FloatType::getF32(context);
-  mlir::IntegerType r = mlir::IntegerType::get(context, Bits);
+  auto t = mlir::FloatType::getF32(context);
+  auto r = mlir::IntegerType::get(context, Bits);
   return mlir::FunctionType::get(context, {t}, {r});
 }
 
