@@ -315,7 +315,7 @@ public:
   static bool isEqual(const std::vector<A> &x, const std::vector<A> &y) {
     if (x.size() != y.size())
       return false;
-    const size_t size = x.size();
+    const std::size_t size = x.size();
     for (std::remove_const_t<decltype(size)> i = 0; i < size; ++i)
       if (!isEqual(x[i], y[i]))
         return false;
