@@ -1657,6 +1657,18 @@ public:
     return gen(expr);
   }
 
+  /// Helper to lower intrinsic arguments to a fir::BoxValue.
+  /// It preserves all the non default lower bounds/non deferred length
+  /// parameter information.
+  ExtValue lowerIntrinsicArgumentAsBox(const Fortran::lower::SomeExpr &expr) {
+    mlir::Location loc = getLoc();
+    ExtValue exv = genBoxArg(expr);
+    mlir::Value box = builder.createBox(loc, exv);
+    return fir::BoxValue(
+        box, fir::factory::getNonDefaultLowerBounds(builder, loc, exv),
+        fir::factory::getNonDeferredLengthParams(exv));
+  }
+
   /// Generate a call to an intrinsic function.
   ExtValue
   genIntrinsicRef(const Fortran::evaluate::ProcedureRef &procRef,
@@ -1693,7 +1705,7 @@ public:
         operands.emplace_back(gen(*expr));
         continue;
       case Fortran::lower::LowerIntrinsicArgAs::Box:
-        operands.emplace_back(builder.createBox(getLoc(), genBoxArg(*expr)));
+        operands.emplace_back(lowerIntrinsicArgumentAsBox(*expr));
         continue;
       case Fortran::lower::LowerIntrinsicArgAs::Inquired:
         operands.emplace_back(lowerIntrinsicArgumentAsInquired(*expr));
