@@ -206,7 +206,8 @@ mlir::Value createSubroutineCall(AbstractConverter &converter,
 // pass-by-ref semantics for a VALUE parameter. The optimizer may be able to
 // eliminate these.
 inline mlir::NamedAttribute getAdaptToByRefAttr(fir::FirOpBuilder &builder) {
-  return {mlir::Identifier::get("adapt.valuebyref", builder.getContext()),
+  return {mlir::Identifier::get(fir::getAdaptToByRefAttrName(),
+                                builder.getContext()),
           builder.getUnitAttr()};
 }
 

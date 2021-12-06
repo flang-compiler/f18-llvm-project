@@ -124,12 +124,12 @@ public:
 
 /// Class defining simple scalars are captured in internal procedures.
 /// Simple scalars are non character intrinsic scalars. They are captured
-/// as !fir.ptr<T> (.e.g !fir.ptr<i32> for INTEGER(4)).
+/// as `!fir.ref<T>`, for example `!fir.ref<i32>` for `INTEGER*4`.
 class CapturedSimpleScalars : public CapturedSymbols<CapturedSimpleScalars> {
 public:
   static mlir::Type getType(Fortran::lower::AbstractConverter &converter,
                             const Fortran::semantics::Symbol &sym) {
-    return fir::PointerType::get(converter.genType(sym));
+    return fir::ReferenceType::get(converter.genType(sym));
   }
 
   static void instantiateHostTuple(const InstantiateHostTuple &args,
@@ -309,21 +309,21 @@ public:
 };
 
 /// Class defining how arrays are captured inside internal procedures.
-/// Array are captured via a fir.box<fir.ptr<T>> pointer descriptor that
-/// belongs to the host tuple. This allows capturing lower bounds, which
-/// a non pointer descriptor (fir.box<T>) would not allow.
+/// Array are captured via a `fir.box<fir.array<T>>` descriptor that belongs to
+/// the host tuple. This allows capturing lower bounds, which can be done by
+/// providing a ShapeShiftOp argument to the EmboxOp.
 class CapturedArrays : public CapturedSymbols<CapturedArrays> {
 
   // Note: Constant shape arrays are not specialized (their base address would
   // be sufficient information inside the tuple). They could be specialized in
-  // a later FIR pass, or A CapturedStaticShapeArrays could be added to deal
+  // a later FIR pass, or a CapturedStaticShapeArrays could be added to deal
   // with them here.
 public:
   static mlir::Type getType(Fortran::lower::AbstractConverter &converter,
                             const Fortran::semantics::Symbol &sym) {
     auto type = converter.genType(sym);
     assert(type.isa<fir::SequenceType>() && "must be a sequence type");
-    return fir::BoxType::get(fir::PointerType::get(type));
+    return fir::BoxType::get(type);
   }
 
   static void instantiateHostTuple(const InstantiateHostTuple &args,
@@ -433,6 +433,7 @@ typename T::Result
 walkCaptureCategories(T visitor, Fortran::lower::AbstractConverter &converter,
                       const Fortran::semantics::Symbol &sym) {
   if (isDerivedWithLengthParameters(sym))
+    // Should be boxed.
     TODO(converter.genLocation(sym.name()),
          "host associated derived type with length parameters");
   Fortran::lower::BoxAnalyzer ba;
