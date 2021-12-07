@@ -125,6 +125,8 @@ static fir::GlobalOp declareGlobal(Fortran::lower::AbstractConverter &converter,
                                    llvm::StringRef globalName,
                                    mlir::StringAttr linkage) {
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  if (fir::GlobalOp global = builder.getNamedGlobal(globalName))
+    return global;
   const Fortran::semantics::Symbol &sym = var.getSymbol();
   mlir::Location loc = converter.genLocation(sym.name());
   // Resolve potential host and module association before checking that this
@@ -356,6 +358,24 @@ static mlir::Value genDefaultInitializerValue(
   return initialValue;
 }
 
+/// Does this global already have an initializer ?
+static bool globalIsInitialized(fir::GlobalOp global) {
+  return !global.getRegion().empty() || global.initVal();
+}
+
+/// Call \p genInit to generate code inside \p global initializer region.
+static void
+createGlobalInitialization(fir::FirOpBuilder &builder, fir::GlobalOp global,
+                           std::function<void(fir::FirOpBuilder &)> genInit) {
+  mlir::Region &region = global.getRegion();
+  region.push_back(new mlir::Block);
+  mlir::Block &block = region.back();
+  auto insertPt = builder.saveInsertionPoint();
+  builder.setInsertionPointToStart(&block);
+  genInit(builder);
+  builder.restoreInsertionPoint(insertPt);
+}
+
 /// Create the global op and its init if it has one
 static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
                                   const Fortran::lower::pft::Variable &var,
@@ -365,49 +385,47 @@ static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
   const Fortran::semantics::Symbol &sym = var.getSymbol();
   mlir::Location loc = converter.genLocation(sym.name());
   bool isConst = sym.attrs().test(Fortran::semantics::Attr::PARAMETER);
-  fir::GlobalOp global;
+  fir::GlobalOp global = builder.getNamedGlobal(globalName);
+  if (global && globalIsInitialized(global))
+    return global;
+  mlir::Type symTy = converter.genType(var);
+  if (!global)
+    global = builder.createGlobal(loc, symTy, globalName, linkage,
+                                  mlir::Attribute{}, isConst);
   if (Fortran::semantics::IsAllocatableOrPointer(sym)) {
-    mlir::Type symTy = converter.genType(var);
     const auto *details =
         sym.detailsIf<Fortran::semantics::ObjectEntityDetails>();
     if (details && details->init()) {
       auto expr = *details->init();
-      auto init = [&](fir::FirOpBuilder &b) {
+      createGlobalInitialization(builder, global, [&](fir::FirOpBuilder &b) {
         mlir::Value box =
             Fortran::lower::genInitialDataTarget(converter, loc, symTy, expr);
         b.create<fir::HasValueOp>(loc, box);
-      };
-      global =
-          builder.createGlobal(loc, symTy, globalName, isConst, init, linkage);
+      });
     } else {
       // Create unallocated/disassociated descriptor if no explicit init
-      auto init = [&](fir::FirOpBuilder &b) {
+      createGlobalInitialization(builder, global, [&](fir::FirOpBuilder &b) {
         mlir::Value box =
             fir::factory::createUnallocatedBox(b, loc, symTy, llvm::None);
         b.create<fir::HasValueOp>(loc, box);
-      };
-      global =
-          builder.createGlobal(loc, symTy, globalName, isConst, init, linkage);
+      });
     }
 
   } else if (const auto *details =
                  sym.detailsIf<Fortran::semantics::ObjectEntityDetails>()) {
     if (details->init()) {
-      mlir::Type symTy = converter.genType(var);
       if (fir::isa_char(symTy)) {
         // CHARACTER literal
         if (auto chLit = getCharacterLiteralCopy(details->init().value())) {
           mlir::StringAttr init =
               builder.getStringAttr(std::get<std::string>(*chLit));
-          global = builder.createGlobal(loc, symTy, globalName, linkage, init,
-                                        isConst);
+          global->setAttr(global.getInitValAttrName(), init);
         } else {
           fir::emitFatalError(loc, "CHARACTER has unexpected initial value");
         }
       } else {
-        global = builder.createGlobal(
-            loc, symTy, globalName, isConst,
-            [&](fir::FirOpBuilder &builder) {
+        createGlobalInitialization(
+            builder, global, [&](fir::FirOpBuilder &builder) {
               Fortran::lower::StatementContext stmtCtx(/*prohibited=*/true);
               fir::ExtendedValue initVal = genInitializerExprValue(
                   converter, loc, details->init().value(), stmtCtx);
@@ -415,44 +433,46 @@ static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
                   builder.createConvert(loc, symTy, fir::getBase(initVal));
               stmtCtx.finalize();
               builder.create<fir::HasValueOp>(loc, castTo);
-            },
-            linkage);
+            });
       }
     } else if (hasDefaultInitialization(sym)) {
-      mlir::Type symTy = converter.genType(var);
-      global = builder.createGlobal(
-          loc, symTy, globalName, isConst,
-          [&](fir::FirOpBuilder &builder) {
+      createGlobalInitialization(
+          builder, global, [&](fir::FirOpBuilder &builder) {
             Fortran::lower::StatementContext stmtCtx(/*prohibited=*/true);
             mlir::Value initVal =
                 genDefaultInitializerValue(converter, loc, sym, symTy, stmtCtx);
-            mlir::Value castTo =
-                builder.createConvert(loc, symTy, fir::getBase(initVal));
+            mlir::Value castTo = builder.createConvert(loc, symTy, initVal);
             stmtCtx.finalize();
             builder.create<fir::HasValueOp>(loc, castTo);
-          },
-          linkage);
+          });
     }
   } else if (sym.has<Fortran::semantics::CommonBlockDetails>()) {
     mlir::emitError(loc, "COMMON symbol processed elsewhere");
   } else {
     TODO(loc, "global"); // Procedure pointer or something else
   }
-  // Creates undefined initializer for globals without initialziers
-  if (!global) {
-    mlir::Type symTy = converter.genType(var);
-    global = builder.createGlobal(
-        loc, symTy, globalName, isConst,
-        [&](fir::FirOpBuilder &builder) {
+  // Creates undefined initializer for globals without initializers
+  if (!globalIsInitialized(global))
+    createGlobalInitialization(
+        builder, global, [&](fir::FirOpBuilder &builder) {
           builder.create<fir::HasValueOp>(
               loc, builder.create<fir::UndefOp>(loc, symTy));
-        },
-        linkage);
-  }
+        });
   // Set public visibility to prevent global definition to be optimized out
   // even if they have no initializer and are unused in this compilation unit.
   global.setVisibility(mlir::SymbolTable::Visibility::Public);
   return global;
+}
+
+/// Return linkage attribute for \p var.
+static mlir::StringAttr
+getLinkageAttribute(fir::FirOpBuilder &builder,
+                    const Fortran::lower::pft::Variable &var) {
+  if (var.isModuleVariable())
+    return {}; // external linkage
+  // Otherwise, the variable is owned by a procedure and must not be visible in
+  // other compilation units.
+  return builder.createInternalLinkage();
 }
 
 /// Instantiate a global variable. If it hasn't already been processed, add
@@ -467,18 +487,13 @@ static void instantiateGlobal(Fortran::lower::AbstractConverter &converter,
   std::string globalName = Fortran::lower::mangle::mangleName(sym);
   mlir::Location loc = converter.genLocation(sym.name());
   fir::GlobalOp global = builder.getNamedGlobal(globalName);
-  if (!global) {
-    if (var.isDeclaration()) {
-      // Using a global from a module not defined in this compilation unit.
-      mlir::StringAttr externalLinkage;
-      global = declareGlobal(converter, var, globalName, externalLinkage);
-    } else {
-      mlir::StringAttr linkage; // external if remains empty.
-      if (!sym.owner().IsModule() &&
-          !Fortran::semantics::FindCommonBlockContaining(sym))
-        linkage = builder.createInternalLinkage();
-      global = defineGlobal(converter, var, globalName, linkage);
-    }
+  mlir::StringAttr linkage = getLinkageAttribute(builder, var);
+  if (var.isModuleVariable()) {
+    // A module global was or will be defined when lowering the module. Emit
+    // only a declaration if the global does not exist at that point.
+    global = declareGlobal(converter, var, globalName, linkage);
+  } else {
+    global = defineGlobal(converter, var, globalName, linkage);
   }
   auto addrOf = builder.create<fir::AddrOfOp>(loc, global.resultType(),
                                               global.getSymbol());
@@ -624,23 +639,27 @@ static fir::GlobalOp defineGlobalAggregateStore(
     StringRef aggName, mlir::StringAttr linkage) {
   assert(aggregate.isGlobal() && "not a global interval");
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  fir::GlobalOp global = builder.getNamedGlobal(aggName);
+  if (global && globalIsInitialized(global))
+    return global;
   mlir::Location loc = converter.getCurrentLocation();
   mlir::Type aggTy = getAggregateType(converter, aggregate);
+  if (!global)
+    global = builder.createGlobal(loc, aggTy, aggName, linkage);
+
   if (const Fortran::semantics::Symbol *initSym =
           aggregate.getInitialValueSymbol())
     if (const auto *objectDetails =
             initSym->detailsIf<Fortran::semantics::ObjectEntityDetails>())
-      if (objectDetails->init()) {
-        auto initFunc = [&](fir::FirOpBuilder &builder) {
-          Fortran::lower::StatementContext stmtCtx;
-          mlir::Value initVal = fir::getBase(genInitializerExprValue(
-              converter, loc, objectDetails->init().value(), stmtCtx));
-          builder.create<fir::HasValueOp>(loc, initVal);
-        };
-        return builder.createGlobal(loc, aggTy, aggName,
-                                    /*isConstant=*/false, initFunc, linkage);
-      }
-  return builder.createGlobal(loc, aggTy, aggName, linkage);
+      if (objectDetails->init())
+        createGlobalInitialization(
+            builder, global, [&](fir::FirOpBuilder &builder) {
+              Fortran::lower::StatementContext stmtCtx;
+              mlir::Value initVal = fir::getBase(genInitializerExprValue(
+                  converter, loc, objectDetails->init().value(), stmtCtx));
+              builder.create<fir::HasValueOp>(loc, initVal);
+            });
+  return global;
 }
 
 /// Declare a GlobalOp for the storage of a global equivalence described
@@ -656,8 +675,11 @@ static fir::GlobalOp declareGlobalAggregateStore(
     const Fortran::lower::pft::Variable::AggregateStore &aggregate,
     StringRef aggName, mlir::StringAttr linkage) {
   assert(aggregate.isGlobal() && "not a global interval");
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  if (fir::GlobalOp global = builder.getNamedGlobal(aggName))
+    return global;
   mlir::Type aggTy = getAggregateType(converter, aggregate);
-  return converter.getFirOpBuilder().createGlobal(loc, aggTy, aggName, linkage);
+  return builder.createGlobal(loc, aggTy, aggName, linkage);
 }
 
 /// This is an aggregate store for a set of EQUIVALENCED variables. Create the
@@ -672,23 +694,17 @@ instantiateAggregateStore(Fortran::lower::AbstractConverter &converter,
   mlir::Location loc = converter.getCurrentLocation();
   std::string aggName = mangleGlobalAggregateStore(var.getAggregateStore());
   if (var.isGlobal()) {
-    // The scope of this aggregate is this procedure.
-    fir::GlobalOp global = builder.getNamedGlobal(aggName);
-    if (!global) {
-      auto &aggregate = var.getAggregateStore();
-      if (var.isDeclaration()) {
-        // Using aggregate from a module not defined in the current
-        // compilation unit.
-        mlir::StringAttr externalLinkage;
-        global = declareGlobalAggregateStore(converter, loc, aggregate, aggName,
-                                             externalLinkage);
-      } else {
-        // The aggregate is owned by a procedure and must not be
-        // visible in other compilation units.
-        mlir::StringAttr internalLinkage = builder.createInternalLinkage();
-        global = defineGlobalAggregateStore(converter, aggregate, aggName,
-                                            internalLinkage);
-      }
+    fir::GlobalOp global;
+    auto &aggregate = var.getAggregateStore();
+    mlir::StringAttr linkage = getLinkageAttribute(builder, var);
+    if (var.isModuleVariable()) {
+      // A module global was or will be defined when lowering the module. Emit
+      // only a declaration if the global does not exist at that point.
+      global = declareGlobalAggregateStore(converter, loc, aggregate, aggName,
+                                           linkage);
+    } else {
+      global =
+          defineGlobalAggregateStore(converter, aggregate, aggName, linkage);
     }
     auto addr = builder.create<fir::AddrOfOp>(loc, global.resultType(),
                                               global.getSymbol());
@@ -1709,9 +1725,6 @@ void Fortran::lower::defineModuleVariable(
   // Use empty linkage for module variables, which makes them available
   // for use in another unit.
   mlir::StringAttr externalLinkage;
-  // Only define variable owned by this module
-  if (var.isDeclaration())
-    return;
   if (!var.isGlobal())
     fir::emitFatalError(converter.genLocation(),
                         "attempting to lower module variable as local");

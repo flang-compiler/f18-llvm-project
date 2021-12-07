@@ -2699,8 +2699,13 @@ private:
         fir::NameUniquer::doGenerated("ModuleSham"),
         mlir::FunctionType::get(context, llvm::None, llvm::None));
     builder = new fir::FirOpBuilder(func, bridge.getKindMap());
-    for (const Fortran::lower::pft::Variable &var : mod.getOrderedSymbolTable())
-      Fortran::lower::defineModuleVariable(*this, var);
+    for (const Fortran::lower::pft::Variable &var :
+         mod.getOrderedSymbolTable()) {
+      // Only define the variables owned by this module.
+      const Fortran::semantics::Scope *owningScope = var.getOwningScope();
+      if (!owningScope || mod.getScope() == *owningScope)
+        Fortran::lower::defineModuleVariable(*this, var);
+    }
     if (mlir::Region *region = func.getCallableRegion())
       region->dropAllReferences();
     func.erase();

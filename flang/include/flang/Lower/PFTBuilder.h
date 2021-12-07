@@ -23,6 +23,7 @@
 #include "flang/Lower/PFTDefs.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/attr.h"
+#include "flang/Semantics/scope.h"
 #include "flang/Semantics/symbol.h"
 #include "llvm/Support/ErrorHandling.h"
 #include "llvm/Support/raw_ostream.h"
@@ -391,9 +392,6 @@ struct Variable {
     const semantics::Symbol *symbol{};
 
     bool isGlobal() const { return global; }
-    bool isDeclaration() const {
-      return !symbol || symbol != &symbol->GetUltimate();
-    }
 
     int depth{};
     bool global{};
@@ -413,18 +411,16 @@ struct Variable {
   struct AggregateStore {
     AggregateStore(Interval &&interval,
                    const Fortran::semantics::Symbol &namingSym,
-                   bool isDeclaration = false, bool isGlobal = false)
+                   bool isGlobal = false)
         : interval{std::move(interval)}, namingSymbol{&namingSym},
-          isDecl{isDeclaration}, isGlobalAggregate{isGlobal} {}
+          isGlobalAggregate{isGlobal} {}
     AggregateStore(const semantics::Symbol &initialValueSym,
-                   const semantics::Symbol &namingSym,
-                   bool isDeclaration = false, bool isGlobal = false)
+                   const semantics::Symbol &namingSym, bool isGlobal = false)
         : interval{initialValueSym.offset(), initialValueSym.size()},
           namingSymbol{&namingSym}, initialValueSymbol{&initialValueSym},
-          isDecl{isDeclaration}, isGlobalAggregate{isGlobal} {};
+          isGlobalAggregate{isGlobal} {};
 
     bool isGlobal() const { return isGlobalAggregate; }
-    bool isDeclaration() const { return isDecl; }
     /// Get offset of the aggregate inside its scope.
     std::size_t getOffset() const { return std::get<0>(interval); }
     /// Returns symbols holding the aggregate initial value if any.
@@ -443,8 +439,6 @@ struct Variable {
     const semantics::Symbol *namingSymbol;
     /// Compiler generated symbol with the aggregate initial value if any.
     const semantics::Symbol *initialValueSymbol = nullptr;
-    /// Is this a declaration of a storage defined in another scope ?
-    bool isDecl;
     /// Is this a global aggregate ?
     bool isGlobalAggregate;
   };
@@ -485,9 +479,10 @@ struct Variable {
     return std::visit([](const auto &x) { return x.isGlobal(); }, var);
   }
 
-  /// Is this a declaration of a variable owned by another scope ?
-  bool isDeclaration() const {
-    return std::visit([](const auto &x) { return x.isDeclaration(); }, var);
+  /// Is this a module variable ?
+  bool isModuleVariable() const {
+    const semantics::Scope *scope = getOwningScope();
+    return scope && scope->IsModule();
   }
 
   const Fortran::semantics::Scope *getOwningScope() const {
@@ -699,6 +694,9 @@ struct ModuleLikeUnit : public ProgramUnit {
 
   /// Get the starting source location for this module like unit.
   parser::CharBlock getStartingSourceLoc() const;
+
+  /// Get the module scope.
+  const Fortran::semantics::Scope &getScope() const;
 
   ModuleStatement beginStmt;
   ModuleStatement endStmt;

@@ -1297,14 +1297,13 @@ struct SymbolDependenceDepth {
     while (!parentScope->IsGlobal()) {
       parentScope = &parentScope->parent();
       if (parentScope->IsModule())
-        analyzeAliases(*parentScope, /*isDeclaration=*/true);
+        analyzeAliases(*parentScope);
     }
     for (const auto &iter : scope) {
       const auto &ultimate = iter.second.get().GetUltimate();
       if (skipSymbol(ultimate))
         continue;
-      bool isDeclaration = scope != ultimate.owner();
-      analyzeAliases(ultimate.owner(), isDeclaration);
+      analyzeAliases(ultimate.owner());
     }
     // add all aggregate stores to the front of the work list
     adjustSize(1);
@@ -1323,7 +1322,7 @@ struct SymbolDependenceDepth {
 
   // Analyze the equivalence sets. This analysis need not be performed when the
   // scope has no equivalence sets.
-  void analyzeAliases(const semantics::Scope &scope, bool isDeclaration) {
+  void analyzeAliases(const semantics::Scope &scope) {
     if (scope.equivalenceSets().empty())
       return;
     // Don't analyze a scope if it has already been analyzed.
@@ -1356,9 +1355,9 @@ struct SymbolDependenceDepth {
       if (!aggregateSym) {
         stores.emplace_back(
             Fortran::lower::pft::Variable::Interval{start, end - start},
-            *namingSym, isDeclaration, isGlobal);
+            *namingSym, isGlobal);
       } else {
-        stores.emplace_back(*aggregateSym, *namingSym, isDeclaration, isGlobal);
+        stores.emplace_back(*aggregateSym, *namingSym, isGlobal);
       }
     }
   }
@@ -1631,6 +1630,13 @@ Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
 parser::CharBlock
 Fortran::lower::pft::ModuleLikeUnit::getStartingSourceLoc() const {
   return stmtSourceLoc(beginStmt);
+}
+const Fortran::semantics::Scope &
+Fortran::lower::pft::ModuleLikeUnit::getScope() const {
+  const Fortran::semantics::Symbol *symbol = getSymbol(beginStmt);
+  assert(symbol && symbol->scope() &&
+         "Module statement must have a symbol with a scope");
+  return *symbol->scope();
 }
 
 //===----------------------------------------------------------------------===//
