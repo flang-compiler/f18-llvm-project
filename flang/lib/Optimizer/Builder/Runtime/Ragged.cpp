@@ -29,6 +29,7 @@ void fir::runtime::genRaggedArrayAllocate(mlir::Location loc,
       static_cast<fir::SequenceType::Extent>(rank)};
   auto extentTy = fir::SequenceType::get(shape, i64Ty);
   auto refTy = fir::ReferenceType::get(i64Ty);
+  // Position of the bufferPointer in the header struct.
   auto one = builder.createIntegerConstant(loc, i32Ty, 1);
   auto eleTy = fir::unwrapSequenceType(fir::unwrapRefType(header.getType()));
   auto ptrTy = builder.getRefType(eleTy.cast<mlir::TupleType>().getType(1));

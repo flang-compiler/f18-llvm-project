@@ -1014,7 +1014,7 @@ void fir::factory::genRecordAssignment(fir::FirOpBuilder &builder,
 
 mlir::TupleType
 fir::factory::getRaggedArrayHeaderType(fir::FirOpBuilder &builder) {
-  auto i64Ty = builder.getIntegerType(64);
+  mlir::IntegerType i64Ty = builder.getIntegerType(64);
   auto arrTy = fir::SequenceType::get(builder.getIntegerType(8), 1);
   auto buffTy = fir::HeapType::get(arrTy);
   auto extTy = fir::SequenceType::get(i64Ty, 1);

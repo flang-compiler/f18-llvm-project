@@ -493,7 +493,8 @@ void genRecordAssignment(fir::FirOpBuilder &builder, mlir::Location loc,
                          const fir::ExtendedValue &rhs);
 
 /// Builds and returns the type of a ragged array header used to cache mask
-/// evaluations.
+/// evaluations. RaggedArrayHeader is defined in
+/// flang/include/flang/Runtime/ragged.h.
 mlir::TupleType getRaggedArrayHeaderType(fir::FirOpBuilder &builder);
 
 /// Generate the, possibly dynamic, LEN of a CHARACTER. \p arrLoad determines
