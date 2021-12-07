@@ -1482,15 +1482,16 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
         }
       }
       if (!skipNext) {
-        // store lower bound (normally 0 for BIND(C) interoperability)
+        // Lower bound is normalized to 0 for BIND(C) interoperability.
         auto lb = zero;
         bool isaPointerOrAllocatable =
             eleTy.isa<fir::PointerType>() || eleTy.isa<fir::HeapType>();
-        if (isaPointerOrAllocatable)
+        // Lower bound is defaults to 1 for POINTER, ALLOCATABLE, and
+        // denormalized descriptors.
+        if (isaPointerOrAllocatable || !normalizedLowerBound(xbox))
           lb = one;
-        // Normally, allow a non-zero lower bound to be encoded in the box. For
-        // C interoperability however, the lower bound should be normalized to 0
-        // unless the boxed object is a pointer or allocatable.
+        // If there is a shifted origin and this is not a normalized descriptor
+        // then use the value from the shift op as the lower bound.
         if (hasShift &&
             (isaPointerOrAllocatable || !normalizedLowerBound(xbox)))
           lb = operands[shiftOff];

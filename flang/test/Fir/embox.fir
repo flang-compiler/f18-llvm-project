@@ -13,7 +13,7 @@ func @_QPtest_slice() {
 // CHECK:  %[[a3:.*]] = getelementptr [20 x i32], [20 x i32]* %[[a2]], i64 0, i64 0, 
 // CHECK:  %[[a4:.*]] = insertvalue { i32*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }  
 // CHECK:  { i32* undef, i64 4, i32 20180515, i8 1, i8 9, i8 0, i8 0, [1 x [3 x i64]] 
-// CHECK: [i64 0, i64 5, i64 8]] }, i32* %[[a3]], 0, 
+// CHECK: [i64 1, i64 5, i64 8]] }, i32* %[[a3]], 0, 
 // CHECK:  store { i32*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } %[[a4]], { i32*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[a1]], align 8
 // CHECK:  call void @_QPtest_callee({ i32*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[a1]]), 
   %c20 = arith.constant 20 : index
@@ -40,7 +40,7 @@ func @_QPtest_dt_slice() {
 // CHECK:  %[[a4:.*]] = getelementptr [20 x %_QFtest_dt_sliceTt], [20 x %_QFtest_dt_sliceTt]* %[[a3]], i64 0, i64 0, i32 0,
 // CHECK: %[[a5:.*]] = insertvalue { i32*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }
 // CHECK-SAME: { i32* undef, i64 4, i32 20180515, i8 1, i8 9, i8 0, i8 0, [1 x [3 x i64]]
-// CHECK-SAME: [i64 0, i64 5, i64 mul
+// CHECK-SAME: [i64 1, i64 5, i64 mul
 // CHECK-SAME: (i64 ptrtoint (%_QFtest_dt_sliceTt* getelementptr (%_QFtest_dt_sliceTt, %_QFtest_dt_sliceTt* null, i64 1) to i64), i64 2)]] }
 // CHECK-SAME: , i32* %[[a4]], 0
 
