@@ -42,6 +42,7 @@ add_flang_library(FortranRuntime PARTIAL_SOURCES_INTENDED
   edit-input.cpp
   edit-output.cpp
   environment.cpp
+  extensions.cpp
   extrema.cpp
   file.cpp
   findloc.cpp
