@@ -221,7 +221,7 @@ private:
   /// Initialize a new module-like unit and make it the builder's focus.
   template <typename A>
   bool enterModule(const A &func) {
-    auto &unit =
+    Fortran::lower::pft::ModuleLikeUnit &unit =
         addUnit(lower::pft::ModuleLikeUnit{func, pftParentStack.back()});
     functionList = &unit.nestedFunctions;
     pftParentStack.emplace_back(unit);
@@ -274,8 +274,9 @@ private:
   bool enterFunction(const A &func,
                      const semantics::SemanticsContext &semanticsContext) {
     endFunctionBody(); // enclosing host subprogram body, if any
-    auto &unit = addFunction(lower::pft::FunctionLikeUnit{
-        func, pftParentStack.back(), semanticsContext});
+    Fortran::lower::pft::FunctionLikeUnit &unit =
+        addFunction(lower::pft::FunctionLikeUnit{func, pftParentStack.back(),
+                                                 semanticsContext});
     labelEvaluationMap = &unit.labelEvaluationMap;
     assignSymbolLabelMap = &unit.assignSymbolLabelMap;
     functionList = &unit.nestedFunctions;
@@ -299,7 +300,7 @@ private:
   /// Initialize a new construct or directive and make it the builder's focus.
   template <typename A>
   bool enterConstructOrDirective(const A &constructOrDirective) {
-    auto &eval = addEvaluation(
+    Fortran::lower::pft::Evaluation &eval = addEvaluation(
         lower::pft::Evaluation{constructOrDirective, pftParentStack.back()});
     eval.evaluationList.reset(new lower::pft::EvaluationList);
     pushEvaluationList(eval.evaluationList.get());
@@ -314,7 +315,8 @@ private:
     if (eval->isExecutableDirective()) {
       // A construct at the end of an (unstructured) OpenACC or OpenMP
       // construct region must have an exit target inside the region.
-      auto &evaluationList = *eval->evaluationList;
+      Fortran::lower::pft::EvaluationList &evaluationList =
+          *eval->evaluationList;
       if (!evaluationList.empty() && evaluationList.back().isConstruct()) {
         static const parser::ContinueStmt exitTarget{};
         addEvaluation(
@@ -392,13 +394,14 @@ private:
         p->printIndex = 1;
       }
       lastLexicalEvaluation = p;
-      for (auto entryIndex = entryPointList.size() - 1;
+      for (std::size_t entryIndex = entryPointList.size() - 1;
            entryIndex && !entryPointList[entryIndex].second->lexicalSuccessor;
            --entryIndex)
         // Link to the entry's first executable statement.
         entryPointList[entryIndex].second->lexicalSuccessor = p;
     } else if (const auto *entryStmt = p->getIf<parser::EntryStmt>()) {
-      const auto *sym = std::get<parser::Name>(entryStmt->t).symbol;
+      const semantics::Symbol *sym =
+          std::get<parser::Name>(entryStmt->t).symbol;
       assert(sym->has<semantics::SubprogramDetails>() &&
              "entry must be a subprogram");
       entryPointList.push_back(std::pair{sym, p});
@@ -484,10 +487,11 @@ private:
       auto firstStmt = [](lower::pft::Evaluation *e) {
         return e->isConstruct() ? &*e->evaluationList->begin() : e;
       };
-      const auto &targetEval = *firstStmt(&eval);
+      const Fortran::lower::pft::Evaluation &targetEval = *firstStmt(&eval);
       bool targetEvalIsEndDoStmt = targetEval.isA<parser::EndDoStmt>();
       auto branchTargetMatch = [&]() {
-        if (const auto targetLabel = ifCandidateStack.back().ifTargetLabel)
+        if (const parser::Label targetLabel =
+                ifCandidateStack.back().ifTargetLabel)
           if (targetLabel == *targetEval.label)
             return true; // goto target match
         if (targetEvalIsEndDoStmt && ifCandidateStack.back().isCycleStmt)
@@ -496,19 +500,24 @@ private:
       };
       if (targetEval.label || targetEvalIsEndDoStmt) {
         while (!ifCandidateStack.empty() && branchTargetMatch()) {
-          auto ifConstructIt = ifCandidateStack.back().ifConstructIt;
-          auto successorIt = std::next(ifConstructIt);
+          lower::pft::EvaluationList::iterator ifConstructIt =
+              ifCandidateStack.back().ifConstructIt;
+          lower::pft::EvaluationList::iterator successorIt =
+              std::next(ifConstructIt);
           if (successorIt != it) {
-            auto &ifBodyList = *ifConstructIt->evaluationList;
-            auto branchStmtIt = std::next(ifBodyList.begin());
+            Fortran::lower::pft::EvaluationList &ifBodyList =
+                *ifConstructIt->evaluationList;
+            lower::pft::EvaluationList::iterator branchStmtIt =
+                std::next(ifBodyList.begin());
             assert((branchStmtIt->isA<parser::GotoStmt>() ||
                     branchStmtIt->isA<parser::CycleStmt>()) &&
                    "expected goto or cycle statement");
             ifBodyList.erase(branchStmtIt);
-            auto &ifStmt = *ifBodyList.begin();
+            lower::pft::Evaluation &ifStmt = *ifBodyList.begin();
             ifStmt.negateCondition = true;
             ifStmt.lexicalSuccessor = firstStmt(&*successorIt);
-            auto endIfStmtIt = std::prev(ifBodyList.end());
+            lower::pft::EvaluationList::iterator endIfStmtIt =
+                std::prev(ifBodyList.end());
             std::prev(it)->lexicalSuccessor = &*endIfStmtIt;
             endIfStmtIt->lexicalSuccessor = firstStmt(&*it);
             ifBodyList.splice(endIfStmtIt, evaluationList, successorIt, it);
@@ -603,8 +612,8 @@ private:
     // If this is a branch into the body of a construct (usually illegal,
     // but allowed in some legacy cases), then the targetEvaluation and its
     // ancestors must be marked as unstructured.
-    auto *sourceConstruct = sourceEvaluation.parentConstruct;
-    auto *targetConstruct = targetEvaluation.parentConstruct;
+    lower::pft::Evaluation *sourceConstruct = sourceEvaluation.parentConstruct;
+    lower::pft::Evaluation *targetConstruct = targetEvaluation.parentConstruct;
     if (targetConstruct &&
         &targetConstruct->getFirstNestedEvaluation() == &targetEvaluation)
       // A branch to an initial constructStmt is a branch to the construct.
@@ -613,7 +622,7 @@ private:
       while (sourceConstruct && sourceConstruct != targetConstruct)
         sourceConstruct = sourceConstruct->parentConstruct;
       if (sourceConstruct != targetConstruct) // branch into a construct body
-        for (auto *eval = &targetEvaluation; eval;
+        for (lower::pft::Evaluation *eval = &targetEvaluation; eval;
              eval = eval->parentConstruct) {
           eval->isUnstructured = true;
           // If the branch is a backward branch into an already analyzed
@@ -952,8 +961,8 @@ private:
   /// also find one of the largest function results, since a single result
   /// container holds the result for all entries.
   void processEntryPoints() {
-    auto *initialEval = &evaluationListStack.back()->front();
-    auto *unit = initialEval->getOwningProcedure();
+    lower::pft::Evaluation *initialEval = &evaluationListStack.back()->front();
+    lower::pft::FunctionLikeUnit *unit = initialEval->getOwningProcedure();
     int entryCount = unit->entryPointList.size();
     if (entryCount == 1)
       return;
@@ -962,7 +971,7 @@ private:
       unit->setActiveEntry(entryIndex);
       const auto &details =
           unit->getSubprogramSymbol().get<semantics::SubprogramDetails>();
-      for (auto *arg : details.dummyArgs()) {
+      for (semantics::Symbol *arg : details.dummyArgs()) {
         if (!arg)
           continue; // alternate return specifier (no actual argument)
         const auto iter = dummyCountMap.find(arg);
@@ -972,7 +981,7 @@ private:
           ++iter->second;
       }
       if (details.isFunction()) {
-        const auto *resultSym = &details.result();
+        const semantics::Symbol *resultSym = &details.result();
         assert(resultSym && "missing result symbol");
         if (!unit->primaryResult ||
             unit->primaryResult->size() < resultSym->size())
@@ -1082,7 +1091,7 @@ public:
                           int indent = 1) {
     static const auto white = "                                      ++"s;
     auto indentString = white.substr(0, indent * 2);
-    for (const auto &eval : evaluationList)
+    for (const lower::pft::Evaluation &eval : evaluationList)
       dumpEvaluation(outputStream, eval, indentString, indent);
   }
 
@@ -1127,7 +1136,8 @@ public:
     dumpEvaluationList(outputStream, functionLikeUnit.evaluationList);
     if (!functionLikeUnit.nestedFunctions.empty()) {
       outputStream << "\nContains\n";
-      for (auto &func : functionLikeUnit.nestedFunctions)
+      for (const lower::pft::FunctionLikeUnit &func :
+           functionLikeUnit.nestedFunctions)
         dumpFunctionLikeUnit(outputStream, func);
       outputStream << "End Contains\n";
     }
@@ -1139,7 +1149,8 @@ public:
     outputStream << getNodeIndex(moduleLikeUnit) << " ";
     outputStream << "ModuleLike: ";
     outputStream << "\nContains\n";
-    for (auto &func : moduleLikeUnit.nestedFunctions)
+    for (const lower::pft::FunctionLikeUnit &func :
+         moduleLikeUnit.nestedFunctions)
       dumpFunctionLikeUnit(outputStream, func);
     outputStream << "End Contains\nEnd ModuleLike\n\n";
   }
@@ -1242,7 +1253,7 @@ static bool isReEntrant(const Fortran::semantics::Scope &scope) {
   if (scope.kind() == Fortran::semantics::Scope::Kind::MainProgram)
     return false;
   if (scope.kind() == Fortran::semantics::Scope::Kind::Subprogram) {
-    const auto *sym = scope.symbol();
+    const Fortran::semantics::Symbol *sym = scope.symbol();
     assert(sym && "Subprogram scope must have a symbol");
     return sym->attrs().test(semantics::Attr::RECURSIVE) ||
            (!sym->attrs().test(semantics::Attr::NON_RECURSIVE) &&
@@ -1261,7 +1272,7 @@ bool Fortran::lower::symbolIsGlobal(const semantics::Symbol &sym) {
     if (!isReEntrant(sym.owner())) {
       // Turn array and character of non re-entrant programs (like the main
       // program) into global memory.
-      if (const auto *symTy = sym.GetType())
+      if (const Fortran::semantics::DeclTypeSpec *symTy = sym.GetType())
         if (symTy->category() == semantics::DeclTypeSpec::Character)
           if (auto e = symTy->characterTypeSpec().length().GetExplicit())
             return true;
@@ -1293,14 +1304,14 @@ struct SymbolDependenceDepth {
     /// symbol are added to the function scope for module symbols used in this
     /// scope. As a result, alias analysis in parent module scopes must be
     /// preformed here.
-    const auto *parentScope = &scope;
+    const semantics::Scope *parentScope = &scope;
     while (!parentScope->IsGlobal()) {
       parentScope = &parentScope->parent();
       if (parentScope->IsModule())
         analyzeAliases(*parentScope, /*isDeclaration=*/true);
     }
     for (const auto &iter : scope) {
-      const auto &ultimate = iter.second.get().GetUltimate();
+      const semantics::Symbol &ultimate = iter.second.get().GetUltimate();
       if (skipSymbol(ultimate))
         continue;
       bool isDeclaration = scope != ultimate.owner();
@@ -1315,8 +1326,8 @@ struct SymbolDependenceDepth {
 
   // Compute the offset of the last byte that resides in the symbol.
   inline static std::size_t offsetWidth(const Fortran::semantics::Symbol &sym) {
-    auto width = sym.offset();
-    if (auto size = sym.size())
+    std::size_t width = sym.offset();
+    if (std::size_t size = sym.size())
       width += size - 1;
     return width;
   }
@@ -1331,16 +1342,17 @@ struct SymbolDependenceDepth {
       return;
 
     analyzedScopes.insert(&scope);
-    auto aggregates = Fortran::semantics::GetStorageAssociations(scope);
-    for (auto aggregate : aggregates) {
+    std::list<std::list<semantics::SymbolRef>> aggregates =
+        Fortran::semantics::GetStorageAssociations(scope);
+    for (std::list<semantics::SymbolRef> aggregate : aggregates) {
       const Fortran::semantics::Symbol *aggregateSym = nullptr;
       bool isGlobal = false;
-      const auto &first = *aggregate.front();
-      auto start = first.offset();
-      auto end = first.offset() + first.size();
+      const semantics::Symbol &first = *aggregate.front();
+      std::size_t start = first.offset();
+      std::size_t end = first.offset() + first.size();
       const Fortran::semantics::Symbol *namingSym = nullptr;
-      for (auto symRef : aggregate) {
-        const auto &sym = *symRef;
+      for (semantics::SymbolRef symRef : aggregate) {
+        const semantics::Symbol &sym = *symRef;
         aliasSyms.insert(&sym);
         if (sym.test(Fortran::semantics::Symbol::Flag::CompilerCreated)) {
           aggregateSym = &sym;
@@ -1374,11 +1386,11 @@ struct SymbolDependenceDepth {
       // TODO: add declaration?
       return 0;
     }
-    auto ultimate = sym.GetUltimate();
+    semantics::Symbol ultimate = sym.GetUltimate();
     if (const auto *details =
             ultimate.detailsIf<semantics::NamelistDetails>()) {
       // handle namelist group symbols
-      for (const auto &s : details->objects())
+      for (const semantics::SymbolRef &s : details->objects())
         analyze(s);
       return 0;
     }
@@ -1391,7 +1403,7 @@ struct SymbolDependenceDepth {
 
     // Symbol must be something lowering will have to allocate.
     int depth = 0;
-    const auto *symTy = sym.GetType();
+    const semantics::DeclTypeSpec *symTy = sym.GetType();
     assert(symTy && "symbol must have a type");
 
     // Analyze symbols appearing in object entity specification expression. This
@@ -1414,12 +1426,12 @@ struct SymbolDependenceDepth {
         }
       };
       // handle any symbols in array bound declarations
-      for (const auto &subs : details->shape()) {
+      for (const semantics::ShapeSpec &subs : details->shape()) {
         doExplicit(subs.lbound());
         doExplicit(subs.ubound());
       }
       // handle any symbols in coarray bound declarations
-      for (const auto &subs : details->coshape()) {
+      for (const semantics::ShapeSpec &subs : details->coshape()) {
         doExplicit(subs.lbound());
         doExplicit(subs.ubound());
       }
@@ -1429,7 +1441,7 @@ struct SymbolDependenceDepth {
           depth = std::max(analyze(s) + 1, depth);
     }
     adjustSize(depth + 1);
-    auto global = lower::symbolIsGlobal(sym);
+    bool global = lower::symbolIsGlobal(sym);
     vars[depth].emplace_back(sym, global, depth);
     if (semantics::IsAllocatable(sym))
       vars[depth].back().setHeapAlloc();
@@ -1440,7 +1452,7 @@ struct SymbolDependenceDepth {
 
     // If there are alias sets, then link the participating variables to their
     // aggregate stores when constructing the new variable on the list.
-    if (auto *store = findStoreIfAlias(sym)) {
+    if (lower::pft::Variable::AggregateStore *store = findStoreIfAlias(sym)) {
       vars[depth].back().setAlias(store->getOffset());
     }
     return depth;
@@ -1456,16 +1468,16 @@ struct SymbolDependenceDepth {
 
   Fortran::lower::pft::Variable::AggregateStore *
   findStoreIfAlias(const Fortran::evaluate::Symbol &sym) {
-    const auto &ultimate = sym.GetUltimate();
-    const auto &scope = ultimate.owner();
+    const semantics::Symbol &ultimate = sym.GetUltimate();
+    const semantics::Scope &scope = ultimate.owner();
     // Expect the total number of EQUIVALENCE sets to be small for a typical
     // Fortran program.
     if (aliasSyms.find(&ultimate) != aliasSyms.end()) {
       LLVM_DEBUG(llvm::dbgs() << "symbol: " << ultimate << '\n');
       LLVM_DEBUG(llvm::dbgs() << "scope: " << scope << '\n');
-      auto off = ultimate.offset();
-      auto symSize = ultimate.size();
-      for (auto &v : stores) {
+      std::size_t off = ultimate.offset();
+      std::size_t symSize = ultimate.size();
+      for (lower::pft::Variable::AggregateStore &v : stores) {
         if (&v.getOwningScope() == &scope) {
           auto intervalOff = std::get<0>(v.interval);
           auto intervalSize = std::get<1>(v.interval);
@@ -1479,7 +1491,7 @@ struct SymbolDependenceDepth {
       // clang-format off
       LLVM_DEBUG(
           llvm::dbgs() << "looking for " << off << "\n{\n";
-          for (auto v : stores) {
+          for (lower::pft::Variable::AggregateStore &v : stores) {
             llvm::dbgs() << " in scope: " << &v.getOwningScope() << "\n";
             llvm::dbgs() << "  i = [" << std::get<0>(v.interval) << ".."
                 << std::get<0>(v.interval) + std::get<1>(v.interval)
@@ -1541,7 +1553,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
       std::get<std::optional<parser::Statement<parser::ProgramStmt>>>(func.t);
   if (programStmt.has_value()) {
     beginStmt = FunctionStatement(programStmt.value());
-    auto symbol = getSymbol(*beginStmt);
+    const semantics::Symbol *symbol = getSymbol(*beginStmt);
     entryPointList[0].first = symbol;
     processSymbolTable(*symbol->scope(), varList);
   } else {
@@ -1558,7 +1570,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::FunctionStmt>(func)},
       endStmt{getFunctionStmt<parser::EndFunctionStmt>(func)} {
-  auto symbol = getSymbol(*beginStmt);
+  const semantics::Symbol *symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
   processSymbolTable(*symbol->scope(), varList);
 }
@@ -1569,7 +1581,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::SubroutineStmt>(func)},
       endStmt{getFunctionStmt<parser::EndSubroutineStmt>(func)} {
-  auto symbol = getSymbol(*beginStmt);
+  const semantics::Symbol *symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
   processSymbolTable(*symbol->scope(), varList);
 }
@@ -1580,7 +1592,7 @@ Fortran::lower::pft::FunctionLikeUnit::FunctionLikeUnit(
     : ProgramUnit{func, parent},
       beginStmt{getFunctionStmt<parser::MpSubprogramStmt>(func)},
       endStmt{getFunctionStmt<parser::EndMpSubprogramStmt>(func)} {
-  auto symbol = getSymbol(*beginStmt);
+  const semantics::Symbol *symbol = getSymbol(*beginStmt);
   entryPointList[0].first = symbol;
   processSymbolTable(*symbol->scope(), varList);
 }
@@ -1615,7 +1627,7 @@ Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
     const parser::Module &m, const lower::pft::PftNode &parent)
     : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::ModuleStmt>(m)},
       endStmt{getModuleStmt<parser::EndModuleStmt>(m)} {
-  auto symbol = getSymbol(beginStmt);
+  const semantics::Symbol *symbol = getSymbol(beginStmt);
   processSymbolTable(*symbol->scope(), varList);
 }
 
@@ -1624,7 +1636,7 @@ Fortran::lower::pft::ModuleLikeUnit::ModuleLikeUnit(
     : ProgramUnit{m, parent}, beginStmt{getModuleStmt<parser::SubmoduleStmt>(
                                   m)},
       endStmt{getModuleStmt<parser::EndSubmoduleStmt>(m)} {
-  auto symbol = getSymbol(beginStmt);
+  const semantics::Symbol *symbol = getSymbol(beginStmt);
   processSymbolTable(*symbol->scope(), varList);
 }
 
@@ -1746,14 +1758,15 @@ struct SymbolVisitor {
   }
 
   bool Pre(const Fortran::parser::Name &name) {
-    if (const auto *symbol = name.symbol)
+    if (const semantics::Symbol *symbol = name.symbol)
       visitSymbol(*symbol);
     return false;
   }
 
   void
   visitExpr(const Fortran::evaluate::Expr<Fortran::evaluate::SomeType> &expr) {
-    for (const auto &symbol : Fortran::evaluate::CollectSymbols(expr))
+    for (const semantics::Symbol &symbol :
+         Fortran::evaluate::CollectSymbols(expr))
       visitSymbol(symbol);
   }
 
