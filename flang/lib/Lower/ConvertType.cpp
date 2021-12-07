@@ -138,10 +138,10 @@ struct TypeBuilder {
       : converter{converter}, context{&converter.getMLIRContext()} {}
 
   mlir::Type genExprType(const Fortran::lower::SomeExpr &expr) {
-    auto dynamicType = expr.GetType();
+    std::optional<Fortran::evaluate::DynamicType> dynamicType = expr.GetType();
     if (!dynamicType)
       return genTypelessExprType(expr);
-    auto category = dynamicType->category();
+    Fortran::common::TypeCategory category = dynamicType->category();
 
     mlir::Type baseType;
     if (category == Fortran::common::TypeCategory::Derived) {
@@ -152,7 +152,7 @@ struct TypeBuilder {
       translateLenParameters(params, category, expr);
       baseType = genFIRType(context, category, dynamicType->kind(), params);
     }
-    auto shapeExpr =
+    std::optional<Fortran::evaluate::Shape> shapeExpr =
         Fortran::evaluate::GetShape(converter.getFoldingContext(), expr);
     fir::SequenceType::Shape shape;
     if (shapeExpr) {
@@ -160,10 +160,10 @@ struct TypeBuilder {
     } else {
       // Shape static analysis cannot return something useful for the shape.
       // Use unknown extents.
-      auto rank = expr.Rank();
+      int rank = expr.Rank();
       if (rank < 0)
         TODO(converter.genLocation(), "Assumed rank expression type lowering");
-      for (auto dim = 0; dim < rank; ++dim)
+      for (int dim = 0; dim < rank; ++dim)
         shape.emplace_back(fir::SequenceType::getUnknownExtent());
     }
     if (!shape.empty())
@@ -173,9 +173,10 @@ struct TypeBuilder {
 
   template <typename A>
   void translateShape(A &shape, Fortran::evaluate::Shape &&shapeExpr) {
-    for (auto extentExpr : shapeExpr) {
-      auto extent = fir::SequenceType::getUnknownExtent();
-      if (auto constantExtent = toInt64(std::move(extentExpr)))
+    for (Fortran::evaluate::MaybeExtentExpr extentExpr : shapeExpr) {
+      fir::SequenceType::Extent extent = fir::SequenceType::getUnknownExtent();
+      if (std::optional<std::int64_t> constantExtent =
+              toInt64(std::move(extentExpr)))
         extent = *constantExtent;
       shape.push_back(extent);
     }
@@ -216,7 +217,7 @@ struct TypeBuilder {
 
   mlir::Type genSymbolType(const Fortran::semantics::Symbol &symbol,
                            bool isAlloc = false, bool isPtr = false) {
-    auto loc = converter.genLocation(symbol.name());
+    mlir::Location loc = converter.genLocation(symbol.name());
     mlir::Type ty;
     // If the symbol is not the same as the ultimate one (i.e, it is host or use
     // associated), all the symbol properties are the ones of the ultimate
@@ -224,14 +225,16 @@ struct TypeBuilder {
     // avoid issues with helper functions that would not follow association
     // links, the fir type is built based on the ultimate symbol. This relies
     // on the fact volatile and asynchronous are not reflected in fir types.
-    const auto &ultimate = symbol.GetUltimate();
-    if (auto *type{ultimate.GetType()}) {
-      if (auto *tySpec{type->AsIntrinsic()}) {
+    const Fortran::semantics::Symbol &ultimate = symbol.GetUltimate();
+    if (const Fortran::semantics::DeclTypeSpec * type{ultimate.GetType()}) {
+      if (const Fortran::semantics::IntrinsicTypeSpec *
+          tySpec{type->AsIntrinsic()}) {
         int kind = toInt64(Fortran::common::Clone(tySpec->kind())).value();
         llvm::SmallVector<Fortran::lower::LenParameterTy> params;
         translateLenParameters(params, tySpec->category(), ultimate);
         ty = genFIRType(context, tySpec->category(), kind, params);
-      } else if (auto *tySpec = type->AsDerived()) {
+      } else if (const Fortran::semantics::DerivedTypeSpec *tySpec =
+                     type->AsDerived()) {
         ty = genDerivedType(*tySpec);
       } else {
         fir::emitFatalError(loc, "symbol's type must have a type spec");
@@ -269,7 +272,7 @@ struct TypeBuilder {
       const Fortran::semantics::Symbol &component) {
     if (const auto *objDetails =
             component.detailsIf<Fortran::semantics::ObjectEntityDetails>())
-      for (const auto &bounds : objDetails->shape())
+      for (const Fortran::semantics::ShapeSpec &bounds : objDetails->shape())
         if (auto lb = bounds.lbound().GetExplicit())
           if (auto constant = Fortran::evaluate::ToInt64(*lb))
             if (!constant || *constant != 1)
@@ -280,8 +283,8 @@ struct TypeBuilder {
   mlir::Type genDerivedType(const Fortran::semantics::DerivedTypeSpec &tySpec) {
     std::vector<std::pair<std::string, mlir::Type>> ps;
     std::vector<std::pair<std::string, mlir::Type>> cs;
-    const auto &typeSymbol = tySpec.typeSymbol();
-    if (auto ty = getTypeIfDerivedAlreadyInConstruction(typeSymbol))
+    const Fortran::semantics::Symbol &typeSymbol = tySpec.typeSymbol();
+    if (mlir::Type ty = getTypeIfDerivedAlreadyInConstruction(typeSymbol))
       return ty;
     auto rec = fir::RecordType::get(context,
                                     Fortran::lower::mangle::mangleName(tySpec));
@@ -297,7 +300,7 @@ struct TypeBuilder {
       if (componentHasNonDefaultLowerBounds(field))
         TODO(converter.genLocation(field.name()),
              "lowering derived type components with non default lower bounds");
-      auto ty = genSymbolType(field);
+      mlir::Type ty = genSymbolType(field);
       // Do not add the parent component (component of the parents are
       // added and should be sufficient, the parent component would
       // duplicate the fields).
@@ -353,7 +356,7 @@ struct TypeBuilder {
   }
   Fortran::lower::LenParameterTy
   getCharacterLength(const Fortran::semantics::Symbol &symbol) {
-    auto *type = symbol.GetType();
+    const Fortran::semantics::DeclTypeSpec *type = symbol.GetType();
     if (!type ||
         type->category() != Fortran::semantics::DeclTypeSpec::Character ||
         !type->AsIntrinsic())
