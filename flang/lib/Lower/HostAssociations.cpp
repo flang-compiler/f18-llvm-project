@@ -371,7 +371,7 @@ public:
     llvm::SmallVector<mlir::Value> lbounds;
     if (!ba.lboundIsAllOnes()) {
       if (ba.isStaticArray()) {
-        for (int64_t lb : ba.staticLBound())
+        for (std::int64_t lb : ba.staticLBound())
           lbounds.emplace_back(builder.createIntegerConstant(loc, idxTy, lb));
       } else {
         // Cannot re-evaluate specification expressions here.
