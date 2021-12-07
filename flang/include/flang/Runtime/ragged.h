@@ -24,9 +24,13 @@ namespace Fortran::runtime {
 // By default, a header is set to zero, which is its unused state.
 // The layout of a ragged buffer header is mirrored in the compiler.
 struct RaggedArrayHeader {
-  std::uint64_t flags{0u};
+  bool indirection{false};
+  std::uint8_t rank;
   void *bufferPointer{nullptr};
   std::int64_t *extentPointer{nullptr};
+
+  bool isIndirection() { return indirection; }
+  std::uint8_t getRank() { return rank; }
 };
 
 RaggedArrayHeader *RaggedArrayAllocate(
