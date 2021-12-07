@@ -1570,19 +1570,22 @@ struct XReboxOpConversion : public EmboxCommonConversion<fir::cg::XReboxOp> {
   using EmboxCommonConversion::EmboxCommonConversion;
 
   mlir::LogicalResult
-  matchAndRewrite(fir::cg::XReboxOp rebox, OperandTy operands,
+  matchAndRewrite(fir::cg::XReboxOp rebox, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto loc = rebox.getLoc();
-    auto idxTy = lowerTy().indexType();
-    auto loweredBox = operands[0];
+    mlir::Location loc = rebox.getLoc();
+    mlir::Type idxTy = lowerTy().indexType();
+    mlir::Value loweredBox = adaptor.getOperands()[0];
+    mlir::ValueRange operands = adaptor.getOperands();
 
     // Create new descriptor and fill its non-shape related data.
     llvm::SmallVector<mlir::Value, 2> lenParams;
-    auto inputEleTy = getInputEleTy(rebox);
+    mlir::Type inputEleTy = getInputEleTy(rebox);
     if (auto charTy = inputEleTy.dyn_cast<fir::CharacterType>()) {
-      auto len = loadElementSizeFromBox(loc, idxTy, loweredBox, rewriter);
+      mlir::Value len =
+          loadElementSizeFromBox(loc, idxTy, loweredBox, rewriter);
       if (charTy.getFKind() != 1) {
-        auto width = genConstantIndex(loc, idxTy, rewriter, charTy.getFKind());
+        mlir::Value width =
+            genConstantIndex(loc, idxTy, rewriter, charTy.getFKind());
         len = rewriter.create<mlir::LLVM::SDivOp>(loc, idxTy, len, width);
       }
       lenParams.emplace_back(len);
@@ -1596,23 +1599,24 @@ struct XReboxOpConversion : public EmboxCommonConversion<fir::cg::XReboxOp> {
     // Read input extents, strides, and base address
     llvm::SmallVector<mlir::Value> inputExtents;
     llvm::SmallVector<mlir::Value> inputStrides;
-    const auto inputRank = rebox.getRank();
+    const unsigned inputRank = rebox.getRank();
     for (unsigned i = 0; i < inputRank; ++i) {
-      auto dim = genConstantIndex(loc, idxTy, rewriter, i);
-      auto dimInfo =
+      mlir::Value dim = genConstantIndex(loc, idxTy, rewriter, i);
+      SmallVector<mlir::Value, 3> dimInfo =
           getDimsFromBox(loc, {idxTy, idxTy, idxTy}, loweredBox, dim, rewriter);
       inputExtents.emplace_back(dimInfo[1]);
       inputStrides.emplace_back(dimInfo[2]);
     }
 
-    auto baseTy = getBaseAddrTypeFromBox(loweredBox.getType());
-    auto baseAddr = loadBaseAddrFromBox(loc, baseTy, loweredBox, rewriter);
+    mlir::Type baseTy = getBaseAddrTypeFromBox(loweredBox.getType());
+    mlir::Value baseAddr =
+        loadBaseAddrFromBox(loc, baseTy, loweredBox, rewriter);
 
     if (!rebox.slice().empty() || !rebox.subcomponent().empty())
       return sliceBox(rebox, dest, baseAddr, inputExtents, inputStrides,
-                      rewriter);
+                      operands, rewriter);
     return reshapeBox(rebox, dest, baseAddr, inputExtents, inputStrides,
-                      rewriter);
+                      operands, rewriter);
   }
 
 private:
@@ -1623,17 +1627,18 @@ private:
                 mlir::ValueRange lbounds, mlir::ValueRange extents,
                 mlir::ValueRange strides,
                 mlir::ConversionPatternRewriter &rewriter) const {
-    auto loc = rebox.getLoc();
-    auto one = genConstantIndex(loc, lowerTy().indexType(), rewriter, 1);
+    mlir::Location loc = rebox.getLoc();
+    mlir::Value one = genConstantIndex(loc, lowerTy().indexType(), rewriter, 1);
     for (auto iter : llvm::enumerate(llvm::zip(extents, strides))) {
-      auto dim = iter.index();
-      auto lb = lbounds.empty() ? one : lbounds[dim];
+      unsigned dim = iter.index();
+      mlir::Value lb = lbounds.empty() ? one : lbounds[dim];
       dest = insertLowerBound(rewriter, loc, dest, dim, lb);
       dest = insertExtent(rewriter, loc, dest, dim, std::get<0>(iter.value()));
       dest = insertStride(rewriter, loc, dest, dim, std::get<1>(iter.value()));
     }
     dest = insertBaseAddress(rewriter, loc, dest, base);
-    auto result = placeInMemoryIfNotGlobalInit(rewriter, rebox.getLoc(), dest);
+    mlir::Value result =
+        placeInMemoryIfNotGlobalInit(rewriter, rebox.getLoc(), dest);
     rewriter.replaceOp(rebox, result);
     return success();
   }
@@ -1642,27 +1647,29 @@ private:
   mlir::LogicalResult
   sliceBox(fir::cg::XReboxOp rebox, mlir::Value dest, mlir::Value base,
            mlir::ValueRange inputExtents, mlir::ValueRange inputStrides,
+           mlir::ValueRange operands,
            mlir::ConversionPatternRewriter &rewriter) const {
-    auto loc = rebox.getLoc();
-    auto voidPtrTy = getVoidPtrType(rebox.getContext());
-    auto idxTy = lowerTy().indexType();
+    mlir::Location loc = rebox.getLoc();
+    mlir::Type voidPtrTy = ::getVoidPtrType(rebox.getContext());
+    mlir::Type idxTy = lowerTy().indexType();
     mlir::Value zero = genConstantIndex(loc, idxTy, rewriter, 0);
     // Apply subcomponent and substring shift on base address.
     if (!rebox.subcomponent().empty() || !rebox.substr().empty()) {
       // Cast to inputEleTy* so that a GEP can be used.
-      auto inputEleTy = getInputEleTy(rebox);
+      mlir::Type inputEleTy = getInputEleTy(rebox);
       auto llvmElePtrTy =
           mlir::LLVM::LLVMPointerType::get(convertType(inputEleTy));
       base = rewriter.create<mlir::LLVM::BitcastOp>(loc, llvmElePtrTy, base);
 
       if (!rebox.subcomponent().empty()) {
         llvm::SmallVector<mlir::Value> gepOperands = {zero};
-        gepOperands.append(rebox.subcomponent().begin(),
-                           rebox.subcomponent().end());
+        for (unsigned i = 0; i < rebox.subcomponent().size(); ++i)
+          gepOperands.push_back(operands[rebox.subcomponentOffset() + i]);
         base = genGEP(loc, llvmElePtrTy, rewriter, base, gepOperands);
       }
       if (!rebox.substr().empty())
-        base = shiftSubstringBase(rewriter, loc, base, rebox.substr()[0]);
+        base = shiftSubstringBase(rewriter, loc, base,
+                                  operands[rebox.substrOffset()]);
     }
 
     if (rebox.slice().empty())
@@ -1678,38 +1685,42 @@ private:
     // and strides.
     llvm::SmallVector<mlir::Value> slicedExtents;
     llvm::SmallVector<mlir::Value> slicedStrides;
-    auto one = genConstantIndex(loc, idxTy, rewriter, 1);
+    mlir::Value one = genConstantIndex(loc, idxTy, rewriter, 1);
     const bool sliceHasOrigins = !rebox.shift().empty();
-    auto sliceOps = rebox.slice().begin();
-    auto shiftOps = rebox.shift().begin();
+    unsigned sliceOps = rebox.sliceOffset();
+    unsigned shiftOps = rebox.shiftOffset();
     auto strideOps = inputStrides.begin();
-    const auto inputRank = inputStrides.size();
+    const unsigned inputRank = inputStrides.size();
     for (unsigned i = 0; i < inputRank;
          ++i, ++strideOps, ++shiftOps, sliceOps += 3) {
-      auto sliceLb = integerCast(loc, rewriter, idxTy, *sliceOps);
-      auto inputStride = *strideOps; // already idxTy
+      mlir::Value sliceLb =
+          integerCast(loc, rewriter, idxTy, operands[sliceOps]);
+      mlir::Value inputStride = *strideOps; // already idxTy
       // Apply origin shift: base += (lb-shift)*input_stride
-      auto sliceOrigin =
-          sliceHasOrigins ? integerCast(loc, rewriter, idxTy, *shiftOps) : one;
-      auto diff =
+      mlir::Value sliceOrigin =
+          sliceHasOrigins
+              ? integerCast(loc, rewriter, idxTy, operands[shiftOps])
+              : one;
+      mlir::Value diff =
           rewriter.create<mlir::LLVM::SubOp>(loc, idxTy, sliceLb, sliceOrigin);
-      auto offset =
+      mlir::Value offset =
           rewriter.create<mlir::LLVM::MulOp>(loc, idxTy, diff, inputStride);
       base = genGEP(loc, voidPtrTy, rewriter, base, offset);
       // Apply upper bound and step if this is a triplet. Otherwise, the
       // dimension is dropped and no extents/strides are computed.
-      mlir::Value upper = *(sliceOps + 1);
+      mlir::Value upper = operands[sliceOps + 1];
       const bool isTripletSlice =
-          !mlir::isa_and_nonnull<fir::UndefOp>(upper.getDefiningOp());
+          !mlir::isa_and_nonnull<mlir::LLVM::UndefOp>(upper.getDefiningOp());
       if (isTripletSlice) {
-        auto step = integerCast(loc, rewriter, idxTy, *(sliceOps + 2));
+        mlir::Value step =
+            integerCast(loc, rewriter, idxTy, operands[sliceOps + 2]);
         // extent = ub-lb+step/step
-        auto sliceUb = integerCast(loc, rewriter, idxTy, upper);
-        auto extent = computeTripletExtent(rewriter, loc, sliceLb, sliceUb,
-                                           step, zero, idxTy);
+        mlir::Value sliceUb = integerCast(loc, rewriter, idxTy, upper);
+        mlir::Value extent = computeTripletExtent(rewriter, loc, sliceLb,
+                                                  sliceUb, step, zero, idxTy);
         slicedExtents.emplace_back(extent);
         // stride = step*input_stride
-        auto stride =
+        mlir::Value stride =
             rewriter.create<mlir::LLVM::MulOp>(loc, idxTy, step, inputStride);
         slicedStrides.emplace_back(stride);
       }
@@ -1723,36 +1734,42 @@ private:
   mlir::LogicalResult
   reshapeBox(fir::cg::XReboxOp rebox, mlir::Value dest, mlir::Value base,
              mlir::ValueRange inputExtents, mlir::ValueRange inputStrides,
+             mlir::ValueRange operands,
              mlir::ConversionPatternRewriter &rewriter) const {
-    if (rebox.shape().empty())
+    mlir::ValueRange reboxShifts{operands.begin() + rebox.shiftOffset(),
+                                 operands.begin() + rebox.shiftOffset() +
+                                     rebox.shift().size()};
+    if (rebox.shape().empty()) {
       // Only setting new lower bounds.
-      return finalizeRebox(rebox, dest, base, rebox.shift(), inputExtents,
+      return finalizeRebox(rebox, dest, base, reboxShifts, inputExtents,
                            inputStrides, rewriter);
+    }
 
-    auto loc = rebox.getLoc();
+    mlir::Location loc = rebox.getLoc();
     // Strides from the fir.box are in bytes.
-    auto voidPtrTy = getVoidPtrType(rebox.getContext());
+    mlir::Type voidPtrTy = ::getVoidPtrType(rebox.getContext());
     base = rewriter.create<mlir::LLVM::BitcastOp>(loc, voidPtrTy, base);
 
     llvm::SmallVector<mlir::Value> newStrides;
     llvm::SmallVector<mlir::Value> newExtents;
-    auto idxTy = lowerTy().indexType();
+    mlir::Type idxTy = lowerTy().indexType();
     // First stride from input box is kept. The rest is assumed contiguous
     // (it is not possible to reshape otherwise). If the input is scalar,
     // which may be OK if all new extents are ones, the stride does not
     // matter, use one.
-    auto stride = inputStrides.empty()
-                      ? genConstantIndex(loc, idxTy, rewriter, 1)
-                      : inputStrides[0];
-    for (auto rawExtent : rebox.shape()) {
-      auto extent = integerCast(loc, rewriter, idxTy, rawExtent);
+    mlir::Value stride = inputStrides.empty()
+                             ? genConstantIndex(loc, idxTy, rewriter, 1)
+                             : inputStrides[0];
+    for (unsigned i = 0; i < rebox.shape().size(); ++i) {
+      mlir::Value rawExtent = operands[rebox.shapeOffset() + i];
+      mlir::Value extent = integerCast(loc, rewriter, idxTy, rawExtent);
       newExtents.emplace_back(extent);
       newStrides.emplace_back(stride);
       // nextStride = extent * stride;
       stride = rewriter.create<mlir::LLVM::MulOp>(loc, idxTy, extent, stride);
     }
-    return finalizeRebox(rebox, dest, base, rebox.shift(), newExtents,
-                         newStrides, rewriter);
+    return finalizeRebox(rebox, dest, base, reboxShifts, newExtents, newStrides,
+                         rewriter);
   }
 
   /// Return scalar element type of the input box.
