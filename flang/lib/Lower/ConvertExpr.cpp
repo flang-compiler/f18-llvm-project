@@ -4912,6 +4912,19 @@ private:
         mlir::Value coor = builder.create<fir::ArrayCoorOp>(
             loc, refEleTy, memref, shape, slice, indices,
             fir::getTypeParams(extMemref));
+        if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
+          llvm::SmallVector<mlir::Value> substringBounds;
+          populateBounds(substringBounds, components.substring);
+          if (!substringBounds.empty()) {
+            mlir::Value dstLen = fir::factory::genLenOfCharacter(
+                builder, loc, arrTy.cast<fir::SequenceType>(), memref,
+                fir::getTypeParams(extMemref), iters.iterVec(),
+                substringBounds);
+            fir::CharBoxValue dstChar(coor, dstLen);
+            return fir::factory::CharacterExprHelper{builder, loc}
+                .createSubstring(dstChar, substringBounds);
+          }
+        }
         return fir::factory::arraySectionElementToExtendedValue(
             builder, loc, extMemref, coor, slice);
       };

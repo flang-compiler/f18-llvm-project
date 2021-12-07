@@ -1025,6 +1025,16 @@ fir::factory::getRaggedArrayHeaderType(fir::FirOpBuilder &builder) {
 mlir::Value fir::factory::genLenOfCharacter(
     fir::FirOpBuilder &builder, mlir::Location loc, fir::ArrayLoadOp arrLoad,
     llvm::ArrayRef<mlir::Value> path, llvm::ArrayRef<mlir::Value> substring) {
+  llvm::SmallVector<mlir::Value> typeParams(arrLoad.typeparams());
+  return genLenOfCharacter(builder, loc,
+                           arrLoad.getType().cast<fir::SequenceType>(),
+                           arrLoad.memref(), typeParams, path, substring);
+}
+
+mlir::Value fir::factory::genLenOfCharacter(
+    fir::FirOpBuilder &builder, mlir::Location loc, fir::SequenceType seqTy,
+    mlir::Value memref, llvm::ArrayRef<mlir::Value> typeParams,
+    llvm::ArrayRef<mlir::Value> path, llvm::ArrayRef<mlir::Value> substring) {
   auto idxTy = builder.getIndexType();
   auto zero = builder.createIntegerConstant(loc, idxTy, 0);
   auto saturatedDiff = [&](mlir::Value lower, mlir::Value upper) {
@@ -1043,8 +1053,7 @@ mlir::Value fir::factory::genLenOfCharacter(
   auto lower = zero;
   if (substring.size() == 1)
     lower = builder.createConvert(loc, idxTy, substring.front());
-  auto arrTy = arrLoad.getType().cast<fir::SequenceType>();
-  auto eleTy = fir::applyPathToType(arrTy, path);
+  auto eleTy = fir::applyPathToType(seqTy, path);
   if (!fir::hasDynamicSize(eleTy)) {
     if (auto charTy = eleTy.dyn_cast<fir::CharacterType>()) {
       // Use LEN from the type.
@@ -1054,7 +1063,6 @@ mlir::Value fir::factory::genLenOfCharacter(
     fir::emitFatalError(loc,
                         "application of path did not result in a !fir.char");
   }
-  auto memref = arrLoad.memref();
   if (fir::isa_box_type(memref.getType())) {
     if (memref.getType().isa<fir::BoxCharType>())
       return builder.create<fir::BoxCharLenOp>(loc, idxTy, memref);
@@ -1062,12 +1070,12 @@ mlir::Value fir::factory::genLenOfCharacter(
       return CharacterExprHelper(builder, loc).readLengthFromBox(memref);
     fir::emitFatalError(loc, "memref has wrong type");
   }
-  if (arrLoad.typeparams().empty()) {
+  if (typeParams.empty()) {
     fir::emitFatalError(loc, "array_load must have typeparams");
   }
-  if (fir::isa_char(arrTy.getEleTy())) {
-    assert(arrLoad.typeparams().size() == 1 && "too many typeparams");
-    return arrLoad.typeparams().front();
+  if (fir::isa_char(seqTy.getEleTy())) {
+    assert(typeParams.size() == 1 && "too many typeparams");
+    return typeParams.front();
   }
   TODO(loc, "LEN of character must be computed at runtime");
 }

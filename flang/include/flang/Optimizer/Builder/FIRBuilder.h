@@ -504,6 +504,11 @@ mlir::Value genLenOfCharacter(fir::FirOpBuilder &builder, mlir::Location loc,
                               fir::ArrayLoadOp arrLoad,
                               llvm::ArrayRef<mlir::Value> path,
                               llvm::ArrayRef<mlir::Value> substring);
+mlir::Value genLenOfCharacter(fir::FirOpBuilder &builder, mlir::Location loc,
+                              fir::SequenceType seqTy, mlir::Value memref,
+                              llvm::ArrayRef<mlir::Value> typeParams,
+                              llvm::ArrayRef<mlir::Value> path,
+                              llvm::ArrayRef<mlir::Value> substring);
 
 } // namespace fir::factory
 
