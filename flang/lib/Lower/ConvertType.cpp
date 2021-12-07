@@ -226,9 +226,9 @@ struct TypeBuilder {
     // links, the fir type is built based on the ultimate symbol. This relies
     // on the fact volatile and asynchronous are not reflected in fir types.
     const Fortran::semantics::Symbol &ultimate = symbol.GetUltimate();
-    if (const Fortran::semantics::DeclTypeSpec * type{ultimate.GetType()}) {
+    if (const Fortran::semantics::DeclTypeSpec * type = ultimate.GetType()) {
       if (const Fortran::semantics::IntrinsicTypeSpec *
-          tySpec{type->AsIntrinsic()}) {
+          tySpec = type->AsIntrinsic()) {
         int kind = toInt64(Fortran::common::Clone(tySpec->kind())).value();
         llvm::SmallVector<Fortran::lower::LenParameterTy> params;
         translateLenParameters(params, tySpec->category(), ultimate);
