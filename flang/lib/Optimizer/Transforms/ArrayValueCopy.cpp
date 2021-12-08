@@ -420,27 +420,38 @@ void ArrayCopyAnalysis::arrayMentions(
   loadMapSets.insert({load, visited});
 }
 
+static bool hasPointerType(mlir::Type type) {
+  if (auto boxTy = type.dyn_cast<BoxType>())
+    type = boxTy.getEleTy();
+  return type.isa<fir::PointerType>();
+}
+
 /// Is there a conflict between the array value that was updated and to be
 /// stored to `st` and the set of arrays loaded (`reach`) and used to compute
 /// the updated value?
 static bool conflictOnLoad(llvm::ArrayRef<mlir::Operation *> reach,
                            ArrayMergeStoreOp st) {
   mlir::Value load;
-  auto addr = st.memref();
-  auto stEleTy = dyn_cast_ptrOrBoxEleTy(addr.getType());
+  mlir::Value addr = st.memref();
+  const bool storeHasPointerType = hasPointerType(addr.getType());
+  mlir::Type stEleTy =
+      fir::unwrapSequenceType(fir::unwrapPassByRefType(addr.getType()));
   for (auto *op : reach)
     if (auto ld = mlir::dyn_cast<ArrayLoadOp>(op)) {
-      auto ldTy = ld.memref().getType();
-      if (auto boxTy = ldTy.dyn_cast<BoxType>())
-        ldTy = boxTy.getEleTy();
-      if (ldTy.isa<fir::PointerType>() && stEleTy == dyn_cast_ptrEleTy(ldTy))
-        return true;
+      mlir::Type ldTy = ld.memref().getType();
+      mlir::Type ldEleTy =
+          fir::unwrapSequenceType(fir::unwrapPassByRefType(ldTy));
       if (ld.memref() == addr) {
         if (ld.getResult() != st.original())
           return true;
         if (load)
+          // TODO: only return if the loads may overlap (look at slices if any).
           return true;
         load = ld;
+      } else if ((hasPointerType(ldTy) || storeHasPointerType) &&
+                 stEleTy == ldEleTy) {
+        // TODO: Use target attribute to restrict this case further.
+        return true;
       }
     }
   return false;
