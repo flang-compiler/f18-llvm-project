@@ -33,17 +33,3 @@ void fir::runtime::genDerivedTypeDestroy(fir::FirOpBuilder &builder,
   auto args = fir::runtime::createArguments(builder, loc, fTy, box);
   builder.create<fir::CallOp>(loc, func, args);
 }
-
-void fir::runtime::genDerivedTypeAssign(fir::FirOpBuilder &builder,
-                                        mlir::Location loc,
-                                        mlir::Value destinationBox,
-                                        mlir::Value sourceBox) {
-  auto func = fir::runtime::getRuntimeFunc<mkRTKey(Assign)>(loc, builder);
-  auto fTy = func.getType();
-  auto sourceFile = fir::factory::locationToFilename(builder, loc);
-  auto sourceLine =
-      fir::factory::locationToLineNo(builder, loc, fTy.getInput(3));
-  auto args = fir::runtime::createArguments(builder, loc, fTy, destinationBox,
-                                            sourceBox, sourceFile, sourceLine);
-  builder.create<fir::CallOp>(loc, func, args);
-}

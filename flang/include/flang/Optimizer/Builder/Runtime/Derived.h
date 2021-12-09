@@ -30,10 +30,5 @@ void genDerivedTypeInitialize(fir::FirOpBuilder &builder, mlir::Location loc,
 void genDerivedTypeDestroy(fir::FirOpBuilder &builder, mlir::Location loc,
                            mlir::Value box);
 
-/// Generate call to derived type assignment runtime routine to
-/// assign \p sourceBox to \p destinationBox.
-void genDerivedTypeAssign(fir::FirOpBuilder &builder, mlir::Location loc,
-                          mlir::Value destinationBox, mlir::Value sourceBox);
-
 } // namespace fir::runtime
 #endif // FORTRAN_OPTIMIZER_BUILDER_RUNTIME_DERIVED_H

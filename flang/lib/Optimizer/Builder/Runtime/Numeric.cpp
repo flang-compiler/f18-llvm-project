@@ -7,7 +7,6 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Optimizer/Builder/Runtime/Numeric.h"
-#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/BoxValue.h"
 #include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
@@ -234,7 +233,7 @@ mlir::Value fir::runtime::genExponent(fir::FirOpBuilder &builder,
     else if (resultType.isInteger(64))
       func = fir::runtime::getRuntimeFunc<ForcedExponent16_8>(loc, builder);
   } else
-    TODO(loc, "unsupported real kind in Exponent lowering");
+    fir::emitFatalError(loc, "unsupported real kind in Exponent lowering");
 
   auto funcTy = func.getType();
   llvm::SmallVector<mlir::Value> args = {
@@ -258,7 +257,7 @@ mlir::Value fir::runtime::genFraction(fir::FirOpBuilder &builder,
   else if (fltTy.isF128())
     func = fir::runtime::getRuntimeFunc<ForcedFraction16>(loc, builder);
   else
-    TODO(loc, "unsupported real kind in Fraction lowering");
+    fir::emitFatalError(loc, "unsupported real kind in Fraction lowering");
 
   auto funcTy = func.getType();
   llvm::SmallVector<mlir::Value> args = {
@@ -317,7 +316,7 @@ mlir::Value fir::runtime::genRRSpacing(fir::FirOpBuilder &builder,
   else if (fltTy.isF128())
     func = fir::runtime::getRuntimeFunc<ForcedRRSpacing16>(loc, builder);
   else
-    TODO(loc, "unsupported real kind in RRSpacing lowering");
+    fir::emitFatalError(loc, "unsupported real kind in RRSpacing lowering");
 
   auto funcTy = func.getType();
   llvm::SmallVector<mlir::Value> args = {
@@ -366,7 +365,7 @@ mlir::Value fir::runtime::genSetExponent(fir::FirOpBuilder &builder,
   else if (fltTy.isF128())
     func = fir::runtime::getRuntimeFunc<ForcedSetExponent16>(loc, builder);
   else
-    TODO(loc, "unsupported real kind in Fraction lowering");
+    fir::emitFatalError(loc, "unsupported real kind in Fraction lowering");
 
   auto funcTy = func.getType();
   auto args = fir::runtime::createArguments(builder, loc, funcTy, x, i);
@@ -389,7 +388,7 @@ mlir::Value fir::runtime::genSpacing(fir::FirOpBuilder &builder,
   else if (fltTy.isF128())
     func = fir::runtime::getRuntimeFunc<ForcedSpacing16>(loc, builder);
   else
-    TODO(loc, "unsupported real kind in Spacing lowering");
+    fir::emitFatalError(loc, "unsupported real kind in Spacing lowering");
 
   auto funcTy = func.getType();
   llvm::SmallVector<mlir::Value> args = {

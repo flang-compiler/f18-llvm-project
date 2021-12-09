@@ -24,7 +24,18 @@ template <typename FN>
 static void genCharacterSearch(FN func, fir::FirOpBuilder &builder,
                                mlir::Location loc, mlir::Value resultBox,
                                mlir::Value string1Box, mlir::Value string2Box,
-                               mlir::Value backBox, mlir::Value kind);
+                               mlir::Value backBox, mlir::Value kind) {
+
+  auto fTy = func.getType();
+  auto sourceFile = fir::factory::locationToFilename(builder, loc);
+  auto sourceLine =
+      fir::factory::locationToLineNo(builder, loc, fTy.getInput(6));
+
+  auto args = fir::runtime::createArguments(builder, loc, fTy, resultBox,
+                                            string1Box, string2Box, backBox,
+                                            kind, sourceFile, sourceLine);
+  builder.create<fir::CallOp>(loc, func, args);
+}
 
 /// Helper function to recover the KIND from the FIR type.
 static int discoverKind(mlir::Type ty) {
@@ -45,23 +56,15 @@ static int discoverKind(mlir::Type ty) {
 // Lower character operations
 //===----------------------------------------------------------------------===//
 
-void fir::runtime::genAdjustL(fir::FirOpBuilder &builder, mlir::Location loc,
-                              mlir::Value resultBox, mlir::Value stringBox) {
-  auto adjustFunc =
-      fir::runtime::getRuntimeFunc<mkRTKey(Adjustl)>(loc, builder);
-  fir::runtime::genAdjust(builder, loc, resultBox, stringBox, adjustFunc);
-}
-
-void fir::runtime::genAdjustR(fir::FirOpBuilder &builder, mlir::Location loc,
-                              mlir::Value resultBox, mlir::Value stringBox) {
-  auto adjustFunc =
-      fir::runtime::getRuntimeFunc<mkRTKey(Adjustr)>(loc, builder);
-  fir::runtime::genAdjust(builder, loc, resultBox, stringBox, adjustFunc);
-}
-
-void fir::runtime::genAdjust(fir::FirOpBuilder &builder, mlir::Location loc,
-                             mlir::Value resultBox, mlir::Value stringBox,
-                             mlir::FuncOp &adjustFunc) {
+/// Generate a call to the `ADJUST[L|R]` runtime.
+///
+/// \p resultBox must be an unallocated allocatable used for the temporary
+/// result.  \p StringBox must be a fir.box describing the adjustr string
+/// argument.  The \p adjustFunc should be a mlir::FuncOp for the appropriate
+/// runtime entry function.
+static void genAdjust(fir::FirOpBuilder &builder, mlir::Location loc,
+                      mlir::Value resultBox, mlir::Value stringBox,
+                      mlir::FuncOp &adjustFunc) {
 
   auto fTy = adjustFunc.getType();
   auto sourceLine =
@@ -70,6 +73,20 @@ void fir::runtime::genAdjust(fir::FirOpBuilder &builder, mlir::Location loc,
   auto args = fir::runtime::createArguments(builder, loc, fTy, resultBox,
                                             stringBox, sourceFile, sourceLine);
   builder.create<fir::CallOp>(loc, adjustFunc, args);
+}
+
+void fir::runtime::genAdjustL(fir::FirOpBuilder &builder, mlir::Location loc,
+                              mlir::Value resultBox, mlir::Value stringBox) {
+  auto adjustFunc =
+      fir::runtime::getRuntimeFunc<mkRTKey(Adjustl)>(loc, builder);
+  genAdjust(builder, loc, resultBox, stringBox, adjustFunc);
+}
+
+void fir::runtime::genAdjustR(fir::FirOpBuilder &builder, mlir::Location loc,
+                              mlir::Value resultBox, mlir::Value stringBox) {
+  auto adjustFunc =
+      fir::runtime::getRuntimeFunc<mkRTKey(Adjustr)>(loc, builder);
+  genAdjust(builder, loc, resultBox, stringBox, adjustFunc);
 }
 
 mlir::Value
@@ -112,7 +129,8 @@ mlir::Value fir::runtime::genCharCompare(fir::FirOpBuilder &builder,
   auto allocateIfNotInMemory = [&](mlir::Value base) -> mlir::Value {
     if (fir::isa_ref_type(base.getType()))
       return base;
-    auto mem = builder.create<fir::AllocaOp>(loc, base.getType(), /*pinned=*/false);
+    auto mem =
+        builder.create<fir::AllocaOp>(loc, base.getType(), /*pinned=*/false);
     builder.create<fir::StoreOp>(loc, base, mem);
     return mem;
   };
@@ -187,9 +205,6 @@ void fir::runtime::genTrim(fir::FirOpBuilder &builder, mlir::Location loc,
   builder.create<fir::CallOp>(loc, trimFunc, args);
 }
 
-/// Generate call to scan runtime routine.
-/// This calls the descriptor based runtime call implementation of the scan
-/// intrinsic.
 void fir::runtime::genScanDescriptor(fir::FirOpBuilder &builder,
                                      mlir::Location loc, mlir::Value resultBox,
                                      mlir::Value stringBox, mlir::Value setBox,
@@ -199,9 +214,6 @@ void fir::runtime::genScanDescriptor(fir::FirOpBuilder &builder,
                      kind);
 }
 
-/// Generate call to scan runtime routine that is specialized on
-/// \param kind.
-/// The \param kind represents the kind of the elements in the strings.
 mlir::Value fir::runtime::genScan(fir::FirOpBuilder &builder,
                                   mlir::Location loc, int kind,
                                   mlir::Value stringBase, mlir::Value stringLen,
@@ -228,9 +240,6 @@ mlir::Value fir::runtime::genScan(fir::FirOpBuilder &builder,
   return builder.create<fir::CallOp>(loc, func, args).getResult(0);
 }
 
-/// Generate call to verify runtime routine.
-/// This calls the descriptor based runtime call implementation of the
-/// verify intrinsic.
 void fir::runtime::genVerifyDescriptor(fir::FirOpBuilder &builder,
                                        mlir::Location loc,
                                        mlir::Value resultBox,
@@ -242,9 +251,6 @@ void fir::runtime::genVerifyDescriptor(fir::FirOpBuilder &builder,
                      kind);
 }
 
-/// Generate call to verify runtime routine that is specialized on
-/// \param kind.
-/// The \param kind represents the kind of the elements in the strings.
 mlir::Value fir::runtime::genVerify(fir::FirOpBuilder &builder,
                                     mlir::Location loc, int kind,
                                     mlir::Value stringBase,
@@ -269,24 +275,4 @@ mlir::Value fir::runtime::genVerify(fir::FirOpBuilder &builder,
   auto args = fir::runtime::createArguments(builder, loc, fTy, stringBase,
                                             stringLen, setBase, setLen, back);
   return builder.create<fir::CallOp>(loc, func, args).getResult(0);
-}
-
-/// Generate calls to string handling intrinsics such as index, scan, and
-/// verify. These are the descriptor based implementations that take four
-/// arguments (string1, string2, back, kind).
-template <typename FN>
-static void genCharacterSearch(FN func, fir::FirOpBuilder &builder,
-                               mlir::Location loc, mlir::Value resultBox,
-                               mlir::Value string1Box, mlir::Value string2Box,
-                               mlir::Value backBox, mlir::Value kind) {
-
-  auto fTy = func.getType();
-  auto sourceFile = fir::factory::locationToFilename(builder, loc);
-  auto sourceLine =
-      fir::factory::locationToLineNo(builder, loc, fTy.getInput(6));
-
-  auto args = fir::runtime::createArguments(builder, loc, fTy, resultBox,
-                                            string1Box, string2Box, backBox,
-                                            kind, sourceFile, sourceLine);
-  builder.create<fir::CallOp>(loc, func, args);
 }

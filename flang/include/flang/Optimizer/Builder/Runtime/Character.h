@@ -18,18 +18,18 @@ class FirOpBuilder;
 
 namespace fir::runtime {
 
-/// Generate a call to the ADJUSTL runtime.
+/// Generate a call to the `ADJUSTL` runtime.
 /// This calls the simple runtime entry point that then calls into the more
 /// complex runtime cases handling left or right adjustments.
 ///
 /// \p resultBox must be an unallocated allocatable used for the temporary
-/// result.  \p StringBox must be a fir.box describing the adjustl string
+/// result. \p StringBox must be a fir.box describing the adjustl string
 /// argument. Note that the \p genAdjust() helper is called to do the majority
 /// of the lowering work.
 void genAdjustL(fir::FirOpBuilder &builder, mlir::Location loc,
                 mlir::Value resultBox, mlir::Value stringBox);
 
-/// Generate a call to the ADJUSTR runtime.
+/// Generate a call to the `ADJUSTR` runtime.
 /// This calls the simple runtime entry point that then calls into the more
 /// complex runtime cases handling left or right adjustments.
 ///
@@ -39,16 +39,6 @@ void genAdjustL(fir::FirOpBuilder &builder, mlir::Location loc,
 /// of the lowering work.
 void genAdjustR(fir::FirOpBuilder &builder, mlir::Location loc,
                 mlir::Value resultBox, mlir::Value stringBox);
-
-/// Generate a call to the ADJUST[L|R] runtime.
-///
-/// \p resultBox must be an unallocated allocatable used for the temporary
-/// result.  \p StringBox must be a fir.box describing the adjustr string
-/// argument.  The \p adjustFunc should be a mlir::FuncOp for the appropriate
-/// runtime entry function.
-void genAdjust(fir::FirOpBuilder &builder, mlir::Location loc,
-               mlir::Value resultBox, mlir::Value stringBox,
-               mlir::FuncOp &adjustFunc);
 
 /// Generate call to a character comparison for two ssa-values of type
 /// `boxchar`.

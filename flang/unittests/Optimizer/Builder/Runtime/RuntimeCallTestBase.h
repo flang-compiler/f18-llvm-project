@@ -50,6 +50,7 @@ public:
     c16Ty = fir::ComplexType::get(firBuilder->getContext(), 16);
 
     seqTy10 = fir::SequenceType::get(fir::SequenceType::Shape(1, 10), i32Ty);
+    boxTy = fir::BoxType::get(mlir::NoneType::get(firBuilder->getContext()));
   }
 
   mlir::MLIRContext context;
@@ -71,13 +72,14 @@ public:
   mlir::Type c10Ty;
   mlir::Type c16Ty;
   mlir::Type seqTy10;
+  mlir::Type boxTy;
 };
 
 /// Check that the \p op is a `fir::CallOp` operation and its name matches
 /// \p fctName and the number of arguments is equal to \p nbArgs.
 /// Most runtime calls have two additional location arguments added. These are
 /// added in this check when \p addLocArgs is true.
-static void checkCallOp(mlir::Operation *op, llvm::StringRef fctName,
+static inline void checkCallOp(mlir::Operation *op, llvm::StringRef fctName,
     unsigned nbArgs, bool addLocArgs = true) {
   EXPECT_TRUE(mlir::isa<fir::CallOp>(*op));
   auto callOp = mlir::dyn_cast<fir::CallOp>(*op);
@@ -107,7 +109,7 @@ static void checkCallOp(mlir::Operation *op, llvm::StringRef fctName,
 /// %arg = fir.convert %result : (i32) -> i16
 /// %0 = fir.call @foo(%arg) : (i16) -> i1
 /// ```
-static void checkCallOpFromResultBox(mlir::Value result,
+static inline void checkCallOpFromResultBox(mlir::Value result,
     llvm::StringRef fctName, unsigned nbArgs, bool addLocArgs = true) {
   EXPECT_TRUE(result.hasOneUse());
   const auto &u = result.user_begin();
