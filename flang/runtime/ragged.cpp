@@ -12,12 +12,12 @@
 namespace Fortran::runtime {
 
 inline bool isIndirection(const RaggedArrayHeader *const header) {
-   return header->flags & 1;
- }
+  return header->flags & 1;
+}
 
- inline std::size_t rank(const RaggedArrayHeader *const header) {
-   return header->flags >> 1;
- }
+inline std::size_t rank(const RaggedArrayHeader *const header) {
+  return header->flags >> 1;
+}
 
 RaggedArrayHeader *RaggedArrayAllocate(RaggedArrayHeader *header, bool isHeader,
     std::int64_t rank, std::int64_t elementSize, std::int64_t *extentVector) {
