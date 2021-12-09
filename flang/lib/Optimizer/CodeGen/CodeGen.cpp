@@ -196,9 +196,10 @@ protected:
                     mlir::ConversionPatternRewriter &rewriter) const {
     auto idxTy = lowerTy().indexType();
     auto c0 = genConstantOffset(loc, rewriter, 0);
-    auto c7 = genConstantOffset(loc, rewriter, 7);
+    auto cDims = genConstantOffset(loc, rewriter, kDimsPosInBox);
     auto dimValue = genConstantIndex(loc, idxTy, rewriter, dim);
-    return loadFromOffset(loc, box, c0, c7, dimValue, 2, idxTy, rewriter);
+    return loadFromOffset(loc, box, c0, cDims, dimValue, kDimStridePos, idxTy,
+                          rewriter);
   }
 
   /// Read base address from a fir.box. Returned address has type ty.
@@ -1388,34 +1389,34 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
                              operands.drop_front(xbox.lenParamOffset()));
     // Generate the triples in the dims field of the descriptor
     auto i64Ty = mlir::IntegerType::get(xbox.getContext(), 64);
-    auto base = operands[0];
+    mlir::Value base = operands[0];
     assert(!xbox.shape().empty() && "must have a shape");
-    unsigned shapeOff = xbox.shapeOffset();
+    unsigned shapeOffset = xbox.shapeOffset();
     bool hasShift = !xbox.shift().empty();
-    unsigned shiftOff = xbox.shiftOffset();
+    unsigned shiftOffset = xbox.shiftOffset();
     bool hasSlice = !xbox.slice().empty();
-    unsigned sliceOff = xbox.sliceOffset();
-    auto loc = xbox.getLoc();
+    unsigned sliceOffset = xbox.sliceOffset();
+    mlir::Location loc = xbox.getLoc();
     mlir::Value zero = genConstantIndex(loc, i64Ty, rewriter, 0);
     mlir::Value one = genConstantIndex(loc, i64Ty, rewriter, 1);
     mlir::Value prevDim = integerCast(loc, rewriter, i64Ty, eleSize);
     mlir::Value prevPtrOff = one;
-    auto eleTy = boxTy.getEleTy();
-    const auto rank = xbox.getRank();
+    mlir::Type eleTy = boxTy.getEleTy();
+    const unsigned rank = xbox.getRank();
     llvm::SmallVector<mlir::Value> gepArgs;
     unsigned constRows = 0;
     mlir::Value ptrOffset = zero;
-    auto memEleTy = fir::dyn_cast_ptrEleTy(xbox.memref().getType());
+    mlir::Type memEleTy = fir::dyn_cast_ptrEleTy(xbox.memref().getType());
     assert(memEleTy.isa<fir::SequenceType>());
     auto seqTy = memEleTy.cast<fir::SequenceType>();
-    auto seqEleTy = seqTy.getEleTy();
+    mlir::Type seqEleTy = seqTy.getEleTy();
     // Adjust the element scaling factor if the element is a dependent type.
     if (fir::hasDynamicSize(seqEleTy)) {
       if (auto charTy = seqEleTy.dyn_cast<fir::CharacterType>()) {
         assert(xbox.lenParams().size() == 1);
-        auto charSize = genConstantIndex(
+        mlir::LLVM::ConstantOp charSize = genConstantIndex(
             loc, i64Ty, rewriter, lowerTy().characterBitsize(charTy) / 8);
-        auto castedLen =
+        mlir::Value castedLen =
             integerCast(loc, rewriter, i64Ty, operands[xbox.lenParamOffset()]);
         auto byteOffset =
             rewriter.create<mlir::LLVM::MulOp>(loc, i64Ty, charSize, castedLen);
@@ -1455,14 +1456,14 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
     // translating everything to values in the descriptor wherever the entity
     // has a dynamic array dimension.
     for (unsigned di = 0, descIdx = 0; di < rank; ++di) {
-      mlir::Value extent = operands[shapeOff];
+      mlir::Value extent = operands[shapeOffset];
       mlir::Value outerExtent = extent;
       bool skipNext = false;
       if (hasSlice) {
-        auto off = operands[sliceOff];
+        auto off = operands[sliceOffset];
         auto adj = one;
         if (hasShift)
-          adj = operands[shiftOff];
+          adj = operands[shiftOffset];
         auto ao = rewriter.create<mlir::LLVM::SubOp>(loc, i64Ty, off, adj);
         if (constRows > 0) {
           gepArgs.push_back(ao);
@@ -1494,21 +1495,21 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
         // then use the value from the shift op as the lower bound.
         if (hasShift &&
             (isaPointerOrAllocatable || !normalizedLowerBound(xbox)))
-          lb = operands[shiftOff];
+          lb = operands[shiftOffset];
         dest = insertLowerBound(rewriter, loc, dest, descIdx, lb);
 
         // store extent
         if (hasSlice)
-          extent = computeTripletExtent(rewriter, loc, operands[sliceOff],
-                                        operands[sliceOff + 1],
-                                        operands[sliceOff + 2], zero, i64Ty);
+          extent = computeTripletExtent(rewriter, loc, operands[sliceOffset],
+                                        operands[sliceOffset + 1],
+                                        operands[sliceOffset + 2], zero, i64Ty);
         dest = insertExtent(rewriter, loc, dest, descIdx, extent);
 
         // store step (scaled by shaped extent)
         mlir::Value step = (hasSubcomp || hasSubstr) ? stepExpr : prevDim;
         if (hasSlice)
           step = rewriter.create<mlir::LLVM::MulOp>(loc, i64Ty, step,
-                                                    operands[sliceOff + 2]);
+                                                    operands[sliceOffset + 2]);
         dest = insertStride(rewriter, loc, dest, descIdx, step);
         ++descIdx;
       }
@@ -1521,11 +1522,11 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
                                                         outerExtent);
 
       // increment iterators
-      ++shapeOff;
+      ++shapeOffset;
       if (hasShift)
-        ++shiftOff;
+        ++shiftOffset;
       if (hasSlice)
-        sliceOff += 3;
+        sliceOffset += 3;
     }
     if (hasSlice || hasSubcomp || hasSubstr) {
       llvm::SmallVector<mlir::Value> args = {base, ptrOffset};
@@ -1543,7 +1544,7 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
       }
       base = rewriter.create<mlir::LLVM::GEPOp>(loc, base.getType(), args);
       if (hasSubstr)
-        base = shiftSubstringBase(rewriter, loc, base, xbox.substr()[0]);
+        base = shiftSubstringBase(rewriter, loc, base, operands[xbox.substrOffset()]);
     }
     dest = insertBaseAddress(rewriter, loc, dest, base);
     if (isDerivedTypeWithLenParams(boxTy))
