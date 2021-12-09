@@ -107,7 +107,8 @@ private:
 
   mlir::Type gen(const Fortran::evaluate::Component &component) {
     auto recTy = gen(component.base()).cast<fir::RecordType>();
-    const Fortran::semantics::Symbol &componentSymbol = component.GetLastSymbol();
+    const Fortran::semantics::Symbol &componentSymbol =
+        component.GetLastSymbol();
     // Parent components will not be found here, they are not part
     // of the FIR type and cannot be used in the path yet.
     if (componentSymbol.test(Fortran::semantics::Symbol::Flag::ParentComp))
@@ -158,8 +159,8 @@ private:
   mlir::Type genRankedArrayRefSubscriptAndBase(
       const Fortran::evaluate::ArrayRef &arrayRef) {
     // Lower the save the base
-    Fortran::evaluate::Expr<Fortran::evaluate::SomeType> baseExpr
-        = namedEntityToExpr(arrayRef.base());
+    Fortran::evaluate::Expr<Fortran::evaluate::SomeType> baseExpr =
+        namedEntityToExpr(arrayRef.base());
     loweredBase = converter.genExprAddr(baseExpr, stmtCtx);
     // Lower and save the subscripts
     fir::FirOpBuilder &builder = converter.getFirOpBuilder();
@@ -362,10 +363,10 @@ Fortran::lower::VectorSubscriptBox::genLoopBounds(fir::FirOpBuilder &builder,
       continue;
     mlir::Value lb, ub, step;
     if (const auto *triplet = std::get_if<LoweredTriplet>(&subscript)) {
-      mlir::Value extent = builder.genExtentFromTriplet(loc, triplet->lb,
-          triplet->ub, triplet->stride, idxTy);
-      mlir::Value baseLb = fir::factory::readLowerBound(builder, loc, loweredBase,
-                                                 dimension, one);
+      mlir::Value extent = builder.genExtentFromTriplet(
+          loc, triplet->lb, triplet->ub, triplet->stride, idxTy);
+      mlir::Value baseLb = fir::factory::readLowerBound(
+          builder, loc, loweredBase, dimension, one);
       baseLb = builder.createConvert(loc, idxTy, baseLb);
       lb = baseLb;
       ub = builder.create<mlir::arith::SubIOp>(loc, idxTy, extent, one);

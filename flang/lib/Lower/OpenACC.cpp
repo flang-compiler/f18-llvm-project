@@ -506,7 +506,7 @@ createParallelOp(Fortran::lower::AbstractConverter &converter,
 
   mlir::acc::ParallelOp parallelOp =
       createRegionOp<mlir::acc::ParallelOp, mlir::acc::YieldOp>(
-      firOpBuilder, currentLocation, operands, operandSegments);
+          firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
     parallelOp->setAttr(mlir::acc::ParallelOp::getAsyncAttrName(),
@@ -996,8 +996,8 @@ static void genACC(Fortran::lower::AbstractConverter &converter,
   addOperand(operands, operandSegments, waitDevnum);
   addOperand(operands, operandSegments, ifCond);
 
-  mlir::acc::WaitOp waitOp = createSimpleOp<mlir::acc::WaitOp>(firOpBuilder, currentLocation,
-                                                  operands, operandSegments);
+  mlir::acc::WaitOp waitOp = createSimpleOp<mlir::acc::WaitOp>(
+      firOpBuilder, currentLocation, operands, operandSegments);
 
   if (addAsyncAttr)
     waitOp.asyncAttr(firOpBuilder.getUnitAttr());
