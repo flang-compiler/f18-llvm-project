@@ -22,6 +22,7 @@
 #include "llvm/Option/ArgList.h"
 #include "llvm/Support/Host.h"
 #include "llvm/Support/InitLLVM.h"
+#include "llvm/Support/TargetSelect.h"
 #include "llvm/Support/VirtualFileSystem.h"
 
 using llvm::StringRef;
@@ -67,10 +68,11 @@ static int ExecuteFC1Tool(llvm::SmallVectorImpl<const char *> &argV) {
 }
 
 int main(int argc, const char **argv) {
-
   // Initialize variables to call the driver
   llvm::InitLLVM x(argc, argv);
   llvm::SmallVector<const char *, 256> args(argv, argv + argc);
+
+  llvm::InitializeAllTargets();
 
   clang::driver::ParsedClangName targetandMode("flang", "--driver-mode=flang");
   std::string driverPath = GetExecutablePath(args[0]);

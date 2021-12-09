@@ -1,6 +1,4 @@
-! TODO Add `-target <arch>` once that's available
-
-! RUN: %flang_fc1 -S %s -o - | FileCheck %s
+! RUN: %flang_fc1 -S -triple aarch64-unknown-linux-gnu %s -o - | FileCheck %s
 
 ! REQUIRES: aarch64-registered-target
 

@@ -100,6 +100,10 @@ static void setUpFrontendBasedOnAction(FrontendOptions &opts) {
     opts.needProvenanceRangeToCharBlockMappings = true;
 }
 
+static void ParseTargetArgs(TargetOptions &opts, llvm::opt::ArgList &args) {
+  opts.triple = args.getLastArgValue(clang::driver::options::OPT_triple);
+}
+
 static bool ParseFrontendArgs(FrontendOptions &opts, llvm::opt::ArgList &args,
     clang::DiagnosticsEngine &diags) {
   unsigned numErrorsBefore = diags.getNumErrors();
@@ -556,6 +560,7 @@ bool CompilerInvocation::CreateFromArgs(CompilerInvocation &res,
   }
 
   success &= ParseFrontendArgs(res.frontendOpts(), args, diags);
+  ParseTargetArgs(res.targetOpts(), args);
   parsePreprocessorArgs(res.preprocessorOpts(), args);
   success &= parseSemaArgs(res, args, diags);
   success &= parseDialectArgs(res, args, diags);

@@ -453,7 +453,7 @@ void CodeGenAction::GenerateLLVMIR() {
   fir::support::registerLLVMTranslation(ctx);
 
   // Set-up the MLIR pass manager
-  fir::setTargetTriple(mlirMod, "native");
+  fir::setTargetTriple(mlirMod, ci.invocation().targetOpts().triple);
   auto &defKinds = ci.invocation().semanticsContext().defaultKinds();
   fir::KindMapping kindMap(&ci.mlirCtx(),
       llvm::ArrayRef<fir::KindTy>{fir::fromDefaultKinds(defKinds)});

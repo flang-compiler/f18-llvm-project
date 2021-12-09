@@ -3789,9 +3789,9 @@ def print_multi_lib : Flag<["-", "--"], "print-multi-lib">;
 def print_multi_os_directory : Flag<["-", "--"], "print-multi-os-directory">,
   Flags<[Unsupported]>;
 def print_target_triple : Flag<["-", "--"], "print-target-triple">,
-  HelpText<"Print the normalized target triple">;
+  HelpText<"Print the normalized target triple">, Flags<[FlangOption]>;
 def print_effective_triple : Flag<["-", "--"], "print-effective-triple">,
-  HelpText<"Print the effective target triple">;
+  HelpText<"Print the effective target triple">, Flags<[FlangOption]>;
 def print_multiarch : Flag<["-", "--"], "print-multiarch">,
   HelpText<"Print the multiarch target triple">;
 def print_prog_name_EQ : Joined<["-", "--"], "print-prog-name=">,
@@ -3801,7 +3801,7 @@ def print_resource_dir : Flag<["-", "--"], "print-resource-dir">,
 def print_search_dirs : Flag<["-", "--"], "print-search-dirs">,
   HelpText<"Print the paths used for finding libraries and programs">;
 def print_targets : Flag<["-", "--"], "print-targets">,
-  HelpText<"Print the registered targets">;
+  HelpText<"Print the registered targets">, Flags<[FlangOption]>;
 def print_rocm_search_dirs : Flag<["-", "--"], "print-rocm-search-dirs">,
   HelpText<"Print the paths used for finding ROCm installation">;
 def print_runtime_dir : Flag<["-", "--"], "print-runtime-dir">,
@@ -3902,7 +3902,7 @@ def no_system_header_prefix : Joined<["--"], "no-system-header-prefix=">,
            "system header.">;
 def : Separate<["--"], "no-system-header-prefix">, Alias<no_system_header_prefix>;
 def s : Flag<["-"], "s">, Group<Link_Group>;
-def target : Joined<["--"], "target=">, Flags<[NoXarchOption, CoreOption]>,
+def target : Joined<["--"], "target=">, Flags<[NoXarchOption, CoreOption, FlangOption]>,
   HelpText<"Generate code for the given target">;
 def print_supported_cpus : Flag<["-", "--"], "print-supported-cpus">,
   Group<CompileOnly_Group>, Flags<[CC1Option, CoreOption]>,
@@ -4670,7 +4670,7 @@ defm analyzed_objects_for_unparse : OptOutFC1FFlag<"analyzed-objects-for-unparse
 let Flags = [CC1Option, NoDriverOption] in {
 
 //===----------------------------------------------------------------------===//
-// Target Options
+// Target Options (cc1 + cc1as)
 //===----------------------------------------------------------------------===//
 
 let Flags = [CC1Option, CC1AsOption, NoDriverOption] in {
@@ -4684,10 +4684,6 @@ def tune_cpu : Separate<["-"], "tune-cpu">,
 def target_feature : Separate<["-"], "target-feature">,
   HelpText<"Target specific attributes">,
   MarshallingInfoStringVector<TargetOpts<"FeaturesAsWritten">>;
-def triple : Separate<["-"], "triple">,
-  HelpText<"Specify target triple (e.g. i686-apple-darwin9)">,
-  MarshallingInfoString<TargetOpts<"Triple">, "llvm::Triple::normalize(llvm::sys::getDefaultTargetTriple())">,
-  AlwaysEmit, Normalizer<"normalizeTriple">;
 def target_abi : Separate<["-"], "target-abi">,
   HelpText<"Target a particular ABI type">,
   MarshallingInfoString<TargetOpts<"ABI">>;
@@ -4696,6 +4692,20 @@ def target_sdk_version_EQ : Joined<["-"], "target-sdk-version=">,
 
 }
 
+//===----------------------------------------------------------------------===//
+// Target Options (cc1 + cc1as + fc1)
+//===----------------------------------------------------------------------===//
+let Flags = [CC1Option, CC1AsOption, FC1Option, NoDriverOption] in {
+
+def triple : Separate<["-"], "triple">,
+  HelpText<"Specify target triple (e.g. i686-apple-darwin9)">,
+  MarshallingInfoString<TargetOpts<"Triple">, "llvm::Triple::normalize(llvm::sys::getDefaultTargetTriple())">,
+  AlwaysEmit, Normalizer<"normalizeTriple">;
+} // let Flags = [CC1Option, CC1ASOption, FC1Option, NoDriverOption]
+
+//===----------------------------------------------------------------------===//
+// Target Options (other)
+//===----------------------------------------------------------------------===//
 def target_linker_version : Separate<["-"], "target-linker-version">,
   HelpText<"Target linker version">,
   MarshallingInfoString<TargetOpts<"LinkerVersion">>;

@@ -51,9 +51,13 @@
 ! HELP-NEXT: -nocpp                 Disable predefined and command line preprocessor macros
 ! HELP-NEXT: -o <file>              Write output to <file>
 ! HELP-NEXT: -pedantic              Warn on language extensions
+! HELP-NEXT: -print-effective-triple Print the effective target triple
+! HELP-NEXT: -print-target-triple    Print the normalized target triple
+! HELP-NEXT: -print-targets          Print the registered targets
 ! HELP-NEXT: -P                     Disable linemarker output in -E mode
 ! HELP-NEXT: -std=<value>           Language standard to compile for
 ! HELP-NEXT: -S                     Only run preprocess and compilation steps
+! HELP-NEXT: --target=<value>       Generate code for the given target
 ! HELP-NEXT: -U <macro>             Undefine macro <macro>
 ! HELP-NEXT: --version              Print version information
 ! HELP-NEXT: -W<warning>            Enable the specified warning
@@ -127,6 +131,7 @@
 ! HELP-FC1-NEXT: -std=<value>           Language standard to compile for
 ! HELP-FC1-NEXT: -S                     Only run preprocess and compilation steps
 ! HELP-FC1-NEXT: -test-io               Run the InputOuputTest action. Use for development and testing only.
+! HELP-FC1-NEXT: -triple <value>        Specify target triple (e.g. i686-apple-darwin9)
 ! HELP-FC1-NEXT: -U <macro>             Undefine macro <macro>
 ! HELP-FC1-NEXT: --version              Print version information
 ! HELP-FC1-NEXT: -W<warning>            Enable the specified warning

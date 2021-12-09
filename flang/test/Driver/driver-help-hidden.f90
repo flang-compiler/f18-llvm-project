@@ -51,9 +51,13 @@
 ! CHECK-NEXT: -nocpp                 Disable predefined and command line preprocessor macros
 ! CHECK-NEXT: -o <file> Write output to <file>
 ! CHECK-NEXT: -pedantic              Warn on language extensions
+! CHECK-NEXT: -print-effective-triple Print the effective target triple
+! CHECK-NEXT: -print-target-triple    Print the normalized target triple
+! CHECK-NEXT: -print-targets          Print the registered targets
 ! CHECK-NEXT: -P                     Disable linemarker output in -E mode
 ! CHECK-NEXT: -std=<value>           Language standard to compile for
 ! CHECK-NEXT: -S                     Only run preprocess and compilation steps
+! CHECK-NEXT: --target=<value>        Generate code for the given target
 ! CHECK-NEXT: -U <macro>             Undefine macro <macro>
 ! CHECK-NEXT: --version Print version information
 ! CHECK-NEXT: -W<warning>            Enable the specified warning
