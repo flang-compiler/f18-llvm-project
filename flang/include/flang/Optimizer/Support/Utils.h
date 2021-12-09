@@ -21,7 +21,7 @@
 namespace fir {
 /// Return the integer value of a arith::ConstantOp.
 inline std::int64_t toInt(mlir::arith::ConstantOp cop) {
-  return cop.value().cast<mlir::IntegerAttr>().getValue().getSExtValue();
+  return cop.getValue().cast<mlir::IntegerAttr>().getValue().getSExtValue();
 }
 
 // Translate front-end KINDs for use in the IR and code gen.
