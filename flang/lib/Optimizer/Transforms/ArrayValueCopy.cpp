@@ -434,13 +434,9 @@ static bool conflictOnLoad(llvm::ArrayRef<mlir::Operation *> reach,
   mlir::Value load;
   mlir::Value addr = st.memref();
   const bool storeHasPointerType = hasPointerType(addr.getType());
-  mlir::Type stEleTy =
-      fir::unwrapSequenceType(fir::unwrapPassByRefType(addr.getType()));
   for (auto *op : reach)
     if (auto ld = mlir::dyn_cast<ArrayLoadOp>(op)) {
       mlir::Type ldTy = ld.memref().getType();
-      mlir::Type ldEleTy =
-          fir::unwrapSequenceType(fir::unwrapPassByRefType(ldTy));
       if (ld.memref() == addr) {
         if (ld.getResult() != st.original())
           return true;
@@ -448,9 +444,16 @@ static bool conflictOnLoad(llvm::ArrayRef<mlir::Operation *> reach,
           // TODO: only return if the loads may overlap (look at slices if any).
           return true;
         load = ld;
-      } else if ((hasPointerType(ldTy) || storeHasPointerType) &&
-                 stEleTy == ldEleTy) {
+      } else if ((hasPointerType(ldTy) || storeHasPointerType)) {
         // TODO: Use target attribute to restrict this case further.
+        // TODO: Check if types can also allow ruling out some cases. For now,
+        // the fact that equivalences is using pointer attribute to enforce
+        // aliasing is preventing any attempt to do so, and in general, it may
+        // be wrong to use this if any of the types is a complex or a derived
+        // for which it is possible to create a pointer to a part with a
+        // different type than the whole, although this deserve some more
+        // investigation because existing compiler behavior seem to diverge
+        // here.
         return true;
       }
     }
