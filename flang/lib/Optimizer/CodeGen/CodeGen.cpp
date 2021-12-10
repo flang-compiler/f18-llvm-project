@@ -1399,7 +1399,6 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
     mlir::Location loc = xbox.getLoc();
     mlir::Value zero = genConstantIndex(loc, i64Ty, rewriter, 0);
     mlir::Value one = genConstantIndex(loc, i64Ty, rewriter, 1);
-    mlir::Value prevDim = integerCast(loc, rewriter, i64Ty, eleSize);
     mlir::Value prevPtrOff = one;
     mlir::Type eleTy = boxTy.getEleTy();
     const unsigned rank = xbox.getRank();
@@ -1433,22 +1432,24 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
 
     const auto hasSubcomp = !xbox.subcomponent().empty();
     const bool hasSubstr = !xbox.substr().empty();
-    mlir::Value stepExpr;
+    /// Compute initial element stride that will be use to compute the step in
+    /// each dimension.
+    mlir::Value prevDimByteStride = integerCast(loc, rewriter, i64Ty, eleSize);
     if (hasSubcomp) {
       // We have a subcomponent. The step value needs to be the number of
       // bytes per element (which is a derived type).
       auto eleTy = mlir::LLVM::LLVMPointerType::get(convertType(seqEleTy));
-      stepExpr = computeDerivedTypeSize(loc, eleTy, i64Ty, rewriter);
+      prevDimByteStride = computeDerivedTypeSize(loc, eleTy, i64Ty, rewriter);
     } else if (hasSubstr) {
       // We have a substring. The step value needs to be the number of bytes
       // per CHARACTER element.
       auto charTy = seqEleTy.cast<fir::CharacterType>();
       if (fir::hasDynamicSize(charTy)) {
-        stepExpr = prevPtrOff;
+        prevDimByteStride = prevPtrOff;
       } else {
-        stepExpr = genConstantIndex(loc, i64Ty, rewriter,
-                                    charTy.getLen() *
-                                        lowerTy().characterBitsize(charTy) / 8);
+        prevDimByteStride = genConstantIndex(
+            loc, i64Ty, rewriter,
+            charTy.getLen() * lowerTy().characterBitsize(charTy) / 8);
       }
     }
 
@@ -1506,7 +1507,7 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
         dest = insertExtent(rewriter, loc, dest, descIdx, extent);
 
         // store step (scaled by shaped extent)
-        mlir::Value step = (hasSubcomp || hasSubstr) ? stepExpr : prevDim;
+        mlir::Value step = prevDimByteStride;
         if (hasSlice)
           step = rewriter.create<mlir::LLVM::MulOp>(loc, i64Ty, step,
                                                     operands[sliceOffset + 2]);
@@ -1515,8 +1516,8 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
       }
 
       // compute the stride and offset for the next natural dimension
-      prevDim =
-          rewriter.create<mlir::LLVM::MulOp>(loc, i64Ty, prevDim, outerExtent);
+      prevDimByteStride = rewriter.create<mlir::LLVM::MulOp>(
+          loc, i64Ty, prevDimByteStride, outerExtent);
       if (constRows == 0)
         prevPtrOff = rewriter.create<mlir::LLVM::MulOp>(loc, i64Ty, prevPtrOff,
                                                         outerExtent);
@@ -1544,7 +1545,8 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
       }
       base = rewriter.create<mlir::LLVM::GEPOp>(loc, base.getType(), args);
       if (hasSubstr)
-        base = shiftSubstringBase(rewriter, loc, base, operands[xbox.substrOffset()]);
+        base = shiftSubstringBase(rewriter, loc, base,
+                                  operands[xbox.substrOffset()]);
     }
     dest = insertBaseAddress(rewriter, loc, dest, base);
     if (isDerivedTypeWithLenParams(boxTy))

@@ -59,3 +59,25 @@ func @_QPtest_dt_slice() {
   fir.call @_QPtest_dt_callee(%5) : (!fir.box<!fir.array<?xi32>>) -> ()
   return
 }
+
+func private @takesRank2CharBox(!fir.box<!fir.array<?x?x!fir.char<1,?>>>)
+
+// CHECK-LABEL: define void @emboxSubstring(
+// CHECK-SAME: [3 x [2 x [4 x i8]]]* %[[arg0:.*]])
+func @emboxSubstring(%arg0: !fir.ref<!fir.array<2x3x!fir.char<1,4>>>) {
+  %c2 = arith.constant 2 : index
+  %c3 = arith.constant 3 : index
+  %c1 = arith.constant 1 : index
+  %0 = fir.shape %c2, %c3 : (index, index) -> !fir.shape<2>
+  %1 = fir.slice %c1, %c2, %c1, %c1, %c3, %c1 substr %c1, %c2 : (index, index, index, index, index, index, index, index) -> !fir.slice<2>
+  %2 = fir.embox %arg0(%0) [%1] : (!fir.ref<!fir.array<2x3x!fir.char<1,4>>>, !fir.shape<2>, !fir.slice<2>) -> !fir.box<!fir.array<?x?x!fir.char<1,?>>>
+
+  // CHECK: %[[addr:.*]] = getelementptr [3 x [2 x [4 x i8]]], [3 x [2 x [4 x i8]]]* %[[arg0]], i64 0, i64 0, i64 0
+  // CHECK: %[[substringAddr:.*]] = getelementptr [4 x i8], [4 x i8]* %[[addr]], i64 0, i64 1
+  // CHECK: insertvalue {[[descriptorType:.*]]} { i8* undef, i64 2, i32 20180515, i8 2, i8 32, i8 0, i8 0,
+  // CHECK-SAME: [2 x [3 x i64]] [{{\[}}3 x i64] [i64 1, i64 2, i64 4], [3 x i64] [i64 1, i64 3, i64 8]] },
+  // CHECK-SAME: i8* %[[substringAddr]], 0
+
+  fir.call @takesRank2CharBox(%2) : (!fir.box<!fir.array<?x?x!fir.char<1,?>>>) -> ()
+  return
+}
