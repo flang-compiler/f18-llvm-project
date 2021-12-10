@@ -7,11 +7,11 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Lower/CallInterface.h"
-#include "flang/Lower/StatementContext.h"
 #include "flang/Evaluate/fold.h"
 #include "flang/Lower/Bridge.h"
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
+#include "flang/Lower/StatementContext.h"
 #include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"

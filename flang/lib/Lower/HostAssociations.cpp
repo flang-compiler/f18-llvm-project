@@ -400,7 +400,7 @@ public:
         auto boxTy = box.getType().cast<fir::BoxType>();
         auto eleTy = boxTy.getEleTy();
         if (!fir::isa_ref_type(eleTy))
-           eleTy = builder.getRefType(eleTy);
+          eleTy = builder.getRefType(eleTy);
         auto addr = builder.create<fir::BoxAddrOp>(loc, eleTy, box);
         mlir::Value isPresent = builder.genIsNotNull(loc, addr);
         auto absentBox = builder.create<fir::AbsentOp>(loc, boxTy);

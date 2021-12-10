@@ -46,7 +46,7 @@ set(FLANG_TEST_PARAMS
   flang_site_config=${CMAKE_CURRENT_BINARY_DIR}/lit.site.cfg.py)
 
 set(FLANG_TEST_DEPENDS
-  flang-new FileCheck count not module_files
+  flang-new FileCheck count not split-file module_files
   opt llc
   tco bbc
   fir-opt
