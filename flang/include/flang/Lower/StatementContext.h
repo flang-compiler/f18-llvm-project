@@ -41,12 +41,14 @@ public:
       cleanup();
   }
 
+  using CleanupFunction = std::function<void()>;
+
   /// Append the cleanup function `cuf` to the list of cleanups.
-  void attachCleanup(std::function<void()> cuf) {
+  void attachCleanup(CleanupFunction cuf) {
     if (cleanupProhibited)
       llvm::report_fatal_error("expression cleanups disallowed");
     assert(!finalized);
-    std::function<void()> oldCleanup = cleanup;
+    CleanupFunction oldCleanup = cleanup;
     cleanup = [=]() {
       cuf();
       oldCleanup();
@@ -67,11 +69,21 @@ public:
   bool hasCleanups() const { return cleanupAdded; }
 
   /// Reset the statement context to its default initial state.
-  void reset() {
-    assert((finalized || !cleanupAdded) &&
+  void reset(bool force = false) {
+    assert((finalized || !cleanupAdded || force) &&
            "statement context is not empty and not finalized");
     cleanup = []() {};
     finalized = cleanupAdded = false;
+  }
+
+  /// Reset the statement context.  Return any existing cleanup function,
+  /// so it can be restored with a subsequent attachCleanup call.
+  std::optional<CleanupFunction> saveAndReset() {
+    if (!hasCleanups())
+      return {};
+    CleanupFunction cuf = cleanup;
+    reset(/*force=*/true);
+    return cuf;
   }
 
 private:
@@ -80,7 +92,7 @@ private:
   StatementContext &operator=(const StatementContext &) = delete;
   StatementContext(StatementContext &&) = delete;
 
-  std::function<void()> cleanup;
+  CleanupFunction cleanup;
   bool finalized{};
   bool cleanupAdded{};
   bool cleanupProhibited{};

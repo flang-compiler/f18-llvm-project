@@ -83,9 +83,34 @@ subroutine ss4(N)
 ! print*, aa(1:2,:), aa(N-1:N,:)
 end
 
+! CHECK-LABEL: func @_QPtt1
+subroutine tt1
+  ! CHECK: fir.call @_FortranAioBeginExternalListOutput
+  ! CHECK: %[[temp3:[0-9]+]] = fir.allocmem !fir.array<3xf32>
+  ! CHECK: br ^bb1(%[[temp3]]
+  ! CHECK-NEXT: ^bb1(%[[temp3arg:[0-9]+]]: !fir.heap<!fir.array<3xf32>>
+  ! CHECK: %[[temp1:[0-9]+]] = fir.allocmem !fir.array<1xf32>
+  ! CHECK: fir.call @_QFtt1Pr
+  ! CHECK: fir.call @realloc
+  ! CHECK: fir.freemem %[[temp1]] : !fir.heap<!fir.array<1xf32>>
+  ! CHECK: %[[temp3x:[0-9]+]] = fir.allocmem !fir.array<3xf32>
+  ! CHECK: fir.call @_FortranAioOutputDescriptor
+  ! CHECK-NEXT: fir.freemem %[[temp3x]] : !fir.heap<!fir.array<3xf32>>
+  ! CHECK-NEXT: fir.freemem %[[temp3arg]] : !fir.heap<!fir.array<3xf32>>
+  ! CHECK-NEXT: fir.call @_FortranAioEndIoStatement
+  print*, [(r([7.0]),i=1,3)]
+contains
+  ! CHECK-LABEL: func @_QFtt1Pr
+  function r(x)
+    real x(:)
+    r = x(1)
+  end
+end
+
 program p
 ! call ss1
 ! call ss2(2650000)
 ! call ss3(2650000)
 ! call ss4(2650000)
+! call tt1
 end
