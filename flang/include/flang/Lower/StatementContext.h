@@ -13,77 +13,61 @@
 #ifndef FORTRAN_LOWER_STATEMENTCONTEXT_H
 #define FORTRAN_LOWER_STATEMENTCONTEXT_H
 
-#include "flang/Lower/SymbolMap.h"
-#include "llvm/Support/ErrorHandling.h"
 #include <functional>
 
 namespace Fortran::lower {
 
-/// When lowering a statement, large temporaries may be allocated on the heap to
-/// buffer intermediate results. These temporaries must be deallocated at the
-/// end of the statement. These deallocations are threaded via a
-/// StatementContext back to the "end" of the statement.
+/// When lowering a statement, temporaries for intermediate results may be
+/// allocated on the heap.  A StatementContext enables their deallocation
+/// either explicitly with finalize() calls, or implicitly at the end of
+/// the context.  A context may prohibit temporary allocation.  Otherwise,
+/// an initial "outer" context scope may have nested context scopes, which
+/// must make explicit subscope finalize() calls.
 class StatementContext {
 public:
-  /// Default constructor.
-  explicit StatementContext() {
-    cleanup = []() {};
-  }
-
-  /// Cleanups can be prohibited in some contexts. If prohibited, the compiler
-  /// will crash if and where it tries to unexpectedly add a cleanup.
-  explicit StatementContext(bool prohibited) : cleanupProhibited{prohibited} {
-    cleanup = []() {};
+  explicit StatementContext(bool cleanupProhibited = false) {
+    if (cleanupProhibited)
+      return;
+    cufs.push_back({});
   }
 
   ~StatementContext() {
-    if (!finalized)
-      cleanup();
+    if (!cufs.empty())
+      finalize(/*popScope=*/true);
+    assert(cufs.empty() && "invalid StatementContext destructor call");
   }
 
   using CleanupFunction = std::function<void()>;
 
-  /// Append the cleanup function `cuf` to the list of cleanups.
+  /// Push a context subscope.
+  void pushScope() {
+    assert(!cufs.empty() && "invalid pushScope statement context");
+    cufs.push_back({});
+  }
+
+  /// Append a cleanup function to the "list" of cleanup functions.
   void attachCleanup(CleanupFunction cuf) {
-    if (cleanupProhibited)
-      llvm::report_fatal_error("expression cleanups disallowed");
-    assert(!finalized);
-    CleanupFunction oldCleanup = cleanup;
-    cleanup = [=]() {
-      cuf();
-      oldCleanup();
-    };
-    cleanupAdded = true;
+    assert(!cufs.empty() && "invalid attachCleanup statement context");
+    if (cufs.back()) {
+      CleanupFunction oldCleanup = *cufs.back();
+      cufs.back() = [=]() {
+        cuf();
+        oldCleanup();
+      };
+    } else {
+      cufs.back() = cuf;
+    }
   }
 
-  /// Force finalization of cleanups. Normally, cleanups are applied by the
-  /// destructor, but some statements require the cleanups be added before an Op
-  /// that will change the control dependence.
-  void finalize() {
-    cleanup();
-    finalized = true;
-    cleanup = []() { llvm::report_fatal_error("already finalized"); };
-  }
-
-  /// Does the statement context have any cleanups to perform?
-  bool hasCleanups() const { return cleanupAdded; }
-
-  /// Reset the statement context to its default initial state.
-  void reset(bool force = false) {
-    assert((finalized || !cleanupAdded || force) &&
-           "statement context is not empty and not finalized");
-    cleanup = []() {};
-    finalized = cleanupAdded = false;
-  }
-
-  /// Reset the statement context.  Return any existing cleanup function,
-  /// so it can be restored with a subsequent attachCleanup call.
-  std::optional<CleanupFunction> saveAndReset() {
-    if (!hasCleanups())
-      return {};
-    CleanupFunction cuf = cleanup;
-    reset(/*force=*/true);
-    return cuf;
+  /// Make cleanup calls.  Pop or reset the stack top list.
+  void finalize(bool popScope = false) {
+    assert(!cufs.empty() && "invalid finalize statement context");
+    if (cufs.back())
+      (*cufs.back())();
+    if (popScope)
+      cufs.pop_back();
+    else
+      cufs.back().reset();
   }
 
 private:
@@ -92,10 +76,8 @@ private:
   StatementContext &operator=(const StatementContext &) = delete;
   StatementContext(StatementContext &&) = delete;
 
-  CleanupFunction cleanup;
-  bool finalized{};
-  bool cleanupAdded{};
-  bool cleanupProhibited{};
+  // Stack of cleanup function "lists" (nested cleanup function calls).
+  llvm::SmallVector<llvm::Optional<CleanupFunction>> cufs;
 };
 
 } // namespace Fortran::lower

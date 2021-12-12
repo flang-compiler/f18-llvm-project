@@ -830,14 +830,12 @@ void Fortran::lower::ExplicitIterSpace::conditionalCleanup() {
     // Exiting the outermost FORALL context.
     // Cleanup any residual mask buffers.
     outermostContext().finalize();
-    outermostContext().reset();
     // Clear and reset all the cached information.
     symbolStack.clear();
     lhsBases.clear();
     rhsBases.clear();
     loadBindings.clear();
     ccLoopNest.clear();
-    stmtCtx.reset();
     innerArgs.clear();
     outerLoop = llvm::None;
     clearLoops();

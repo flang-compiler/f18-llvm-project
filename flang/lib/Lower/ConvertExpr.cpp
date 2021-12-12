@@ -5407,8 +5407,7 @@ private:
     mlir::Type eleRefTy = builder.getRefType(eleTy);
 
     // Any temps created in the loop body must be freed inside the loop body.
-    std::optional<Fortran::lower::StatementContext::CleanupFunction> cuf =
-        stmtCtx.saveAndReset();
+    stmtCtx.pushScope();
     llvm::Optional<mlir::Value> charLen;
     for (const Fortran::evaluate::ArrayConstructorValue<A> &acv : x.values()) {
       auto [exv, copyNeeded] = std::visit(
@@ -5428,12 +5427,7 @@ private:
         builder.create<fir::StoreOp>(loc, castLen, charLen.getValue());
       }
     }
-    if (stmtCtx.hasCleanups()) {
-      stmtCtx.finalize();
-      stmtCtx.reset();
-    }
-    if (cuf)
-      stmtCtx.attachCleanup(*cuf); // restore the pre-loop statement context
+    stmtCtx.finalize(/*popScope=*/true);
 
     builder.create<fir::ResultOp>(loc, mem);
     builder.restoreInsertionPoint(insPt);

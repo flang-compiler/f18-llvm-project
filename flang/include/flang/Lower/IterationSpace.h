@@ -15,6 +15,7 @@
 
 #include "flang/Evaluate/tools.h"
 #include "flang/Lower/StatementContext.h"
+#include "flang/Lower/SymbolMap.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 
 namespace llvm {
@@ -159,8 +160,6 @@ public:
   bool empty() const { return stack.empty(); }
 
   void growStack() {
-    if (empty())
-      stmtCtx.reset();
     stack.push_back(A{});
   }
 
@@ -524,7 +523,6 @@ public:
   /// Finalize the current body statement context.
   void finalizeContext() {
     stmtCtx.finalize();
-    stmtCtx.reset();
   }
 
   void appendLoops(const llvm::SmallVector<fir::DoLoopOp> &loops) {

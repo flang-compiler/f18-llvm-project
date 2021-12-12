@@ -426,23 +426,23 @@ static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
       } else {
         createGlobalInitialization(
             builder, global, [&](fir::FirOpBuilder &builder) {
-              Fortran::lower::StatementContext stmtCtx(/*prohibited=*/true);
+              Fortran::lower::StatementContext stmtCtx(
+                  /*cleanupProhibited=*/true);
               fir::ExtendedValue initVal = genInitializerExprValue(
                   converter, loc, details->init().value(), stmtCtx);
               mlir::Value castTo =
                   builder.createConvert(loc, symTy, fir::getBase(initVal));
-              stmtCtx.finalize();
               builder.create<fir::HasValueOp>(loc, castTo);
             });
       }
     } else if (hasDefaultInitialization(sym)) {
       createGlobalInitialization(
           builder, global, [&](fir::FirOpBuilder &builder) {
-            Fortran::lower::StatementContext stmtCtx(/*prohibited=*/true);
+            Fortran::lower::StatementContext stmtCtx(
+                /*cleanupProhibited=*/true);
             mlir::Value initVal =
                 genDefaultInitializerValue(converter, loc, sym, symTy, stmtCtx);
             mlir::Value castTo = builder.createConvert(loc, symTy, initVal);
-            stmtCtx.finalize();
             builder.create<fir::HasValueOp>(loc, castTo);
           });
     }
