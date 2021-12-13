@@ -5,6 +5,7 @@
 // RUN: ./a.out | FileCheck %s --check-prefix=EXECHECK
 
 // REQUIRES: x86-registered-target
+// UNSUPPORTED: darwin, macos
 
 // EXECHECK: <0.935893, 2.252526>
 

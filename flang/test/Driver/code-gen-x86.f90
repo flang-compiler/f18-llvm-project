@@ -8,6 +8,8 @@
 ! RUN: llvm-objdump --disassemble-all %t.o | FileCheck %s
 
 ! REQUIRES: x86-registered-target
+! UNSUPPORTED: darwin, macos
+
 
 ! CHECK-LABEL: <_QQmain>:
 ! CHECK-NEXT:  	retq
