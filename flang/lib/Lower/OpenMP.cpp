@@ -142,7 +142,7 @@ void createEmptyRegionBlocks(
 }
 
 static mlir::Type getLoopVarType(Fortran::lower::AbstractConverter &converter,
-                                 std::uint64_t loopVarTypeSize) {
+                                 std::size_t loopVarTypeSize) {
   // OpenMP runtime requires 32-bit or 64-bit loop variables.
   loopVarTypeSize = loopVarTypeSize * 8;
   if (loopVarTypeSize < 32) {
@@ -171,7 +171,7 @@ static void createBodyOfOp(
   // e.g. For loops the argument is the induction variable. And all further
   // uses of the induction variable should use this mlir value.
   if (args.size()) {
-    std::uint64_t loopVarTypeSize = 0;
+    std::size_t loopVarTypeSize = 0;
     for (const Fortran::semantics::Symbol *arg : args)
       loopVarTypeSize = std::max(loopVarTypeSize, arg->GetUltimate().size());
     mlir::Type loopVarType = getLoopVarType(converter, loopVarTypeSize);
@@ -558,7 +558,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
 
   std::int64_t collapseValue =
       Fortran::lower::getCollapseValue(wsLoopOpClauseList);
-  std::uint64_t loopVarTypeSize = 0;
+  std::size_t loopVarTypeSize = 0;
   SmallVector<const Fortran::semantics::Symbol *> iv;
   do {
     Fortran::lower::pft::Evaluation *doLoop =
