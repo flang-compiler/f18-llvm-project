@@ -44,6 +44,7 @@ std::unique_ptr<mlir::Pass> createSimplifyRegionLitePass();
 /// as block arguments.
 /// TODO: This pass needs some additional work.
 std::unique_ptr<mlir::Pass> createMemToRegPass();
+std::unique_ptr<mlir::Pass> createMemoryAllocationPass();
 
 /// Optionally force the body of a DO to execute at least once.
 bool isAlwaysExecuteLoopBody();
