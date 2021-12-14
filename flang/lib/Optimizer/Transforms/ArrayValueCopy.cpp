@@ -455,10 +455,10 @@ static bool mutuallyExclusiveSliceRange(ArrayLoadOp ld, ArrayMergeStoreOp st) {
   // Crudely test that the two slices do not overlap by looking for the
   // following general condition. If the slices look like (i:j) and (j+1:k) then
   // these ranges do not overlap. The addend must be a constant.
-  auto ldTrips = ldSlice.triples();
-  auto stTrips = stSlice.triples();
-  const auto size = ldTrips.size();
-  if (size != stTrips.size())
+  auto ldTriples = ldSlice.triples();
+  auto stTriples = stSlice.triples();
+  const auto size = ldTriples.size();
+  if (size != stTriples.size())
     return false;
 
   auto displacedByConstant = [](mlir::Value v1, mlir::Value v2) {
@@ -494,17 +494,17 @@ static bool mutuallyExclusiveSliceRange(ArrayLoadOp ld, ArrayMergeStoreOp st) {
 
   for (std::remove_const_t<decltype(size)> i = 0; i < size; i += 3) {
     // If identical, skip to the next triple.
-    if (ldTrips[i] == stTrips[i] && ldTrips[i + 1] == stTrips[i + 1] &&
-        ldTrips[i + 2] == stTrips[i + 2])
+    if (ldTriples[i] == stTriples[i] && ldTriples[i + 1] == stTriples[i + 1] &&
+        ldTriples[i + 2] == stTriples[i + 2])
       continue;
     // If both are loop invariant, skip to the next triple.
-    if (mlir::isa_and_nonnull<fir::UndefOp>(ldTrips[i + 1].getDefiningOp()) &&
-        mlir::isa_and_nonnull<fir::UndefOp>(stTrips[i + 1].getDefiningOp()))
+    if (mlir::isa_and_nonnull<fir::UndefOp>(ldTriples[i + 1].getDefiningOp()) &&
+        mlir::isa_and_nonnull<fir::UndefOp>(stTriples[i + 1].getDefiningOp()))
       continue;
     // If ubound and lbound are the same with a constant offset, skip to the
     // next triple.
-    if (displacedByConstant(ldTrips[i + 1], stTrips[i]) ||
-        displacedByConstant(stTrips[i + 1], ldTrips[i]))
+    if (displacedByConstant(ldTriples[i + 1], stTriples[i]) ||
+        displacedByConstant(stTriples[i + 1], ldTriples[i]))
       continue;
     return false;
   }
