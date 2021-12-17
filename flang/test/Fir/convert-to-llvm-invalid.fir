@@ -88,3 +88,20 @@ func @bar_select_type(%arg : !fir.box<!fir.ref<f32>>) -> i32 {
   %zero = arith.constant 0 : i32
   return %zero : i32
 }
+
+// -----
+
+// Verify that `fir.dt_entry` requires a parent op
+
+// expected-error@+1{{'fir.dt_entry' op expects parent op 'fir.dispatch_table'}}
+fir.dt_entry "method", @method_impl
+
+// -----
+
+// `fir.coordinate_of` - dynamically sized arrays are not supported
+func @coordinate_of_dynamic_array(%arg0: !fir.ref<!fir.array<1x!fir.char<4,?>>>, %arg1: index) {
+  // expected-error@+2{{fir.coordinate_of with a dynamic element size is unsupported}}
+  // expected-error@+1{{failed to legalize operation 'fir.coordinate_of'}}
+  %p = fir.coordinate_of %arg0, %arg1 : (!fir.ref<!fir.array<1x!fir.char<4,?>>>, index) -> !fir.ref<f32>
+  return
+}
