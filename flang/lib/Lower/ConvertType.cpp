@@ -236,6 +236,8 @@ struct TypeBuilder {
       } else if (const Fortran::semantics::DerivedTypeSpec *tySpec =
                      type->AsDerived()) {
         ty = genDerivedType(*tySpec);
+      } else if (type->IsPolymorphic()) {
+        TODO(loc, "polymorphic types");
       } else {
         fir::emitFatalError(loc, "symbol's type must have a type spec");
       }
