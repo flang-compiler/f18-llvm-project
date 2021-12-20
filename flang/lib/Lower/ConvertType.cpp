@@ -233,11 +233,11 @@ struct TypeBuilder {
         llvm::SmallVector<Fortran::lower::LenParameterTy> params;
         translateLenParameters(params, tySpec->category(), ultimate);
         ty = genFIRType(context, tySpec->category(), kind, params);
+      } else if (type->IsPolymorphic()) {
+        TODO(loc, "[genSymbolType] polymorphic types");
       } else if (const Fortran::semantics::DerivedTypeSpec *tySpec =
                      type->AsDerived()) {
         ty = genDerivedType(*tySpec);
-      } else if (type->IsPolymorphic()) {
-        TODO(loc, "polymorphic types");
       } else {
         fir::emitFatalError(loc, "symbol's type must have a type spec");
       }
