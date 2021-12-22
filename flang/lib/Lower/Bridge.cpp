@@ -2081,6 +2081,8 @@ private:
             // [3] Pointer assignment with possibly empty bounds-spec. R1035: a
             // bounds-spec is a lower bound value.
             [&](const Fortran::evaluate::Assignment::BoundsSpec &lbExprs) {
+              if (IsProcedure(assign.rhs))
+                TODO(loc, "procedure pointer assignment");
               std::optional<Fortran::evaluate::DynamicType> lhsType =
                   assign.lhs.GetType();
               std::optional<Fortran::evaluate::DynamicType> rhsType =
