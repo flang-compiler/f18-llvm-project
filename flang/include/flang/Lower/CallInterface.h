@@ -204,6 +204,11 @@ public:
   /// Must the MLIR result be saved with a fir.save_result ?
   bool mustSaveResult() const { return saveResult; }
 
+  /// Can the associated procedure be called via an implicit interface?
+  bool canBeCalledViaImplicitInterface() const {
+    return characteristic && characteristic->CanBeCalledViaImplicitInterface();
+  }
+
 protected:
   CallInterface(Fortran::lower::AbstractConverter &c) : converter{c} {}
   /// CRTP handle.

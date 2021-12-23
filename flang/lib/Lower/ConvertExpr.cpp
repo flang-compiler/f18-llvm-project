@@ -2105,9 +2105,14 @@ public:
 
     // Deal with potential mismatches in arguments types. Passing an array to a
     // scalar argument should for instance be tolerated here.
+    bool callingImplicitInterface = caller.canBeCalledViaImplicitInterface();
     for (auto [fst, snd] :
          llvm::zip(caller.getInputs(), funcType.getInputs())) {
-      mlir::Value cast = builder.convertWithSemantics(getLoc(), snd, fst);
+      // When passing arguments to a procedure that can be called an implicit
+      // interface, allow character actual arguments to be passed to dummy
+      // arguments of any type and vice versa
+      mlir::Value cast = builder.convertWithSemantics(getLoc(), snd, fst,
+                                                      callingImplicitInterface);
       operands.push_back(cast);
     }
 

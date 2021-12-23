@@ -262,9 +262,10 @@ fir::GlobalOp fir::FirOpBuilder::createGlobal(
   return glob;
 }
 
-mlir::Value fir::FirOpBuilder::convertWithSemantics(mlir::Location loc,
-                                                    mlir::Type toTy,
-                                                    mlir::Value val) {
+mlir::Value
+fir::FirOpBuilder::convertWithSemantics(mlir::Location loc, mlir::Type toTy,
+                                        mlir::Value val,
+                                        bool allowConversionsWithCharacters) {
   assert(toTy && "store location must be typed");
   auto fromTy = val.getType();
   if (fromTy == toTy)
@@ -286,6 +287,27 @@ mlir::Value fir::FirOpBuilder::convertWithSemantics(mlir::Location loc,
     auto rp = helper.extractComplexPart(val, /*isImagPart=*/false);
     return createConvert(loc, toTy, rp);
   }
+  if (allowConversionsWithCharacters) {
+    if (fromTy.isa<fir::BoxCharType>()) {
+      // Extract the address of the character string and pass it
+      fir::factory::CharacterExprHelper charHelper{*this, loc};
+      std::pair<mlir::Value, mlir::Value> unboxchar =
+          charHelper.createUnboxChar(val);
+      return createConvert(loc, toTy, unboxchar.first);
+    }
+    if (auto boxType = toTy.dyn_cast<fir::BoxCharType>()) {
+      // Extract the address of the actual argument and create a boxed
+      // character value with an undefined length
+      // TODO: We should really calculate the total size of the actual
+      // argument in characters and use it as the length of the string
+      auto refType = getRefType(boxType.getEleTy());
+      mlir::Value charBase = createConvert(loc, refType, val);
+      mlir::Value unknownLen = this->create<fir::UndefOp>(loc, getIndexType());
+      fir::factory::CharacterExprHelper charHelper{*this, loc};
+      return charHelper.createEmboxChar(charBase, unknownLen);
+    }
+  }
+
   return createConvert(loc, toTy, val);
 }
 
