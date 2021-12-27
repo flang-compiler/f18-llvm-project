@@ -503,6 +503,7 @@ enum ClauseType {
   collapseClause,
   orderClause,
   orderedClause,
+  doacrossVirturalClause,
   memoryOrderClause,
   hintClause,
   COUNT
@@ -574,6 +575,11 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
   SmallVector<OpAsmParser::OperandType> linears;
   SmallVector<Type> linearTypes;
   SmallVector<OpAsmParser::OperandType> linearSteps;
+
+  // "doacross" is not one real clause and it is attached with "ordered" clause
+  // when ordered value is greater than 0.
+  SmallVector<OpAsmParser::OperandType> doacrossVars;
+  SmallVector<Type> doacrossTypes;
 
   SmallString<8> schedule;
   SmallVector<SmallString<12>> modifiers;
@@ -709,17 +715,18 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
       result.addAttribute("collapse_val", attr);
     } else if (clauseKeyword == "ordered") {
       mlir::IntegerAttr attr;
-      if (checkAllowed(orderedClause))
+      auto type = parser.getBuilder().getI64Type();
+      if (checkAllowed(orderedClause) || parser.parseLParen() ||
+          parser.parseAttribute(attr, type) || parser.parseRParen())
         return failure();
-      if (succeeded(parser.parseOptionalLParen())) {
-        auto type = parser.getBuilder().getI64Type();
-        if (parser.parseAttribute(attr, type) || parser.parseRParen())
-          return failure();
-      } else {
-        // Use 0 to represent no ordered parameter was specified
-        attr = parser.getBuilder().getI64IntegerAttr(0);
-      }
       result.addAttribute("ordered_val", attr);
+      if (attr.getValue().getSExtValue() > 0) {
+        if (checkAllowed(doacrossVirturalClause) ||
+            parser.parseKeyword("doacross") ||
+            parseOperandAndTypeList(parser, doacrossVars, doacrossTypes))
+          return failure();
+        clauseSegments[pos[doacrossVirturalClause]] = doacrossVars.size();
+      }
     } else if (clauseKeyword == "order") {
       StringRef order;
       if (checkAllowed(orderClause) || parser.parseLParen() ||
@@ -843,6 +850,13 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
       parser.resolveOperand(*scheduleChunkSize, chunkSizeType, result.operands);
     }
   }
+
+  // Add ordered doacross parameters
+  if (done[doacrossVirturalClause] &&
+      clauseSegments[pos[doacrossVirturalClause]] &&
+      failed(parser.resolveOperands(doacrossVars, doacrossTypes,
+                                    doacrossVars[0].location, result.operands)))
+    return failure();
 
   segments.insert(segments.end(), clauseSegments.begin(), clauseSegments.end());
 
@@ -1004,9 +1018,9 @@ static ParseResult parseWsLoopOp(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   SmallVector<ClauseType> clauses = {
-      privateClause,   firstprivateClause, lastprivateClause, linearClause,
-      reductionClause, collapseClause,     orderClause,       orderedClause,
-      nowaitClause,    scheduleClause};
+      privateClause,   firstprivateClause, lastprivateClause,     linearClause,
+      reductionClause, collapseClause,     orderClause,           orderedClause,
+      nowaitClause,    scheduleClause,     doacrossVirturalClause};
   SmallVector<int> segments{numIVs, numIVs, numIVs};
   if (failed(parseClauses(parser, result, clauses, segments)))
     return failure();
@@ -1049,8 +1063,11 @@ static void printWsLoopOp(OpAsmPrinter &p, WsLoopOp op) {
   if (op.nowait())
     p << "nowait ";
 
-  if (auto ordered = op.ordered_val())
+  if (auto ordered = op.ordered_val()) {
     p << "ordered(" << ordered << ") ";
+    if (ordered.getValue() > 0)
+      printDataVars(p, op.doacross_vars(), "doacross");
+  }
 
   if (auto order = op.order_val())
     p << "order(" << order << ") ";
@@ -1154,7 +1171,8 @@ void WsLoopOp::build(OpBuilder &builder, OperationState &state,
         /*linear_vars=*/ValueRange(), /*linear_step_vars=*/ValueRange(),
         /*reduction_vars=*/ValueRange(), /*schedule_val=*/nullptr,
         /*schedule_chunk_var=*/nullptr, /*collapse_val=*/nullptr,
-        /*nowait=*/nullptr, /*ordered_val=*/nullptr, /*order_val=*/nullptr,
+        /*nowait=*/nullptr, /*ordered_val=*/nullptr,
+        /*doacross_vars=*/ValueRange(), /*order_val=*/nullptr,
         /*inclusive=*/nullptr, /*buildBody=*/false);
   state.addAttributes(attributes);
 }
@@ -1176,8 +1194,8 @@ void WsLoopOp::build(OpBuilder &builder, OperationState &result,
                      ValueRange linearStepVars, ValueRange reductionVars,
                      StringAttr scheduleVal, Value scheduleChunkVar,
                      IntegerAttr collapseVal, UnitAttr nowait,
-                     IntegerAttr orderedVal, StringAttr orderVal,
-                     UnitAttr inclusive, bool buildBody) {
+                     IntegerAttr orderedVal, ValueRange doacrossVars,
+                     StringAttr orderVal, UnitAttr inclusive, bool buildBody) {
   result.addOperands(lowerBounds);
   result.addOperands(upperBounds);
   result.addOperands(steps);
@@ -1187,6 +1205,7 @@ void WsLoopOp::build(OpBuilder &builder, OperationState &result,
   result.addOperands(linearStepVars);
   if (scheduleChunkVar)
     result.addOperands(scheduleChunkVar);
+  result.addOperands(doacrossVars);
 
   if (scheduleVal)
     result.addAttribute("schedule_val", scheduleVal);
@@ -1212,7 +1231,8 @@ void WsLoopOp::build(OpBuilder &builder, OperationState &result,
            static_cast<int32_t>(linearVars.size()),
            static_cast<int32_t>(linearStepVars.size()),
            static_cast<int32_t>(reductionVars.size()),
-           static_cast<int32_t>(scheduleChunkVar != nullptr ? 1 : 0)}));
+           static_cast<int32_t>(scheduleChunkVar != nullptr ? 1 : 0),
+           static_cast<int32_t>(doacrossVars.size())}));
 
   Region *bodyRegion = result.addRegion();
   if (buildBody) {

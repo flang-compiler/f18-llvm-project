@@ -677,9 +677,9 @@ convertOmpWsLoop(Operation &opInst, llvm::IRBuilderBase &builder,
       return failure();
   }
 
-  // Collapse loops. Store the insertion point because LoopInfos may get
+  // Collapse loops. Store the basic block because LoopInfos may get
   // invalidated.
-  llvm::IRBuilderBase::InsertPoint afterIP = loopInfos.front()->getAfterIP();
+  llvm::BasicBlock *afterBB = loopInfos.front()->getAfter();
   llvm::CanonicalLoopInfo *loopInfo =
       ompBuilder->collapseLoops(diLoc, loopInfos, {});
 
@@ -691,9 +691,10 @@ convertOmpWsLoop(Operation &opInst, llvm::IRBuilderBase &builder,
     isSimd = (modifier == omp::ScheduleModifier::simd);
   }
 
-  // TODO: Emit kmpc_doacross_init call before kmpc_for_static_init call or
-  // kmpc_dispatch_init call with the argument of orderedVal when orderedVal is
-  // greater than 0.
+  // Store the BBs since loopInfo get invalidated after apply*WorkshareLoop.
+  llvm::BasicBlock *preHeaderBB = loopInfo->getPreheader();
+  llvm::BasicBlock *exitBB = loopInfo->getExit();
+
   std::int64_t orderedVal =
       loop.ordered_val().hasValue() ? loop.ordered_val().getValue() : -1;
   if (schedule == omp::ClauseScheduleKind::Static && orderedVal != 0) {
@@ -770,16 +771,24 @@ convertOmpWsLoop(Operation &opInst, llvm::IRBuilderBase &builder,
             schedType == llvm::omp::OMPScheduleType::OrderedStaticChunked))
         schedType |= llvm::omp::OMPScheduleType::ModifierNonmonotonic;
     }
-    afterIP = ompBuilder->applyDynamicWorkshareLoop(
-        ompLoc.DL, loopInfo, allocaIP, schedType, !loop.nowait(), chunk,
-        /*ordered*/ orderedVal == 0);
+    ompBuilder->applyDynamicWorkshareLoop(ompLoc.DL, loopInfo, allocaIP,
+                                          schedType, !loop.nowait(), chunk,
+                                          /*ordered*/ orderedVal == 0);
+  }
+
+  if (orderedVal > 0) {
+    SmallVector<llvm::Value *> doacrossVars =
+        moduleTranslation.lookupValues(loop.doacross_vars());
+    ompBuilder->applyDoacrossLoop(ompLoc.DL, allocaIP, preHeaderBB, exitBB,
+                                  orderedVal, doacrossVars);
   }
 
   // Continue building IR after the loop. Note that the LoopInfo returned by
   // `collapseLoops` points inside the outermost loop and is intended for
-  // potential further loop transformations. Use the insertion point stored
-  // before collapsing loops instead.
-  builder.restoreIP(afterIP);
+  // potential further loop transformations. Use the after basic block stored
+  // before collapsing loops instead and insert the created instructions
+  // appended to the after basic block.
+  builder.SetInsertPoint(afterBB, afterBB->end());
 
   // Process the reductions if required.
   if (numReductions == 0)

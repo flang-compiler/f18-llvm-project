@@ -114,10 +114,10 @@ extern "C" void workshareloop_rangefor(float *a, float *b, float *c) {
 // CHECK-NEXT:    br label [[OMP_LOOP_HEADER]]
 // CHECK:       omp_loop.exit:
 // CHECK-NEXT:    call void @__kmpc_for_static_fini(%struct.ident_t* @[[GLOB1]], i32 [[OMP_GLOBAL_THREAD_NUM]])
-// CHECK-NEXT:    [[OMP_GLOBAL_THREAD_NUM6:%.*]] = call i32 @__kmpc_global_thread_num(%struct.ident_t* @[[GLOB1]])
-// CHECK-NEXT:    call void @__kmpc_barrier(%struct.ident_t* @[[GLOB2:[0-9]+]], i32 [[OMP_GLOBAL_THREAD_NUM6]])
 // CHECK-NEXT:    br label [[OMP_LOOP_AFTER:%.*]]
 // CHECK:       omp_loop.after:
+// CHECK-NEXT:    [[OMP_GLOBAL_THREAD_NUM6:%.*]] = call i32 @__kmpc_global_thread_num(%struct.ident_t* @[[GLOB1]])
+// CHECK-NEXT:    call void @__kmpc_barrier(%struct.ident_t* @[[GLOB2:[0-9]+]], i32 [[OMP_GLOBAL_THREAD_NUM6]])
 // CHECK-NEXT:    ret void
 //
 //

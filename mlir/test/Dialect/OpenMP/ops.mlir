@@ -147,52 +147,51 @@ func @omp_parallel_pretty(%data_var : memref<i32>, %if_cond : i1, %num_threads :
 }
 
 // CHECK-LABEL: omp_wsloop
-func @omp_wsloop(%lb : index, %ub : index, %step : index, %data_var : memref<i32>, %linear_var : i32, %chunk_var : i32) -> () {
+func @omp_wsloop(%lb : index, %ub : index, %step : index, %data_var : memref<i32>, %linear_var : i32, %chunk_var : i32, %doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64, %doacross_var4 : i64, %doacross_var5 : i64, %doacross_var6 : i64) -> () {
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>, %{{.*}} : memref<i32>) collapse(2) ordered(1)
-  "omp.wsloop" (%lb, %ub, %step, %data_var, %data_var) ({
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>, %{{.*}} : memref<i32>) collapse(2) ordered(1) doacross(%{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64)
+  "omp.wsloop" (%lb, %ub, %step, %data_var, %data_var, %doacross_var1, %doacross_var2, %doacross_var3) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,2,0,0,0,0,0,0]> : vector<10xi32>, collapse_val = 2, ordered_val = 1} :
-    (index, index, index, memref<i32>, memref<i32>) -> ()
+  }) {operand_segment_sizes = dense<[1,1,1,2,0,0,0,0,0,0,3]> : vector<11xi32>, collapse_val = 2, ordered_val = 1} :
+    (index, index, index, memref<i32>, memref<i32>, i64, i64, i64) -> ()
 
   // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(static)
   "omp.wsloop" (%lb, %ub, %step, %data_var, %linear_var) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,0,0,0,1,1,0,0]> : vector<10xi32>, schedule_val = "Static"} :
+  }) {operand_segment_sizes = dense<[1,1,1,0,0,0,1,1,0,0,0]> : vector<11xi32>, schedule_val = "Static"} :
     (index, index, index, memref<i32>, i32) -> ()
 
   // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) linear(%{{.*}} = %{{.*}} : memref<i32>, %{{.*}} = %{{.*}} : memref<i32>) schedule(static)
   "omp.wsloop" (%lb, %ub, %step, %data_var, %data_var, %linear_var, %linear_var) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,0,0,0,2,2,0,0]> : vector<10xi32>, schedule_val = "Static"} :
+  }) {operand_segment_sizes = dense<[1,1,1,0,0,0,2,2,0,0,0]> : vector<11xi32>, schedule_val = "Static"} :
     (index, index, index, memref<i32>, memref<i32>, i32, i32) -> ()
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}) collapse(3) ordered(2)
-  "omp.wsloop" (%lb, %ub, %step, %data_var, %data_var, %data_var, %data_var, %linear_var, %chunk_var) ({
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}) collapse(3) ordered(2) doacross(%{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64)
+  "omp.wsloop" (%lb, %ub, %step, %data_var, %data_var, %data_var, %data_var, %linear_var, %chunk_var, %doacross_var1, %doacross_var2, %doacross_var3, %doacross_var4, %doacross_var5, %doacross_var6) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,1,1,1,1,1,0,1]> : vector<10xi32>, schedule_val = "Dynamic", collapse_val = 3, ordered_val = 2} :
-    (index, index, index, memref<i32>, memref<i32>, memref<i32>, memref<i32>, i32, i32) -> ()
+  }) {operand_segment_sizes = dense<[1,1,1,1,1,1,1,1,0,1,6]> : vector<11xi32>, schedule_val = "Dynamic", collapse_val = 3, ordered_val = 2} :
+    (index, index, index, memref<i32>, memref<i32>, memref<i32>, memref<i32>, i32, i32, i64, i64, i64, i64, i64, i64) -> ()
 
   // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) schedule(auto) nowait
   "omp.wsloop" (%lb, %ub, %step, %data_var) ({
     ^bb0(%iv: index):
       omp.yield
-  }) {operand_segment_sizes = dense<[1,1,1,1,0,0,0,0,0,0]> : vector<10xi32>, nowait, schedule_val = "Auto"} :
+  }) {operand_segment_sizes = dense<[1,1,1,1,0,0,0,0,0,0,0]> : vector<11xi32>, nowait, schedule_val = "Auto"} :
     (index, index, index, memref<i32>) -> ()
 
   return
 }
 
 // CHECK-LABEL: omp_wsloop_pretty
-func @omp_wsloop_pretty(%lb : index, %ub : index, %step : index,
-                 %data_var : memref<i32>, %linear_var : i32, %chunk_var : i32) -> () {
+func @omp_wsloop_pretty(%lb : index, %ub : index, %step : index, %data_var : memref<i32>, %linear_var : i32, %chunk_var : i32, %doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64, %doacross_var4 : i64, %doacross_var5 : i64, %doacross_var6 : i64) -> () {
 
   // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>) collapse(2) ordered(2) {
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>) collapse(2) {
     omp.yield
   }
 
@@ -201,36 +200,36 @@ func @omp_wsloop_pretty(%lb : index, %ub : index, %step : index,
     omp.yield
   }
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(static = %{{.*}}) collapse(3) ordered(2)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) private(%data_var : memref<i32>)
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(static = %{{.*}}) collapse(3) ordered(2) doacross(%{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64, %{{.*}} : i64)
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) doacross(%doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64, %doacross_var4 : i64, %doacross_var5 : i64, %doacross_var6 : i64) private(%data_var : memref<i32>)
      firstprivate(%data_var : memref<i32>) lastprivate(%data_var : memref<i32>) linear(%data_var = %linear_var : memref<i32>)
      schedule(static = %chunk_var) collapse(3) {
     omp.yield
   }
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, nonmonotonic) collapse(3) ordered(2)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) private(%data_var : memref<i32>)
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, nonmonotonic) collapse(3)
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>)
      firstprivate(%data_var : memref<i32>) lastprivate(%data_var : memref<i32>) linear(%data_var = %linear_var : memref<i32>)
      schedule(dynamic = %chunk_var, nonmonotonic) collapse(3) {
     omp.yield
   }
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, monotonic) collapse(3) ordered(2)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) private(%data_var : memref<i32>)
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, monotonic) collapse(3)
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>)
      firstprivate(%data_var : memref<i32>) lastprivate(%data_var : memref<i32>) linear(%data_var = %linear_var : memref<i32>)
      schedule(dynamic = %chunk_var, monotonic) collapse(3) {
     omp.yield
   }
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, nonmonotonic) collapse(3) ordered(2)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) private(%data_var : memref<i32>)
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, nonmonotonic) collapse(3)
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>)
      firstprivate(%data_var : memref<i32>) lastprivate(%data_var : memref<i32>) linear(%data_var = %linear_var : memref<i32>)
      schedule(dynamic = %chunk_var, nonmonotonic) collapse(3) {
     omp.yield
   }
 
-  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, monotonic) collapse(3) ordered(2)
-  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) ordered(2) private(%data_var : memref<i32>)
+  // CHECK: omp.wsloop (%{{.*}}) : index = (%{{.*}}) to (%{{.*}}) step (%{{.*}}) private(%{{.*}} : memref<i32>) firstprivate(%{{.*}} : memref<i32>) lastprivate(%{{.*}} : memref<i32>) linear(%{{.*}} = %{{.*}} : memref<i32>) schedule(dynamic = %{{.*}}, monotonic) collapse(3)
+  omp.wsloop (%iv) : index = (%lb) to (%ub) step (%step) private(%data_var : memref<i32>)
      firstprivate(%data_var : memref<i32>) lastprivate(%data_var : memref<i32>) linear(%data_var = %linear_var : memref<i32>)
      schedule(dynamic = %chunk_var, monotonic) collapse(3) {
     omp.yield
@@ -464,8 +463,7 @@ func @omp_critical() -> () {
   return
 }
 
-func @omp_ordered(%arg1 : i32, %arg2 : i32, %arg3 : i32,
-    %vec0 : i64, %vec1 : i64, %vec2 : i64, %vec3 : i64) -> () {
+func @omp_ordered(%arg1 : i32, %arg2 : i32, %arg3 : i32, %vec0 : i64, %vec1 : i64, %vec2 : i64, %vec3 : i64, %doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64, %doacross_var4 : i64, %doacross_var5 : i64, %doacross_var6 : i64) -> () {
   // CHECK: omp.ordered_region
   omp.ordered_region {
     // CHECK: omp.terminator
@@ -479,7 +477,7 @@ func @omp_ordered(%arg1 : i32, %arg2 : i32, %arg3 : i32,
     omp.yield
   }
 
-  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) {
+  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) doacross(%doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64) {
     // Only one DEPEND(SINK: vec) clause
     // CHECK: omp.ordered depend_type("dependsink") depend_vec(%{{.*}} : i64) {num_loops_val = 1 : i64}
     omp.ordered depend_type("dependsink") depend_vec(%vec0 : i64) {num_loops_val = 1 : i64}
@@ -490,7 +488,7 @@ func @omp_ordered(%arg1 : i32, %arg2 : i32, %arg3 : i32,
     omp.yield
   }
 
-  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(2) {
+  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(2) doacross(%doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64, %doacross_var4 : i64, %doacross_var5 : i64, %doacross_var6 : i64) {
     // Multiple DEPEND(SINK: vec) clauses
     // CHECK: omp.ordered depend_type("dependsink") depend_vec(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}} : i64, i64, i64, i64) {num_loops_val = 2 : i64}
     omp.ordered depend_type("dependsink") depend_vec(%vec0, %vec1, %vec2, %vec3 : i64, i64, i64, i64) {num_loops_val = 2 : i64}

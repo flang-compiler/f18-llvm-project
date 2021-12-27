@@ -514,7 +514,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
   mlir::Location currentLocation = converter.getCurrentLocation();
   SmallVector<Value, 4> lowerBound, upperBound, step, privateClauseOperands,
       firstPrivateClauseOperands, lastPrivateClauseOperands, linearVars,
-      linearStepVars, reductionVars;
+      linearStepVars, reductionVars, doacrossVars;
   mlir::Value scheduleChunkClauseOperand;
   mlir::Attribute scheduleClauseOperand, collapseClauseOperand,
       noWaitClauseOperand, orderedClauseOperand, orderClauseOperand;
@@ -618,7 +618,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
       scheduleChunkClauseOperand,
       collapseClauseOperand.dyn_cast_or_null<IntegerAttr>(),
       noWaitClauseOperand.dyn_cast_or_null<UnitAttr>(),
-      orderedClauseOperand.dyn_cast_or_null<IntegerAttr>(),
+      orderedClauseOperand.dyn_cast_or_null<IntegerAttr>(), doacrossVars,
       orderClauseOperand.dyn_cast_or_null<StringAttr>(),
       firOpBuilder.getUnitAttr() /* Inclusive stop */, false /* buildBody */);
 

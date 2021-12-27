@@ -1550,16 +1550,16 @@ OpenMPIRBuilder::applyStaticWorkshareLoop(DebugLoc DL, CanonicalLoopInfo *CLI,
                          CLI->getExit()->getTerminator()->getIterator());
   Builder.CreateCall(StaticFini, {SrcLoc, ThreadNum});
 
+  Builder.restoreIP(CLI->getAfterIP());
   // Add the barrier if requested.
   if (NeedsBarrier)
     createBarrier(LocationDescription(Builder.saveIP(), DL),
                   omp::Directive::OMPD_for, /* ForceSimpleCall */ false,
                   /* CheckCancelFlag */ false);
 
-  InsertPointTy AfterIP = CLI->getAfterIP();
   CLI->invalidate();
 
-  return AfterIP;
+  return Builder.saveIP();
 }
 
 OpenMPIRBuilder::InsertPointTy
@@ -1723,16 +1723,79 @@ OpenMPIRBuilder::InsertPointTy OpenMPIRBuilder::applyDynamicWorkshareLoop(
     Builder.CreateCall(DynamicFini, {SrcLoc, ThreadNum});
   }
 
+  Builder.restoreIP(AfterIP);
   // Add the barrier if requested.
-  if (NeedsBarrier) {
-    Builder.SetInsertPoint(&Exit->back());
+  if (NeedsBarrier)
     createBarrier(LocationDescription(Builder.saveIP(), DL),
                   omp::Directive::OMPD_for, /* ForceSimpleCall */ false,
                   /* CheckCancelFlag */ false);
-  }
 
   CLI->invalidate();
-  return AfterIP;
+  return Builder.saveIP();
+}
+
+void OpenMPIRBuilder::applyDoacrossLoop(DebugLoc DL, InsertPointTy AllocaIP,
+                                        BasicBlock *PreHeaderBB,
+                                        BasicBlock *ExitBB,
+                                        std::int64_t OrderedVal,
+                                        ArrayRef<llvm::Value *> DoacrossVars) {
+  assert(DoacrossVars[0]->getType()->isIntegerTy(64) &&
+         "Doacross init runtime call requires loop bounds info with i64 type");
+  // Set up the source location value for OpenMP runtime.
+  Builder.SetInsertPoint(&PreHeaderBB->front());
+  Builder.SetCurrentDebugLocation(DL);
+
+  Constant *SrcLocStr = getOrCreateSrcLocStr(DL);
+  Value *SrcLoc = getOrCreateIdent(SrcLocStr);
+
+  // Allocate space for loop bounds and generate alloc instruction.
+  SmallVector<Type *, 3> ElementsTys;
+  ElementsTys.emplace_back(Int64); // lower
+  ElementsTys.emplace_back(Int64); // upper
+  ElementsTys.emplace_back(Int64); // stride(step)
+  auto *KmpDimTy = StructType::create(ElementsTys, "kmp_dim");
+  auto *DimsTy = ArrayType::get(KmpDimTy, OrderedVal);
+
+  Builder.restoreIP(AllocaIP);
+  AllocaInst *DimsInst = Builder.CreateAlloca(DimsTy, nullptr, "dims");
+  DimsInst->setAlignment(Align(8));
+
+  // Emit doacross init call in preheader front.
+  Builder.SetInsertPoint(&PreHeaderBB->front());
+
+  // Store doacross loop vars in loop bounds.
+  for (std::int64_t I = 0; I < OrderedVal; I++) {
+    Value *LoopBounds = Builder.CreateInBoundsGEP(
+        DimsTy, DimsInst, {Builder.getInt64(0), Builder.getInt64(I)});
+    Value *LowerBound = Builder.CreateInBoundsGEP(
+        KmpDimTy, LoopBounds, {Builder.getInt32(0), Builder.getInt32(0)});
+    StoreInst *LBInst = Builder.CreateStore(DoacrossVars[I * 3], LowerBound);
+    LBInst->setAlignment(Align(8));
+    Value *UpperBound = Builder.CreateInBoundsGEP(
+        KmpDimTy, LoopBounds, {Builder.getInt32(0), Builder.getInt32(1)});
+    StoreInst *UBInst =
+        Builder.CreateStore(DoacrossVars[I * 3 + 1], UpperBound);
+    UBInst->setAlignment(Align(8));
+    Value *Step = Builder.CreateInBoundsGEP(
+        KmpDimTy, LoopBounds, {Builder.getInt32(0), Builder.getInt32(2)});
+    StoreInst *StepInst = Builder.CreateStore(DoacrossVars[I * 3 + 2], Step);
+    StepInst->setAlignment(Align(8));
+  }
+
+  Value *LoopBoundsBase = Builder.CreateInBoundsGEP(
+      DimsTy, DimsInst, {Builder.getInt64(0), Builder.getInt64(0)});
+  Value *LoopBoundsBaseInt8Ptr = Builder.CreateBitCast(LoopBoundsBase, Int8Ptr);
+
+  Value *ThreadId = getOrCreateThreadID(SrcLoc);
+  Function *RTLFnInit =
+      getOrCreateRuntimeFunctionPtr(OMPRTL___kmpc_doacross_init);
+  Builder.CreateCall(RTLFnInit, {SrcLoc, ThreadId, Builder.getInt32(OrderedVal),
+                                 LoopBoundsBaseInt8Ptr});
+
+  Builder.SetInsertPoint(&ExitBB->back());
+  Function *RTLFnFini =
+      getOrCreateRuntimeFunctionPtr(OMPRTL___kmpc_doacross_fini);
+  Builder.CreateCall(RTLFnFini, {SrcLoc, ThreadId});
 }
 
 /// Make \p Source branch to \p Target.

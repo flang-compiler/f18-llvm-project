@@ -410,6 +410,25 @@ public:
                                           Value *Chunk = nullptr,
                                           bool Ordered = false);
 
+  /// Insert doacross loop info in a workshare loop.
+  ///
+  /// In \p AllocaIP, allocate space for the loop bounds info. In the front of
+  /// \p PreHeaderBB, store \p DoacrossVars in the loop bounds info and call
+  /// doacross loop init runtime function. Call the fini doacross loop runtime
+  /// function in \p ExitBB.
+  ///
+  /// \param DL           Debug location for instructions.
+  /// \param AllocaIP     An insertion point for Alloca instructions.
+  /// \param PreHeaderBB  The preheader basic block of the loop.
+  /// \param ExitBB       The exit basic block of the loop.
+  /// \param OrderedVal   The ordered parameter (n) specified in ordered clause.
+  /// \param DoacrossVars The lower bounds, upper bounds, and steps of n outer
+  ///                     loops.
+  void applyDoacrossLoop(DebugLoc DL, InsertPointTy AllocaIP,
+                         BasicBlock *PreHeaderBB, BasicBlock *ExitBB,
+                         std::int64_t OrderedVal,
+                         ArrayRef<llvm::Value *> DoacrossVars);
+
   /// Modifies the canonical loop to be a workshare loop.
   ///
   /// This takes a \p LoopInfo representing a canonical loop, such as the one

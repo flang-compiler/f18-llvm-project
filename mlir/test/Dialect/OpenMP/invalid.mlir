@@ -120,7 +120,7 @@ func @order_not_allowed() {
 
 func @ordered_not_allowed() {
   // expected-error@+1 {{ordered is not a valid clause for the omp.parallel operation}}
-  omp.parallel ordered(2) {}
+  omp.parallel ordered(0) {}
 }
 
 // -----
@@ -448,8 +448,8 @@ omp.critical.declare @mutex hint(invalid_hint)
 
 // -----
 
-func @omp_ordered1(%arg1 : i32, %arg2 : i32, %arg3 : i32) -> () {
-  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) {
+func @omp_ordered1(%arg1 : i32, %arg2 : i32, %arg3 : i32, %doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64) -> () {
+  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) doacross(%doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64) {
     // expected-error @below {{ordered region must be closely nested inside a worksharing-loop region with an ordered clause without parameter present}}
     omp.ordered_region {
       omp.terminator
@@ -493,8 +493,8 @@ func @omp_ordered4(%arg1 : i32, %arg2 : i32, %arg3 : i32, %vec0 : i64) -> () {
 }
 // -----
 
-func @omp_ordered5(%arg1 : i32, %arg2 : i32, %arg3 : i32, %vec0 : i64, %vec1 : i64) -> () {
-  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) {
+func @omp_ordered5(%arg1 : i32, %arg2 : i32, %arg3 : i32, %vec0 : i64, %vec1 : i64, %doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64) -> () {
+  omp.wsloop (%0) : i32 = (%arg1) to (%arg2) step (%arg3) ordered(1) doacross(%doacross_var1 : i64, %doacross_var2 : i64, %doacross_var3 : i64) {
     // expected-error @below {{number of variables in depend clause does not match number of iteration variables in the doacross loop}}
     omp.ordered depend_type("dependsource") depend_vec(%vec0, %vec1 : i64, i64) {num_loops_val = 2 : i64}
 
@@ -753,7 +753,7 @@ func @omp_sections() {
 
 func @omp_sections() {
   // expected-error @below {{ordered is not a valid clause for the omp.sections operation}}
-  omp.sections ordered(2) {
+  omp.sections ordered(0) {
     omp.terminator
   }
   return

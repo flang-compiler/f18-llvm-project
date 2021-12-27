@@ -153,10 +153,10 @@ program wsloop_collapse
 ! LLVMIR:         br i1 %[[VAL_68]], label %[[VAL_69:.*]], label %[[VAL_70:.*]], !dbg !26
 ! LLVMIR:       omp_collapsed.exit:                               ; preds = %[[VAL_67]]
 ! LLVMIR:         call void @__kmpc_for_static_fini(%[[VAL_58]]* @3, i32 %[[VAL_57]]), !dbg !26
-! LLVMIR:         %[[VAL_71:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58]]* @3), !dbg !26
-! LLVMIR:         call void @__kmpc_barrier(%[[VAL_58]]* @4, i32 %[[VAL_71]]), !dbg !26
 ! LLVMIR:         br label %[[VAL_72:.*]], !dbg !26
 ! LLVMIR:       omp_collapsed.after:                              ; preds = %[[VAL_70]]
+! LLVMIR:         %[[VAL_71:.*]] = call i32 @__kmpc_global_thread_num(%[[VAL_58]]* @3), !dbg !26
+! LLVMIR:         call void @__kmpc_barrier(%[[VAL_58]]* @4, i32 %[[VAL_71]]), !dbg !26
 ! LLVMIR:         br label %[[VAL_73:.*]], !dbg !26
 ! LLVMIR:       omp_loop.after:                                   ; preds = %[[VAL_72]]
 ! LLVMIR:       omp.par.pre_finalize:                             ; preds = %[[VAL_73]]

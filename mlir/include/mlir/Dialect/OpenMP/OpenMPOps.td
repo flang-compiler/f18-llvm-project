@@ -274,6 +274,10 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
     with the worksharing-loop construct. The value of zero refers to the ordered
     clause specified without parameter.
 
+    The `doacross_vars` are arguments of doacross loop nest, which is formed by
+    "n" outer loops when the parameter "n" is in ordered clause. The arguments
+    store the loop bounds info, which is required in doacorss init runtime call.
+
     The optional `order` attribute specifies which order the iterations of the
     associate loops are executed in. Currently the only option for this
     attribute is "concurrent".
@@ -296,6 +300,7 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
              Confined<OptionalAttr<I64Attr>, [IntMinValue<0>]>:$collapse_val,
              UnitAttr:$nowait,
              Confined<OptionalAttr<I64Attr>, [IntMinValue<0>]>:$ordered_val,
+             Variadic<IntLikeType>:$doacross_vars,
              OptionalAttr<OrderKind>:$order_val,
              UnitAttr:$inclusive);
 
@@ -312,8 +317,9 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
                "ValueRange":$linear_step_vars, "ValueRange":$reduction_vars,
                "StringAttr":$schedule_val, "Value":$schedule_chunk_var,
                "IntegerAttr":$collapse_val, "UnitAttr":$nowait,
-               "IntegerAttr":$ordered_val, "StringAttr":$order_val,
-               "UnitAttr":$inclusive, CArg<"bool", "true">:$buildBody)>,
+               "IntegerAttr":$ordered_val, "ValueRange":$doacross_vars,
+               "StringAttr":$order_val, "UnitAttr":$inclusive,
+               CArg<"bool", "true">:$buildBody)>,
     OpBuilder<(ins "TypeRange":$resultTypes, "ValueRange":$operands,
                CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
   ];

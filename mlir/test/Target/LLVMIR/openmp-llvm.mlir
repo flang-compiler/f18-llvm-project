@@ -379,7 +379,7 @@ llvm.func @wsloop_simple(%arg0: !llvm.ptr<f32>) {
       llvm.store %3, %4 : !llvm.ptr<f32>
       omp.yield
       // CHECK: call void @__kmpc_for_static_fini(%struct.ident_t* @[[$wsloop_loc_struct]],
-    }) {operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0]> : vector<10xi32>} : (i64, i64, i64) -> ()
+    }) {operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]> : vector<11xi32>} : (i64, i64, i64) -> ()
     omp.terminator
   }
   llvm.return
@@ -397,7 +397,7 @@ llvm.func @wsloop_inclusive_1(%arg0: !llvm.ptr<f32>) {
     %4 = llvm.getelementptr %arg0[%arg1] : (!llvm.ptr<f32>, i64) -> !llvm.ptr<f32>
     llvm.store %3, %4 : !llvm.ptr<f32>
     omp.yield
-  }) {operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0]> : vector<10xi32>} : (i64, i64, i64) -> ()
+  }) {operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]> : vector<11xi32>} : (i64, i64, i64) -> ()
   llvm.return
 }
 
@@ -413,7 +413,7 @@ llvm.func @wsloop_inclusive_2(%arg0: !llvm.ptr<f32>) {
     %4 = llvm.getelementptr %arg0[%arg1] : (!llvm.ptr<f32>, i64) -> !llvm.ptr<f32>
     llvm.store %3, %4 : !llvm.ptr<f32>
     omp.yield
-  }) {inclusive, operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0]> : vector<10xi32>} : (i64, i64, i64) -> ()
+  }) {inclusive, operand_segment_sizes = dense<[1, 1, 1, 0, 0, 0, 0, 0, 0, 0, 0]> : vector<11xi32>} : (i64, i64, i64) -> ()
   llvm.return
 }
 
@@ -718,9 +718,103 @@ llvm.func @collapse_wsloop(
 
 // -----
 
-// CHECK-LABEL: @omp_ordered
-llvm.func @omp_ordered(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
-    %arg4: i64, %arg5: i64, %arg6: i64) -> () {
+// Check that the loop bounds are emitted in the correct location in case of
+// collapse for dynamic schedule. This only checks the overall shape of the IR,
+// detailed checking is done by the OpenMPIRBuilder.
+
+// CHECK-LABEL: @collapse_wsloop_dynamic
+// CHECK: i32* noalias %[[TIDADDR:[0-9A-Za-z.]*]]
+// CHECK: load i32, i32* %[[TIDADDR]]
+// CHECK: store
+// CHECK: load
+// CHECK: %[[LB0:.*]] = load i32
+// CHECK: %[[UB0:.*]] = load i32
+// CHECK: %[[STEP0:.*]] = load i32
+// CHECK: %[[LB1:.*]] = load i32
+// CHECK: %[[UB1:.*]] = load i32
+// CHECK: %[[STEP1:.*]] = load i32
+// CHECK: %[[LB2:.*]] = load i32
+// CHECK: %[[UB2:.*]] = load i32
+// CHECK: %[[STEP2:.*]] = load i32
+
+llvm.func @collapse_wsloop_dynamic(
+    %0: i32, %1: i32, %2: i32,
+    %3: i32, %4: i32, %5: i32,
+    %6: i32, %7: i32, %8: i32,
+    %20: !llvm.ptr<i32>) {
+  omp.parallel {
+    // CHECK: icmp slt i32 %[[LB0]], 0
+    // CHECK-COUNT-4: select
+    // CHECK: %[[TRIPCOUNT0:.*]] = select
+    // CHECK: br label %[[PREHEADER:.*]]
+    //
+    // CHECK: [[PREHEADER]]:
+    // CHECK: icmp slt i32 %[[LB1]], 0
+    // CHECK-COUNT-4: select
+    // CHECK: %[[TRIPCOUNT1:.*]] = select
+    // CHECK: icmp slt i32 %[[LB2]], 0
+    // CHECK-COUNT-4: select
+    // CHECK: %[[TRIPCOUNT2:.*]] = select
+    // CHECK: %[[PROD:.*]] = mul nuw i32 %[[TRIPCOUNT0]], %[[TRIPCOUNT1]]
+    // CHECK: %[[TOTAL:.*]] = mul nuw i32 %[[PROD]], %[[TRIPCOUNT2]]
+    // CHECK: br label %[[COLLAPSED_PREHEADER:.*]]
+    //
+    // CHECK: [[COLLAPSED_PREHEADER]]:
+    // CHECK: store i32 1, i32*
+    // CHECK: store i32 %[[TOTAL]], i32*
+    // CHECK: call void @__kmpc_dispatch_init_4u
+    omp.wsloop (%arg0, %arg1, %arg2) : i32 = (%0, %1, %2) to (%3, %4, %5) step (%6, %7, %8) collapse(3) schedule(dynamic) {
+      %31 = llvm.load %20 : !llvm.ptr<i32>
+      %32 = llvm.add %31, %arg0 : i32
+      %33 = llvm.add %32, %arg1 : i32
+      %34 = llvm.add %33, %arg2 : i32
+      llvm.store %34, %20 : !llvm.ptr<i32>
+      omp.yield
+    }
+    omp.terminator
+  }
+  llvm.return
+}
+
+// -----
+
+// CHECK-LABEL: @omp_ordered_clause_para
+llvm.func @omp_ordered_clause_para(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
+    %arg4: i64, %arg5: i64, %arg6: i64, %arg7 : i64, %arg8 : i64) -> () {
+  // CHECK: [[DIMS:%.*]] = alloca [2 x [[KMPDIM:%.*]]], align 8
+  omp.wsloop (%arg) : i32 = (%arg0) to (%arg1) step (%arg2) ordered(2) doacross(%arg3 : i64, %arg4 : i64, %arg5 : i64, %arg6 : i64, %arg7 : i64, %arg8 : i64) {
+    // CHECK: omp_loop.preheader:
+    // CHECK: [[ADDR0:%.*]] = getelementptr inbounds [2 x [[KMPDIM]]], [2 x [[KMPDIM]]]* [[DIMS]], i64 0, i64 0
+    // CHECK: [[LB0:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR0]], i32 0, i32 0
+    // CHECK: store i64 [[ARG3:%.*]], i64* [[LB0]], align 8
+    // CHECK: [[UB0:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR0]], i32 0, i32 1
+    // CHECK: store i64 [[ARG4:%.*]], i64* [[UB0]], align 8
+    // CHECK: [[STEP0:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR0]], i32 0, i32 2
+    // CHECK: store i64 [[ARG5:%.*]], i64* [[STEP0]], align 8
+    // CHECK: [[ADDR1:%.*]] = getelementptr inbounds [2 x [[KMPDIM]]], [2 x [[KMPDIM]]]* [[DIMS]], i64 0, i64 1
+    // CHECK: [[LB1:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR1]], i32 0, i32 0
+    // CHECK: store i64 [[ARG6:%.*]], i64* [[LB1:%.*]], align 8
+    // CHECK: [[UB1:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR1]], i32 0, i32 1
+    // CHECK: store i64 [[ARG7:%.*]], i64* [[UB1:%.*]], align 8
+    // CHECK: [[STEP1:%.*]] = getelementptr inbounds [[KMPDIM]], [[KMPDIM]]* [[ADDR1]], i32 0, i32 2
+    // CHECK: store i64 [[ARG8:%.*]], i64* [[STEP1:%.*]], align 8
+    // CHECK: [[BASE:%.*]] = getelementptr inbounds [2 x [[KMPDIM]]], [2 x [[KMPDIM]]]* %dims, i64 0, i64 0
+    // CHECK: [[BASEI8:%.*]] = bitcast [[KMPDIM]]* [[BASE]] to i8*
+    // CHECK: [[OMP_THREAD:%.*]] = call i32 @__kmpc_global_thread_num(%struct.ident_t* @[[GLOB1:[0-9]+]])
+    // CHECK: call void @__kmpc_doacross_init(%struct.ident_t* @[[GLOB1]], i32 [[OMP_THREAD]], i32 2, i8* [[BASEI8]])
+    // CHECK: omp_loop.exit:
+    // CHECK: call void @__kmpc_doacross_fini(%struct.ident_t* @[[GLOB1]], i32 [[OMP_THREAD]])
+    omp.yield
+  }
+
+  llvm.return
+}
+// -----
+
+// CHECK-LABEL: @omp_ordered_construct
+llvm.func @omp_ordered_construct(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
+    %arg4: i64, %arg5: i64, %arg6: i64, %arg8 : i64, %arg9 : i64, %arg10 : i64,
+    %arg11 : i64, %arg12 : i64, %arg13 : i64) -> () {
   // CHECK: [[ADDR9:%.*]] = alloca [2 x i64], align 8
   // CHECK: [[ADDR7:%.*]] = alloca [2 x i64], align 8
   // CHECK: [[ADDR5:%.*]] = alloca [2 x i64], align 8
@@ -744,7 +838,7 @@ llvm.func @omp_ordered(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
     omp.yield
   }
 
-  omp.wsloop (%arg7) : i32 = (%arg0) to (%arg1) step (%arg2) ordered(1) {
+  omp.wsloop (%arg7) : i32 = (%arg0) to (%arg1) step (%arg2) ordered(1) doacross(%arg8 : i64, %arg9 : i64, %arg10 : i64) {
     // CHECK: [[TMP:%.*]] = getelementptr inbounds [1 x i64], [1 x i64]* [[ADDR]], i64 0, i64 0
     // CHECK: store i64 [[ARG0:%.*]], i64* [[TMP]], align 4
     // CHECK: [[TMP2:%.*]] = getelementptr inbounds [1 x i64], [1 x i64]* [[ADDR]], i64 0, i64 0
@@ -762,7 +856,7 @@ llvm.func @omp_ordered(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
     omp.yield
   }
 
-  omp.wsloop (%arg7) : i32 = (%arg0) to (%arg1) step (%arg2) ordered(2) {
+  omp.wsloop (%arg7) : i32 = (%arg0) to (%arg1) step (%arg2) ordered(2) doacross(%arg8 : i64, %arg9 : i64, %arg10 : i64, %arg11 : i64, %arg12 : i64, %arg13 : i64) {
     // CHECK: [[TMP5:%.*]] = getelementptr inbounds [2 x i64], [2 x i64]* [[ADDR5]], i64 0, i64 0
     // CHECK: store i64 [[ARG0]], i64* [[TMP5]], align 4
     // CHECK: [[TMP6:%.*]] = getelementptr inbounds [2 x i64], [2 x i64]* [[ADDR5]], i64 0, i64 1
