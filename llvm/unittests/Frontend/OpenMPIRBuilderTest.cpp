@@ -1883,11 +1883,13 @@ TEST_P(OpenMPIRBuilderTestWithParams, DynamicWorkShareLoop) {
   InsertPointTy AfterIP = CLI->getAfterIP();
   BasicBlock *Preheader = CLI->getPreheader();
   BasicBlock *ExitBlock = CLI->getExit();
+  BasicBlock *LatchBlock = CLI->getLatch();
   Value *IV = CLI->getIndVar();
 
   InsertPointTy EndIP =
       OMPBuilder.applyDynamicWorkshareLoop(DL, CLI, AllocaIP, SchedType,
-                                           /*NeedsBarrier=*/true, ChunkVal);
+                                           /*NeedsBarrier=*/true, ChunkVal,
+                                           /*Ordered*/ false);
   // The returned value should be the "after" point.
   ASSERT_EQ(EndIP.getBlock(), AfterIP.getBlock());
   ASSERT_EQ(EndIP.getPoint(), AfterIP.getPoint());
@@ -1940,6 +1942,10 @@ TEST_P(OpenMPIRBuilderTestWithParams, DynamicWorkShareLoop) {
   EXPECT_EQ(OrigUpperBound->getValue(), 21);
   EXPECT_EQ(OrigStride->getValue(), 1);
 
+  CallInst *FiniCall = dyn_cast<CallInst>(
+      &*(LatchBlock->getTerminator()->getPrevNonDebugInstruction(true)));
+  EXPECT_EQ(FiniCall, nullptr);
+
   // The original loop iterator should only be used in the condition, in the
   // increment and in the statement that adds the lower bound to it.
   EXPECT_EQ(std::distance(IV->use_begin(), IV->use_end()), 3);
@@ -1974,6 +1980,119 @@ INSTANTIATE_TEST_SUITE_P(
                           omp::OMPScheduleType::ModifierMonotonic,
                       omp::OMPScheduleType::Runtime |
                           omp::OMPScheduleType::ModifierMonotonic));
+
+TEST_F(OpenMPIRBuilderTest, DynamicWorkShareLoopOrdered) {
+  using InsertPointTy = OpenMPIRBuilder::InsertPointTy;
+  OpenMPIRBuilder OMPBuilder(*M);
+  OMPBuilder.initialize();
+  IRBuilder<> Builder(BB);
+  OpenMPIRBuilder::LocationDescription Loc({Builder.saveIP(), DL});
+
+  omp::OMPScheduleType SchedType = omp::OMPScheduleType::OrderedStaticChunked;
+  uint32_t ChunkSize = 1;
+  Type *LCTy = Type::getInt32Ty(Ctx);
+  Value *StartVal = ConstantInt::get(LCTy, 10);
+  Value *StopVal = ConstantInt::get(LCTy, 52);
+  Value *StepVal = ConstantInt::get(LCTy, 2);
+  Value *ChunkVal = ConstantInt::get(LCTy, ChunkSize);
+  auto LoopBodyGen = [&](InsertPointTy, llvm::Value *) {};
+
+  CanonicalLoopInfo *CLI = OMPBuilder.createCanonicalLoop(
+      Loc, LoopBodyGen, StartVal, StopVal, StepVal,
+      /*IsSigned=*/false, /*InclusiveStop=*/false);
+
+  Builder.SetInsertPoint(BB, BB->getFirstInsertionPt());
+  InsertPointTy AllocaIP = Builder.saveIP();
+
+  // Collect all the info from CLI, as it isn't usable after the call to
+  // createDynamicWorkshareLoop.
+  InsertPointTy AfterIP = CLI->getAfterIP();
+  BasicBlock *Preheader = CLI->getPreheader();
+  BasicBlock *ExitBlock = CLI->getExit();
+  BasicBlock *LatchBlock = CLI->getLatch();
+  Value *IV = CLI->getIndVar();
+
+  InsertPointTy EndIP =
+      OMPBuilder.applyDynamicWorkshareLoop(DL, CLI, AllocaIP, SchedType,
+                                           /*NeedsBarrier=*/true, ChunkVal,
+                                           /*Ordered*/ true);
+  // The returned value should be the "after" point.
+  ASSERT_EQ(EndIP.getBlock(), AfterIP.getBlock());
+  ASSERT_EQ(EndIP.getPoint(), AfterIP.getPoint());
+
+  auto AllocaIter = BB->begin();
+  ASSERT_GE(std::distance(BB->begin(), BB->end()), 4);
+  AllocaInst *PLastIter = dyn_cast<AllocaInst>(&*(AllocaIter++));
+  AllocaInst *PLowerBound = dyn_cast<AllocaInst>(&*(AllocaIter++));
+  AllocaInst *PUpperBound = dyn_cast<AllocaInst>(&*(AllocaIter++));
+  AllocaInst *PStride = dyn_cast<AllocaInst>(&*(AllocaIter++));
+  EXPECT_NE(PLastIter, nullptr);
+  EXPECT_NE(PLowerBound, nullptr);
+  EXPECT_NE(PUpperBound, nullptr);
+  EXPECT_NE(PStride, nullptr);
+
+  auto PreheaderIter = Preheader->begin();
+  ASSERT_GE(std::distance(Preheader->begin(), Preheader->end()), 6);
+  StoreInst *LowerBoundStore = dyn_cast<StoreInst>(&*(PreheaderIter++));
+  StoreInst *UpperBoundStore = dyn_cast<StoreInst>(&*(PreheaderIter++));
+  StoreInst *StrideStore = dyn_cast<StoreInst>(&*(PreheaderIter++));
+  ASSERT_NE(LowerBoundStore, nullptr);
+  ASSERT_NE(UpperBoundStore, nullptr);
+  ASSERT_NE(StrideStore, nullptr);
+
+  CallInst *ThreadIdCall = dyn_cast<CallInst>(&*(PreheaderIter++));
+  ASSERT_NE(ThreadIdCall, nullptr);
+  EXPECT_EQ(ThreadIdCall->getCalledFunction()->getName(),
+            "__kmpc_global_thread_num");
+
+  CallInst *InitCall = dyn_cast<CallInst>(&*PreheaderIter);
+
+  ASSERT_NE(InitCall, nullptr);
+  EXPECT_EQ(InitCall->getCalledFunction()->getName(),
+            "__kmpc_dispatch_init_4u");
+  EXPECT_EQ(InitCall->arg_size(), 7U);
+  EXPECT_EQ(InitCall->getArgOperand(6), ConstantInt::get(LCTy, ChunkSize));
+  ConstantInt *SchedVal = cast<ConstantInt>(InitCall->getArgOperand(2));
+  EXPECT_EQ(SchedVal->getValue(), static_cast<uint64_t>(SchedType));
+
+  ConstantInt *OrigLowerBound =
+      dyn_cast<ConstantInt>(LowerBoundStore->getValueOperand());
+  ConstantInt *OrigUpperBound =
+      dyn_cast<ConstantInt>(UpperBoundStore->getValueOperand());
+  ConstantInt *OrigStride =
+      dyn_cast<ConstantInt>(StrideStore->getValueOperand());
+  ASSERT_NE(OrigLowerBound, nullptr);
+  ASSERT_NE(OrigUpperBound, nullptr);
+  ASSERT_NE(OrigStride, nullptr);
+  EXPECT_EQ(OrigLowerBound->getValue(), 1);
+  EXPECT_EQ(OrigUpperBound->getValue(), 21);
+  EXPECT_EQ(OrigStride->getValue(), 1);
+
+  CallInst *FiniCall = dyn_cast<CallInst>(
+      &*(LatchBlock->getTerminator()->getPrevNonDebugInstruction(true)));
+  ASSERT_NE(FiniCall, nullptr);
+  EXPECT_EQ(FiniCall->getCalledFunction()->getName(),
+            "__kmpc_dispatch_fini_4u");
+  EXPECT_EQ(FiniCall->arg_size(), 2U);
+  EXPECT_EQ(InitCall->getArgOperand(0), FiniCall->getArgOperand(0));
+  EXPECT_EQ(InitCall->getArgOperand(1), FiniCall->getArgOperand(1));
+
+  // The original loop iterator should only be used in the condition, in the
+  // increment and in the statement that adds the lower bound to it.
+  EXPECT_EQ(std::distance(IV->use_begin(), IV->use_end()), 3);
+
+  // The exit block should contain the barrier call, plus the call to obtain
+  // the thread ID.
+  size_t NumCallsInExitBlock =
+      count_if(*ExitBlock, [](Instruction &I) { return isa<CallInst>(I); });
+  EXPECT_EQ(NumCallsInExitBlock, 2u);
+
+  // Add a termination to our block and check that it is internally consistent.
+  Builder.restoreIP(EndIP);
+  Builder.CreateRetVoid();
+  OMPBuilder.finalize();
+  EXPECT_FALSE(verifyModule(*M, &errs()));
+}
 
 TEST_F(OpenMPIRBuilderTest, MasterDirective) {
   using InsertPointTy = OpenMPIRBuilder::InsertPointTy;

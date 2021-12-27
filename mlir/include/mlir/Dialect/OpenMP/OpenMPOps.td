@@ -218,9 +218,9 @@ def SectionsOp : OpenMP_Op<"sections", [AttrSizedOperandSegments]> {
 
 def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
                          AllTypesMatch<["lowerBound", "upperBound", "step"]>]> {
-  let summary = "workshare loop construct";
+  let summary = "worksharing-loop construct";
   let description = [{
-    The workshare loop construct specifies that the iterations of the loop(s)
+    The worksharing-loop construct specifies that the iterations of the loop(s)
     will be executed in parallel by threads in the current context. These
     iterations are spread across threads that already exist in the enclosing
     parallel region. The lower and upper bounds specify a half-open range: the
@@ -271,7 +271,8 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
     implicit barrier at the end of the loop.
 
     The optional `ordered_val` attribute specifies how many loops are associated
-    with the do loop construct.
+    with the worksharing-loop construct. The value of zero refers to the ordered
+    clause specified without parameter.
 
     The optional `order` attribute specifies which order the iterations of the
     associate loops are executed in. Currently the only option for this
