@@ -528,27 +528,39 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
         converter, eval,
         std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t));
   }
+
+  std::int64_t collapseValue = 1;
+  std::int64_t orderedValue = 0;
   for (const Fortran::parser::OmpClause &clause : wsLoopOpClauseList.v) {
+    Fortran::lower::StatementContext stmtCtx;
     if (const auto &lastPrivateClause =
             std::get_if<Fortran::parser::OmpClause::Lastprivate>(&clause.u)) {
       const Fortran::parser::OmpObjectList &ompObjectList =
           lastPrivateClause->v;
       genObjectList(ompObjectList, converter, lastPrivateClauseOperands);
-    }
-  }
-
-  for (const Fortran::parser::OmpClause &clause : wsLoopOpClauseList.v) {
-    if (const auto &scheduleClause =
-            std::get_if<Fortran::parser::OmpClause::Schedule>(&clause.u)) {
+    } else if (const auto &scheduleClause =
+                   std::get_if<Fortran::parser::OmpClause::Schedule>(
+                       &clause.u)) {
       if (const auto &chunkExpr =
               std::get<std::optional<Fortran::parser::ScalarIntExpr>>(
                   scheduleClause->v.t)) {
         if (const auto *expr = Fortran::semantics::GetExpr(*chunkExpr)) {
-          Fortran::lower::StatementContext stmtCtx;
           scheduleChunkClauseOperand =
               fir::getBase(converter.genExprValue(*expr, stmtCtx));
         }
       }
+    } else if (const auto &orderedClause =
+                   std::get_if<Fortran::parser::OmpClause::Ordered>(
+                       &clause.u)) {
+      if (orderedClause->v.has_value()) {
+        const auto *expr = Fortran::semantics::GetExpr(orderedClause->v);
+        orderedValue = Fortran::evaluate::ToInt64(*expr).value();
+      }
+    } else if (const auto &collapseClause =
+                   std::get_if<Fortran::parser::OmpClause::Collapse>(
+                       &clause.u)) {
+      const auto *expr = Fortran::semantics::GetExpr(collapseClause->v);
+      collapseValue = Fortran::evaluate::ToInt64(*expr).value();
     }
   }
 
@@ -556,8 +568,6 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
   Fortran::lower::pft::Evaluation *doConstructEval =
       &eval.getFirstNestedEvaluation();
 
-  std::int64_t collapseValue =
-      Fortran::lower::getCollapseValue(wsLoopOpClauseList);
   std::size_t loopVarTypeSize = 0;
   SmallVector<const Fortran::semantics::Symbol *> iv;
   do {
@@ -578,13 +588,13 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
       if (bounds->step) {
         step.push_back(fir::getBase(converter.genExprValue(
             *Fortran::semantics::GetExpr(bounds->step), stmtCtx)));
-      }
-      // If `step` is not present, assume it as `1`.
-      else {
+      } else {
+        // If `step` is not present, assume it as `1`.
         step.push_back(firOpBuilder.createIntegerConstant(
             currentLocation, firOpBuilder.getIntegerType(32), 1));
       }
-      iv.push_back(bounds->name.thing.symbol);
+      if (collapseValue > 0)
+        iv.push_back(bounds->name.thing.symbol);
       loopVarTypeSize = std::max(
           loopVarTypeSize, bounds->name.thing.symbol->GetUltimate().size());
     }
@@ -605,6 +615,41 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     step[it] =
         firOpBuilder.createConvert(currentLocation, loopVarType, step[it]);
   }
+
+  doConstructEval = &eval.getFirstNestedEvaluation();
+  while (orderedValue > 0) {
+    Fortran::lower::pft::Evaluation *doLoop =
+        &doConstructEval->getFirstNestedEvaluation();
+    auto *doStmt = doLoop->getIf<Fortran::parser::NonLabelDoStmt>();
+    assert(doStmt && "Expected do loop to be in the nested evaluation");
+    const auto &loopControl =
+        std::get<std::optional<Fortran::parser::LoopControl>>(doStmt->t);
+    const Fortran::parser::LoopControl::Bounds *bounds =
+        std::get_if<Fortran::parser::LoopControl::Bounds>(&loopControl->u);
+    if (bounds) {
+      Fortran::lower::StatementContext stmtCtx;
+      doacrossVars.push_back(fir::getBase(converter.genExprValue(
+          *Fortran::semantics::GetExpr(bounds->lower), stmtCtx)));
+      doacrossVars.push_back(fir::getBase(converter.genExprValue(
+          *Fortran::semantics::GetExpr(bounds->upper), stmtCtx)));
+      if (bounds->step) {
+        doacrossVars.push_back(fir::getBase(converter.genExprValue(
+            *Fortran::semantics::GetExpr(bounds->step), stmtCtx)));
+      } else {
+        // If `step` is not present, assume it as `1`.
+        doacrossVars.push_back(firOpBuilder.createIntegerConstant(
+            currentLocation, firOpBuilder.getIntegerType(64), 1));
+      }
+    }
+
+    orderedValue--;
+    doConstructEval =
+        &*std::next(doConstructEval->getNestedEvaluations().begin());
+  }
+  // The doacross init runtime call requires loop bounds info of i64 type.
+  for (unsigned it = 0; it < (unsigned)doacrossVars.size(); it++)
+    doacrossVars[it] = firOpBuilder.createConvert(
+        currentLocation, firOpBuilder.getI64Type(), doacrossVars[it]);
 
   // FIXME: Add support for following clauses:
   // 1. linear
@@ -627,17 +672,19 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     if (const auto &collapseClause =
             std::get_if<Fortran::parser::OmpClause::Collapse>(&clause.u)) {
       const auto *expr = Fortran::semantics::GetExpr(collapseClause->v);
-      const std::optional<std::int64_t> collapseValue =
+      const std::optional<std::int64_t> collapseClauseValue =
           Fortran::evaluate::ToInt64(*expr);
-      wsLoopOp.collapse_valAttr(firOpBuilder.getI64IntegerAttr(*collapseValue));
+      wsLoopOp.collapse_valAttr(
+          firOpBuilder.getI64IntegerAttr(*collapseClauseValue));
     } else if (const auto &orderedClause =
                    std::get_if<Fortran::parser::OmpClause::Ordered>(
                        &clause.u)) {
       if (orderedClause->v.has_value()) {
         const auto *expr = Fortran::semantics::GetExpr(orderedClause->v);
-        const std::optional<std::int64_t> orderedValue =
+        const std::optional<std::int64_t> orderedClauseValue =
             Fortran::evaluate::ToInt64(*expr);
-        wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(*orderedValue));
+        wsLoopOp.ordered_valAttr(
+            firOpBuilder.getI64IntegerAttr(*orderedClauseValue));
       } else {
         wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(0));
       }
