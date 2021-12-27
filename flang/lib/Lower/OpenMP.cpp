@@ -207,6 +207,187 @@ static void createBodyOfOp(
     privatizeVars(converter, *clauses);
 }
 
+static std::int64_t
+collectDependSourceOperands(Fortran::lower::AbstractConverter &converter,
+                            Fortran::lower::pft::Evaluation &eval,
+                            llvm::SmallVectorImpl<mlir::Value> &operands) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  auto currentLocation = converter.getCurrentLocation();
+  // The number of associated loops in the doacross loop nest.
+  std::int64_t orderedLevel = 0;
+
+  auto evalIter = eval.parentConstruct;
+  while (evalIter) {
+    if ((*evalIter).isDirective()) {
+      const auto ompConstruct =
+          (*evalIter).getIf<Fortran::parser::OpenMPConstruct>();
+      if (const auto &loopConstruct{
+              std::get_if<Fortran::parser::OpenMPLoopConstruct>(
+                  &ompConstruct->u)}) {
+        const auto &loopClauseList = std::get<Fortran::parser::OmpClauseList>(
+            std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct->t)
+                .t);
+        // Get the value of the parameter specified in the ORDERED clause in the
+        // worksharing-loop directive.
+        for (const auto &clause : loopClauseList.v) {
+          if (const auto &orderedClause{
+                  std::get_if<Fortran::parser::OmpClause::Ordered>(
+                      &clause.u)}) {
+            orderedLevel = *Fortran::evaluate::ToInt64(
+                Fortran::semantics::GetExpr(orderedClause->v));
+            break;
+          }
+        }
+        if (orderedLevel > 0) {
+          // Get the loop iterators in the doacross loop nest and create the
+          // indexes of the loop iterators to form the depend clause operands.
+          const auto &doConstruct =
+              std::get<std::optional<Fortran::parser::DoConstruct>>(
+                  loopConstruct->t);
+          const Fortran::parser::DoConstruct *loop{&*doConstruct};
+          for (std::int64_t level = 0; level < orderedLevel; level++) {
+            const auto &name = std::get<Fortran::parser::LoopControl::Bounds>(
+                                   loop->GetLoopControl()->u)
+                                   .name.thing;
+            auto varSym = converter.getSymbolAddress(*name.symbol);
+            // The type of the outermost loop iterator is "iN" such as "i32" and
+            // the type of other loop iterators is "fir.ref<iN>".
+            mlir::Value varI64;
+            if (level == 0) {
+              varI64 = firOpBuilder.createConvert(
+                  currentLocation, firOpBuilder.getI64Type(), varSym);
+            } else {
+              auto varOriTy =
+                  firOpBuilder.create<fir::LoadOp>(currentLocation, varSym);
+              varI64 = firOpBuilder.createConvert(
+                  currentLocation, firOpBuilder.getI64Type(), varOriTy);
+            }
+            operands.push_back(varI64);
+            const auto &doBlock = std::get<Fortran::parser::Block>(loop->t);
+            const auto it{doBlock.begin()};
+            assert(it != doBlock.end() && "Empty block in DO construct");
+            loop = Fortran::parser::Unwrap<Fortran::parser::DoConstruct>(*it);
+          }
+          break;
+        }
+      }
+    }
+    evalIter = (*evalIter).parentConstruct;
+  }
+  return orderedLevel;
+}
+
+static std::int64_t collectDependSinkOperands(
+    Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::pft::Evaluation &eval,
+    const Fortran::parser::OmpDependClause::Sink *sinkVectors,
+    llvm::SmallVectorImpl<mlir::Value> &operands) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  auto currentLocation = converter.getCurrentLocation();
+  Fortran::lower::StatementContext stmtCtx;
+  std::int64_t orderedLevel{0};
+
+  // For DEPEND(SINK: vec) clause, there is no necessary to iterate the
+  // doacross loop nest since "vec" contains the loop iteration variables.
+  for (const auto &sinkVec : sinkVectors->v) {
+    mlir::Value sinkOperand;
+    // The name corresponds to the loop iterator and create its index.
+    const auto &name = std::get<Fortran::parser::Name>(sinkVec.t);
+    auto varSym = converter.getSymbolAddress(*name.symbol);
+    mlir::Value varI64;
+    if (orderedLevel == 0) {
+      varI64 = firOpBuilder.createConvert(currentLocation,
+                                          firOpBuilder.getI64Type(), varSym);
+    } else {
+      auto varOriTy = firOpBuilder.create<fir::LoadOp>(currentLocation, varSym);
+      varI64 = firOpBuilder.createConvert(currentLocation,
+                                          firOpBuilder.getI64Type(), varOriTy);
+    }
+    // Analyze the "vec" in DEPEND(SINK: vec) if the offset exists such as
+    // depend(sink: j - 1), where "j" is the "name" and "1" is the scalar
+    // integer constant expression.
+    const auto &sinkVecLength =
+        std::get<std::optional<Fortran::parser::OmpDependSinkVecLength>>(
+            sinkVec.t);
+    if (sinkVecLength) {
+      const auto &definedOperator =
+          std::get<Fortran::parser::DefinedOperator>((*sinkVecLength).t);
+      const auto &intrinsicOperator =
+          std::get_if<Fortran::parser::DefinedOperator::IntrinsicOperator>(
+              &definedOperator.u);
+      const auto &expr =
+          std::get<Fortran::parser::ScalarIntConstantExpr>((*sinkVecLength).t);
+      auto offI32 = fir::getBase(
+          converter.genExprValue(*Fortran::semantics::GetExpr(expr), stmtCtx));
+      auto offI64 = firOpBuilder.createConvert(
+          currentLocation, firOpBuilder.getI64Type(), offI32);
+      if (*intrinsicOperator ==
+          Fortran::parser::DefinedOperator::IntrinsicOperator::Subtract) {
+        sinkOperand = firOpBuilder.create<mlir::arith::SubIOp>(currentLocation,
+                                                               varI64, offI64);
+      } else {
+        assert(*intrinsicOperator ==
+                   Fortran::parser::DefinedOperator::IntrinsicOperator::Add &&
+               "Operator must be Add or Subtract");
+        sinkOperand = firOpBuilder.create<mlir::arith::AddIOp>(currentLocation,
+                                                               varI64, offI64);
+      }
+    } else {
+      sinkOperand = varI64;
+    }
+    operands.push_back(sinkOperand);
+    orderedLevel++;
+  }
+  return orderedLevel;
+}
+
+static void createOrderedStandaloneOp(
+    Fortran::lower::AbstractConverter &converter,
+    Fortran::lower::pft::Evaluation &eval,
+    const Fortran::parser::OpenMPSimpleStandaloneConstruct &c) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  auto currentLocation = converter.getCurrentLocation();
+  mlir::Attribute dependTypeOperand, numLoops;
+  llvm::SmallVector<mlir::Value> dependOperands;
+  bool orderedDependSource = false;
+  std::int64_t orderedLevel = 0;
+
+  // Collect ordered depend operands. For DEPEND(SOURCE) clause, the operands
+  // are loop vars of the doacross loop nest, which is formed by n outer loops
+  // when the ordered clause is specified with parameter n in wsloop construct.
+  // For DEPEND(SINK: vec) clause, the operands are values of a list of
+  // expressions in depend vectors(vec).
+  const auto &clauses = std::get<Fortran::parser::OmpClauseList>(c.t);
+  for (const auto &clause : clauses.v) {
+    const auto &dependClause =
+        std::get_if<Fortran::parser::OmpClause::Depend>(&clause.u);
+    if (std::get_if<Fortran::parser::OmpDependClause::Source>(
+            &dependClause->v.u)) {
+      // Only one DEPEND(SOURCE) is allowed in ORDERED directive.
+      orderedDependSource = true;
+      orderedLevel =
+          collectDependSourceOperands(converter, eval, dependOperands);
+    } else if (const auto *sinkVectors{
+                   std::get_if<Fortran::parser::OmpDependClause::Sink>(
+                       &dependClause->v.u)}) {
+      // Multiple DEPEND(SINK: vec) may exist.
+      orderedLevel = collectDependSinkOperands(converter, eval, sinkVectors,
+                                               dependOperands);
+    }
+  }
+  // Create and insert the operation.
+  auto orderedOp = firOpBuilder.create<mlir::omp::OrderedOp>(
+      currentLocation, dependTypeOperand.dyn_cast_or_null<StringAttr>(),
+      numLoops.dyn_cast_or_null<IntegerAttr>(), dependOperands);
+  if (orderedDependSource)
+    orderedOp.depend_type_valAttr(firOpBuilder.getStringAttr(
+        omp::stringifyClauseDepend(omp::ClauseDepend::dependsource)));
+  else
+    orderedOp.depend_type_valAttr(firOpBuilder.getStringAttr(
+        omp::stringifyClauseDepend(omp::ClauseDepend::dependsink)));
+  orderedOp.num_loops_valAttr(firOpBuilder.getI64IntegerAttr(orderedLevel));
+}
+
 static void genOMP(Fortran::lower::AbstractConverter &converter,
                    Fortran::lower::pft::Evaluation &eval,
                    const Fortran::parser::OpenMPSimpleStandaloneConstruct
@@ -236,7 +417,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
   case llvm::omp::Directive::OMPD_target_update:
     TODO(converter.getCurrentLocation(), "OMPD_target_update");
   case llvm::omp::Directive::OMPD_ordered:
-    TODO(converter.getCurrentLocation(), "OMPD_ordered");
+    createOrderedStandaloneOp(converter, eval, simpleStandaloneConstruct);
   }
 }
 
