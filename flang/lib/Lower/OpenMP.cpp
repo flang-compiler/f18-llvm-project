@@ -633,10 +633,14 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     } else if (const auto &orderedClause =
                    std::get_if<Fortran::parser::OmpClause::Ordered>(
                        &clause.u)) {
-      const auto *expr = Fortran::semantics::GetExpr(orderedClause->v);
-      const std::optional<std::int64_t> orderedValue =
-          Fortran::evaluate::ToInt64(*expr);
-      wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(*orderedValue));
+      if (orderedClause->v.has_value()) {
+        const auto *expr = Fortran::semantics::GetExpr(orderedClause->v);
+        const std::optional<std::int64_t> orderedValue =
+            Fortran::evaluate::ToInt64(*expr);
+        wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(*orderedValue));
+      } else {
+        wsLoopOp.ordered_valAttr(firOpBuilder.getI64IntegerAttr(0));
+      }
     } else if (const auto &scheduleClause =
                    std::get_if<Fortran::parser::OmpClause::Schedule>(
                        &clause.u)) {
