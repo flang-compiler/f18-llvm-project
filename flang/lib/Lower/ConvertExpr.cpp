@@ -1705,14 +1705,20 @@ public:
     return converter.genType(dt.GetDerivedTypeSpec());
   }
 
-  /// Apply the function `func` and return a reference to the resultant value.
-  /// This is required for lowering expressions such as `f1(f2(v))`.
+  /// Lower a function reference
   template <typename A>
-  ExtValue gen(const Fortran::evaluate::FunctionRef<A> &func) {
-    if (!func.GetType().has_value())
-      mlir::emitError(getLoc(), "internal: a function must have a type");
-    mlir::Type resTy = genType(*func.GetType());
-    ExtValue retVal = genProcedureRef(func, {resTy});
+  ExtValue genFunctionRef(const Fortran::evaluate::FunctionRef<A> &funcRef) {
+    if (!funcRef.GetType().has_value())
+      fir::emitFatalError(getLoc(), "internal: a function must have a type");
+    mlir::Type resTy = genType(*funcRef.GetType());
+    return genProcedureRef(funcRef, {resTy});
+  }
+
+  /// Lower function call `funcRef` and return a reference to the resultant
+  /// value. This is required for lowering expressions such as `f1(f2(v))`.
+  template <typename A>
+  ExtValue gen(const Fortran::evaluate::FunctionRef<A> &funcRef) {
+    ExtValue retVal = genFunctionRef(funcRef);
     mlir::Value retValBase = fir::getBase(retVal);
     if (fir::conformsWithPassByRef(retValBase.getType()))
       return retVal;
@@ -2533,12 +2539,9 @@ public:
     return result;
   }
 
-  template <Fortran::common::TypeCategory TC, int KIND>
-  ExtValue
-  genval(const Fortran::evaluate::FunctionRef<Fortran::evaluate::Type<TC, KIND>>
-             &funRef) {
-    mlir::Type retTy = converter.genType(TC, KIND);
-    ExtValue result = genProcedureRef(funRef, {retTy});
+  template <typename A>
+  ExtValue genval(const Fortran::evaluate::FunctionRef<A> &funcRef) {
+    ExtValue result = genFunctionRef(funcRef);
     if (result.rank() == 0 && fir::isa_ref_type(fir::getBase(result).getType()))
       return genLoad(result);
     return result;
@@ -4551,7 +4554,8 @@ private:
         global = builder.createGlobalConstant(
             loc, arrTy, globalName,
             [&](fir::FirOpBuilder &builder) {
-              Fortran::lower::StatementContext stmtCtx(/*cleanupProhibited=*/true);
+              Fortran::lower::StatementContext stmtCtx(
+                  /*cleanupProhibited=*/true);
               fir::ExtendedValue result =
                   Fortran::lower::createSomeInitializerExpression(
                       loc, converter, toEvExpr(x), symMap, stmtCtx);

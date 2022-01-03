@@ -33,3 +33,19 @@ merge_test2 = merge(o1, o2, mask)
 ! CHECK:  %{{.*}} = select %[[a4]], %[[a1]], %[[a2]] : i32
 end
 
+! CHECK-LABEL: merge_test3
+! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<!fir.array<10x!fir.type<_QFmerge_test3Tt{i:i32}>>>, 
+! CHECK-SAME: %[[arg1:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>, 
+! CHECK-SAME: %[[arg2:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>, 
+! CHECK-SAME: %[[arg3:.*]]: !fir.ref<!fir.logical<4>>) {
+subroutine merge_test3(result, o1, o2, mask)
+type t
+  integer :: i
+end type
+type(t) :: result(10), o1, o2
+logical :: mask
+result = merge(o1, o2, mask)
+! CHECK:  %[[mask:.*]] = fir.load %[[arg3]] : !fir.ref<!fir.logical<4>>
+! CHECK:  %[[mask_cast:.*]] = fir.convert %[[mask]] : (!fir.logical<4>) -> i1
+! CHECK:  = select %[[mask_cast]], %[[arg1]], %[[arg2]] : !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>
+end
