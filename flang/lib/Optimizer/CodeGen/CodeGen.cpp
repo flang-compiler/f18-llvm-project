@@ -86,9 +86,6 @@ static constexpr unsigned kAttrAllocatable = CFI_attribute_allocatable;
 // fir::LLVMTypeConverter for converting to LLVM IR dialect types.
 #include "TypeConverter.h"
 
-// Instantiate static data member of the type converter.
-StringMap<mlir::Type> fir::LLVMTypeConverter::identStructCache;
-
 inline mlir::Type getVoidPtrType(mlir::MLIRContext *context) {
   return mlir::LLVM::LLVMPointerType::get(mlir::IntegerType::get(context, 8));
 }
