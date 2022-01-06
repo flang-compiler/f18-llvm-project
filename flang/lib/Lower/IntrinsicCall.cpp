@@ -472,6 +472,7 @@ struct IntrinsicLibrary {
   mlir::Value genFloor(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genFraction(mlir::Type resultType,
                           mlir::ArrayRef<mlir::Value> args);
+  void genGetCommandArgument(mlir::ArrayRef<fir::ExtendedValue> args);
   mlir::Value genIand(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genIbclr(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genIbits(mlir::Type, llvm::ArrayRef<mlir::Value>);
@@ -707,6 +708,10 @@ static constexpr IntrinsicHandler handlers[]{
     {"exponent", &I::genExponent},
     {"floor", &I::genFloor},
     {"fraction", &I::genFraction},
+    {"get_command_argument", &I::genGetCommandArgument,
+    {{{"number", asValue}, {"value", asAddr}, {"length", asAddr},
+      {"status", asAddr}, {"errmsg", asAddr}}},
+     /*isElemental=*/false},
     {"iachar", &I::genIchar},
     {"iand", &I::genIand},
     {"ibclr", &I::genIbclr},
@@ -2282,6 +2287,35 @@ mlir::Value IntrinsicLibrary::genFraction(mlir::Type resultType,
   return builder.createConvert(
       loc, resultType,
       fir::runtime::genFraction(builder, loc, fir::getBase(args[0])));
+}
+
+// GET_COMMAND_ARGUMENT
+void IntrinsicLibrary::genGetCommandArgument(llvm::ArrayRef<fir::ExtendedValue> args) {
+  assert(args.size() == 5);
+
+  // Handle NUMBER argument
+  mlir::Value number = fir::getBase(args[0]);
+  if(!number)
+    fir::emitFatalError(loc, "expected NUMBER parameter");
+
+  // Handle optional VALUE argument
+  llvm::Optional<fir::CharBoxValue> value;
+  if(const fir::CharBoxValue *charBox = args[1].getCharBox())
+    value = *charBox;
+
+  // Handle optional LENGTH argument
+  mlir::Value length = fir::getBase(args[2]);
+
+  // Handle optional STATUS argument
+  mlir::Value status = fir::getBase(args[3]);
+
+  // Handle optional ERRMSG argument
+  llvm::Optional<fir::CharBoxValue> errmsg;
+  if(const fir::CharBoxValue *charBox = args[4].getCharBox())
+    errmsg = *charBox;
+
+  fir::runtime::genGetCommandArgument(builder, loc, number, value,
+                                      length, status, errmsg);
 }
 
 // IAND
