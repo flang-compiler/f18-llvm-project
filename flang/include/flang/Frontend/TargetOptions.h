@@ -16,7 +16,14 @@
 
 namespace Fortran::frontend {
 
-/// Options for controlling the target.
+/// Options for controlling the target. Currently this is just a placeholder.
+/// In the future we will use this for options to specify various target
+/// options that will affect the generated code e.g.:
+///   * CPU to tune the code for
+///   * available CPU/hardware extensions
+///   * target specific features to enable/disable
+///   * options for accelerators (e.g. GPUs)
+///   * (...)
 class TargetOptions {
 public:
   /// The name of the target triple to compile for.
