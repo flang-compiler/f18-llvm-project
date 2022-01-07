@@ -3032,13 +3032,13 @@ IntrinsicLibrary::genSize(mlir::Type resultType,
   // Handle the ARRAY argument
   mlir::Value array = builder.createBox(loc, args[0]);
 
-  // Handle the DIM argument.  Note that the lowering code never sees a call
-  // to SIZE that doesn't have a DIM argument.  If the Fortran source has such
-  // a call, the front end changes it to an expression that consists of the
-  // product of a set of calls to SIZE(ARRAY, DIM) where DIM goes from 1 to N
-  // where N is the rank of an array.  For N == 2, for example, a call to
-  // "SIZE(ARRAY)" gets changed to "SIZE(ARRAY, 1) * SIZE(ARRAY, 2)".
+  // The front-end rewrites SIZE without the DIM argument to
+  // an array of SIZE with DIM in most cases, but it may not be
+  // possible in some cases like when in SIZE(function_call()).
+  if (isAbsent(args, 1))
+    TODO(loc, "lowering of size intrinsic without 'dim' argument");
 
+  // Handle the DIM argument.
   // Convert the Fortran 1-based index to the FIR 0-based index
   mlir::IndexType indexType = builder.getIndexType();
   mlir::Value oneBasedDim =

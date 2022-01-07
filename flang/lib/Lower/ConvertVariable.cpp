@@ -1804,9 +1804,38 @@ void Fortran::lower::mapCallInterfaceSymbols(
       instantiateVariable(converter, var, symMap, storeMap);
     } else {
       const Fortran::semantics::Symbol &sym = var.getSymbol();
-      // Get the argument for the dummy argument symbols of the current call.
-      if (Fortran::semantics::IsDummy(sym) && sym.owner() == result.owner())
+      const auto *hostDetails =
+          sym.detailsIf<Fortran::semantics::HostAssocDetails>();
+      if (hostDetails && !var.isModuleVariable()) {
+        // The callee is an internal procedure `A` whose result properties
+        // depend on host variables. There caller may be the host, or another
+        // internal procedure `B` contained in the same host.  In the first
+        // case, the host symbol is obviously mapped, in the second case, it
+        // must also be mapped because
+        // HostAssociations::internalProcedureBindings that was called when
+        // lowering `B` did map all host symbols of captured variables to the
+        // variable from the tuple argument, whether the host symbol is actually
+        // referred to in `B`. Hence it is possible to simply lookup for the
+        // variable associated to the host symbol without having to go back to
+        // the tuple argument.
+        Fortran::lower::SymbolBox hostValue =
+            symMap.lookupSymbol(hostDetails->symbol());
+        assert(hostValue && "callee host symbol must be mapped on caller side");
+        symMap.addSymbol(sym, hostValue.toExtendedValue());
+        // The SymbolBox associated to the host symbols is complete, skip
+        // instantiateVariable that would try to allocate a new storage.
+        continue;
+      }
+      if (Fortran::semantics::IsDummy(sym) && sym.owner() == result.owner()) {
+        // Get the argument for the dummy argument symbols of the current call.
         symMap.addSymbol(sym, caller.getArgumentValue(sym));
+        // All the properties of the dummy variable may not come from the actual
+        // argument, let instantiateVariable handle this.
+      }
+      // If this is neither a host associated or dummy symbol, it must be a
+      // module or common block variable to satisfy specification expression
+      // requirements in  10.1.11, instantiateVariable will get its address and
+      // properties.
       instantiateVariable(converter, var, symMap, storeMap);
     }
   }
