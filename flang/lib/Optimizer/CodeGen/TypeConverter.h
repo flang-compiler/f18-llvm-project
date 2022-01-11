@@ -170,9 +170,9 @@ public:
       return success();
     }
     llvm::SmallVector<mlir::Type> members;
-    for (auto mem : derived.getTypeList()) {
+    for (auto mem : derived.getTypeList())
       members.push_back(convertType(mem.second).cast<mlir::Type>());
-    }
+
     if (mlir::failed(st.setBody(members, /*isPacked=*/false)))
       return failure();
     results.push_back(st);
