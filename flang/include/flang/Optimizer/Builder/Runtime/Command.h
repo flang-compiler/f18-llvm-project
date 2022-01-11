@@ -17,11 +17,11 @@ class Location;
 namespace fir {
 class FirOpBuilder;
 class CharBoxValue;
-}
+} // namespace fir
 
 namespace llvm {
-    template<typename T>
-    class Optional;
+template <typename T>
+class Optional;
 }
 
 namespace fir::runtime {
@@ -30,9 +30,13 @@ namespace fir::runtime {
 mlir::Value genCommandArgumentCount(fir::FirOpBuilder &, mlir::Location);
 
 /// Generate call to GET_COMMAND_ARGUMENT intrinsic runtime routine.
-void genGetCommandArgument(fir::FirOpBuilder &, mlir::Location, mlir::Value number,
-                           llvm::Optional<fir::CharBoxValue> valueBox, mlir::Value length,
-                           mlir::Value status, llvm::Optional<fir::CharBoxValue> errmsgBox);
+/// Note that GET_COMMAND_ARGUMENT intrinsic is split between 2 functions in
+/// implementation; ArgumentValue and ArgumentLength. So we handle each
+/// seperately.
+void genGetCommandArgument(fir::FirOpBuilder &, mlir::Location,
+                           mlir::Value number, mlir::Value value,
+                           mlir::Value length, mlir::Value status,
+                           mlir::Value errmsg);
 
 } // namespace fir::runtime
 #endif // FORTRAN_OPTIMIZER_BUILDER_RUNTIME_COMMAND_H

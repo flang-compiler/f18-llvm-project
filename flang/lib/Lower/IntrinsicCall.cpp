@@ -708,9 +708,13 @@ static constexpr IntrinsicHandler handlers[]{
     {"exponent", &I::genExponent},
     {"floor", &I::genFloor},
     {"fraction", &I::genFraction},
-    {"get_command_argument", &I::genGetCommandArgument,
-    {{{"number", asValue}, {"value", asAddr}, {"length", asAddr},
-      {"status", asAddr}, {"errmsg", asAddr}}},
+    {"get_command_argument",
+     &I::genGetCommandArgument,
+     {{{"number", asValue},
+       {"value", asAddr},
+       {"length", asAddr},
+       {"status", asAddr},
+       {"errmsg", asAddr}}},
      /*isElemental=*/false},
     {"iachar", &I::genIchar},
     {"iand", &I::genIand},
@@ -2290,18 +2294,33 @@ mlir::Value IntrinsicLibrary::genFraction(mlir::Type resultType,
 }
 
 // GET_COMMAND_ARGUMENT
-void IntrinsicLibrary::genGetCommandArgument(llvm::ArrayRef<fir::ExtendedValue> args) {
+void IntrinsicLibrary::genGetCommandArgument(
+    llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 5);
+
+  auto processCharBox = [&](llvm::Optional<fir::CharBoxValue> arg,
+                            mlir::Value &value) -> void {
+    if (arg.hasValue()) {
+      value = builder.createBox(loc, *arg);
+    } else {
+      value = builder
+                  .create<fir::AbsentOp>(
+                      loc, fir::BoxType::get(builder.getNoneType()))
+                  .getResult();
+    }
+  };
 
   // Handle NUMBER argument
   mlir::Value number = fir::getBase(args[0]);
-  if(!number)
+  if (!number)
     fir::emitFatalError(loc, "expected NUMBER parameter");
 
   // Handle optional VALUE argument
-  llvm::Optional<fir::CharBoxValue> value;
-  if(const fir::CharBoxValue *charBox = args[1].getCharBox())
-    value = *charBox;
+  mlir::Value value;
+  llvm::Optional<fir::CharBoxValue> valBox;
+  if (const fir::CharBoxValue *charBox = args[1].getCharBox())
+    valBox = *charBox;
+  processCharBox(valBox, value);
 
   // Handle optional LENGTH argument
   mlir::Value length = fir::getBase(args[2]);
@@ -2310,12 +2329,14 @@ void IntrinsicLibrary::genGetCommandArgument(llvm::ArrayRef<fir::ExtendedValue> 
   mlir::Value status = fir::getBase(args[3]);
 
   // Handle optional ERRMSG argument
-  llvm::Optional<fir::CharBoxValue> errmsg;
-  if(const fir::CharBoxValue *charBox = args[4].getCharBox())
-    errmsg = *charBox;
+  mlir::Value errmsg;
+  llvm::Optional<fir::CharBoxValue> errmsgBox;
+  if (const fir::CharBoxValue *charBox = args[4].getCharBox())
+    errmsgBox = *charBox;
+  processCharBox(errmsgBox, errmsg);
 
-  fir::runtime::genGetCommandArgument(builder, loc, number, value,
-                                      length, status, errmsg);
+  fir::runtime::genGetCommandArgument(builder, loc, number, value, length,
+                                      status, errmsg);
 }
 
 // IAND
