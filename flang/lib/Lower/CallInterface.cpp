@@ -240,23 +240,27 @@ void Fortran::lower::CallerInterface::walkResultExtents(
   // descriptor inquiries to it that would fail to lower on the caller side).
   const Fortran::semantics::Symbol *interfaceSymbol =
       procRef.proc().GetInterfaceSymbol();
-  assert(interfaceSymbol &&
-         "can only walk result extent of user procedure with interface");
-  const Fortran::semantics::Symbol &result =
-      interfaceSymbol->get<Fortran::semantics::SubprogramDetails>().result();
-  if (const auto *objectDetails =
-          result.detailsIf<Fortran::semantics::ObjectEntityDetails>())
-    if (objectDetails->shape().IsExplicitShape())
-      for (const Fortran::semantics::ShapeSpec &shapeSpec :
-           objectDetails->shape())
-        visitor(Fortran::evaluate::AsGenericExpr(getExtentExpr(shapeSpec)));
+  if (interfaceSymbol) {
+    const Fortran::semantics::Symbol &result =
+        interfaceSymbol->get<Fortran::semantics::SubprogramDetails>().result();
+    if (const auto *objectDetails =
+            result.detailsIf<Fortran::semantics::ObjectEntityDetails>())
+      if (objectDetails->shape().IsExplicitShape())
+        for (const Fortran::semantics::ShapeSpec &shapeSpec :
+             objectDetails->shape())
+          visitor(Fortran::evaluate::AsGenericExpr(getExtentExpr(shapeSpec)));
+  } else {
+    assert(procRef.Rank() == 0 &&
+           "only scalar functions may not have an interface symbol");
+  }
 }
 
 bool Fortran::lower::CallerInterface::mustMapInterfaceSymbols() const {
   assert(characteristic && "characteristic was not computed");
   const std::optional<Fortran::evaluate::characteristics::FunctionResult>
       &result = characteristic->functionResult;
-  if (!result || result->CanBeReturnedViaImplicitInterface())
+  if (!result || result->CanBeReturnedViaImplicitInterface() ||
+      !procRef.proc().GetInterfaceSymbol())
     return false;
   bool allResultSpecExprConstant = true;
   auto visitor = [&](const Fortran::lower::SomeExpr &e) {

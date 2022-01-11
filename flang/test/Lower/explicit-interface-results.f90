@@ -387,3 +387,16 @@ function test_recursion(n) result(res)
     print *, n
   end if
 end function
+
+! Test call to character function for which only the result type is explicit
+!CHECK-LABEL:func @_QPtest_not_entirely_explicit_interface(
+!CHECK-SAME: %[[n_arg:.*]]: !fir.ref<i64>) {
+subroutine test_not_entirely_explicit_interface(n)
+  integer(8) :: n
+  character(n) :: return_dyn_char_2
+  print *, return_dyn_char_2(10)
+  !CHECK: %[[n:.*]] = fir.load %[[n_arg]] : !fir.ref<i64>
+  !CHECK: %[[len:.*]] = fir.convert %[[n]] : (i64) -> index
+  !CHECK: %[[result:.*]] = fir.alloca !fir.char<1,?>(%[[len]] : index) {bindc_name = ".result"}
+  !CHECK: fir.call @_QPreturn_dyn_char_2(%[[result]], %[[len]], %{{.*}}) : (!fir.ref<!fir.char<1,?>>, index, !fir.ref<i32>) -> !fir.boxchar<1>
+end subroutine
