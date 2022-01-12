@@ -165,6 +165,8 @@ public:
                     ArrayRef<mlir::Type> callStack) {
     auto name = derived.getName();
     auto st = mlir::LLVM::LLVMStructType::getIdentified(&getContext(), name);
+    // We are using an O(n) function (llvm::count) since we expect the stack
+    // size to be small.
     if (llvm::count(callStack, derived) > 1) {
       results.push_back(st);
       return success();
