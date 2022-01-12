@@ -32,8 +32,11 @@ bool Fortran::frontend::mustBePreprocessed(llvm::StringRef suffix) {
 }
 
 InputKind FrontendOptions::GetInputKindForExtension(llvm::StringRef extension) {
-  if (isFixedFormSuffix(extension) || isFreeFormSuffix(extension)) {
+  if (isFixedFormSuffix(extension) || isFreeFormSuffix(extension))
     return Language::Fortran;
-  }
+
+  if (extension == "bc" || extension == "ll")
+    return Language::LLVM_IR;
+
   return Language::Unknown;
 }

@@ -8,6 +8,7 @@
 
 #include "flang/Frontend/CompilerInvocation.h"
 #include "flang/Common/Fortran-features.h"
+#include "flang/Frontend/FrontendActions.h"
 #include "flang/Frontend/PreprocessorOptions.h"
 #include "flang/Semantics/semantics.h"
 #include "flang/Version.inc"
@@ -132,6 +133,9 @@ static bool ParseFrontendArgs(FrontendOptions &opts, llvm::opt::ArgList &args,
       break;
     case clang::driver::options::OPT_emit_llvm:
       opts.programAction = EmitLLVM;
+      break;
+    case clang::driver::options::OPT_emit_llvm_bc:
+      opts.programAction = EmitLLVMBitcode;
       break;
     case clang::driver::options::OPT_emit_obj:
       opts.programAction = EmitObj;

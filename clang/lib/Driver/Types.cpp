@@ -256,12 +256,14 @@ bool types::isHIP(ID Id) {
   }
 }
 
-bool types::isFortran(ID Id) {
+bool types::isAcceptedByFlang(ID Id) {
   switch (Id) {
   default:
     return false;
 
   case TY_Fortran: case TY_PP_Fortran:
+    return true;
+  case TY_LLVM_IR: case TY_LLVM_BC:
     return true;
   }
 }
