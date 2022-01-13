@@ -643,12 +643,12 @@ genACC(Fortran::lower::AbstractConverter &converter,
       std::get<Fortran::parser::AccClauseList>(beginCombinedDirective.t);
 
   if (combinedDirective.v == llvm::acc::ACCD_kernels_loop) {
-    TODO(converter.genLocation(),
+    TODO(converter.getCurrentLocation(),
          "OpenACC Kernels Loop construct not lowered yet!");
   } else if (combinedDirective.v == llvm::acc::ACCD_parallel_loop) {
     genACCParallelLoopOps(converter, accClauseList);
   } else if (combinedDirective.v == llvm::acc::ACCD_serial_loop) {
-    TODO(converter.genLocation(),
+    TODO(converter.getCurrentLocation(),
          "OpenACC Serial Loop construct not lowered yet!");
   } else {
     llvm::report_fatal_error(
@@ -930,7 +930,8 @@ genACC(Fortran::lower::AbstractConverter &converter,
   } else if (standaloneDirective.v == llvm::acc::Directive::ACCD_shutdown) {
     genACCInitShutdownOp<mlir::acc::ShutdownOp>(converter, accClauseList);
   } else if (standaloneDirective.v == llvm::acc::Directive::ACCD_set) {
-    TODO(converter.genLocation(), "OpenACC set directive not lowered yet!");
+    TODO(converter.getCurrentLocation(),
+         "OpenACC set directive not lowered yet!");
   } else if (standaloneDirective.v == llvm::acc::Directive::ACCD_update) {
     genACCUpdateOp(converter, accClauseList);
   }
@@ -1025,14 +1026,14 @@ void Fortran::lower::genOpenACCConstruct(
             genACC(converter, eval, standaloneConstruct);
           },
           [&](const Fortran::parser::OpenACCCacheConstruct &cacheConstruct) {
-            TODO(converter.genLocation(),
+            TODO(converter.getCurrentLocation(),
                  "OpenACC Cache construct not lowered yet!");
           },
           [&](const Fortran::parser::OpenACCWaitConstruct &waitConstruct) {
             genACC(converter, eval, waitConstruct);
           },
           [&](const Fortran::parser::OpenACCAtomicConstruct &atomicConstruct) {
-            TODO(converter.genLocation(),
+            TODO(converter.getCurrentLocation(),
                  "OpenACC Atomic construct not lowered yet!");
           },
       },
@@ -1048,12 +1049,12 @@ void Fortran::lower::genOpenACCDeclarativeConstruct(
       common::visitors{
           [&](const Fortran::parser::OpenACCStandaloneDeclarativeConstruct
                   &standaloneDeclarativeConstruct) {
-            TODO(converter.genLocation(),
+            TODO(converter.getCurrentLocation(),
                  "OpenACC Standalone Declarative construct not lowered yet!");
           },
           [&](const Fortran::parser::OpenACCRoutineConstruct
                   &routineConstruct) {
-            TODO(converter.genLocation(),
+            TODO(converter.getCurrentLocation(),
                  "OpenACC Routine construct not lowered yet!");
           },
       },

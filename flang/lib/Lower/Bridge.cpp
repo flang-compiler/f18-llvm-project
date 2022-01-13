@@ -1694,7 +1694,8 @@ private:
     }
   }
 
-  void genFIR(const Fortran::parser::BlockConstruct &) {
+  void genFIR(const Fortran::parser::BlockConstruct &blockConstruct) {
+    setCurrentPosition(Fortran::parser::FindSourceLocation(blockConstruct));
     TODO(toLocation(), "BlockConstruct lowering");
   }
   void genFIR(const Fortran::parser::BlockStmt &) {
@@ -1714,7 +1715,8 @@ private:
     genEndChangeTeamStmt(*this, getEval(), stmt);
   }
 
-  void genFIR(const Fortran::parser::CriticalConstruct &) {
+  void genFIR(const Fortran::parser::CriticalConstruct &criticalConstruct) {
+    setCurrentPosition(Fortran::parser::FindSourceLocation(criticalConstruct));
     TODO(toLocation(), "CriticalConstruct lowering");
   }
   void genFIR(const Fortran::parser::CriticalStmt &) {
@@ -1724,7 +1726,9 @@ private:
     TODO(toLocation(), "EndCriticalStmt lowering");
   }
 
-  void genFIR(const Fortran::parser::SelectRankConstruct &) {
+  void genFIR(const Fortran::parser::SelectRankConstruct &selectRankConstruct) {
+    setCurrentPosition(
+        Fortran::parser::FindSourceLocation(selectRankConstruct));
     TODO(toLocation(), "SelectRankConstruct lowering");
   }
   void genFIR(const Fortran::parser::SelectRankStmt &) {
@@ -1734,7 +1738,9 @@ private:
     TODO(toLocation(), "SelectRankCaseStmt lowering");
   }
 
-  void genFIR(const Fortran::parser::SelectTypeConstruct &) {
+  void genFIR(const Fortran::parser::SelectTypeConstruct &selectTypeConstruct) {
+    setCurrentPosition(
+        Fortran::parser::FindSourceLocation(selectTypeConstruct));
     TODO(toLocation(), "SelectTypeConstruct lowering");
   }
   void genFIR(const Fortran::parser::SelectTypeStmt &) {

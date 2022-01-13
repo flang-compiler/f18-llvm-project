@@ -27,27 +27,27 @@ void Fortran::lower::genChangeTeamConstruct(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::ChangeTeamConstruct &) {
-  TODO(converter.genLocation(), "CHANGE TEAM construct");
+  TODO(converter.getCurrentLocation(), "CHANGE TEAM construct");
 }
 
 void Fortran::lower::genChangeTeamStmt(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::ChangeTeamStmt &) {
-  TODO(converter.genLocation(), "CHANGE TEAM stmt");
+  TODO(converter.getCurrentLocation(), "CHANGE TEAM stmt");
 }
 
 void Fortran::lower::genEndChangeTeamStmt(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &,
     const Fortran::parser::EndChangeTeamStmt &) {
-  TODO(converter.genLocation(), "END CHANGE TEAM");
+  TODO(converter.getCurrentLocation(), "END CHANGE TEAM");
 }
 
 void Fortran::lower::genFormTeamStatement(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &, const Fortran::parser::FormTeamStmt &) {
-  TODO(converter.genLocation(), "FORM TEAM");
+  TODO(converter.getCurrentLocation(), "FORM TEAM");
 }
 
 //===----------------------------------------------------------------------===//
@@ -59,10 +59,10 @@ fir::ExtendedValue Fortran::lower::CoarrayExprHelper::genAddr(
   (void)converter;
   (void)symMap;
   (void)loc;
-  TODO(converter.genLocation(), "co-array address");
+  TODO(converter.getCurrentLocation(), "co-array address");
 }
 
 fir::ExtendedValue Fortran::lower::CoarrayExprHelper::genValue(
     const Fortran::evaluate::CoarrayRef &expr) {
-  TODO(converter.genLocation(), "co-array value");
+  TODO(converter.getCurrentLocation(), "co-array value");
 }

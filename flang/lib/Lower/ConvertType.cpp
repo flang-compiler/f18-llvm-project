@@ -162,7 +162,8 @@ struct TypeBuilder {
       // Use unknown extents.
       int rank = expr.Rank();
       if (rank < 0)
-        TODO(converter.genLocation(), "Assumed rank expression type lowering");
+        TODO(converter.getCurrentLocation(),
+             "Assumed rank expression type lowering");
       for (int dim = 0; dim < rank; ++dim)
         shape.emplace_back(fir::SequenceType::getUnknownExtent());
     }
@@ -326,7 +327,8 @@ struct TypeBuilder {
     if (!ps.empty()) {
       // This type is a PDT (parametric derived type). Create the functions to
       // use for allocation, dereferencing, and address arithmetic here.
-      TODO_NOLOC("PDT");
+      TODO(converter.genLocation(typeSymbol.name()),
+           "parametrized derived types lowering");
     }
     LLVM_DEBUG(llvm::dbgs() << "derived type: " << rec << '\n');
     return rec;
@@ -355,7 +357,8 @@ struct TypeBuilder {
     if (category == Fortran::common::TypeCategory::Character)
       params.push_back(getCharacterLength(exprOrSym));
     else if (category == Fortran::common::TypeCategory::Derived)
-      TODO(converter.genLocation(), "lowering derived type length parameters");
+      TODO(converter.getCurrentLocation(),
+           "lowering derived type length parameters");
     return;
   }
   Fortran::lower::LenParameterTy

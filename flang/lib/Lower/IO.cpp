@@ -1265,17 +1265,17 @@ maybeGetInternalIODescriptor<Fortran::parser::PrintStmt>(
 }
 
 template <typename A>
-static bool isDataTransferAsynchronous(const A &stmt) {
+static bool isDataTransferAsynchronous(mlir::Location loc, const A &stmt) {
   if (auto *asynch =
           getIOControl<Fortran::parser::IoControlSpec::Asynchronous>(stmt)) {
     // FIXME: should contain a string of YES or NO
-    TODO_NOLOC("asynchronous transfers not implemented in runtime");
+    TODO(loc, "asynchronous transfers not implemented in runtime");
   }
   return false;
 }
 template <>
-constexpr bool isDataTransferAsynchronous<Fortran::parser::PrintStmt>(
-    const Fortran::parser::PrintStmt &) {
+bool isDataTransferAsynchronous<Fortran::parser::PrintStmt>(
+    mlir::Location, const Fortran::parser::PrintStmt &) {
   return false;
 }
 
@@ -1741,7 +1741,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
       isInternal ? maybeGetInternalIODescriptor(converter, stmt, stmtCtx)
                  : llvm::None;
   const bool isInternalWithDesc = descRef.hasValue();
-  const bool isAsync = isDataTransferAsynchronous(stmt);
+  const bool isAsync = isDataTransferAsynchronous(loc, stmt);
   const bool isNml = isDataTransferNamelist(stmt);
 
   // Generate the begin data transfer function call.

@@ -91,8 +91,8 @@ mlir::Location Fortran::lower::CallerInterface::getCalleeLocation() const {
   // wrong location (i.e, the caller location).
   if (const Fortran::semantics::Symbol *symbol = proc.GetSymbol())
     return converter.genLocation(symbol->name());
-  // Unknown location for intrinsics.
-  return converter.genLocation();
+  // Use current location for intrinsics.
+  return converter.getCurrentLocation();
 }
 
 // Get dummy argument characteristic for a procedure with implicit interface
@@ -217,7 +217,7 @@ void Fortran::lower::CallerInterface::walkResultLengths(
     const Fortran::semantics::DerivedTypeSpec &derivedTypeSpec =
         dynamicType.GetDerivedTypeSpec();
     if (Fortran::semantics::CountLenParameters(derivedTypeSpec) > 0)
-      TODO(converter.genLocation(),
+      TODO(converter.getCurrentLocation(),
            "function result with derived type length parameters");
   }
 }
@@ -269,7 +269,7 @@ bool Fortran::lower::CallerInterface::mustMapInterfaceSymbols() const {
 
 mlir::Value Fortran::lower::CallerInterface::getArgumentValue(
     const semantics::Symbol &sym) const {
-  mlir::Location loc = converter.genLocation();
+  mlir::Location loc = converter.getCurrentLocation();
   const Fortran::semantics::Symbol *iface = procRef.proc().GetInterfaceSymbol();
   if (!iface)
     fir::emitFatalError(
@@ -292,7 +292,7 @@ mlir::Type Fortran::lower::CallerInterface::getResultStorageType() const {
 
 const Fortran::semantics::Symbol &
 Fortran::lower::CallerInterface::getResultSymbol() const {
-  mlir::Location loc = converter.genLocation();
+  mlir::Location loc = converter.getCurrentLocation();
   const Fortran::semantics::Symbol *iface = procRef.proc().GetInterfaceSymbol();
   if (!iface)
     fir::emitFatalError(
@@ -604,7 +604,7 @@ private:
   void handleImplicitResult(
       const Fortran::evaluate::characteristics::FunctionResult &result) {
     if (result.IsProcedurePointer())
-      TODO(interface.converter.genLocation(),
+      TODO(interface.converter.getCurrentLocation(),
            "procedure pointer result not yet handled");
     const Fortran::evaluate::characteristics::TypeAndShape *typeAndShape =
         result.GetTypeAndShape();
@@ -695,7 +695,7 @@ private:
     // DERIVED
     if (cat == Fortran::common::TypeCategory::Derived) {
       if (dynamicType.IsPolymorphic())
-        TODO(interface.converter.genLocation(),
+        TODO(interface.converter.getCurrentLocation(),
              "[translateDynamicType] polymorphic types");
       return getConverter().genType(dynamicType.GetDerivedTypeSpec());
     }
@@ -715,7 +715,8 @@ private:
     using Attrs = Fortran::evaluate::characteristics::DummyDataObject::Attr;
 
     bool isValueAttr = false;
-    [[maybe_unused]] mlir::Location loc = interface.converter.genLocation();
+    [[maybe_unused]] mlir::Location loc =
+        interface.converter.getCurrentLocation();
     llvm::SmallVector<mlir::NamedAttribute> attrs;
     auto addMLIRAttr = [&](llvm::StringRef attr) {
       attrs.emplace_back(mlir::Identifier::get(attr, &mlirContext),
@@ -795,7 +796,8 @@ private:
       const FortranEntity &entity) {
     if (proc.attrs.test(
             Fortran::evaluate::characteristics::DummyProcedure::Attr::Pointer))
-      llvm_unreachable("TODO: procedure pointer arguments");
+      TODO(interface.converter.getCurrentLocation(),
+           "procedure pointer arguments");
     // Otherwise, it is a dummy procedure
     mlir::Type funcType =
         getDummyProcedureTypeImpl(&proc.procedure.value(), interface.converter);
@@ -809,8 +811,8 @@ private:
     using Attr = Fortran::evaluate::characteristics::FunctionResult::Attr;
 
     if (result.IsProcedurePointer())
-      TODO(interface.converter.genLocation(),
-           "procedure pointer result not yet handled");
+      TODO(interface.converter.getCurrentLocation(),
+           "procedure pointer results");
     const Fortran::evaluate::characteristics::TypeAndShape *typeAndShape =
         result.GetTypeAndShape();
     assert(typeAndShape && "expect type for non proc pointer result");

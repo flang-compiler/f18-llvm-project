@@ -483,7 +483,7 @@ void Fortran::lower::HostAssociations::hostProcedureBindings(
   // Create the tuple variable.
   mlir::TupleType tupTy = unwrapTupleTy(getArgumentType(converter));
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
-  mlir::Location loc = converter.genLocation();
+  mlir::Location loc = converter.getCurrentLocation();
   auto hostTuple = builder.create<fir::AllocaOp>(loc, tupTy);
   mlir::IntegerType offTy = builder.getIntegerType(32);
 
@@ -511,7 +511,7 @@ void Fortran::lower::HostAssociations::internalProcedureBindings(
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   mlir::Type argTy = getArgumentType(converter);
   mlir::TupleType tupTy = unwrapTupleTy(argTy);
-  mlir::Location loc = converter.genLocation();
+  mlir::Location loc = converter.getCurrentLocation();
   mlir::FuncOp func = builder.getFunction();
   mlir::Value tupleArg;
   for (auto [ty, arg] : llvm::reverse(

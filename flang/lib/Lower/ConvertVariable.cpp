@@ -1751,7 +1751,7 @@ void Fortran::lower::defineModuleVariable(
   // for use in another unit.
   mlir::StringAttr externalLinkage;
   if (!var.isGlobal())
-    fir::emitFatalError(converter.genLocation(),
+    fir::emitFatalError(converter.getCurrentLocation(),
                         "attempting to lower module variable as local");
   // Define aggregate storages for equivalenced objects.
   if (var.isAggregateStore()) {
