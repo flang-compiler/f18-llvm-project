@@ -250,8 +250,10 @@ void Fortran::lower::CallerInterface::walkResultExtents(
              objectDetails->shape())
           visitor(Fortran::evaluate::AsGenericExpr(getExtentExpr(shapeSpec)));
   } else {
-    assert(procRef.Rank() == 0 &&
-           "only scalar functions may not have an interface symbol");
+    if (procRef.Rank() != 0)
+      fir::emitFatalError(
+          converter.getCurrentLocation(),
+          "only scalar functions may not have an interface symbol");
   }
 }
 
