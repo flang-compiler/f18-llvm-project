@@ -8,7 +8,7 @@
 ! RUN: %flang -c --target=x86_64-unknown-linux-gnu %s -o %t.o
 ! RUN: llvm-objdump --triple aarch64-unknown-linux-gnu --disassemble-all %t.o | FileCheck %s --check-prefix=INCORRECT_TRIPLE
 
-! REQUIRES: x86-registered-target
+! REQUIRES: x86-registered-target, aarch64-registered-target
 ! UNSUPPORTED: darwin, macos
 
 
