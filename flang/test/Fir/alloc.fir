@@ -41,9 +41,8 @@ func @f5() -> !fir.ref<!fir.ptr<!fir.array<?xi32>>> {
 // CHECK-SAME: i32 %[[l:.*]], i64 %[[e:.*]])
 func @char_array_alloca(%l: i32, %e : index) -> !fir.ref<!fir.array<?x?x!fir.char<1,?>>> {
   // CHECK: %[[lcast:.*]] = sext i32 %[[l]] to i64
-  // CHECK: %[[prod:.*]] = mul i64 %[[lcast]], 1
-  // CHECK: %[[m1:.*]] = mul i64 %[[prod]], %[[e]]
-  // CHECK: %[[size:.*]] = mul i64 %[[m1]], %[[e]]
+  // CHECK: %[[prod:.*]] = mul i64 %[[lcast]], %[[e]]
+  // CHECK: %[[size:.*]] = mul i64 %[[prod]], %[[e]]
   // CHECK: alloca i8, i64 %[[size]]
   %a = fir.alloca !fir.array<?x?x!fir.char<1,?>>(%l : i32), %e, %e
   return %a :  !fir.ref<!fir.array<?x?x!fir.char<1,?>>>
