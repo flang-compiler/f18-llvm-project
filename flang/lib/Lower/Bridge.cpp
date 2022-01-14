@@ -426,7 +426,7 @@ public:
   mlir::Location getCurrentLocation() override final { return toLocation(); }
 
   /// Generate a dummy location.
-  mlir::Location genLocation() override final {
+  mlir::Location genUnknownLocation() override final {
     // Note: builder may not be instantiated yet
     return mlir::UnknownLoc::get(&getMLIRContext());
   }
@@ -445,7 +445,7 @@ public:
                                          filePos.line, filePos.column);
       }
     }
-    return genLocation();
+    return genUnknownLocation();
   }
 
   fir::FirOpBuilder &getFirOpBuilder() override final { return *builder; }
@@ -901,7 +901,7 @@ private:
   ///  - structured and unstructured increment loops
   ///  - structured and unstructured concurrent loops
   void genFIR(const Fortran::parser::DoConstruct &doConstruct) {
-    setCurrentPosition(Fortran::parser::FindSourceLocation(doConstruct));
+    setCurrentPositionAt(doConstruct);
     // Collect loop nest information.
     // Generate begin loop code directly for infinite and while loops.
     Fortran::lower::pft::Evaluation &eval = getEval();
@@ -1695,7 +1695,7 @@ private:
   }
 
   void genFIR(const Fortran::parser::BlockConstruct &blockConstruct) {
-    setCurrentPosition(Fortran::parser::FindSourceLocation(blockConstruct));
+    setCurrentPositionAt(blockConstruct);
     TODO(toLocation(), "BlockConstruct lowering");
   }
   void genFIR(const Fortran::parser::BlockStmt &) {
@@ -1716,7 +1716,7 @@ private:
   }
 
   void genFIR(const Fortran::parser::CriticalConstruct &criticalConstruct) {
-    setCurrentPosition(Fortran::parser::FindSourceLocation(criticalConstruct));
+    setCurrentPositionAt(criticalConstruct);
     TODO(toLocation(), "CriticalConstruct lowering");
   }
   void genFIR(const Fortran::parser::CriticalStmt &) {
@@ -1727,8 +1727,7 @@ private:
   }
 
   void genFIR(const Fortran::parser::SelectRankConstruct &selectRankConstruct) {
-    setCurrentPosition(
-        Fortran::parser::FindSourceLocation(selectRankConstruct));
+    setCurrentPositionAt(selectRankConstruct);
     TODO(toLocation(), "SelectRankConstruct lowering");
   }
   void genFIR(const Fortran::parser::SelectRankStmt &) {
@@ -1739,8 +1738,7 @@ private:
   }
 
   void genFIR(const Fortran::parser::SelectTypeConstruct &selectTypeConstruct) {
-    setCurrentPosition(
-        Fortran::parser::FindSourceLocation(selectTypeConstruct));
+    setCurrentPositionAt(selectTypeConstruct);
     TODO(toLocation(), "SelectTypeConstruct lowering");
   }
   void genFIR(const Fortran::parser::SelectTypeStmt &) {
@@ -2730,6 +2728,15 @@ private:
   void setCurrentPosition(const Fortran::parser::CharBlock &position) {
     if (position != Fortran::parser::CharBlock{})
       currentPosition = position;
+  }
+
+  /// Set current position at the location of \p parseTreeNode. Note that the
+  /// position is updated automatically when visiting statements, but not when
+  /// entering higher level nodes like constructs or procedures. This helper is
+  /// intended to cover the latter cases.
+  template <typename A>
+  void setCurrentPositionAt(const A &parseTreeNode) {
+    setCurrentPosition(Fortran::parser::FindSourceLocation(parseTreeNode));
   }
 
   //===--------------------------------------------------------------------===//

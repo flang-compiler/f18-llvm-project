@@ -173,7 +173,7 @@ public:
   /// Get the converter's current location
   virtual mlir::Location getCurrentLocation() = 0;
   /// Generate a dummy location
-  virtual mlir::Location genLocation() = 0;
+  virtual mlir::Location genUnknownLocation() = 0;
   /// Generate the location as converted from a CharBlock
   virtual mlir::Location genLocation(const Fortran::parser::CharBlock &) = 0;
 
