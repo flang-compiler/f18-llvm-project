@@ -128,8 +128,9 @@ public:
     // Preliminary translation pass.
     //  - Declare all functions that have definitions so that definition
     //    signatures prevail over call site signatures.
-    //  - Define module variables so they are available before lowering any
-    //    function that may use them.
+    //  - Define module variables and OpenMP/OpenACC declarative construct so
+    //    that they are available before lowering any function that may use
+    //    them.
     //  - Translate block data programs so that common block definitions with
     //    data initializations take precedence over other definitions.
     for (Fortran::lower::pft::Program::Units &u : pft.getUnits()) {
@@ -139,7 +140,7 @@ public:
                 declareFunction(f);
               },
               [&](Fortran::lower::pft::ModuleLikeUnit &m) {
-                lowerModuleVariables(m);
+                lowerModuleDeclScope(m);
                 for (Fortran::lower::pft::FunctionLikeUnit &f :
                      m.nestedFunctions)
                   declareFunction(f);
@@ -2690,8 +2691,9 @@ private:
       lowerFunc(f); // internal procedure
   }
 
-  /// Lower module variable definitions to fir::globalOp
-  void lowerModuleVariables(Fortran::lower::pft::ModuleLikeUnit &mod) {
+  /// Lower module variable definitions to fir::globalOp and OpenMP/OpenACC
+  /// declarative construct.
+  void lowerModuleDeclScope(Fortran::lower::pft::ModuleLikeUnit &mod) {
     // FIXME: get rid of the bogus function context and instantiate the
     // globals directly into the module.
     MLIRContext *context = &getMLIRContext();
@@ -2708,6 +2710,8 @@ private:
       if (!owningScope || mod.getScope() == *owningScope)
         Fortran::lower::defineModuleVariable(*this, var);
     }
+    for (auto &eval : mod.evaluationList)
+      genFIR(eval);
     if (mlir::Region *region = func.getCallableRegion())
       region->dropAllReferences();
     func.erase();
