@@ -74,7 +74,7 @@ func @emboxSubstring(%arg0: !fir.ref<!fir.array<2x3x!fir.char<1,4>>>) {
 
   // CHECK: %[[addr:.*]] = getelementptr [3 x [2 x [4 x i8]]], [3 x [2 x [4 x i8]]]* %[[arg0]], i64 0, i64 0, i64 0
   // CHECK: %[[substringAddr:.*]] = getelementptr [4 x i8], [4 x i8]* %[[addr]], i64 0, i64 1
-  // CHECK: insertvalue {[[descriptorType:.*]]} { i8* undef, i64 2, i32 20180515, i8 2, i8 32, i8 0, i8 0,
+  // CHECK: insertvalue {[[descriptorType:.*]]} { i8* undef, i64 2, i32 20180515, i8 2, i8 40, i8 0, i8 0,
   // CHECK-SAME: [2 x [3 x i64]] [{{\[}}3 x i64] [i64 1, i64 2, i64 4], [3 x i64] [i64 1, i64 3, i64 8]] },
   // CHECK-SAME: i8* %[[substringAddr]], 0
 

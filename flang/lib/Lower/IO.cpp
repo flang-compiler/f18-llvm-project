@@ -416,23 +416,22 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
     }
     llvm_unreachable("unknown OutputInteger kind");
   }
-  if (auto ty = type.dyn_cast<mlir::FloatType>())
-    return ty.getWidth() <= 32
-               ? getIORuntimeFunc<mkIOKey(OutputReal32)>(loc, builder)
-               : getIORuntimeFunc<mkIOKey(OutputReal64)>(loc, builder);
-  if (auto ty = type.dyn_cast<fir::ComplexType>())
-    return ty.getFKind() <= 4
-               ? getIORuntimeFunc<mkIOKey(OutputComplex32)>(loc, builder)
-               : getIORuntimeFunc<mkIOKey(OutputComplex64)>(loc, builder);
+  if (auto ty = type.dyn_cast<mlir::FloatType>()) {
+    if (auto width = ty.getWidth(); width <= 32)
+      return getIORuntimeFunc<mkIOKey(OutputReal32)>(loc, builder);
+    else if (width <= 64)
+      return getIORuntimeFunc<mkIOKey(OutputReal64)>(loc, builder);
+  }
+  if (auto ty = type.dyn_cast<fir::ComplexType>()) {
+    if (auto kind = ty.getFKind(); kind <= 4)
+      return getIORuntimeFunc<mkIOKey(OutputComplex32)>(loc, builder);
+    else if (kind <= 8)
+      return getIORuntimeFunc<mkIOKey(OutputComplex64)>(loc, builder);
+  }
   if (type.isa<fir::LogicalType>())
     return getIORuntimeFunc<mkIOKey(OutputLogical)>(loc, builder);
-  if (type.isa<fir::BoxType>())
-    return getIORuntimeFunc<mkIOKey(OutputDescriptor)>(loc, builder);
   if (fir::factory::CharacterExprHelper::isCharacterScalar(type))
     return getIORuntimeFunc<mkIOKey(OutputAscii)>(loc, builder);
-  // Use descriptors for arrays
-  if (auto refTy = type.dyn_cast<fir::ReferenceType>())
-    type = refTy.getEleTy();
   return getIORuntimeFunc<mkIOKey(OutputDescriptor)>(loc, builder);
 }
 
@@ -505,18 +504,20 @@ static mlir::FuncOp getInputFunc(mlir::Location loc, fir::FirOpBuilder &builder,
     return ty.getWidth() == 1
                ? getIORuntimeFunc<mkIOKey(InputLogical)>(loc, builder)
                : getIORuntimeFunc<mkIOKey(InputInteger)>(loc, builder);
-  if (auto ty = type.dyn_cast<mlir::FloatType>())
-    return ty.getWidth() <= 32
-               ? getIORuntimeFunc<mkIOKey(InputReal32)>(loc, builder)
-               : getIORuntimeFunc<mkIOKey(InputReal64)>(loc, builder);
-  if (auto ty = type.dyn_cast<fir::ComplexType>())
-    return ty.getFKind() <= 4
-               ? getIORuntimeFunc<mkIOKey(InputComplex32)>(loc, builder)
-               : getIORuntimeFunc<mkIOKey(InputComplex64)>(loc, builder);
+  if (auto ty = type.dyn_cast<mlir::FloatType>()) {
+    if (auto width = ty.getWidth(); width <= 32)
+      return getIORuntimeFunc<mkIOKey(InputReal32)>(loc, builder);
+    else if (width <= 64)
+      return getIORuntimeFunc<mkIOKey(InputReal64)>(loc, builder);
+  }
+  if (auto ty = type.dyn_cast<fir::ComplexType>()) {
+    if (auto kind = ty.getFKind(); kind <= 4)
+      return getIORuntimeFunc<mkIOKey(InputComplex32)>(loc, builder);
+    else if (kind <= 8)
+      return getIORuntimeFunc<mkIOKey(InputComplex64)>(loc, builder);
+  }
   if (type.isa<fir::LogicalType>())
     return getIORuntimeFunc<mkIOKey(InputLogical)>(loc, builder);
-  if (type.isa<fir::BoxType>())
-    return getIORuntimeFunc<mkIOKey(InputDescriptor)>(loc, builder);
   if (fir::factory::CharacterExprHelper::isCharacterScalar(type))
     return getIORuntimeFunc<mkIOKey(InputAscii)>(loc, builder);
   return getIORuntimeFunc<mkIOKey(InputDescriptor)>(loc, builder);

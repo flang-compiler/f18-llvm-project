@@ -9,7 +9,7 @@ fir.global internal @globalx : !fir.box<!fir.heap<i32>> {
   fir.has_value %1 : !fir.box<!fir.heap<i32>>
 }
 
-// CHECK-LABEL: @globaly = internal global { float*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } { float* null, i64 4, i32 20180515, i8 1, i8 25, i8 2, i8 0,{{.*}}[3 x i64] [i64 1, i64 0, i64 4]
+// CHECK-LABEL: @globaly = internal global { float*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } { float* null, i64 4, i32 20180515, i8 1, i8 27, i8 2, i8 0,{{.*}}[3 x i64] [i64 1, i64 0, i64 4]
 fir.global internal @globaly : !fir.box<!fir.heap<!fir.array<?xf32>>> {
   %c0 = arith.constant 0 : index
   %0 = fir.convert %c0 : (index) -> !fir.heap<!fir.array<?xf32>>
@@ -27,7 +27,7 @@ func private @ga(%b : !fir.box<!fir.array<?xf32>>)
 // CHECK: (float* %[[ARG:.*]])
 func @f(%a : !fir.ref<f32>) {
   // CHECK: %[[DESC:.*]] = alloca { float*, i64, i32, i8, i8, i8, i8 }
-  // CHECK: %[[INS0:.*]] = insertvalue {{.*}} { float* undef, i64 4, i32 20180515, i8 0, i8 25, i8 0, i8 0 }, float* %[[ARG]], 0
+  // CHECK: %[[INS0:.*]] = insertvalue {{.*}} { float* undef, i64 4, i32 20180515, i8 0, i8 27, i8 0, i8 0 }, float* %[[ARG]], 0
   // CHECK: store {{.*}} %[[INS0]], {{.*}}* %[[DESC]]
   %b = fir.embox %a : (!fir.ref<f32>) -> !fir.box<f32>
 
@@ -45,7 +45,7 @@ func @fa(%a : !fir.ref<!fir.array<100xf32>>) {
   %c100 = arith.constant 100 : index
   %d = fir.shape %c100 : (index) -> !fir.shape<1>
   // CHECK: %[[bitcast:.*]] = bitcast [100 x float]* %
-  // CHECK: %[[INS70:.*]] = insertvalue {{.*}} { float* undef, i64 4, i32 20180515, i8 1, i8 25, i8 0, i8 0, {{.*}} }, float* %[[bitcast]], 0
+  // CHECK: %[[INS70:.*]] = insertvalue {{.*}} { float* undef, i64 4, i32 20180515, i8 1, i8 27, i8 0, i8 0, {{.*}} }, float* %[[bitcast]], 0
   %b = fir.embox %c(%d) : (!fir.ref<!fir.array<?xf32>>, !fir.shape<1>) -> !fir.box<!fir.array<?xf32>>
   // CHECK: call void @ga(
   fir.call @ga(%b) : (!fir.box<!fir.array<?xf32>>) -> ()
@@ -71,7 +71,7 @@ func @b1(%arg0 : !fir.ref<!fir.char<1,?>>, %arg1 : index) -> !fir.box<!fir.char<
 // CHECK-SAME: [5 x i8]* %[[arg0:.*]], i64 %[[arg1:.*]])
 func @b2(%arg0 : !fir.ref<!fir.array<?x!fir.char<1,5>>>, %arg1 : index) -> !fir.box<!fir.array<?x!fir.char<1,5>>> {
   %1 = fir.shape %arg1 : (index) -> !fir.shape<1>
-  // CHECK: insertvalue {{.*}} { [5 x i8]* undef, i64 5, i32 20180515, i8 1, i8 32, i8 0, i8 0, {{.*}} }, i64 %[[arg1]], 7, 0, 1
+  // CHECK: insertvalue {{.*}} { [5 x i8]* undef, i64 5, i32 20180515, i8 1, i8 40, i8 0, i8 0, {{.*}} }, i64 %[[arg1]], 7, 0, 1
   // CHECK: insertvalue {{.*}} %{{.*}}, i64 5, 7, 0, 2
   // CHECK: insertvalue {{.*}} [5 x i8]* %[[arg0]], 0
   %2 = fir.embox %arg0(%1) : (!fir.ref<!fir.array<?x!fir.char<1,5>>>, !fir.shape<1>) -> !fir.box<!fir.array<?x!fir.char<1,5>>>
@@ -145,7 +145,7 @@ func @box6(%0 : !fir.ref<!fir.array<?x?x?x?xf32>>, %1 : index, %2 : index) -> i3
   // CHECK: %[[sdp2:.*]] = sdiv i64 %[[dp2]], 2
   // CHECK: %[[cmp:.*]] = icmp sgt i64 %[[sdp2]], 0
   // CHECK: %[[extent:.*]] = select i1 %[[cmp]], i64 %[[sdp2]], i64 0
-  // CHECK: insertvalue { float*, i64, i32, i8, i8, i8, i8, [2 x [3 x i64]] } { float* undef, i64 4, i32 20180515, i8 2, i8 25, i8 0, i8 0, [2 x [3 x i64]] [{{\[}}3 x i64] [i64 1, i64 undef, i64 undef], [3 x i64] undef] }, i64 %[[extent]], 7, 0, 1
+  // CHECK: insertvalue { float*, i64, i32, i8, i8, i8, i8, [2 x [3 x i64]] } { float* undef, i64 4, i32 20180515, i8 2, i8 27, i8 0, i8 0, [2 x [3 x i64]] [{{\[}}3 x i64] [i64 1, i64 undef, i64 undef], [3 x i64] undef] }, i64 %[[extent]], 7, 0, 1
   // CHECK: insertvalue { float*, i64, i32, i8, i8, i8, i8, [2 x [3 x i64]] } %{{.*}}, i64 800, 7, 0, 2
   // CHECK: %[[op25:.*]] = add i64 25000, %[[i100p40]]
   // CHECK: insertvalue { float*, i64, i32, i8, i8, i8, i8, [2 x [3 x i64]] } %{{.*}}, i64 1, 7, 1, 0
