@@ -527,7 +527,7 @@ static bool conflictOnLoad(llvm::ArrayRef<mlir::Operation *> reach,
   mlir::Value load;
   mlir::Value addr = st.memref();
   const bool storeHasPointerType = hasPointerType(addr.getType());
-  for (auto *op : reach)
+  for (auto *op : reach) {
     if (auto ld = mlir::dyn_cast<ArrayLoadOp>(op)) {
       mlir::Type ldTy = ld.memref().getType();
       if (ld.memref() == addr) {
