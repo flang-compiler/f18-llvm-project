@@ -78,9 +78,9 @@ inline bool isa_passbyref_type(mlir::Type t) {
 
 /// Is `t` a type that can conform to be pass-by-reference? Depending on the
 /// context, these types may simply demote to pass-by-reference or a reference
-/// to them may have to be passed instead.
+/// to them may have to be passed instead. Functions are always referent.
 inline bool conformsWithPassByRef(mlir::Type t) {
-  return isa_ref_type(t) || isa_box_type(t);
+  return isa_ref_type(t) || isa_box_type(t) || t.isa<mlir::FunctionType>();
 }
 
 /// Is `t` a derived (record) type?

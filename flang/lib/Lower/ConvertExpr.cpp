@@ -291,30 +291,24 @@ arrayLoadExtValue(fir::FirOpBuilder &builder, mlir::Location loc,
 static fir::ExtendedValue
 placeScalarValueInMemory(fir::FirOpBuilder &builder, mlir::Location loc,
                          const fir::ExtendedValue &exv,
-                         llvm::Optional<mlir::Type> forceValueType) {
+                         mlir::Type storageType) {
   mlir::Value valBase = fir::getBase(exv);
-  // Functions are always referent.
-  if (valBase.getType().template isa<mlir::FunctionType>() ||
-      fir::conformsWithPassByRef(valBase.getType()))
+  if (fir::conformsWithPassByRef(valBase.getType()))
     return exv;
 
-  assert(!fir::hasDynamicSize(valBase.getType()) &&
-         "only expect lengthless scalars to be by value");
+  assert(!fir::hasDynamicSize(storageType) &&
+         "only expect statically sized scalars to be by value");
 
   // Since `a` is not itself a valid referent, determine its value and
-  // create a temporary location at the begining of the function for
+  // create a temporary location at the beginning of the function for
   // referencing.
-  mlir::Value val =
-      forceValueType
-          ? builder.createConvert(loc, forceValueType.getValue(), valBase)
-          : valBase;
-  mlir::FuncOp func = builder.getFunction();
-  auto initPos = builder.saveInsertionPoint();
-  builder.setInsertionPointToStart(&func.front());
-  auto mem = builder.create<fir::AllocaOp>(loc, val.getType());
-  builder.restoreInsertionPoint(initPos);
-  builder.create<fir::StoreOp>(loc, val, mem);
-  return fir::substBase(exv, mem.getResult());
+  mlir::Value val = builder.createConvert(loc, storageType, valBase);
+  mlir::Value temp = builder.createTemporary(
+      loc, storageType,
+      llvm::ArrayRef<mlir::NamedAttribute>{
+          Fortran::lower::getAdaptToByRefAttr(builder)});
+  builder.create<fir::StoreOp>(loc, val, temp);
+  return fir::substBase(exv, temp);
 }
 
 // Copy a copy of scalar \p exv in a new temporary.
@@ -350,29 +344,6 @@ static bool isParenthesizedVariable(const Fortran::evaluate::Expr<T> &expr) {
     return std::visit([&](const auto &x) { return isParenthesizedVariable(x); },
                       expr.u);
   }
-}
-
-/// Generate mlir type for front end expression \p x if it is a Logical
-/// expression type.
-template <typename A>
-static llvm::Optional<mlir::Type>
-genTypeIfLogical(Fortran::lower::AbstractConverter &converter, const A &x) {
-  if constexpr (!Fortran::common::HasMember<
-                    A, Fortran::evaluate::TypelessExpression>) {
-    if constexpr (std::is_same_v<typename A::Result,
-                                 Fortran::evaluate::SomeType>) {
-      if (std::optional<Fortran::evaluate::DynamicType> type = x.GetType())
-        if (type->category() == Fortran::common::TypeCategory::Logical)
-          return converter.genType(type->category(), type->kind());
-    } else {
-      if constexpr (A::Result::category ==
-                    Fortran::common::TypeCategory::Logical) {
-        if (std::optional<Fortran::evaluate::DynamicType> type = x.GetType())
-          return converter.genType(type->category(), type->kind());
-      }
-    }
-  }
-  return llvm::None;
 }
 
 /// Is this a call to an elemental procedure with at least one array argument ?
@@ -2748,10 +2719,8 @@ public:
   }
   template <typename A>
   ExtValue genref(const A &a) {
-    llvm::Optional<mlir::Type> forceTypeIfLogical =
-        genTypeIfLogical(converter, a);
-    return placeScalarValueInMemory(builder, getLoc(), genval(a),
-                                    forceTypeIfLogical);
+    mlir::Type storageType = converter.genType(toEvExpr(a));
+    return placeScalarValueInMemory(builder, getLoc(), genval(a), storageType);
   }
 
   template <typename A, template <typename> typename T,
@@ -4116,11 +4085,10 @@ private:
             return createInMemoryScalarCopy(builder, loc, cc(iters));
           };
         }
-        llvm::Optional<mlir::Type> forceTypeIfLogical =
-            genTypeIfLogical(converter, x);
+        mlir::Type storageType =
+            fir::unwrapSequenceType(converter.genType(toEvExpr(x)));
         return [=](IterSpace iters) -> ExtValue {
-          return placeScalarValueInMemory(builder, loc, cc(iters),
-                                          forceTypeIfLogical);
+          return placeScalarValueInMemory(builder, loc, cc(iters), storageType);
         };
       }
     }
