@@ -51,13 +51,8 @@ Attribute AttrWithTypeBuilderAttr::parse(AsmParser &parser, Type type) {
   return get(parser.getContext(), element);
 }
 
-<<<<<<< HEAD
-void AttrWithTypeBuilderAttr::print(DialectAsmPrinter &printer) const {
-  printer << "attr_with_type_builder " << getAttr();
-=======
 void AttrWithTypeBuilderAttr::print(AsmPrinter &printer) const {
-  printer << " " << getAttr();
->>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
+  printer << "attr_with_type_builder " << getAttr();
 }
 
 //===----------------------------------------------------------------------===//
@@ -85,14 +80,8 @@ Attribute CompoundAAttr::parse(AsmParser &parser, Type type) {
   return get(parser.getContext(), widthOfSomething, oneType, arrayOfInts);
 }
 
-<<<<<<< HEAD
-void CompoundAAttr::print(DialectAsmPrinter &printer) const {
-  printer << "cmpnd_a<" << getWidthOfSomething() << ", " << getOneType()
-          << ", [";
-=======
 void CompoundAAttr::print(AsmPrinter &printer) const {
-  printer << "<" << getWidthOfSomething() << ", " << getOneType() << ", [";
->>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
+  printer << "cmpnd_a<" << getWidthOfSomething() << ", " << getOneType() << ", [";
   llvm::interleaveComma(getArrayOfInts(), printer);
   printer << "]>";
 }
@@ -118,13 +107,8 @@ Attribute TestI64ElementsAttr::parse(AsmParser &parser, Type type) {
       parser.getContext(), type.cast<ShapedType>(), elements);
 }
 
-<<<<<<< HEAD
-void TestI64ElementsAttr::print(DialectAsmPrinter &printer) const {
-  printer << "i64_elements<[";
-=======
 void TestI64ElementsAttr::print(AsmPrinter &printer) const {
-  printer << "<[";
->>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
+  printer << "i64_elements<[";
   llvm::interleaveComma(getElements(), printer);
   printer << "] : " << getType() << ">";
 }
@@ -174,59 +158,6 @@ static void printIntArray(AsmPrinter &printer, ArrayRef<int> ints) {
 }
 
 //===----------------------------------------------------------------------===//
-<<<<<<< HEAD
-=======
-// TestSubElementsAccessAttr
-//===----------------------------------------------------------------------===//
-
-Attribute TestSubElementsAccessAttr::parse(::mlir::AsmParser &parser,
-                                           ::mlir::Type type) {
-  Attribute first, second, third;
-  if (parser.parseLess() || parser.parseAttribute(first) ||
-      parser.parseComma() || parser.parseAttribute(second) ||
-      parser.parseComma() || parser.parseAttribute(third) ||
-      parser.parseGreater()) {
-    return {};
-  }
-  return get(parser.getContext(), first, second, third);
-}
-
-void TestSubElementsAccessAttr::print(::mlir::AsmPrinter &printer) const {
-  printer << "<" << getFirst() << ", " << getSecond() << ", " << getThird()
-          << ">";
-}
-
-void TestSubElementsAccessAttr::walkImmediateSubElements(
-    llvm::function_ref<void(mlir::Attribute)> walkAttrsFn,
-    llvm::function_ref<void(mlir::Type)> walkTypesFn) const {
-  walkAttrsFn(getFirst());
-  walkAttrsFn(getSecond());
-  walkAttrsFn(getThird());
-}
-
-SubElementAttrInterface TestSubElementsAccessAttr::replaceImmediateSubAttribute(
-    ArrayRef<std::pair<size_t, Attribute>> replacements) const {
-  Attribute first = getFirst();
-  Attribute second = getSecond();
-  Attribute third = getThird();
-  for (auto &it : replacements) {
-    switch (it.first) {
-    case 0:
-      first = it.second;
-      break;
-    case 1:
-      second = it.second;
-      break;
-    case 2:
-      third = it.second;
-      break;
-    }
-  }
-  return get(getContext(), first, second, third);
-}
-
-//===----------------------------------------------------------------------===//
->>>>>>> f97e72aaca4a... Use base class AsmParser/AsmPrinter in Types and Attribute print/parse method (NFC)
 // Tablegen Generated Definitions
 //===----------------------------------------------------------------------===//
 
