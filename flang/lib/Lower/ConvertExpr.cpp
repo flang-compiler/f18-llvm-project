@@ -345,6 +345,16 @@ static bool isParenthesizedVariable(const Fortran::evaluate::Expr<T> &expr) {
   }
 }
 
+/// Does \p expr only refer to symbols that are mapped to IR values in \p symMap
+/// ?
+static bool allSymbolsInExprPresentInMap(const Fortran::lower::SomeExpr &expr,
+                                         Fortran::lower::SymMap &symMap) {
+  for (const auto &sym : Fortran::evaluate::CollectSymbols(expr))
+    if (!symMap.lookupSymbol(sym))
+      return false;
+  return true;
+}
+
 /// Is this a call to an elemental procedure with at least one array argument ?
 static bool
 isElementalProcWithArrayArgs(const Fortran::evaluate::ProcedureRef &procRef) {
@@ -606,6 +616,7 @@ public:
   /// The type of the function indirection is not guaranteed to match the one
   /// of the ProcedureDesignator due to Fortran implicit typing rules.
   ExtValue genval(const Fortran::evaluate::ProcedureDesignator &proc) {
+    mlir::Location loc = getLoc();
     if (const Fortran::evaluate::SpecificIntrinsic *intrinsic =
             proc.GetSpecificIntrinsic()) {
       mlir::FunctionType signature =
@@ -618,23 +629,51 @@ public:
               intrinsic->name);
       mlir::SymbolRefAttr symbolRefAttr =
           Fortran::lower::getUnrestrictedIntrinsicSymbolRefAttr(
-              builder, getLoc(), genericName, signature);
+              builder, loc, genericName, signature);
       mlir::Value funcPtr =
-          builder.create<fir::AddrOfOp>(getLoc(), signature, symbolRefAttr);
+          builder.create<fir::AddrOfOp>(loc, signature, symbolRefAttr);
       return funcPtr;
     }
     const Fortran::semantics::Symbol *symbol = proc.GetSymbol();
     assert(symbol && "expected symbol in ProcedureDesignator");
+    mlir::Value funcPtr;
+    mlir::Value funcPtrResultLength;
     if (Fortran::semantics::IsDummy(*symbol)) {
       Fortran::lower::SymbolBox val = symMap.lookupSymbol(*symbol);
       assert(val && "Dummy procedure not in symbol map");
-      return val.getAddr();
+      funcPtr = val.getAddr();
+      if (fir::factory::isCharacterProcedureTuple(funcPtr))
+        std::tie(funcPtr, funcPtrResultLength) =
+            fir::factory::extractCharacterProcedureTuple(builder, loc, funcPtr);
+    } else {
+      std::string name = converter.mangleName(*symbol);
+      mlir::FuncOp func =
+          Fortran::lower::getOrDeclareFunction(name, proc, converter);
+      funcPtr = builder.create<fir::AddrOfOp>(loc, func.getType(),
+                                              builder.getSymbolRefAttr(name));
     }
-    std::string name = converter.mangleName(*symbol);
-    mlir::FuncOp func =
-        Fortran::lower::getOrDeclareFunction(name, proc, converter);
-    mlir::Value funcPtr = builder.create<fir::AddrOfOp>(
-        getLoc(), func.getType(), builder.getSymbolRefAttr(name));
+    if (Fortran::lower::mustPassLengthWithDummyProcedure(proc, converter)) {
+      // The result length, if available here, must be propagated along the
+      // procedure address so that call sites where the result length is assumed
+      // can retrieve the length.
+      Fortran::evaluate::DynamicType resultType = proc.GetType().value();
+      if (const auto &lengthExpr = resultType.GetCharLength()) {
+        // The length expression may refer to dummy argument symbols that are
+        // meaningless without any actual arguments. Leave the length as
+        // unknown in that case, it be resolved on the call site
+        // with the actual arguments.
+        if (allSymbolsInExprPresentInMap(toEvExpr(*lengthExpr), symMap)) {
+          mlir::Value rawLen = fir::getBase(genval(*lengthExpr));
+          // F2018 7.4.4.2 point 5.
+          funcPtrResultLength =
+              Fortran::lower::genMaxWithZero(builder, getLoc(), rawLen);
+        }
+      }
+      if (!funcPtrResultLength)
+        funcPtrResultLength = builder.createIntegerConstant(
+            loc, builder.getCharacterLengthType(), -1);
+      return fir::CharBoxValue{funcPtr, funcPtrResultLength};
+    }
     return funcPtr;
   }
   ExtValue genval(const Fortran::evaluate::NullPointer &) {
@@ -2037,6 +2076,21 @@ public:
       mustPopSymMap = true;
       Fortran::lower::mapCallInterfaceSymbols(converter, caller, symMap);
     }
+    // If this is an indirect call, retrieve the function address. Also retrieve
+    // the result length if this is a character function (note that this length
+    // will be used only if there is no explicit length in the local interface).
+    mlir::Value funcPointer;
+    mlir::Value charFuncPointerLength;
+    if (const Fortran::semantics::Symbol *sym =
+            caller.getIfIndirectCallSymbol()) {
+      funcPointer = symMap.lookupSymbol(*sym).getAddr();
+      if (!funcPointer)
+        fir::emitFatalError(loc, "failed to find indirect call symbol address");
+      if (fir::factory::isCharacterProcedureTuple(funcPointer))
+        std::tie(funcPointer, charFuncPointerLength) =
+            fir::factory::extractCharacterProcedureTuple(builder, loc,
+                                                         funcPointer);
+    }
 
     mlir::IndexType idxTy = builder.getIndexType();
     auto lowerSpecExpr = [&](const auto &expr) -> mlir::Value {
@@ -2061,8 +2115,17 @@ public:
       // Result length parameters should not be provided to box storage
       // allocation and save_results, but they are still useful information to
       // keep in the ExtendedValue if non-deferred.
-      if (!type.isa<fir::BoxType>())
+      if (!type.isa<fir::BoxType>()) {
+        if (fir::isa_char(fir::unwrapSequenceType(type)) && lengths.empty()) {
+          // Calling an assumed length function. This is only possible if this
+          // is a call to a character dummy procedure.
+          if (!charFuncPointerLength)
+            fir::emitFatalError(loc, "failed to retrieve character function "
+                                     "length while calling it");
+          lengths.push_back(charFuncPointerLength);
+        }
         resultLengths = lengths;
+      }
 
       if (!extents.empty() || !lengths.empty()) {
         auto *bldr = &converter.getFirOpBuilder();
@@ -2118,20 +2181,14 @@ public:
 
     // In older Fortran, procedure argument types are inferred. This may lead
     // different view of what the function signature is in different locations.
-    // Casts are inserted as needed below to acomodate this.
+    // Casts are inserted as needed below to accommodate this.
 
     // The mlir::FuncOp type prevails, unless it has a different number of
     // arguments which can happen in legal program if it was passed as a dummy
     // procedure argument earlier with no further type information.
-    mlir::Value funcPointer;
     mlir::SymbolRefAttr funcSymbolAttr;
     bool addHostAssociations = false;
-    if (const Fortran::semantics::Symbol *sym =
-            caller.getIfIndirectCallSymbol()) {
-      funcPointer = symMap.lookupSymbol(*sym).getAddr();
-      if (!funcPointer)
-        TODO(loc, "calling a dummy procedure declared in an outer scope");
-    } else {
+    if (!funcPointer) {
       mlir::FunctionType funcOpType = caller.getFuncOp().getType();
       mlir::SymbolRefAttr symbolAttr =
           builder.getSymbolRefAttr(caller.getMangledName());
@@ -2584,6 +2641,11 @@ public:
         ExtValue argRef = genExtAddr(*expr);
         caller.placeAddressAndLengthInput(arg, fir::getBase(argRef),
                                           fir::getLen(argRef));
+      } else if (arg.passBy == PassBy::CharProcTuple) {
+        ExtValue argRef = genExtAddr(*expr);
+        mlir::Value tuple = fir::factory::createCharacterProcedureTuple(
+            builder, loc, argTy, fir::getBase(argRef), fir::getLen(argRef));
+        caller.placeInput(arg, tuple);
       } else {
         TODO(loc, "pass by value in non elemental function call");
       }
@@ -4244,6 +4306,13 @@ private:
         fir::emitFatalError(
             loc, "unexpected PassBy::AddressAndLength in elemental call");
         break;
+      case PassBy::CharProcTuple: {
+        ExtValue argRef = asScalarRef(*expr);
+        mlir::Value tuple = fir::factory::createCharacterProcedureTuple(
+            builder, loc, argTy, fir::getBase(argRef), fir::getLen(argRef));
+        operands.emplace_back(
+            [=](IterSpace iters) -> ExtValue { return tuple; });
+      } break;
       case PassBy::Box:
       case PassBy::MutableBox:
         // See C15100 and C15101

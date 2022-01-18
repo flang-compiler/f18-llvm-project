@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: merge_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1,?>>, 
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1>>, 
 ! CHECK-SAME: %[[arg1:.*]]: index, 
 ! CHECK-SAME: %[[arg2:[^:]+]]: !fir.boxchar<1>, 
 ! CHECK-SAME: %[[arg3:[^:]+]]: !fir.boxchar<1>, 

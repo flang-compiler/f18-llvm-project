@@ -14,7 +14,7 @@ integer function minval_test(a)
 end function
 
 ! CHECK-LABEL: minval_test2
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1,?>>,
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1>>,
 ! CHECK-SAME: %[[arg1:.*]]: index,
 ! CHECK-SAME: %[[arg2:.*]]: !fir.box<!fir.array<?x!fir.char<1>>>) -> !fir.boxchar<1>
 character function minval_test2(a)

@@ -13,6 +13,7 @@
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/StatementContext.h"
 #include "flang/Lower/Todo.h"
+#include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROpsSupport.h"
@@ -606,6 +607,40 @@ public:
                      interface.side().getHostAssociatedTuple(), emptyValue()});
   }
 
+  static llvm::Optional<Fortran::evaluate::DynamicType> getResultDynamicType(
+      const Fortran::evaluate::characteristics::Procedure &procedure) {
+    if (const std::optional<Fortran::evaluate::characteristics::FunctionResult>
+            &result = procedure.functionResult)
+      if (const auto *resultTypeAndShape = result->GetTypeAndShape())
+        return resultTypeAndShape->type();
+    return llvm::None;
+  }
+
+  static bool mustPassLengthWithDummyProcedure(
+      const Fortran::evaluate::characteristics::Procedure &procedure) {
+    // When passing a character function designator `bar` as dummy procedure to
+    // `foo` (e.g. `foo(bar)`), pass the result length of `bar` to `foo` so that
+    // `bar` can be called inside `foo` even if its length is assumed there.
+    // From an ABI perspective, the extra length argument must be handled
+    // exactly as if passing a character object. Using an argument of
+    // fir.boxchar type gives the expected behavior: after codegen, the
+    // fir.boxchar lengths are added after all the arguments as extra value
+    // arguments (the extra arguments order is the order of the fir.boxchar).
+
+    // This ABI is compatible with ifort, nag, nvfortran, and xlf, but not
+    // gfortran. Gfortran does not pass the length and is therefore unable to
+    // handle later call to `bar` in `foo` where the length would be assumed. If
+    // the result is an array, nag and ifort and xlf still pass the length, but
+    // not nvfortran (and gfortran). It is not clear it is possible to call an
+    // array function with assumed length (f18 forbides defining such
+    // interfaces). Hence, passing the length is most likely useless, but stick
+    // with ifort/nag/xlf interface here.
+    if (llvm::Optional<Fortran::evaluate::DynamicType> type =
+            getResultDynamicType(procedure))
+      return type->category() == Fortran::common::TypeCategory::Character;
+    return false;
+  }
+
 private:
   void handleImplicitResult(
       const Fortran::evaluate::characteristics::FunctionResult &result) {
@@ -643,8 +678,11 @@ private:
     setPassedResult(PassEntityBy::AddressAndLength,
                     getResultEntity(interface.side().getCallDescription()));
     mlir::Type lenTy = mlir::IndexType::get(&mlirContext);
+    std::optional<std::int64_t> constantLen = type.knownLength();
+    fir::CharacterType::LenType len =
+        constantLen ? *constantLen : fir::CharacterType::unknownLen();
     mlir::Type charRefTy = fir::ReferenceType::get(
-        fir::CharacterType::getUnknownLen(&mlirContext, type.kind()));
+        fir::CharacterType::get(&mlirContext, type.kind(), len));
     mlir::Type boxCharTy = fir::BoxCharType::get(&mlirContext, type.kind());
     addFirOperand(charRefTy, resultPosition, Property::CharAddress);
     addFirOperand(lenTy, resultPosition, Property::CharLength);
@@ -804,10 +842,27 @@ private:
             Fortran::evaluate::characteristics::DummyProcedure::Attr::Pointer))
       TODO(interface.converter.getCurrentLocation(),
            "procedure pointer arguments");
-    // Otherwise, it is a dummy procedure
+    // Otherwise, it is a dummy procedure.
+    const Fortran::evaluate::characteristics::Procedure &procedure =
+        proc.procedure.value();
     mlir::Type funcType =
         getDummyProcedureTypeImpl(&proc.procedure.value(), interface.converter);
-
+    llvm::Optional<Fortran::evaluate::DynamicType> resulType =
+        getResultDynamicType(procedure);
+    if (resulType && mustPassLengthWithDummyProcedure(procedure)) {
+      // The result length of dummy procedures that are character functions must
+      // be passed so that the dummy procedure can be called if it has assumed
+      // length on the callee side.
+      mlir::Type tupleType =
+          fir::factory::getCharacterProcedureTupleType(funcType);
+      llvm::StringRef charProcAttr = fir::getCharacterProcedureDummyAttrName();
+      addFirOperand(tupleType, nextPassedArgPosition(), Property::CharProcTuple,
+                    {mlir::NamedAttribute{
+                        mlir::Identifier::get(charProcAttr, &mlirContext),
+                        mlir::UnitAttr::get(&mlirContext)}});
+      addPassedArg(PassEntityBy::CharProcTuple, entity, characteristics);
+      return;
+    }
     addFirOperand(funcType, nextPassedArgPosition(), Property::BaseAddress);
     addPassedArg(PassEntityBy::BaseAddress, entity, characteristics);
   }
@@ -1099,4 +1154,15 @@ mlir::Type Fortran::lower::getDummyProcedureType(
           dummyProc, converter.getFoldingContext());
   return getDummyProcedureTypeImpl(iface.has_value() ? &*iface : nullptr,
                                    converter);
+}
+
+bool Fortran::lower::mustPassLengthWithDummyProcedure(
+    const Fortran::evaluate::ProcedureDesignator &procedure,
+    Fortran::lower::AbstractConverter &converter) {
+  std::optional<Fortran::evaluate::characteristics::Procedure> characteristics =
+      Fortran::evaluate::characteristics::Procedure::Characterize(
+          procedure, converter.getFoldingContext());
+  return characteristics &&
+         CallInterfaceImpl<SignatureBuilder>::mustPassLengthWithDummyProcedure(
+             *characteristics);
 }
