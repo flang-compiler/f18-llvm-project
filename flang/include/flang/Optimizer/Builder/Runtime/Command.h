@@ -16,13 +16,7 @@ class Location;
 
 namespace fir {
 class FirOpBuilder;
-class CharBoxValue;
 } // namespace fir
-
-namespace llvm {
-template <typename T>
-class Optional;
-}
 
 namespace fir::runtime {
 
