@@ -203,10 +203,10 @@ private:
   /// block arguments of a loopOp or forOp are used as dimensions
   MaybeAffineExpr toAffineExpr(mlir::Value value) {
     if (auto op = value.getDefiningOp<mlir::arith::SubIOp>())
-      return affineBinaryOp(mlir::AffineExprKind::Add, toAffineExpr(op.lhs()),
-                            affineBinaryOp(mlir::AffineExprKind::Mul,
-                                           toAffineExpr(op.rhs()),
-                                           toAffineExpr(-1)));
+      return affineBinaryOp(
+          mlir::AffineExprKind::Add, toAffineExpr(op.lhs()),
+          affineBinaryOp(mlir::AffineExprKind::Mul, toAffineExpr(op.rhs()),
+                         toAffineExpr(-1)));
     if (auto op = value.getDefiningOp<mlir::arith::AddIOp>())
       return affineBinaryOp(mlir::AffineExprKind::Add, op.lhs(), op.rhs());
     if (auto op = value.getDefiningOp<mlir::arith::MulIOp>())
@@ -232,7 +232,7 @@ private:
     if (!lhsAffine.hasValue() || !rhsAffine.hasValue())
       return;
     auto constraintPair = constraint(
-        cmpOp.predicate(), rhsAffine.getValue() - lhsAffine.getValue());
+        cmpOp.getPredicate(), rhsAffine.getValue() - lhsAffine.getValue());
     if (!constraintPair)
       return;
     integerSet = mlir::IntegerSet::get(dimCount, symCount,
