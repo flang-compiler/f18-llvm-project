@@ -377,10 +377,10 @@ struct RuntimeTableEntry<RuntimeTableKey<KT>, RuntimeIdentifier<Cs...>> {
 #define FirFullSeq(X) std::integer_sequence<char, FirExpandKey(X)>
 #define FirAsSequence(X)                                                       \
   decltype(fir::runtime::details::filter(FirFullSeq(X){}))
-#define mkKey(X)                                                               \
+#define FirmkKey(X)                                                            \
   fir::runtime::RuntimeTableEntry<fir::runtime::RuntimeTableKey<decltype(X)>,  \
                                   FirAsSequence(X)>
-#define mkRTKey(X) mkKey(RTNAME(X))
+#define mkRTKey(X) FirmkKey(RTNAME(X))
 
 /// Get (or generate) the MLIR FuncOp for a given runtime function. Its template
 /// argument is intended to be of the form: <mkRTKey(runtime function name)>.

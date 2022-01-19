@@ -59,7 +59,7 @@ constexpr TypeBuilderFunc getModel<Fortran::runtime::io::Iostat>() {
 
 using namespace Fortran::runtime::io;
 
-#define mkIOKey(X) mkKey(IONAME(X))
+#define mkIOKey(X) FirmkKey(IONAME(X))
 
 namespace Fortran::lower {
 /// Static table of IO runtime calls
