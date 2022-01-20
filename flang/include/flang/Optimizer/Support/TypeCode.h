@@ -39,7 +39,7 @@ inline int complexBitsToTypeCode(unsigned bitwidth) {
   switch (bitwidth) {
   case 32:  return CFI_type_float_Complex;
   case 64:  return CFI_type_double_Complex;
-  case 80:
+  case 80:  return CFI_type_extended_double_Complex;
   case 128: return CFI_type_long_double_Complex;
   default:  llvm_unreachable("unsupported complex size");
   }
@@ -76,7 +76,7 @@ inline int realBitsToTypeCode(unsigned bitwidth) {
   switch (bitwidth) {
   case 32:  return CFI_type_float;
   case 64:  return CFI_type_double;
-  case 80:
+  case 80:  return CFI_type_extended_double;
   case 128: return CFI_type_long_double;
   default:  llvm_unreachable("unsupported real size");
   }
