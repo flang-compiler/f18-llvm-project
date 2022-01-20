@@ -168,13 +168,13 @@ public:
     } else {
       assert(m.size() == 2);
       // COMPLEX is split into 2 separate arguments
-      auto iTy = rewriter->getIntegerType(32);
       for (auto e : llvm::enumerate(m)) {
         auto &tup = e.value();
         auto ty = std::get<mlir::Type>(tup);
         auto index = e.index();
-        auto idx = rewriter->getIntegerAttr(iTy, index);
-        auto val = rewriter->create<ExtractValueOp>(loc, ty, oper, rewriter->getArrayAttr(idx));
+        auto idx = rewriter->getIntegerAttr(rewriter->getIndexType(), index);
+        auto val = rewriter->create<ExtractValueOp>(
+            loc, ty, oper, rewriter->getArrayAttr(idx));
         newInTys.push_back(ty);
         newOpers.push_back(val);
       }
@@ -348,7 +348,8 @@ public:
               for (auto &tup : specifics->boxcharArgumentType(box.getEleTy())) {
                 auto attr = std::get<CodeGenSpecifics::Attributes>(tup);
                 auto argTy = std::get<mlir::Type>(tup);
-                auto &vec = attr.isAppend() ? trailingInTys : newInTys;
+                llvm::SmallVector<mlir::Type> &vec =
+                    attr.isAppend() ? trailingInTys : newInTys;
                 vec.push_back(argTy);
               }
             }
@@ -367,8 +368,6 @@ public:
     auto newTy = rewriter->getFunctionType(newInTys, newResTys);
     auto newOp =
         rewriter->create<AddrOfOp>(addrOp.getLoc(), newTy, addrOp.symbol());
-    LLVM_DEBUG(llvm::dbgs()
-               << "replacing " << addrOp << " with " << newOp << '\n');
     replaceOp(addrOp, newOp.getResult());
   }
 
@@ -493,8 +492,8 @@ public:
         case FixupTy::Codes::ArgumentAsLoad: {
           // Argument was pass-by-value, but is now pass-by-reference and
           // possibly with a different element type.
-          auto newArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
+          auto newArg = func.front().insertArgument(fixup.index,
+                                                    newInTys[fixup.index], loc);
           rewriter->setInsertionPointToStart(&func.front());
           auto oldArgTy = ReferenceType::get(oldArgTys[fixup.index - offset]);
           auto cast = rewriter->create<ConvertOp>(loc, oldArgTy, newArg);
@@ -505,8 +504,8 @@ public:
         case FixupTy::Codes::ArgumentType: {
           // Argument is pass-by-value, but its type has likely been modified to
           // suit the target ABI convention.
-          auto newArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
+          auto newArg = func.front().insertArgument(fixup.index,
+                                                    newInTys[fixup.index], loc);
           rewriter->setInsertionPointToStart(&func.front());
           auto mem =
               rewriter->create<fir::AllocaOp>(loc, newInTys[fixup.index]);
@@ -524,8 +523,8 @@ public:
         case FixupTy::Codes::CharPair: {
           // The FIR boxchar argument has been split into a pair of distinct
           // arguments that are in juxtaposition to each other.
-          auto newArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
+          auto newArg = func.front().insertArgument(fixup.index,
+                                                    newInTys[fixup.index], loc);
           if (fixup.second == 1) {
             rewriter->setInsertionPointToStart(&func.front());
             auto boxTy = oldArgTys[fixup.index - offset - fixup.second];
@@ -539,8 +538,8 @@ public:
         case FixupTy::Codes::ReturnAsStore: {
           // The value being returned is now being returned in memory (callee
           // stack space) through a hidden reference argument.
-          auto newArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
+          auto newArg = func.front().insertArgument(fixup.index,
+                                                    newInTys[fixup.index], loc);
           offset++;
           func.walk([&](mlir::ReturnOp ret) {
             rewriter->setInsertionPoint(ret);
@@ -571,20 +570,19 @@ public:
         case FixupTy::Codes::Split: {
           // The FIR argument has been split into a pair of distinct arguments
           // that are in juxtaposition to each other. (For COMPLEX value.)
-          auto newArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
+          auto newArg = func.front().insertArgument(fixup.index,
+                                                    newInTys[fixup.index], loc);
           if (fixup.second == 1) {
             rewriter->setInsertionPointToStart(&func.front());
             auto cplxTy = oldArgTys[fixup.index - offset - fixup.second];
             auto undef = rewriter->create<UndefOp>(loc, cplxTy);
-	    auto iTy = rewriter->getIntegerType(32);
-            auto zero = rewriter->getIntegerAttr(iTy, 0);
-            auto one = rewriter->getIntegerAttr(iTy, 1);
+            auto zero = rewriter->getIntegerAttr(rewriter->getIndexType(), 0);
+            auto one = rewriter->getIntegerAttr(rewriter->getIndexType(), 1);
             auto cplx1 = rewriter->create<InsertValueOp>(
                 loc, cplxTy, undef, func.front().getArgument(fixup.index - 1),
                 rewriter->getArrayAttr(zero));
-            auto cplx = rewriter->create<InsertValueOp>(loc, cplxTy, cplx1,
-                                                        newArg, rewriter->getArrayAttr(one));
+            auto cplx = rewriter->create<InsertValueOp>(
+                loc, cplxTy, cplx1, newArg, rewriter->getArrayAttr(one));
             func.getArgument(fixup.index + 1).replaceAllUsesWith(cplx);
             func.front().eraseArgument(fixup.index + 1);
             offset++;
@@ -595,9 +593,10 @@ public:
           // The first part of the pair appears in the original argument
           // position. The second part of the pair is appended after all the
           // original arguments. (Boxchar arguments.)
-          auto newBufArg =
-              func.front().insertArgument(fixup.index, newInTys[fixup.index]);
-          auto newLenArg = func.front().addArgument(trailingTys[fixup.second]);
+          auto newBufArg = func.front().insertArgument(
+              fixup.index, newInTys[fixup.index], loc);
+          auto newLenArg =
+              func.front().addArgument(trailingTys[fixup.second], loc);
           auto boxTy = oldArgTys[fixup.index - offset];
           rewriter->setInsertionPointToStart(&func.front());
           auto box =
