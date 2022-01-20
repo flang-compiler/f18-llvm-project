@@ -23,9 +23,9 @@ namespace fir {
 // ISO_Fortran_binding.h.
 //===----------------------------------------------------------------------===//
 
-inline int characterBitsToTypeCode(unsigned bits) {
+inline int characterBitsToTypeCode(unsigned bitwidth) {
   // clang-format off
-  switch (bits) {
+  switch (bitwidth) {
   case 8:  return CFI_type_char;
   case 16: return CFI_type_char16_t;
   case 32: return CFI_type_char32_t;
@@ -34,22 +34,21 @@ inline int characterBitsToTypeCode(unsigned bits) {
   // clang-format on
 }
 
-inline int complexBitsToTypeCode(unsigned bits) {
+inline int complexBitsToTypeCode(unsigned bitwidth) {
   // clang-format off
-  switch (bits) {
-  case 16:  return CFI_type_half_float_Complex; // CFI_type_bfloat_Complex ?
+  switch (bitwidth) {
   case 32:  return CFI_type_float_Complex;
   case 64:  return CFI_type_double_Complex;
-  case 80:  return CFI_type_extended_double_Complex;
-  case 128: return CFI_type_float128_Complex;
+  case 80:
+  case 128: return CFI_type_long_double_Complex;
   default:  llvm_unreachable("unsupported complex size");
   }
   // clang-format on
 }
 
-inline int integerBitsToTypeCode(unsigned bits) {
+inline int integerBitsToTypeCode(unsigned bitwidth) {
   // clang-format off
-  switch (bits) {
+  switch (bitwidth) {
   case 8:   return CFI_type_int8_t;
   case 16:  return CFI_type_int16_t;
   case 32:  return CFI_type_int32_t;
@@ -60,9 +59,9 @@ inline int integerBitsToTypeCode(unsigned bits) {
   // clang-format on
 }
 
-inline int logicalBitsToTypeCode(unsigned bits) {
+inline int logicalBitsToTypeCode(unsigned bitwidth) {
   // clang-format off
-  switch (bits) {
+  switch (bitwidth) {
   case 8: return CFI_type_Bool;
   case 16: return CFI_type_int_least16_t;
   case 32: return CFI_type_int_least32_t;
@@ -72,14 +71,13 @@ inline int logicalBitsToTypeCode(unsigned bits) {
   // clang-format on
 }
 
-inline int realBitsToTypeCode(unsigned bits) {
+inline int realBitsToTypeCode(unsigned bitwidth) {
   // clang-format off
-  switch (bits) {
-  case 16:  return CFI_type_half_float; // CFI_type_bfloat ?
+  switch (bitwidth) {
   case 32:  return CFI_type_float;
   case 64:  return CFI_type_double;
-  case 80:  return CFI_type_extended_double;
-  case 128: return CFI_type_float128;
+  case 80:
+  case 128: return CFI_type_long_double;
   default:  llvm_unreachable("unsupported real size");
   }
   // clang-format on
