@@ -851,7 +851,15 @@ mlir::Value genCharIOOption(Fortran::lower::AbstractConverter &converter,
 template <typename A>
 mlir::Value genIOOption(Fortran::lower::AbstractConverter &converter,
                         mlir::Location loc, mlir::Value cookie, const A &spec) {
-  // default case: do nothing
+  // These specifiers are processed in advance elsewhere - skip them here.
+  using PreprocessedSpecs =
+      std::tuple<Fortran::parser::EndLabel, Fortran::parser::EorLabel,
+                 Fortran::parser::ErrLabel, Fortran::parser::FileUnitNumber,
+                 Fortran::parser::Format, Fortran::parser::IoUnit,
+                 Fortran::parser::MsgVariable, Fortran::parser::Name,
+                 Fortran::parser::StatVariable>;
+  static_assert(Fortran::common::HasMember<A, PreprocessedSpecs>,
+                "missing genIOOPtion specialization");
   return {};
 }
 
@@ -953,9 +961,8 @@ mlir::Value genIOOption<Fortran::parser::ConnectSpec::Newunit>(
   mlir::Value addr = builder.createConvert(
       loc, ioFuncTy.getInput(1),
       fir::getBase(converter.genExprAddr(var, stmtCtx, loc)));
-  auto kind = builder.create<mlir::arith::ConstantOp>(
-      loc, builder.getIntegerAttr(ioFuncTy.getInput(2),
-                                  var->GetType().value().kind()));
+  auto kind = builder.createIntegerConstant(loc, ioFuncTy.getInput(2),
+                                            var->GetType().value().kind());
   llvm::SmallVector<mlir::Value> ioArgs = {cookie, addr, kind};
   return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 }
