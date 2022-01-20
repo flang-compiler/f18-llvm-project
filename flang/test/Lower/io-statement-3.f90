@@ -24,11 +24,20 @@ subroutine test_read_size(size, c1, c2, unit, stat)
   READ(unit, '(A)', ADVANCE='NO', SIZE=size, IOSTAT=stat) c1, c2
 end subroutine
 
+  ! CHECK: %[[unit:.*]] = fir.alloca i32 {bindc_name = "unit", uniq_name = "_QFEunit"}
   integer :: unit
   character(7) :: c1
   character(4) :: c2
   integer :: size = 0
   integer :: stat = 0
+  ! CHECK: %[[cookie:.*]] = fir.call @_FortranAioBeginOpenNewUnit(%{{.*}}, %{{.*}}) : (!fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[kind:.*]] = arith.constant 4 : i32
+  ! CHECK: fir.call @_FortranAioGetNewUnit(%[[cookie]], %[[unit]], %[[kind]]) : (!fir.ref<i8>, !fir.ref<i32>, i32) -> i1
+  ! CHECK: fir.call @_FortranAioSetAccess(%[[cookie]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioSetAction(%[[cookie]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioSetForm(%[[cookie]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioSetStatus(%[[cookie]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i64) -> i1
+  ! CHECK: fir.call @_FortranAioEndIoStatement(%[[cookie]]) : (!fir.ref<i8>) -> i32
   OPEN(NEWUNIT=unit,ACCESS='SEQUENTIAL',ACTION='READWRITE',&
     FORM='FORMATTED',STATUS='SCRATCH')
   WRITE(unit, '(A)') "ABCDEF"

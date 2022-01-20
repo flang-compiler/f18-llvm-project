@@ -942,6 +942,25 @@ mlir::Value genIOOption<Fortran::parser::ConnectSpec::Recl>(
 }
 
 template <>
+mlir::Value genIOOption<Fortran::parser::ConnectSpec::Newunit>(
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    mlir::Value cookie, const Fortran::parser::ConnectSpec::Newunit &spec) {
+  Fortran::lower::StatementContext stmtCtx;
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(GetNewUnit)>(loc, builder);
+  mlir::FunctionType ioFuncTy = ioFunc.getType();
+  const auto *var = Fortran::semantics::GetExpr(spec);
+  mlir::Value addr = builder.createConvert(
+      loc, ioFuncTy.getInput(1),
+      fir::getBase(converter.genExprAddr(var, stmtCtx, loc)));
+  auto kind = builder.create<mlir::arith::ConstantOp>(
+      loc, builder.getIntegerAttr(ioFuncTy.getInput(2),
+                                  var->GetType().value().kind()));
+  llvm::SmallVector<mlir::Value> ioArgs = {cookie, addr, kind};
+  return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
+}
+
+template <>
 mlir::Value genIOOption<Fortran::parser::StatusExpr>(
     Fortran::lower::AbstractConverter &converter, mlir::Location loc,
     mlir::Value cookie, const Fortran::parser::StatusExpr &spec) {
