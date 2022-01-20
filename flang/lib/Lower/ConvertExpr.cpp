@@ -316,9 +316,8 @@ static fir::ExtendedValue
 createInMemoryScalarCopy(fir::FirOpBuilder &builder, mlir::Location loc,
                          const fir::ExtendedValue &exv) {
   assert(exv.rank() == 0 && "input to scalar memory copy must be a scalar");
-  if (exv.getCharBox() != nullptr) {
+  if (exv.getCharBox() != nullptr)
     return fir::factory::CharacterExprHelper{builder, loc}.createTempFrom(exv);
-  }
   if (fir::isDerivedWithLengthParameters(exv))
     TODO(loc, "copy derived type with length parameters");
   mlir::Type type = fir::unwrapPassByRefType(fir::getBase(exv).getType());
@@ -4066,14 +4065,15 @@ private:
     }
   }
 
-  /// Lower an elemental function array argument with a given
-  /// ConstituentSemantics.
+  /// Lower an elemental function array argument. This ensures array
+  /// sub-expressions that are not variables and must be passed by address
+  /// are lowered by value and placed in memory.
   template <typename A>
-  CC genElementalArgumentAs(const A &x, ConstituentSemantics semantics) {
+  CC genElementalArgument(const A &x) {
     // Ensure the returned element is in memory if this is what was requested.
-    if ((semantics == ConstituentSemantics::RefOpaque ||
-         semantics == ConstituentSemantics::DataAddr ||
-         semantics == ConstituentSemantics::ByValueArg)) {
+    if ((semant == ConstituentSemantics::RefOpaque ||
+         semant == ConstituentSemantics::DataAddr ||
+         semant == ConstituentSemantics::ByValueArg)) {
       if (!Fortran::evaluate::IsVariable(x)) {
         PushSemantics(ConstituentSemantics::DataValue);
         CC cc = genarr(x);
@@ -4092,7 +4092,6 @@ private:
         };
       }
     }
-    PushSemantics(semantics);
     return genarr(x);
   }
 
@@ -4116,27 +4115,27 @@ private:
         operands.emplace_back([=](IterSpace) { return mlir::Value{}; });
       } else if (!argLowering) {
         // No argument lowering instruction, lower by value.
-        auto lambda =
-            genElementalArgumentAs(*expr, ConstituentSemantics::RefTransparent);
+        PushSemantics(ConstituentSemantics::RefTransparent);
+        auto lambda = genElementalArgument(*expr);
         operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
       } else {
         // Ad-hoc argument lowering handling.
         switch (Fortran::lower::lowerIntrinsicArgumentAs(getLoc(), *argLowering,
                                                          dummy.name)) {
         case Fortran::lower::LowerIntrinsicArgAs::Value: {
-          auto lambda = genElementalArgumentAs(
-              *expr, ConstituentSemantics::RefTransparent);
+          PushSemantics(ConstituentSemantics::RefTransparent);
+          auto lambda = genElementalArgument(*expr);
           operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
         } break;
         case Fortran::lower::LowerIntrinsicArgAs::Addr: {
           // Note: assume does not have Fortran VALUE attribute semantics.
-          auto lambda =
-              genElementalArgumentAs(*expr, ConstituentSemantics::RefOpaque);
+          PushSemantics(ConstituentSemantics::RefOpaque);
+          auto lambda = genElementalArgument(*expr);
           operands.emplace_back([=](IterSpace iters) { return lambda(iters); });
         } break;
         case Fortran::lower::LowerIntrinsicArgAs::Box: {
-          auto lambda =
-              genElementalArgumentAs(*expr, ConstituentSemantics::RefOpaque);
+          PushSemantics(ConstituentSemantics::RefOpaque);
+          auto lambda = genElementalArgument(*expr);
           operands.emplace_back([=](IterSpace iters) {
             return builder.createBox(loc, lambda(iters));
           });
@@ -4199,14 +4198,14 @@ private:
       switch (arg.passBy) {
       case PassBy::Value: {
         // True pass-by-value semantics.
-        operands.emplace_back(genElementalArgumentAs(
-            *expr, ConstituentSemantics::RefTransparent));
+        PushSemantics(ConstituentSemantics::RefTransparent);
+        operands.emplace_back(genElementalArgument(*expr));
       } break;
       case PassBy::BaseAddressValueAttribute: {
         // VALUE attribute or pass-by-reference to a copy semantics. (byval*)
         if (isArray(*expr)) {
-          operands.emplace_back(
-              genElementalArgumentAs(*expr, ConstituentSemantics::ByValueArg));
+          PushSemantics(ConstituentSemantics::ByValueArg);
+          operands.emplace_back(genElementalArgument(*expr));
         } else {
           // Store scalar value in a temp to fulfill VALUE attribute.
           mlir::Value val = fir::getBase(asScalar(*expr));
@@ -4221,8 +4220,8 @@ private:
       } break;
       case PassBy::BaseAddress: {
         if (isArray(*expr)) {
-          operands.emplace_back(
-              genElementalArgumentAs(*expr, ConstituentSemantics::RefOpaque));
+          PushSemantics(ConstituentSemantics::RefOpaque);
+          operands.emplace_back(genElementalArgument(*expr));
         } else {
           ExtValue exv = asScalarRef(*expr);
           operands.emplace_back([=](IterSpace iters) { return exv; });
@@ -4230,8 +4229,8 @@ private:
       } break;
       case PassBy::CharBoxValueAttribute: {
         if (isArray(*expr)) {
-          auto lambda =
-              genElementalArgumentAs(*expr, ConstituentSemantics::DataValue);
+          PushSemantics(ConstituentSemantics::DataValue);
+          auto lambda = genElementalArgument(*expr);
           operands.emplace_back([=](IterSpace iters) {
             return fir::factory::CharacterExprHelper{builder, loc}
                 .createTempFrom(lambda(iters));
@@ -4244,8 +4243,8 @@ private:
         }
       } break;
       case PassBy::BoxChar: {
-        operands.emplace_back(
-            genElementalArgumentAs(*expr, ConstituentSemantics::RefOpaque));
+        PushSemantics(ConstituentSemantics::RefOpaque);
+        operands.emplace_back(genElementalArgument(*expr));
       } break;
       case PassBy::AddressAndLength:
         // PassBy::AddressAndLength is only used for character results. Results
