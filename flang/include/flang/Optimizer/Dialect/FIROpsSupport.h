@@ -77,6 +77,12 @@ static constexpr llvm::StringRef getHostAssocAttrName() {
   return "fir.host_assoc";
 }
 
+/// Attribute to mark that a function argument is a character dummy procedure.
+/// Character dummy procedure have special ABI constraints.
+static constexpr llvm::StringRef getCharacterProcedureDummyAttrName() {
+  return "fir.char_proc";
+}
+
 /// Does the function, \p func, have a host-associations tuple argument?
 /// Some internal procedures may have access to host procedure variables.
 bool hasHostAssociationArgument(mlir::FuncOp func);
