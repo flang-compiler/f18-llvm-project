@@ -37,7 +37,7 @@
 
 using namespace llvm;
 
-// list of program return codes
+/// list of program return codes
 static cl::opt<std::string>
     inputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
 
@@ -106,11 +106,12 @@ compileFIR(const mlir::PassPipelineCLParser &passPipeline) {
     // parse the input and pretty-print it back out
     // -emit-fir intentionally disables all the passes
   } else if (passPipeline.hasAnyOccurrences()) {
-    // FIXME: handle result
-    (void)passPipeline.addToPipeline(pm, [&](const Twine &msg) {
-      mlir::emitError(mlir::UnknownLoc::get(&context)) << msg;
+    auto errorHandler = [&](const Twine &msg) {
+      mlir::emitError(mlir::UnknownLoc::get(pm.getContext())) << msg;
       return mlir::failure();
-    });
+    };
+    if (mlir::failed(passPipeline.addToPipeline(pm, errorHandler)))
+      return mlir::failure();
   } else {
     fir::createMLIRToLLVMPassPipeline(pm);
     fir::addLLVMDialectToLLVMPass(pm, out.os());
