@@ -417,15 +417,15 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
     llvm_unreachable("unknown OutputInteger kind");
   }
   if (auto ty = type.dyn_cast<mlir::FloatType>()) {
-    if (auto width = ty.getWidth(); width <= 32)
+    if (auto width = ty.getWidth(); width == 32)
       return getIORuntimeFunc<mkIOKey(OutputReal32)>(loc, builder);
-    else if (width <= 64)
+    else if (width == 64)
       return getIORuntimeFunc<mkIOKey(OutputReal64)>(loc, builder);
   }
   if (auto ty = type.dyn_cast<fir::ComplexType>()) {
-    if (auto kind = ty.getFKind(); kind <= 4)
+    if (auto kind = ty.getFKind(); kind == 4)
       return getIORuntimeFunc<mkIOKey(OutputComplex32)>(loc, builder);
-    else if (kind <= 8)
+    else if (kind == 8)
       return getIORuntimeFunc<mkIOKey(OutputComplex64)>(loc, builder);
   }
   if (type.isa<fir::LogicalType>())

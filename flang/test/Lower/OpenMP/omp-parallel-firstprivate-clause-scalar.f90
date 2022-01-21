@@ -191,9 +191,9 @@ end subroutine
 !FIRDialect-DAG:     %[[LIST_IO:.*]] = fir.call @_FortranAioBeginExternalListOutput
 !FIRDialect-DAG:     %[[ARG1_PVT_VAL:.*]] = fir.load %[[ARG1_PVT]] : !fir.ref<f32>
 !FIRDialect-DAG:     %{{.*}} = fir.call @_FortranAioOutputReal32(%[[LIST_IO]], %[[ARG1_PVT_VAL]]) : (!fir.ref<i8>, f32) -> i1
-!FIRDialect-DAG:     %[[ARG2_PVT_VAL:.*]] = fir.load %[[ARG2_PVT]] : !fir.ref<f16>
-!FIRDialect-DAG:     %[[ARG2_PVT_CVT:.*]] = fir.convert %[[ARG2_PVT_VAL]] : (f16) -> f32
-!FIRDialect-DAG:     %{{.*}} = fir.call @_FortranAioOutputReal32(%[[LIST_IO]], %[[ARG2_PVT_CVT]]) : (!fir.ref<i8>, f32) -> i1
+!FIRDialect-DAG:     %[[ARG2_PVT_VAL:.*]] = fir.embox %[[ARG2_PVT]] : (!fir.ref<f16>) -> !fir.box<f16>
+!FIRDialect-DAG:     %[[ARG2_PVT_CVT:.*]] = fir.convert %[[ARG2_PVT_VAL]] : (!fir.box<f16>) -> !fir.box<none>
+!FIRDialect-DAG:     %{{.*}} = fir.call @_FortranAioOutputDescriptor(%[[LIST_IO]], %[[ARG2_PVT_CVT]]) : (!fir.ref<i8>, !fir.box<none>) -> i1
 !FIRDialect-DAG:     %[[ARG3_PVT_VAL:.*]] = fir.load %[[ARG3_PVT]] : !fir.ref<f32>
 !FIRDialect-DAG:     %{{.*}} = fir.call @_FortranAioOutputReal32(%[[LIST_IO]], %[[ARG3_PVT_VAL]]) : (!fir.ref<i8>, f32) -> i1
 !FIRDialect-DAG:     %[[ARG4_PVT_VAL:.*]] = fir.load %[[ARG4_PVT]] : !fir.ref<f64>
