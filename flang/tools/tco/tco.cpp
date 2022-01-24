@@ -37,7 +37,6 @@
 
 using namespace llvm;
 
-/// list of program return codes
 static cl::opt<std::string>
     inputFilename(cl::Positional, cl::desc("<input file>"), cl::init("-"));
 
