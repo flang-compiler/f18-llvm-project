@@ -13,10 +13,9 @@
 #include "flang/Lower/OpenMP.h"
 #include "flang/Common/idioms.h"
 #include "flang/Lower/Bridge.h"
-#include "flang/Lower/FIRBuilder.h"
 #include "flang/Lower/PFTBuilder.h"
-#include "flang/Lower/Support/BoxValue.h"
 #include "flang/Lower/Todo.h"
+#include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Semantics/tools.h"
 #include "mlir/Dialect/OpenMP/OpenMPDialect.h"
@@ -49,7 +48,7 @@ static void genObjectList(const Fortran::parser::OmpObjectList &objectList,
 }
 
 template <typename Op>
-static void createBodyOfOp(Op &op, Fortran::lower::FirOpBuilder &firOpBuilder,
+static void createBodyOfOp(Op &op, fir::FirOpBuilder &firOpBuilder,
                            mlir::Location &loc) {
   firOpBuilder.createBlock(&op.getRegion());
   auto &block = op.getRegion().back();
