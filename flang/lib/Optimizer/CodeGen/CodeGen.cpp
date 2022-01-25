@@ -2267,7 +2267,7 @@ struct CoordinateOpConversion
     if (fir::isa_complex(objectTy)) {
       mlir::LLVM::ConstantOp c0 =
           genConstantIndex(loc, lowerTy().indexType(), rewriter, 0);
-      SmallVector<mlir::Value> offs = {c0, operands[1]};
+      llvm::SmallVector<mlir::Value> offs = {c0, operands[1]};
       mlir::Value gep = genGEP(loc, ty, rewriter, base, offs);
       rewriter.replaceOp(coor, gep);
       return success();
@@ -2285,7 +2285,7 @@ struct CoordinateOpConversion
         coor, "fir.coordinate_of base operand has unsupported type");
   }
 
-  unsigned getFieldNumber(fir::RecordType ty, mlir::Value op) const {
+  static unsigned getFieldNumber(fir::RecordType ty, mlir::Value op) {
     return fir::hasDynamicSize(ty)
                ? op.getDefiningOp()
                      ->getAttrOfType<mlir::IntegerAttr>("field")
@@ -2293,7 +2293,7 @@ struct CoordinateOpConversion
                : getIntValue(op);
   }
 
-  int64_t getIntValue(mlir::Value val) const {
+  static int64_t getIntValue(mlir::Value val) {
     assert(val && val.dyn_cast<mlir::OpResult>() && "must not be null value");
     mlir::Operation *defop = val.getDefiningOp();
 
@@ -2305,7 +2305,7 @@ struct CoordinateOpConversion
     fir::emitFatalError(val.getLoc(), "must be a constant");
   }
 
-  bool hasSubDimensions(mlir::Type type) const {
+  static bool hasSubDimensions(mlir::Type type) {
     return type.isa<fir::SequenceType, fir::RecordType, mlir::TupleType>();
   }
 
@@ -2314,7 +2314,7 @@ struct CoordinateOpConversion
   /// all valid forms of `!fir.coordinate_of`.
   /// TODO: Either implement the unsupported cases or extend the verifier
   /// in FIROps.cpp instead.
-  bool supportedCoordinate(mlir::Type type, mlir::ValueRange coors) const {
+  static bool supportedCoordinate(mlir::Type type, mlir::ValueRange coors) {
     const std::size_t numOfCoors = coors.size();
     std::size_t i = 0;
     bool subEle = false;
@@ -2343,7 +2343,7 @@ struct CoordinateOpConversion
   /// Walk the abstract memory layout and determine if the path traverses any
   /// array types with unknown shape. Return true iff all the array types have a
   /// constant shape along the path.
-  bool arraysHaveKnownShape(mlir::Type type, mlir::ValueRange coors) const {
+  static bool arraysHaveKnownShape(mlir::Type type, mlir::ValueRange coors) {
     const std::size_t sz = coors.size();
     std::size_t i = 0;
     for (; i < sz; ++i) {
@@ -2380,10 +2380,9 @@ private:
     //   %addr = coordinate_of %box, %lenp
     if (coor.getNumOperands() == 2) {
       mlir::Operation *coordinateDef = (*coor.coor().begin()).getDefiningOp();
-      if (isa_and_nonnull<fir::LenParamIndexOp>(coordinateDef)) {
+      if (isa_and_nonnull<fir::LenParamIndexOp>(coordinateDef))
         TODO(loc,
              "fir.coordinate_of - fir.len_param_index is not supported yet");
-      }
     }
 
     // 2. GENERAL CASE:
@@ -2466,9 +2465,8 @@ private:
     bool hasSubdimension = hasSubDimensions(currentObjTy);
     bool columnIsDeferred = !hasSubdimension;
 
-    if (!supportedCoordinate(currentObjTy, operands.drop_front(1))) {
+    if (!supportedCoordinate(currentObjTy, operands.drop_front(1)))
       TODO(loc, "unsupported combination of coordinate operands");
-    }
 
     const bool hasKnownShape =
         arraysHaveKnownShape(currentObjTy, operands.drop_front(1));
