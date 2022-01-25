@@ -1,81 +1,70 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-
 ! CHECK-LABEL: func @_QPubound_test(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test(a, dim, res)
   real, dimension(:, :) :: a
   integer(8):: dim, res
-! CHECK:         %[[VAL_3:.*]] = fir.load %[[VAL_1]] : !fir.ref<i64>
-! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i64) -> index
-! CHECK:         %[[VAL_5:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_6:.*]] = arith.subi %[[VAL_4]], %[[VAL_5]] : index
-! CHECK:         %[[VAL_7:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_6]] : (!fir.box<!fir.array<?x?xf32>>, index) -> (index, index, index)
-! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_7]]#1 : (index) -> i64
-! CHECK:         %[[VAL_9:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_10:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_9]], %[[VAL_10]] : i64
-! CHECK:         %[[VAL_12:.*]] = arith.addi %[[VAL_11]], %[[VAL_8]] : i64
-! CHECK:         fir.store %[[VAL_12]] to %[[VAL_2]] : !fir.ref<i64>
+! CHECK:         %[[VAL_0:.*]] = fir.load
+! CHECK:         %[[VAL_1:.*]] = fir.address_of(
+! CHECK:         %[[VAL_2:.*]] = fir.convert
+! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_0]] : (i64) -> i32
+! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_1]]
+! CHECK:         %[[VAL_5:.*]] = fir.call @_FortranASizeDim(%[[VAL_2]], %[[VAL_3]], %[[VAL_4]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_6:.*]] = fir.address_of(
+! CHECK:         %[[VAL_7:.*]] = fir.convert %{{.*}} : (!fir.box<!fir.array<?x?xf32>>) -> !fir.box<none>
+! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_0]] : (i64) -> i32
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_6]]
+! CHECK:         %[[VAL_10:.*]] = fir.call @_FortranALboundDim(%[[VAL_7]], %[[VAL_8]], %[[VAL_9]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_10]], %c1_i64 : i64
+! CHECK:         %[[VAL_12:.*]] = arith.addi %[[VAL_11]], %[[VAL_5]] : i64
+
+! CHECK:         fir.store %[[VAL_12]] to %{{.*}} : !fir.ref<i64>
   res = ubound(a, dim, 8)
 end subroutine
 
 ! CHECK-LABEL: func @_QPubound_test_2(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test_2(a, dim, res)
   real, dimension(2:, 3:) :: a
   integer(8):: dim, res
-! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.array<2xi64>
-! CHECK:         %[[VAL_4:.*]] = arith.constant 2 : i64
-! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i64) -> index
-! CHECK:         %[[VAL_6:.*]] = arith.constant 3 : i64
-! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
-! CHECK:         %[[VAL_8:.*]] = fir.load %[[VAL_1]] : !fir.ref<i64>
-! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]] : (i64) -> index
-! CHECK:         %[[VAL_10:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_9]], %[[VAL_10]] : index
-! CHECK:         %[[VAL_12:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_11]] : (!fir.box<!fir.array<?x?xf32>>, index) -> (index, index, index)
-! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_12]]#1 : (index) -> i64
-! CHECK:         %[[VAL_14:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_15:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_14]] : (!fir.ref<!fir.array<2xi64>>, index) -> !fir.ref<i64>
-! CHECK:         %[[VAL_16:.*]] = fir.convert %[[VAL_5]] : (index) -> i64
-! CHECK:         fir.store %[[VAL_16]] to %[[VAL_15]] : !fir.ref<i64>
-! CHECK:         %[[VAL_17:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_18:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_17]] : (!fir.ref<!fir.array<2xi64>>, index) -> !fir.ref<i64>
-! CHECK:         %[[VAL_19:.*]] = fir.convert %[[VAL_7]] : (index) -> i64
-! CHECK:         fir.store %[[VAL_19]] to %[[VAL_18]] : !fir.ref<i64>
-! CHECK:         %[[VAL_20:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_21:.*]] = arith.subi %[[VAL_8]], %[[VAL_20]] : i64
-! CHECK:         %[[VAL_22:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_21]] : (!fir.ref<!fir.array<2xi64>>, i64) -> !fir.ref<i64>
-! CHECK:         %[[VAL_23:.*]] = fir.load %[[VAL_22]] : !fir.ref<i64>
-! CHECK:         %[[VAL_24:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_25:.*]] = arith.subi %[[VAL_23]], %[[VAL_24]] : i64
-! CHECK:         %[[VAL_26:.*]] = arith.addi %[[VAL_25]], %[[VAL_13]] : i64
-! CHECK:         fir.store %[[VAL_26]] to %[[VAL_2]] : !fir.ref<i64>
+! CHECK:         %[[VAL_0:.*]] = fir.load %{{.*}} : !fir.ref<i64>
+! CHECK:         %[[VAL_1:.*]] = fir.address_of(
+! CHECK:         %[[VAL_2:.*]] = fir.convert %{{.*}} : (!fir.box<!fir.array<?x?xf32>>) -> !fir.box<none>
+! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_0]] : (i64) -> i32
+! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_1]]
+! CHECK:         %[[VAL_5:.*]] = fir.call @_FortranASizeDim(%[[VAL_2]], %[[VAL_3]], %[[VAL_4]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_6:.*]] = fir.address_of(
+! CHECK:         %[[VAL_7:.*]] = fir.convert %{{.*}} : (!fir.box<!fir.array<?x?xf32>>) -> !fir.box<none>
+! CHECK:         %[[VAL_8:.*]] = fir.convert %[[VAL_0]] : (i64) -> i32
+! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_6]]
+! CHECK:         %[[VAL_10:.*]] = fir.call @_FortranALboundDim(%[[VAL_7]], %[[VAL_8]], %[[VAL_9]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_10]], %{{.*}} : i64
+! CHECK:         %[[VAL_12:.*]] = arith.addi %[[VAL_11]], %[[VAL_5]] : i64
+! CHECK:         fir.store %[[VAL_12]] to %{{.*}} : !fir.ref<i64>
   res = ubound(a, dim, 8)
 end subroutine
 
 ! CHECK-LABEL: func @_QPubound_test_3(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x20x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test_3(a, dim, res)
   real, dimension(10, 20, *) :: a
   integer(8):: dim, res
-! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant 20 : index
-! CHECK:         %[[VAL_5:.*]] = fir.undefined index
-! CHECK:         %[[VAL_6:.*]] = fir.shape %[[VAL_3]], %[[VAL_4]], %[[VAL_5]] : (index, index, index) -> !fir.shape<3>
-! CHECK:         %[[VAL_7:.*]] = fir.embox %[[VAL_0]](%[[VAL_6]]) : (!fir.ref<!fir.array<10x20x?xf32>>, !fir.shape<3>) -> !fir.box<!fir.array<10x20x?xf32>>
-! CHECK:         %[[VAL_8:.*]] = fir.load %[[VAL_1]] : !fir.ref<i64>
-! CHECK:         %[[VAL_9:.*]] = fir.convert %[[VAL_8]] : (i64) -> index
-! CHECK:         %[[VAL_10:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_9]], %[[VAL_10]] : index
-! CHECK:         %[[VAL_12:.*]]:3 = fir.box_dims %[[VAL_7]], %[[VAL_11]] : (!fir.box<!fir.array<10x20x?xf32>>, index) -> (index, index, index)
-! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_12]]#1 : (index) -> i64
-! CHECK:         %[[VAL_14:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_15:.*]] = arith.constant 1 : i64
-! CHECK:         %[[VAL_16:.*]] = arith.subi %[[VAL_14]], %[[VAL_15]] : i64
-! CHECK:         %[[VAL_17:.*]] = arith.addi %[[VAL_16]], %[[VAL_13]] : i64
-! CHECK:         fir.store %[[VAL_17]] to %[[VAL_2]] : !fir.ref<i64>
-! CHECK:         return
+! CHECK:         %[[VAL_0:.*]] = fir.undefined index
+! CHECK:         %[[VAL_1:.*]] = fir.shape %{{.*}}, %{{.*}}, %[[VAL_0]] : (index, index, index) -> !fir.shape<3>
+! CHECK:         %[[VAL_2:.*]] = fir.embox %{{.*}}(%[[VAL_1]]) : (!fir.ref<!fir.array<10x20x?xf32>>, !fir.shape<3>) -> !fir.box<!fir.array<10x20x?xf32>>
+! CHECK:         %[[VAL_3:.*]] = fir.load %{{.*}} : !fir.ref<i64>
+! CHECK:         %[[VAL_4:.*]] = fir.address_of(
+! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_2]] : (!fir.box<!fir.array<10x20x?xf32>>) -> !fir.box<none>
+
+! CHECK:         %[[VAL_6:.*]] = fir.convert %[[VAL_3]] : (i64) -> i32
+! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_4]]
+! CHECK:         %[[VAL_8:.*]] = fir.call @_FortranASizeDim(%[[VAL_5]], %[[VAL_6]], %[[VAL_7]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_9:.*]] = fir.rebox %[[VAL_2]] : (!fir.box<!fir.array<10x20x?xf32>>) -> !fir.box<!fir.array<10x20x?xf32>>
+! CHECK:         %[[VAL_10:.*]] = fir.address_of(
+! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_9]] : (!fir.box<!fir.array<10x20x?xf32>>) -> !fir.box<none>
+! CHECK:         %[[VAL_12:.*]] = fir.convert %[[VAL_3]]
+! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_10]]
+! CHECK:         %[[VAL_14:.*]] = fir.call @_FortranALboundDim(%[[VAL_11]], %[[VAL_12]], %[[VAL_13]], %{{.*}}) : (!fir.box<none>, i32, !fir.ref<i8>, i32) -> i64
+! CHECK:         %[[VAL_15:.*]] = arith.subi %[[VAL_14]], %{{.*}} : i64
+! CHECK:         %[[VAL_16:.*]] = arith.addi %[[VAL_15]], %[[VAL_8]] : i64
+! CHECK:         fir.store %[[VAL_16]] to %{{.*}} : !fir.ref<i64>
   res = ubound(a, dim, 8)
 end subroutine

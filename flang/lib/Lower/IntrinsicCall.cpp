@@ -27,6 +27,7 @@
 #include "flang/Optimizer/Builder/MutableBox.h"
 #include "flang/Optimizer/Builder/Runtime/Character.h"
 #include "flang/Optimizer/Builder/Runtime/Command.h"
+#include "flang/Optimizer/Builder/Runtime/Inquiry.h"
 #include "flang/Optimizer/Builder/Runtime/Numeric.h"
 #include "flang/Optimizer/Builder/Runtime/RTBuilder.h"
 #include "flang/Optimizer/Builder/Runtime/Reduction.h"
@@ -734,7 +735,7 @@ static constexpr IntrinsicHandler handlers[]{
     {"ishftc", &I::genIshftc},
     {"lbound",
      &I::genLbound,
-     {{{"array", asBox}, {"dim", asValue}, {"kind", asValue}}},
+     {{{"array", asInquired}, {"dim", asValue}, {"kind", asValue}}},
      /*isElemental=*/false},
     {"len", &I::genLen},
     {"len_trim", &I::genLenTrim},
@@ -3116,76 +3117,70 @@ mlir::Value IntrinsicLibrary::genSign(mlir::Type resultType,
 fir::ExtendedValue
 IntrinsicLibrary::genSize(mlir::Type resultType,
                           llvm::ArrayRef<fir::ExtendedValue> args) {
+  // Note that the value of the KIND argument is already reflected in the
+  // resultType
   assert(args.size() == 3);
   if (const auto *boxValue = args[0].getBoxOf<fir::BoxValue>())
     if (boxValue->hasAssumedRank())
       TODO(loc, "SIZE intrinsic with assumed rank argument");
 
-  // Handle the ARRAY argument
+  // Get the ARRAY argument
   mlir::Value array = builder.createBox(loc, args[0]);
 
   // The front-end rewrites SIZE without the DIM argument to
   // an array of SIZE with DIM in most cases, but it may not be
   // possible in some cases like when in SIZE(function_call()).
   if (isAbsent(args, 1))
-    TODO(loc, "lowering of size intrinsic without 'dim' argument");
+    return builder.createConvert(
+        loc, resultType,
+        fir::runtime::genSize(builder, loc, fir::getBase(array)));
 
-  // Handle the DIM argument.
-  // Convert the Fortran 1-based index to the FIR 0-based index
-  mlir::IndexType indexType = builder.getIndexType();
-  mlir::Value oneBasedDim =
-      builder.createConvert(loc, indexType, fir::getBase(args[1]));
-  mlir::Value one = builder.createIntegerConstant(loc, indexType, 1);
-  auto zeroBasedDim =
-      builder.create<mlir::arith::SubIOp>(loc, oneBasedDim, one);
+  // Get the DIM argument.
+  mlir::Value dim = fir::getBase(args[1]);
 
-  // The value of the KIND argument is already reflected in the resultType
-
-  mlir::Value result =
-      builder
-          .create<fir::BoxDimsOp>(loc, indexType, indexType, indexType, array,
-                                  zeroBasedDim)
-          .getResult(1);
-  return builder.createConvert(loc, resultType, result);
+  return builder.createConvert(
+      loc, resultType,
+      fir::runtime::genSizeDim(builder, loc, fir::getBase(array), dim));
 }
 
 // LBOUND
 fir::ExtendedValue
 IntrinsicLibrary::genLbound(mlir::Type resultType,
                             llvm::ArrayRef<fir::ExtendedValue> args) {
+  // Calls to LBOUND that don't have the DIM argument, or for which
+  // the DIM is a compile time constant, are folded to descriptor inquiries by
+  // semantics.  This function covers the situations where a call to the
+  // runtime is required.
   assert(args.size() == 3);
+  assert(!isAbsent(args[1]));
   if (const auto *boxValue = args[0].getBoxOf<fir::BoxValue>())
     if (boxValue->hasAssumedRank())
       TODO(loc, "LBOUND intrinsic with assumed rank argument");
 
-  // Calls to LBOUND that don't have the DIM argument, or for which
-  // the DIM is a compile time constant, are folded to descriptor inquiries by
-  // semantics.
-  assert(!isAbsent(args[1]));
   const fir::ExtendedValue &array = args[0];
-  llvm::SmallVector<mlir::Value> lbounds =
-      fir::factory::getNonDefaultLowerBounds(builder, loc, array);
-  if (lbounds.empty())
-    return builder.createIntegerConstant(loc, resultType, 1);
-  mlir::Type lbArrayType = fir::SequenceType::get(
-      {static_cast<fir::SequenceType::Extent>(array.rank())}, resultType);
-  auto lbArray = builder.createTemporary(loc, lbArrayType);
-  auto lbAddrType = builder.getRefType(resultType);
-  auto indexType = builder.getIndexType();
-  for (auto lb : llvm::enumerate(lbounds)) {
-    auto index = builder.createIntegerConstant(loc, indexType, lb.index());
-    auto lbAddr =
-        builder.create<fir::CoordinateOp>(loc, lbAddrType, lbArray, index);
-    mlir::Value lbValue = builder.createConvert(loc, resultType, lb.value());
-    builder.create<fir::StoreOp>(loc, lbValue, lbAddr);
-  }
-  mlir::Value dimArg = fir::getBase(args[1]);
-  mlir::Value one = builder.createIntegerConstant(loc, dimArg.getType(), 1);
-  mlir::Value zeroBasedDim =
-      builder.create<mlir::arith::SubIOp>(loc, dimArg, one);
-  mlir::Value resAddr =
-      builder.create<fir::CoordinateOp>(loc, lbAddrType, lbArray, zeroBasedDim);
-  return builder.create<fir::LoadOp>(loc, resAddr);
+  mlir::Value box = array.match(
+      [&](const fir::BoxValue &boxValue) -> mlir::Value {
+        // This entity is mapped to a fir.box that may not contain the local
+        // lower bound information if it is a dummy. Rebox it with the local
+        // shape information.
+        mlir::Value localShape = builder.createShape(loc, array);
+        mlir::Value oldBox = boxValue.getAddr();
+        return builder.create<fir::ReboxOp>(
+            loc, oldBox.getType(), oldBox, localShape, /*slice=*/mlir::Value{});
+      },
+      [&](const auto &) -> mlir::Value {
+        // This a pointer/allocatable, or an entity not yet tracked with a
+        // fir.box. For pointer/allocatable, createBox will forward the
+        // descriptor that contains the correct lower bound information. For
+        // other entities, a new fir.box will be made with the local lower
+        // bounds.
+        return builder.createBox(loc, array);
+      });
+
+  mlir::Value dim = fir::getBase(args[1]);
+  return builder.createConvert(
+      loc, resultType,
+      fir::runtime::genLboundDim(builder, loc, fir::getBase(box), dim));
 }
 
 // UBOUND

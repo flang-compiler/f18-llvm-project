@@ -47,6 +47,7 @@ add_flang_library(FortranRuntime PARTIAL_SOURCES_INTENDED
   file.cpp
   findloc.cpp
   format.cpp
+  inquiry.cpp
   internal-unit.cpp
   iostat.cpp
   io-api.cpp
