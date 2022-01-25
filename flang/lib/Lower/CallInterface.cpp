@@ -12,6 +12,7 @@
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/StatementContext.h"
+#include "flang/Lower/Support/Utils.h"
 #include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
@@ -195,11 +196,6 @@ bool Fortran::lower::CallerInterface::verifyActualInputs() const {
   return true;
 }
 
-template <typename T>
-static inline auto AsGenericExpr(T e) {
-  return Fortran::evaluate::AsGenericExpr(Fortran::common::Clone(e));
-}
-
 void Fortran::lower::CallerInterface::walkResultLengths(
     ExprVisitor visitor) const {
   assert(characteristic && "characteristic was not computed");
@@ -213,7 +209,7 @@ void Fortran::lower::CallerInterface::walkResultLengths(
   if (dynamicType.category() == Fortran::common::TypeCategory::Character) {
     if (std::optional<Fortran::evaluate::ExtentExpr> length =
             dynamicType.GetCharLength())
-      visitor(AsGenericExpr(*length));
+      visitor(toEvExpr(*length));
   } else if (dynamicType.category() == common::TypeCategory::Derived) {
     const Fortran::semantics::DerivedTypeSpec &derivedTypeSpec =
         dynamicType.GetDerivedTypeSpec();
@@ -919,7 +915,7 @@ private:
               expr) {
     if (expr)
       return Fortran::evaluate::ToInt64(Fortran::evaluate::Fold(
-          getConverter().getFoldingContext(), AsGenericExpr(*expr)));
+          getConverter().getFoldingContext(), toEvExpr(*expr)));
     return std::nullopt;
   }
   void
