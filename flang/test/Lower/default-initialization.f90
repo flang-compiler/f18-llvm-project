@@ -75,7 +75,7 @@ contains
   ! Test that optional intent(out) are default initialized only when
   ! present.
   ! CHECK-LABEL: func @_QMtest_dinitPintent_out_optional(
-  ! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.type<_QMtest_dinitTt{i:i32}>> {fir.optional})
+  ! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.type<_QMtest_dinitTt{i:i32}>> {fir.bindc_name = "x", fir.optional})
   subroutine intent_out_optional(x)
     ! CHECK: %[[isPresent:.*]] = fir.is_present %[[x]] : (!fir.box<!fir.type<_QMtest_dinitTt{i:i32}>>) -> i1
     ! CHECK: fir.if %[[isPresent]] {

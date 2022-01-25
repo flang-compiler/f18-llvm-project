@@ -3,7 +3,8 @@
 ! Test statement function lowering
 
 ! Simple case
-! CHECK-LABEL: func @_QPtest_stmt_0(%arg0: !fir.ref<f32>) -> f32
+  ! CHECK-LABEL: func @_QPtest_stmt_0(
+  ! CHECK-SAME: %{{.*}}: !fir.ref<f32>{{.*}}) -> f32
 real function test_stmt_0(x)
   real :: x, func, arg
   func(arg) = arg + 0.123456
@@ -118,8 +119,8 @@ integer function test_stmt_character_with_different_length(c)
    test_stmt_character = func(c)
 end function
 
-! CHECK-LABEL: @_QPtest_stmt_character_with_different_length_2
-! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>, %[[arg1:.*]]: !fir.ref<i32>
+! CHECK-LABEL: @_QPtest_stmt_character_with_different_length_2(
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>
 integer function test_stmt_character_with_different_length_2(c, n)
    integer :: func, ifoo
    character(n) :: argc

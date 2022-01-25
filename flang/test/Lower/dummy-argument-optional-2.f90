@@ -35,7 +35,7 @@ contains
 ! allocation/association status match the dummy presence status.
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_pointer_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<i32>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<i32>>>{{.*}}) {
 subroutine pass_pointer_scalar(i)
   integer, pointer :: i
   call takes_opt_scalar(i)
@@ -46,7 +46,7 @@ subroutine pass_pointer_scalar(i)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_allocatable_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<i32>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<i32>>>{{.*}}) {
 subroutine pass_allocatable_scalar(i)
   integer, allocatable :: i
   call takes_opt_scalar(i)
@@ -57,7 +57,7 @@ subroutine pass_allocatable_scalar(i)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_pointer_scalar_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>{{.*}}) {
 subroutine pass_pointer_scalar_char(c)
   character(:), pointer :: c
   call takes_opt_scalar_char(c)
@@ -70,7 +70,7 @@ subroutine pass_pointer_scalar_char(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_allocatable_scalar_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>{{.*}}) {
 subroutine pass_allocatable_scalar_char(c)
   character(:), allocatable :: c
   call takes_opt_scalar_char(c)
@@ -90,7 +90,7 @@ end subroutine
 ! correct present/absent aspect.
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_pointer_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}) {
 subroutine pass_pointer_array(i)
   real, pointer :: i(:)
   call takes_opt_explicit_shape(i)
@@ -124,7 +124,7 @@ subroutine pass_pointer_array(i)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_pointer_array_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>>{{.*}}) {
 subroutine pass_pointer_array_char(c)
   character(:), pointer :: c(:)
   call takes_opt_explicit_shape_char(c)
@@ -201,7 +201,7 @@ end subroutine
 ! shape presence.
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_assumed_shape(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.optional}) {
 subroutine pass_opt_assumed_shape(x)
   real, optional :: x(:)
   call takes_opt_explicit_shape(x)
@@ -234,7 +234,7 @@ subroutine pass_opt_assumed_shape(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_assumed_shape_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>> {fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>> {fir.bindc_name = "c", fir.optional}) {
 subroutine pass_opt_assumed_shape_char(c)
   character(*), optional :: c(:)
   call takes_opt_explicit_shape_char(c)
@@ -272,7 +272,7 @@ end subroutine
 ! There should be no copy-in/copy-out
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_contiguous_assumed_shape(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.contiguous, fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.contiguous, fir.optional}) {
 subroutine pass_opt_contiguous_assumed_shape(x)
   real, optional, contiguous :: x(:)
   call takes_opt_explicit_shape(x)
@@ -288,7 +288,7 @@ subroutine pass_opt_contiguous_assumed_shape(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_contiguous_assumed_shape_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>> {fir.contiguous, fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>> {fir.bindc_name = "c", fir.contiguous, fir.optional}) {
 subroutine pass_opt_contiguous_assumed_shape_char(c)
   character(*), optional, contiguous :: c(:)
   call takes_opt_explicit_shape_char(c)
@@ -313,7 +313,7 @@ end subroutine
 ! copy-in/copy-out.
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_allocatable_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>{{.*}}) {
 subroutine pass_allocatable_array(i)
   real, allocatable :: i(:)
   call takes_opt_explicit_shape(i)
@@ -324,7 +324,7 @@ subroutine pass_allocatable_array(i)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_allocatable_array_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>{{.*}}) {
 subroutine pass_allocatable_array_char(c)
   character(:), allocatable :: c(:)
   call takes_opt_explicit_shape_char(c)
@@ -337,7 +337,7 @@ subroutine pass_allocatable_array_char(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_contiguous_pointer_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {fir.contiguous}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {fir.bindc_name = "i", fir.contiguous}) {
 subroutine pass_contiguous_pointer_array(i)
   real, pointer, contiguous :: i(:)
   call takes_opt_explicit_shape(i)
@@ -348,7 +348,7 @@ subroutine pass_contiguous_pointer_array(i)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_contiguous_pointer_array_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>> {fir.contiguous}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>> {fir.bindc_name = "c", fir.contiguous}) {
 subroutine pass_contiguous_pointer_array_char(c)
   character(:), pointer, contiguous :: c(:)
   call takes_opt_explicit_shape_char(c)
@@ -369,7 +369,7 @@ end subroutine
 ! intent(out), there should be no copy-in.
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_assumed_shape_to_intentin(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.optional}) {
 subroutine pass_opt_assumed_shape_to_intentin(x)
   real, optional :: x(:)
   call takes_opt_explicit_shape_intentin(x)
@@ -397,7 +397,7 @@ subroutine pass_opt_assumed_shape_to_intentin(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMoptional_testsPpass_opt_assumed_shape_to_intentout(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.optional}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.optional}) {
 subroutine pass_opt_assumed_shape_to_intentout(x)
   real, optional :: x(:)
   call takes_opt_explicit_shape_intentout(x)

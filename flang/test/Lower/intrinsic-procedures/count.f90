@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: count_test1
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>{{.*}})
 subroutine count_test1(rslt, mask)
   integer :: rslt
   logical :: mask(:)
@@ -13,7 +13,7 @@ subroutine count_test1(rslt, mask)
 end subroutine
 
 ! CHECK-LABEL: test_count2
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg1:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>{{.*}})
 subroutine test_count2(rslt, mask)
   integer :: rslt(:)
   logical :: mask(:,:)
@@ -31,7 +31,7 @@ subroutine test_count2(rslt, mask)
 end subroutine
 
 ! CHECK-LABEL: test_count3
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>{{.*}})
 subroutine test_count3(rslt, mask)
   integer :: rslt
   logical :: mask(:)

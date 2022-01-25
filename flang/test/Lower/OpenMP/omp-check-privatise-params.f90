@@ -3,7 +3,7 @@
 ! RUN: bbc -fopenmp -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
-!FIRDialect: func @_QParray(%{{.*}}: !fir.ref<!fir.array<?xi32>>, %[[ARG1:.*]]: !fir.ref<i32>) {
+!FIRDialect: func @_QParray(%{{.*}}: !fir.ref<!fir.array<?xi32>>{{.*}}, %[[ARG1:.*]]: !fir.ref<i32>{{.*}}) {
 !FIRDialect-DAG:  %[[N:.*]] = fir.load %[[ARG1]] : !fir.ref<i32>
 !FIRDialect-DAG:  %[[N_CVT1:.*]] = fir.convert %[[N]] : (i32) -> i64
 !FIRDialect-DAG:  %[[N_CVT2:.*]] = fir.convert %[[N_CVT1]] : (i64) -> index

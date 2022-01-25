@@ -22,15 +22,14 @@ contains
 !            Test simple derived type symbol lowering 
 ! -----------------------------------------------------------------------------
 
-! CHECK-LABEL: @_QMdPderived_dummy
-! CHECK-SAME: (%{{.*}}: !fir.ref<!fir.type<_QMdTr{x:f32}>>,
-! CHECK-SAME: %{{.*}}: !fir.ref<!fir.type<_QMdTc2{ch_array:!fir.array<20x30x!fir.char<1,10>>}>>
+! CHECK-LABEL: func @_QMdPderived_dummy(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.type<_QMdTr{x:f32}>>{{.*}}, %{{.*}}: !fir.ref<!fir.type<_QMdTc2{ch_array:!fir.array<20x30x!fir.char<1,10>>}>>{{.*}}) {
 subroutine derived_dummy(some_r, some_c2)
   type(r) :: some_r
   type(c2) :: some_c2
 end subroutine
 
-! CHECK-LABEL: @_QMdPlocal_derived
+! CHECK-LABEL: func @_QMdPlocal_derived(
 subroutine local_derived()
   ! CHECK-DAG: fir.alloca !fir.type<_QMdTc2{ch_array:!fir.array<20x30x!fir.char<1,10>>}>
   ! CHECK-DAG: fir.alloca !fir.type<_QMdTr{x:f32}>
@@ -38,7 +37,7 @@ subroutine local_derived()
   type(c2) :: some_c2
 end subroutine
 
-! CHECK-LABEL: @_QMdPsaved_derived
+! CHECK-LABEL: func @_QMdPsaved_derived(
 subroutine saved_derived()
   ! CHECK-DAG: fir.address_of(@_QMdFsaved_derivedEsome_c2) : !fir.ref<!fir.type<_QMdTc2{ch_array:!fir.array<20x30x!fir.char<1,10>>}>>
   ! CHECK-DAG: fir.address_of(@_QMdFsaved_derivedEsome_r) : !fir.ref<!fir.type<_QMdTr{x:f32}>>
@@ -52,7 +51,7 @@ end subroutine
 !            Test simple derived type references 
 ! -----------------------------------------------------------------------------
 
-! CHECK-LABEL: @_QMdPscalar_numeric_ref 
+! CHECK-LABEL: func @_QMdPscalar_numeric_ref(
 subroutine scalar_numeric_ref()
   ! CHECK: %[[alloc:.*]] = fir.alloca !fir.type<_QMdTr{x:f32}>
   type(r) :: some_r
@@ -61,7 +60,7 @@ subroutine scalar_numeric_ref()
   call real_bar(some_r%x)
 end subroutine
 
-! CHECK-LABEL: @_QMdPscalar_character_ref 
+! CHECK-LABEL: func @_QMdPscalar_character_ref(
 subroutine scalar_character_ref()
   ! CHECK: %[[alloc:.*]] = fir.alloca !fir.type<_QMdTc{ch:!fir.char<1,10>}>
   type(c) :: some_c
@@ -76,7 +75,7 @@ end subroutine
 ! FIXME: coordinate of generated for derived%array_comp(i) are not zero based as they
 ! should be.
 
-! CHECK-LABEL: @_QMdParray_comp_elt_ref
+! CHECK-LABEL: func @_QMdParray_comp_elt_ref(
 subroutine array_comp_elt_ref()
   type(r2) :: some_r2
   ! CHECK: %[[alloc:.*]] = fir.alloca !fir.type<_QMdTr2{x_array:!fir.array<10x20xf32>}>
@@ -89,7 +88,7 @@ subroutine array_comp_elt_ref()
 end subroutine
 
 
-! CHECK-LABEL: @_QMdPchar_array_comp_elt_ref
+! CHECK-LABEL: func @_QMdPchar_array_comp_elt_ref(
 subroutine char_array_comp_elt_ref()
   type(c2) :: some_c2
   ! CHECK: %[[coor:.*]] = fir.coordinate_of %{{.*}}, %{{.*}} : (!fir.ref<!fir.type<_QMdTc2{ch_array:!fir.array<20x30x!fir.char<1,10>>}>>, !fir.field) -> !fir.ref<!fir.array<20x30x!fir.char<1,10>>>
@@ -128,7 +127,7 @@ end subroutine
 ! components. This one requires loading a component which tests other code paths
 ! in lowering.
 
-! CHECK-LABEL: @_QMdPscalar_numeric_load
+! CHECK-LABEL: func @_QMdPscalar_numeric_load(
 ! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMdTr{x:f32}>>
 real function scalar_numeric_load(some_r)
   type(r) :: some_r
@@ -142,7 +141,7 @@ end function
 !            Test returned derived types (no length parameters)
 ! -----------------------------------------------------------------------------
 
-! CHECK-LABEL: @_QMdPbar_return_derived() -> !fir.type<_QMdTr{x:f32}>
+! CHECK-LABEL: func @_QMdPbar_return_derived() -> !fir.type<_QMdTr{x:f32}>
 function bar_return_derived()
   ! CHECK: %[[res:.*]] = fir.alloca !fir.type<_QMdTr{x:f32}>
   type(r) :: bar_return_derived
@@ -150,7 +149,7 @@ function bar_return_derived()
   ! CHECK: return %[[resLoad]] : !fir.type<_QMdTr{x:f32}>
 end function
 
-! CHECK-LABEL: @_QMdPcall_bar_return_derived
+! CHECK-LABEL: func @_QMdPcall_bar_return_derived(
 subroutine call_bar_return_derived()
   ! CHECK: %[[tmp:.*]] = fir.alloca !fir.type<_QMdTr{x:f32}>
   ! CHECK: %[[call:.*]] = fir.call @_QMdPbar_return_derived() : () -> !fir.type<_QMdTr{x:f32}>
@@ -171,8 +170,8 @@ module d2
     type(recursive_t), pointer :: ptr
   end type
 contains
-! CHECK-LABEL: @_QMd2Ptest_recursive_type
-! CHECK: (%{{.*}}: !fir.ref<!fir.type<_QMd2Trecursive_t{x:f32,ptr:!fir.box<!fir.ptr<!fir.type<_QMd2Trecursive_t>>>}>>)
+! CHECK-LABEL: func @_QMd2Ptest_recursive_type(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.type<_QMd2Trecursive_t{x:f32,ptr:!fir.box<!fir.ptr<!fir.type<_QMd2Trecursive_t>>>}>>{{.*}}) {
 subroutine test_recursive_type(some_recursive)
   type(recursive_t) :: some_recursive
 end subroutine

@@ -1,7 +1,7 @@
 ! RUN: bbc %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.boxchar<1>) -> !fir.array<1x!fir.logical<4>> {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) -> !fir.array<1x!fir.logical<4>> {
 ! CHECK-DAG:         %[[VAL_1:.*]] = arith.constant 1 : index
 ! CHECK-DAG:         %[[VAL_2:.*]] = arith.constant 0 : index
 ! CHECK-DAG:         %[[VAL_3:.*]] = arith.constant 0 : i32

@@ -1,8 +1,7 @@
 ! RUN: bbc %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPissue(
-! CHECK-SAME:                 %[[VAL_0:.*]]: !fir.boxchar<1>,
-! CHECK-SAME:                 %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine issue(c1, c2)
   ! CHECK-DAG: %[[VAL_2:.*]] = arith.constant false
   ! CHECK-DAG: %[[VAL_3:.*]] = arith.constant 32 : i8

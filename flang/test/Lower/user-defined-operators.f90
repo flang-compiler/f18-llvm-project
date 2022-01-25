@@ -3,8 +3,7 @@
 
 ! Test user defined assignment
 ! CHECK-LABEL: func @_QPuser_assignment(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<{{.*}}>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<{{.*}}>>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine user_assignment(a, i)
   type t
     real :: x

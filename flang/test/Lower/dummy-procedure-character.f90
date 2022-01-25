@@ -53,8 +53,8 @@ subroutine cst_len_2()
   call foo2(bar2)
 end subroutine
 
-! CHECK-LABEL: func @_QPdyn_len
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32>) {
+! CHECK-LABEL: func @_QPdyn_len(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine dyn_len(n)
   integer :: n
   character(n) :: bar3

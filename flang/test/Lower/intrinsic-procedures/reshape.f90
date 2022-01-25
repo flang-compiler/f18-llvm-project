@@ -1,11 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: reshape_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?xi32>>
-! CHECK-SAME: %[[arg1:[^:]+]]: !fir.box<!fir.array<?x?x?xi32>>,
-! CHECK-SAME: %[[arg2:[^:]+]]: !fir.box<!fir.array<?x?x?xi32>>
-! CHECK-SAME: %[[arg3:.*]]: !fir.ref<!fir.array<2xi32>>,
-! CHECK-SAME: %[[arg4:.*]]: !fir.ref<!fir.array<2xi32>>)
+! CHECK-LABEL: func @_QPreshape_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?xi32>>{{.*}}, %[[arg1:[^:]+]]: !fir.box<!fir.array<?x?x?xi32>>{{.*}}, %[[arg2:[^:]+]]: !fir.box<!fir.array<?x?x?xi32>>{{.*}}, %[[arg3:.*]]: !fir.ref<!fir.array<2xi32>>{{.*}}, %[[arg4:.*]]: !fir.ref<!fir.array<2xi32>>{{.*}}) {
 subroutine reshape_test(x, source, pd, sh, ord)
   integer :: x(:,:)
   integer :: source(:,:,:)

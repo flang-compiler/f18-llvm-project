@@ -37,8 +37,7 @@ END SUBROUTINE DMUMPS_SOL_FWD_LR_SU
 END MODULE DMUMPS_SOL_LR
 
 ! CHECK-LABEL: func @_QMdmumps_sol_lrPdmumps_sol_fwd_lr_su(
-! CHECK-SAME:                                              %[[VAL_0:.*]]: !fir.ref<i32>,
-! CHECK-SAME:                                              %[[VAL_1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:                                              %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 0 : i64
 ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 0 : index
 ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 1 : i32

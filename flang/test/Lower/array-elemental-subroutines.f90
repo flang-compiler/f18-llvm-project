@@ -2,10 +2,7 @@
 ! RUN: bbc -o - -emit-fir %s | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest_elem_sub(
-! CHECK-SAME:                         %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>,
-! CHECK-SAME:                         %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>,
-! CHECK-SAME:                         %[[VAL_2:.*]]: !fir.ref<i32>,
-! CHECK-SAME:                         %[[VAL_3:.*]]: !fir.ref<!fir.complex<4>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<!fir.complex<4>>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]] = fir.alloca !fir.complex<4> {adapt.valuebyref}
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_6:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_5]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
@@ -53,8 +50,7 @@ subroutine test_elem_sub(x, c, i, z)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_elem_sub_no_array_args(
-! CHECK-SAME:                                       %[[VAL_0:.*]]: !fir.ref<i32>,
-! CHECK-SAME:                                       %[[VAL_1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine test_elem_sub_no_array_args(i, j)
   integer :: i, j
   interface

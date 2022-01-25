@@ -18,7 +18,7 @@ subroutine test_forall_with_array_assignment(aa,bb)
 end subroutine test_forall_with_array_assignment
 
 ! CHECK-LABEL: func @_QPtest_forall_with_array_assignment(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index

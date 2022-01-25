@@ -26,7 +26,7 @@ end subroutine
 
 
 ! Test passing character array as assumed shape.
-! CHECK-LABEL: func @_QPfoo_char(%arg0: !fir.boxchar<1>)
+! CHECK-LABEL: func @_QPfoo_char(%arg0: !fir.boxchar<1>{{.*}})
 subroutine foo_char(x)
   interface
     subroutine bar_char(x)

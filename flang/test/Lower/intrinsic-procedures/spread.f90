@@ -1,10 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: spread_test
-! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[arg1:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[arg2:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[arg3:.*]]: !fir.box<!fir.array<?xi32>>)
+! CHECK-LABEL: func @_QPspread_test(
+! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg1:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg2:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg3:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine spread_test(s,d,n,r)
   integer :: s,d,n
   integer :: r(:)
@@ -22,11 +19,8 @@ subroutine spread_test(s,d,n,r)
 ! CHECK:  fir.freemem %[[a15]] : !fir.heap<!fir.array<?xi32>>
 end subroutine
 
-! CHECK-LABEL: spread_test2
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME: %[[arg1:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[arg2:[^:]+]]: !fir.ref<i32>,
-! CHECK-SAME: %[[arg3:.*]]: !fir.box<!fir.array<?x?xi32>>)
+! CHECK-LABEL: func @_QPspread_test2(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg2:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg3:.*]]: !fir.box<!fir.array<?x?xi32>>{{.*}}) {
 subroutine spread_test2(s,d,n,r)
   integer :: s(:),d,n
   integer :: r(:,:)

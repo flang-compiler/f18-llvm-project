@@ -3,8 +3,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest_forall_with_slice(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<i32>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:       %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index

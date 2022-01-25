@@ -2,9 +2,7 @@
 
 
 ! CHECK-LABEL: func @_QPubound_test(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i64>,
-! CHECK-SAME:  %[[VAL_2:.*]]: !fir.ref<i64>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test(a, dim, res)
   real, dimension(:, :) :: a
   integer(8):: dim, res
@@ -23,9 +21,7 @@ subroutine ubound_test(a, dim, res)
 end subroutine
 
 ! CHECK-LABEL: func @_QPubound_test_2(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i64>,
-! CHECK-SAME:  %[[VAL_2:.*]]: !fir.ref<i64>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test_2(a, dim, res)
   real, dimension(2:, 3:) :: a
   integer(8):: dim, res
@@ -60,9 +56,7 @@ subroutine ubound_test_2(a, dim, res)
 end subroutine
 
 ! CHECK-LABEL: func @_QPubound_test_3(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x20x?xf32>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i64>,
-! CHECK-SAME:  %[[VAL_2:.*]]: !fir.ref<i64>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x20x?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine ubound_test_3(a, dim, res)
   real, dimension(10, 20, *) :: a
   integer(8):: dim, res

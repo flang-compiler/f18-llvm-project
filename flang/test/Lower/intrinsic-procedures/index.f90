@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: func @_QPindex_test(%
-! CHECK-SAME: [[s:[^:]+]]: !fir.boxchar<1>, %
-! CHECK-SAME: [[ss:[^:]+]]: !fir.boxchar<1>) -> i32
+! CHECK-LABEL: func @_QPindex_test(
+! CHECK-SAME: %[[s:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[ss:[^:]+]]: !fir.boxchar<1>{{.*}}) -> i32
 integer function index_test(s1, s2)
   character(*) :: s1, s2
   ! CHECK: %[[st:[^:]*]]:2 = fir.unboxchar %[[s]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
@@ -15,9 +14,8 @@ integer function index_test(s1, s2)
   index_test = index(s1, s2)
 end function index_test
 
-! CHECK-LABEL: func @_QPindex_test2(%
-! CHECK-SAME: [[s:[^:]+]]: !fir.boxchar<1>, %
-! CHECK-SAME: [[ss:[^:]+]]: !fir.boxchar<1>) -> i32
+! CHECK-LABEL: func @_QPindex_test2(
+! CHECK-SAME: %[[s:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[ss:[^:]+]]: !fir.boxchar<1>{{.*}}) -> i32
 integer function index_test2(s1, s2)
   character(*) :: s1, s2
   ! CHECK: %[[mut:.*]] = fir.alloca !fir.box<!fir.heap<i32>>

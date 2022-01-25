@@ -123,7 +123,7 @@ end subroutine test8
 
 ! Do make a copy. Assume vector subscripts cause dependences.
 ! CHECK-LABEL: func @_QPtest9(
-! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<?x?xf32>>,
+! CHECK-SAME: %[[a:[^:]+]]: !fir.ref<!fir.array<?x?xf32>>
 ! CHECK: %[[und:.*]] = fir.undefined index
 ! CHECK: %[[slice:.*]] = fir.slice %[[und]], %[[und]], %[[und]],
 ! CHECK: %[[heap:.*]] = fir.allocmem !fir.array<?x?xf32>, %{{.*}}, %{{.*}}

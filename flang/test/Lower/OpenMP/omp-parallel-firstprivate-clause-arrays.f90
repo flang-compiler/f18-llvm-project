@@ -3,7 +3,7 @@
 ! RUN: bbc -fopenmp -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
-!FIRDialect: func @_QPfirstprivate_arrays(%[[ARG1:.*]]: !fir.boxchar<1>, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>) {
+!FIRDialect: func @_QPfirstprivate_arrays(%[[ARG1:.*]]: !fir.boxchar<1>{{.*}}, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 !FIRDialect-DAG: %[[ARG1_UNBOX:.*]]:2 = fir.unboxchar %[[ARG1]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 !FIRDialect-DAG: %[[FIVE:.*]] = arith.constant 5 : index
 !FIRDialect-DAG: omp.parallel {

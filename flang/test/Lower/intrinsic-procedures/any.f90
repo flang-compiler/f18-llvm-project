@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: any_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>) -> !fir.logical<4>
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>{{.*}}) -> !fir.logical<4>
 logical function any_test(mask)
   logical :: mask(:)
 ! CHECK: %[[c1:.*]] = arith.constant 1 : index

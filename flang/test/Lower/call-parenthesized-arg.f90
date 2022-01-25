@@ -3,7 +3,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPfoo_num_scalar(
-! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine foo_num_scalar(x)
   integer :: x
 ! CHECK:         %[[VAL_1:.*]] = fir.alloca i32
@@ -19,7 +19,7 @@ subroutine foo_num_scalar(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfoo_char_scalar(
-! CHECK-SAME:                           %[[VAL_0:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:         %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine foo_char_scalar(x)
   character(5) :: x
 ! CHECK:         %[[VAL_1:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
@@ -45,7 +45,7 @@ subroutine foo_char_scalar(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfoo_num_array(
-! CHECK-SAME:                         %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>) {
+! CHECK-SAME:                         %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 subroutine foo_num_array(x)
   integer :: x(100)
   call bar_num_array(x)
@@ -77,7 +77,7 @@ subroutine foo_num_array(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfoo_char_array(
-! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine foo_char_array(x)
   ! CHECK: %[[VAL_1:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
   ! CHECK: %[[VAL_2:.*]] = arith.constant 10 : index
@@ -126,7 +126,7 @@ subroutine foo_char_array(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfoo_num_array_box(
-! CHECK-SAME:                             %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>) {
+! CHECK-SAME:                             %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 subroutine foo_num_array_box(x)
   ! CHECK: %[[VAL_1:.*]] = arith.constant 100 : index
   ! CHECK: %[[VAL_2:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
@@ -169,8 +169,7 @@ subroutine foo_num_array_box(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfoo_char_array_box(
-! CHECK-SAME:                              %[[VAL_0:.*]]: !fir.boxchar<1>,
-! CHECK-SAME:                              %[[VAL_1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:          %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine foo_char_array_box(x, n)
   ! CHECK: %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
   ! CHECK: %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<?x!fir.char<1,10>>>

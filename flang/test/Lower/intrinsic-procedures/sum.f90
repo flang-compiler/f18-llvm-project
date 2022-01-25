@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: sum_test
-! CHECK-SAME: (%[[arg0:.*]]: !fir.box<!fir.array<?xi32>>) -> i32
+! CHECK-LABEL: func @_QPsum_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) -> i32 {
 integer function sum_test(a)
   integer :: a(:)
 ! CHECK-DAG:  %[[c0:.*]] = arith.constant 0 : index
@@ -13,9 +13,8 @@ integer function sum_test(a)
 ! CHECK:  %{{.*}} = fir.call @_FortranASumInteger4(%[[a3]], %{{.*}}, %{{.*}}, %[[a5]], %[[a6]]) : (!fir.box<none>, !fir.ref<i8>, i32, i32, !fir.box<none>) -> i32
 end function
 
-! CHECK-LABEL: sum_test2
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?xi32>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>
+! CHECK-LABEL: func @_QPsum_test2(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine sum_test2(a,r)
   integer :: a(:,:)
   integer :: r(:)
@@ -32,8 +31,8 @@ subroutine sum_test2(a,r)
 ! CHECK-DAG:  fir.freemem %[[a13]] : !fir.heap<!fir.array<?xi32>>
 end subroutine
 
-! CHECK-LABEL: sum_test3
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x!fir.complex<4>>>) -> !fir.complex<4>
+! CHECK-LABEL: func @_QPsum_test3(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x!fir.complex<4>>>{{.*}}) -> !fir.complex<4> {
 complex function sum_test3(a)
   complex :: a(:)
 ! CHECK-DAG:  %[[c0:.*]] = arith.constant 0 : index
@@ -47,8 +46,8 @@ complex function sum_test3(a)
 ! CHECK:  %{{.*}} = fir.call @_FortranACppSumComplex4(%[[a5]], %[[a6]], %{{.*}}, %{{.*}}, %[[a8]], %[[a9]]) : (!fir.ref<complex<f32>>, !fir.box<none>, !fir.ref<i8>, i32, i32, !fir.box<none>) -> none
 end function
 
-! CHECK-LABEL: sum_test4
-! CHECK-SAME: (%[[arg0:.*]]: !fir.box<!fir.array<?x!fir.complex<10>>>) -> !fir.complex<10>
+! CHECK-LABEL: func @_QPsum_test4(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x!fir.complex<10>>>{{.*}}) -> !fir.complex<10> {
 complex(10) function sum_test4(x)
   complex(10):: x(:)
 ! CHECK-DAG:  %[[c0:.*]] = arith.constant 0 : index
@@ -61,4 +60,3 @@ complex(10) function sum_test4(x)
 ! CHECK-DAG:  %[[a8:.*]] = fir.convert %[[a2]] : (!fir.box<i1>) -> !fir.box<none>
 ! CHECK: fir.call @_FortranACppSumComplex10(%[[a4]], %[[a5]], %{{.*}}, %{{.*}}, %[[a7]], %8) : (!fir.ref<complex<f80>>, !fir.box<none>, !fir.ref<i8>, i32, i32, !fir.box<none>) -> ()
 end
-

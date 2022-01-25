@@ -8,7 +8,7 @@
 
 
 ! CHECK-LABEL: func @_QPtest_scalar(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}})
 subroutine test_scalar(p)
   real, pointer :: p
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<f32>
@@ -18,7 +18,7 @@ subroutine test_scalar(p)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_scalar_char(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>{{.*}})
 subroutine test_scalar_char(p)
   character(:), pointer :: p
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<!fir.char<1,?>>
@@ -28,7 +28,7 @@ subroutine test_scalar_char(p)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine test_array(p)
   real, pointer :: p(:)
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<!fir.array<?xf32>>
@@ -39,8 +39,7 @@ subroutine test_array(p)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_list(
-! CHECK-SAME: %[[p1:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>,
-! CHECK-SAME: %[[p2:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[p1:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}}, %[[p2:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine test_list(p1, p2)
   real, pointer :: p1, p2(:)
   ! CHECK: fir.zero_bits !fir.ptr<f32>

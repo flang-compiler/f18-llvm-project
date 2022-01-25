@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: minloc_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>
+! CHECK-LABEL: func @_QPminloc_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>
 subroutine minloc_test(arr,res)
   integer :: arr(:)
   integer :: res(:)
@@ -20,8 +19,8 @@ subroutine minloc_test(arr,res)
 ! CHECK-DAG: fir.freemem %[[a14]] : !fir.heap<!fir.array<?xi32>>
 end subroutine
 
-! CHECK-LABEL: minloc_test2
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg2:.*]]: !fir.ref<i32>
+! CHECK-LABEL: func @_QPminloc_test2(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg2:.*]]: !fir.ref<i32>
 subroutine minloc_test2(arr,res,d)
   integer :: arr(:)
   integer :: res(:)
@@ -40,4 +39,3 @@ subroutine minloc_test2(arr,res,d)
 ! CHECK:  %[[a13:.*]] = fir.box_addr %[[a12]] : (!fir.box<!fir.heap<i32>>) -> !fir.heap<i32>
 ! CHECK:  fir.freemem %[[a13]] : !fir.heap<i32>
 end subroutine
-

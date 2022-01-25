@@ -3,7 +3,8 @@
 ! Test dummy procedures
 
 ! Test of dummy procedure call
-! CHECK-LABEL: func @_QPfoo(%arg0: () -> ()) -> f32
+! CHECK-LABEL: func @_QPfoo(
+! CHECK-SAME: %{{.*}}: () -> (){{.*}}) -> f32
 real function foo(bar)
   real :: bar, x
   ! CHECK: %[[x:.*]] = fir.alloca f32 {{{.*}}uniq_name = "{{.*}}Ex"}
@@ -14,7 +15,8 @@ real function foo(bar)
 end function
 
 ! Test case where dummy procedure is only transiting.
-! CHECK-LABEL: func @_QPprefoo(%arg0: () -> ()) -> f32
+! CHECK-LABEL: func @_QPprefoo(
+! CHECK-SAME: %{{.*}}: () -> (){{.*}}) -> f32
 real function prefoo(bar)
   external :: bar
   ! CHECK: fir.call @_QPfoo(%arg0) : (() -> ()) -> f32
@@ -22,7 +24,8 @@ real function prefoo(bar)
 end function
 
 ! Function that will be passed as dummy argument
-!CHECK-LABEL: func @_QPfunc(%arg0: !fir.ref<f32>) -> f32
+! CHECK-LABEL: func @_QPfunc(
+! CHECK-SAME: %{{.*}}: !fir.ref<f32>{{.*}}) -> f32
 real function func(x)
   real :: x
   func = x + 0.5
@@ -41,7 +44,8 @@ end function
 
 ! Repeat test with dummy subroutine
 
-! CHECK-LABEL: func @_QPfoo_sub(%arg0: () -> ())
+! CHECK-LABEL: func @_QPfoo_sub(
+! CHECK-SAME: %{{.*}}: () -> (){{.*}})
 subroutine foo_sub(bar_sub)
   ! CHECK: %[[x:.*]] = fir.alloca f32 {{{.*}}uniq_name = "{{.*}}Ex"}
   x = 42.
@@ -51,7 +55,8 @@ subroutine foo_sub(bar_sub)
 end subroutine
 
 ! Test case where dummy procedure is only transiting.
-! CHECK-LABEL: func @_QPprefoo_sub(%arg0: () -> ())
+! CHECK-LABEL: func @_QPprefoo_sub(
+! CHECK-SAME: %{{.*}}: () -> (){{.*}})
 subroutine prefoo_sub(bar_sub)
   external :: bar_sub
   ! CHECK: fir.call @_QPfoo_sub(%arg0) : (() -> ()) -> ()
@@ -59,7 +64,8 @@ subroutine prefoo_sub(bar_sub)
 end subroutine
 
 ! Subroutine that will be passed as dummy argument
-!CHECK-LABEL: func @_QPsub(%arg0: !fir.ref<f32>)
+! CHECK-LABEL: func @_QPsub(
+! CHECK-SAME: %{{.*}}: !fir.ref<f32>{{.*}})
 subroutine sub(x)
   real :: x
   print *, x
@@ -137,7 +143,8 @@ end subroutine
 ! TODO: exhaustive test of unrestricted intrinsic table 16.2 
 
 ! TODO: improve dummy procedure types when interface is given.
-! CHECK: func @_QPtodo3(%arg0: () -> ())
+! CHECK: func @_QPtodo3(
+! CHECK-SAME: %{{.*}}: () -> (){{.*}})
 ! SHOULD-CHECK: func @_QPtodo3(%arg0: (!fir.ref<f32>) -> f32)
 subroutine todo3(dummy_proc)
   intrinsic :: acos

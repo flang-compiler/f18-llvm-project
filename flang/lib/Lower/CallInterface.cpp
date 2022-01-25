@@ -686,6 +686,28 @@ private:
     addFirResult(boxCharTy, resultPosition, Property::BoxChar);
   }
 
+  /// Return an ArrayRef with an attribute with the name of the argument if this
+  /// is a callee interface and the name is available. Otherwise, just return
+  /// llvm::None. The storage for the ArrayRef is provided by the caller and
+  /// passed as \p vector.
+  llvm::SmallVector<mlir::NamedAttribute>
+  dummyNameAttr(const FortranEntity &entity) {
+    if constexpr (std::is_same_v<FortranEntity,
+                                 std::optional<Fortran::common::Reference<
+                                     const Fortran::semantics::Symbol>>>) {
+      if (entity.has_value()) {
+        const Fortran::semantics::Symbol *argument = &*entity.value();
+        // "fir.bindc_name" is used for arguments for the sake of consistency
+        // with other attributes carrying surface syntax names in FIR.
+        return {mlir::NamedAttribute(
+            mlir::Identifier::get("fir.bindc_name", &mlirContext),
+            mlir::StringAttr::get(&mlirContext,
+                                  toStringRef(argument->name())))};
+      }
+    }
+    return {};
+  }
+
   void handleImplicitDummy(
       const DummyCharacteristics *characteristics,
       const Fortran::evaluate::characteristics::DummyDataObject &obj,
@@ -694,7 +716,8 @@ private:
     if (dynamicType.category() == Fortran::common::TypeCategory::Character) {
       mlir::Type boxCharTy =
           fir::BoxCharType::get(&mlirContext, dynamicType.kind());
-      addFirOperand(boxCharTy, nextPassedArgPosition(), Property::BoxChar);
+      addFirOperand(boxCharTy, nextPassedArgPosition(), Property::BoxChar,
+                    dummyNameAttr(entity));
       addPassedArg(PassEntityBy::BoxChar, entity, characteristics);
     } else {
       // non-PDT derived type allowed in implicit interface.
@@ -703,7 +726,8 @@ private:
       if (!bounds.empty())
         type = fir::SequenceType::get(bounds, type);
       mlir::Type refType = fir::ReferenceType::get(type);
-      addFirOperand(refType, nextPassedArgPosition(), Property::BaseAddress);
+      addFirOperand(refType, nextPassedArgPosition(), Property::BaseAddress,
+                    dummyNameAttr(entity));
       addPassedArg(PassEntityBy::BaseAddress, entity, characteristics);
     }
   }
@@ -757,10 +781,10 @@ private:
     bool isValueAttr = false;
     [[maybe_unused]] mlir::Location loc =
         interface.converter.getCurrentLocation();
-    llvm::SmallVector<mlir::NamedAttribute> attrs;
+    llvm::SmallVector<mlir::NamedAttribute> attrs = dummyNameAttr(entity);
     auto addMLIRAttr = [&](llvm::StringRef attr) {
       attrs.emplace_back(mlir::Identifier::get(attr, &mlirContext),
-                         UnitAttr::get(&mlirContext));
+                         mlir::UnitAttr::get(&mlirContext));
     };
     if (obj.attrs.test(Attrs::Optional))
       addMLIRAttr(fir::getOptionalAttrName());

@@ -18,21 +18,24 @@ subroutine pass_foo()
   ! CHECK: fir.convert %[[f]] : ((!fir.ref<!fir.array<2x5xi32>>) -> ()) -> (() -> ())
   call bar(foo)
 end subroutine
-! CHECK-LABEL: func @_QPcall_foo(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo(i)
   integer :: i(10)
   ! %[[argconvert:*]] = fir.convert %arg0 :
   ! fir.call @_QPfoo(%[[argconvert]]) : (!fir.ref<!fir.array<2x5xi32>>) -> ()
   call foo(i)
 end subroutine 
-! CHECK-LABEL: func @_QPfoo(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPfoo(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine foo(i)
   integer :: i(2, 5)
   call do_something(i)
 end subroutine
 
 ! call, pass, define
-! CHECK-LABEL: func @_QPcall_foo2(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo2(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo2(i)
   integer :: i(10)
   ! %[[argconvert:*]] = fir.convert %arg0 :
@@ -46,21 +49,24 @@ subroutine pass_foo2()
   ! CHECK: fir.convert %[[f]] : ((!fir.ref<!fir.array<2x5xi32>>) -> ()) -> (() -> ())
   call bar(foo2)
 end subroutine
-! CHECK-LABEL: func @_QPfoo2(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPfoo2(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine foo2(i)
   integer :: i(2, 5)
   call do_something(i)
 end subroutine
 
 ! call, define, pass
-! CHECK-LABEL: func @_QPcall_foo3(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo3(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo3(i)
   integer :: i(10)
   ! %[[argconvert:*]] = fir.convert %arg0 :
   ! fir.call @_QPfoo3(%[[argconvert]]) : (!fir.ref<!fir.array<2x5xi32>>) -> ()
   call foo3(i)
 end subroutine 
-! CHECK-LABEL: func @_QPfoo3(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPfoo3(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine foo3(i)
   integer :: i(2, 5)
   call do_something(i)
@@ -74,12 +80,14 @@ subroutine pass_foo3()
 end subroutine
 
 ! define, call, pass
-! CHECK-LABEL: func @_QPfoo4(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPfoo4(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine foo4(i)
   integer :: i(2, 5)
   call do_something(i)
 end subroutine
-! CHECK-LABEL: func @_QPcall_foo4(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo4(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo4(i)
   integer :: i(10)
   ! %[[argconvert:*]] = fir.convert %arg0 :
@@ -95,7 +103,8 @@ subroutine pass_foo4()
 end subroutine
 
 ! define, pass, call
-! CHECK-LABEL: func @_QPfoo5(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPfoo5(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine foo5(i)
   integer :: i(2, 5)
   call do_something(i)
@@ -107,7 +116,8 @@ subroutine pass_foo5()
   ! CHECK: fir.convert %[[f]] : ((!fir.ref<!fir.array<2x5xi32>>) -> ()) -> (() -> ())
   call bar(foo5)
 end subroutine
-! CHECK-LABEL: func @_QPcall_foo5(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo5(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo5(i)
   integer :: i(10)
   ! %[[argconvert:*]] = fir.convert %arg0 :
@@ -120,7 +130,8 @@ end subroutine
 ! First use gives the function type
 
 ! call, pass
-! CHECK-LABEL: func @_QPcall_foo6(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo6(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo6(i)
   integer :: i(10)
   ! CHECK-NOT: convert
@@ -141,7 +152,8 @@ subroutine pass_foo7()
   ! CHECK-NOT: convert
   call bar(foo7)
 end subroutine
-! CHECK-LABEL: func @_QPcall_foo7(%arg0: !fir.ref<!fir.array<10xi32>>) -> f32 {
+! CHECK-LABEL: func @_QPcall_foo7(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) -> f32 {
 function call_foo7(i)
   integer :: i(10)
   ! CHECK: %[[f:.*]] = fir.address_of(@_QPfoo7) : () -> ()
@@ -152,13 +164,15 @@ end function
 
 
 ! call, call with different type
-! CHECK-LABEL: func @_QPcall_foo8(%arg0: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo8(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine call_foo8(i)
   integer :: i(10)
   ! CHECK-NOT: convert
   call foo8(i)
 end subroutine 
-! CHECK-LABEL: func @_QPcall_foo8_2(%arg0: !fir.ref<!fir.array<2x5xi32>>) {
+! CHECK-LABEL: func @_QPcall_foo8_2(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.array<2x5xi32>>{{.*}}) {
 subroutine call_foo8_2(i)
   integer :: i(2, 5)
   ! %[[argconvert:*]] = fir.convert %arg0 :

@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: @_QPtrim_test
-! CHECK-SAME: (%[[arg0:.*]]: !fir.boxchar<1>)
+! CHECK-LABEL: func @_QPtrim_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine trim_test(c)
   character(*) :: c
   ! CHECK: %[[tmpBox:.*]] = fir.alloca !fir.box<!fir.heap<!fir.char<1,?>>>

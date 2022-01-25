@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPimplied_iters_allocatable(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFimplied_iters_allocatableTt{oui:!fir.logical<4>,arr:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>,
-! CHECK-SAME %[[VAL_1:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFimplied_iters_allocatableTt{oui:!fir.logical<4>,arr:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine implied_iters_allocatable(thing, a1)
   ! No dependence between lhs and rhs.
   ! Lhs may need to be reallocated to conform.
@@ -23,7 +22,7 @@ subroutine implied_iters_allocatable(thing, a1)
 end subroutine implied_iters_allocatable
 
 ! CHECK-LABEL: func @_QPconflicting_allocatable(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFconflicting_allocatableTt{oui:!fir.logical<4>,arr:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>, %[[VAL_1:.*]]: !fir.ref<i32>, %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFconflicting_allocatableTt{oui:!fir.logical<4>,arr:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine conflicting_allocatable(thing, lo, hi)
   ! Introduce a crossing dependence to incite a (deep) copy.
   integer :: lo,hi
@@ -43,9 +42,7 @@ subroutine conflicting_allocatable(thing, lo, hi)
 end subroutine conflicting_allocatable
 
 ! CHECK-LABEL: func @_QPforall_pointer_assign(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFforall_pointer_assignTt{ptr:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>,
-! CHECK-SAME: %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QFforall_pointer_assignTu{targ:!fir.array<20xf32>}>>> {fir.target},
-! CHECK-SAME: %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QFforall_pointer_assignTt{ptr:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QFforall_pointer_assignTu{targ:!fir.array<20xf32>}>>> {fir.bindc_name = "at", fir.target}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine forall_pointer_assign(ap, at, ii, ij)
   ! Set pointer members in an array of derived type to targets.
   ! No conflicts (multiple-assignment being forbidden, of course).
@@ -128,8 +125,7 @@ subroutine slice_with_explicit_iters
 end subroutine slice_with_explicit_iters
 
 ! CHECK-LABEL: func @_QPembox_argument_with_slice(
-! CHECK-SAME:                                     %[[VAL_0:.*]]: !fir.ref<!fir.array<1xi32>>,
-! CHECK-SAME:                                     %[[VAL_1:.*]]: !fir.ref<!fir.array<2x2xi32>>) {
+! CHECK-SAME:                                     %[[VAL_0:.*]]: !fir.ref<!fir.array<1xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<2x2xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 2 : index

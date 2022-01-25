@@ -9,8 +9,8 @@ module opt
 contains
 
 ! Test simple scalar optional
-! CHECK-LABEL: func @_QMoptPintrinsic_scalar
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<f32> {fir.optional})
+! CHECK-LABEL: func @_QMoptPintrinsic_scalar(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<f32> {fir.bindc_name = "x", fir.optional}) {
 subroutine intrinsic_scalar(x)
   real, optional :: x
   ! CHECK: fir.is_present %[[arg0]] : (!fir.ref<f32>) -> i1
@@ -28,8 +28,8 @@ subroutine call_intrinsic_scalar()
 end subroutine
 
 ! Test explicit shape array optional
-! CHECK-LABEL: func @_QMoptPintrinsic_f77_array
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<!fir.array<100xf32>> {fir.optional})
+! CHECK-LABEL: func @_QMoptPintrinsic_f77_array(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<100xf32>> {fir.bindc_name = "x", fir.optional}) {
 subroutine intrinsic_f77_array(x)
   real, optional :: x(100)
   ! CHECK: fir.is_present %[[arg0]] : (!fir.ref<!fir.array<100xf32>>) -> i1
@@ -47,8 +47,8 @@ subroutine call_intrinsic_f77_array()
 end subroutine
 
 ! Test optional character scalar
-! CHECK-LABEL: func @_QMoptPcharacter_scalar
-! CHECK-SAME: (%[[arg0:.*]]: !fir.boxchar<1> {fir.optional})
+! CHECK-LABEL: func @_QMoptPcharacter_scalar(
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1> {fir.bindc_name = "x", fir.optional}) {
 subroutine character_scalar(x)
   ! CHECK: %[[unboxed:.*]]:2 = fir.unboxchar %[[arg0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
   character(10), optional :: x
@@ -69,8 +69,8 @@ subroutine call_character_scalar()
 end subroutine
 
 ! Test optional assumed shape
-! CHECK-LABEL: func @_QMoptPassumed_shape
-! CHECK-SAME: (%[[arg0:.*]]: !fir.box<!fir.array<?xf32>> {fir.optional})
+! CHECK-LABEL: func @_QMoptPassumed_shape(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xf32>> {fir.bindc_name = "x", fir.optional}) {
 subroutine assumed_shape(x)
   real, optional :: x(:)
   ! CHECK: fir.is_present %[[arg0]] : (!fir.box<!fir.array<?xf32>>) -> i1
@@ -90,8 +90,8 @@ subroutine call_assumed_shape()
 end subroutine
 
 ! Test optional allocatable
-! CHECK: func @_QMoptPallocatable_array
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>> {fir.optional})
+! CHECK: func @_QMoptPallocatable_array(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>> {fir.bindc_name = "x", fir.optional}) {
 subroutine allocatable_array(x)
   real, allocatable, optional :: x(:)
   ! CHECK: fir.is_present %[[arg0]] : (!fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>) -> i1
@@ -108,8 +108,8 @@ subroutine call_allocatable_array()
   call allocatable_array()
 end subroutine
 
-! CHECK: func @_QMoptPallocatable_to_assumed_optional_array
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
+! CHECK: func @_QMoptPallocatable_to_assumed_optional_array(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>{{.*}}) {
 subroutine allocatable_to_assumed_optional_array(x)
   real, allocatable :: x(:)
 
@@ -124,7 +124,7 @@ subroutine allocatable_to_assumed_optional_array(x)
   call assumed_shape(x)
 end subroutine
 
-! CHECK-LABEL: func @_QMoptPalloc_component_to_optional_assumed_shape
+! CHECK-LABEL: func @_QMoptPalloc_component_to_optional_assumed_shape(
 subroutine alloc_component_to_optional_assumed_shape(x)
   type(t) :: x(100)
   ! CHECK-DAG: %[[isAlloc:.*]] = arith.cmpi ne
@@ -134,7 +134,7 @@ subroutine alloc_component_to_optional_assumed_shape(x)
   call assumed_shape(x(55)%p)
 end subroutine
 
-! CHECK-LABEL: func @_QMoptPalloc_component_eval_only_once
+! CHECK-LABEL: func @_QMoptPalloc_component_eval_only_once(
 subroutine alloc_component_eval_only_once(x)
   integer, external :: ifoo
   type(t) :: x(100)

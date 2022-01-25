@@ -15,8 +15,7 @@ contains
 
 ! Simple copies are implemented inline component by component.
 ! CHECK-LABEL: func @_QMarray_derived_assignPtest_simple_copy(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>,
-! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTsimple_copy{i:i32,c:!fir.array<20x!fir.char<1,10>>,p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>{{.*}}) {
 subroutine test_simple_copy(t1, t2)
   type(simple_copy) :: t1(10), t2(10)
   ! CHECK-DAG:         %[[VAL_2:.*]] = arith.constant 20 : index
@@ -71,8 +70,7 @@ end subroutine
 
 ! Types require more complex assignments are passed to the runtime
 ! CHECK-LABEL: func @_QMarray_derived_assignPtest_deep_copy(
-! CHECK-SAME:                                               %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>,
-! CHECK-SAME:                                               %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QMarray_derived_assignTdeep_copy{i:i32,a:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}) {
 subroutine test_deep_copy(t1, t2)
   ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 10 : index
   ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 0 : index

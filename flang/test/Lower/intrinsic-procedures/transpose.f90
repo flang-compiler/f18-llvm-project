@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: transpose_test
-! CHECK-SAME: (%[[source:.*]]: !fir.ref<!fir.array<2x3xf32>>)
+! CHECK-LABEL: func @_QPtranspose_test(
+! CHECK-SAME: %[[source:.*]]: !fir.ref<!fir.array<2x3xf32>>{{.*}}) {
 subroutine transpose_test(mat)
 ! CHECK:  %[[resultDescr:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x?xf32>>>
    real :: mat(2,3)

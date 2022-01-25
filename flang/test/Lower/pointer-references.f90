@@ -3,7 +3,7 @@
 
 ! Assigning/reading to scalar pointer target.
 ! CHECK-LABEL: func @_QPscal_ptr(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}})
 subroutine scal_ptr(p)
   real, pointer :: p
   real :: x
@@ -21,7 +21,7 @@ end subroutine
 
 ! Assigning/reading scalar character pointer target.
 ! CHECK-LABEL: func @_QPchar_ptr(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,12>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,12>>>>{{.*}})
 subroutine char_ptr(p)
   character(12), pointer :: p
   character(12) :: x
@@ -48,7 +48,7 @@ end subroutine
 
 ! Reading from pointer in array expression
 ! CHECK-LABEL: func @_QParr_ptr_read(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine arr_ptr_read(p)
   real, pointer :: p(:)
   real :: x(100)
@@ -61,7 +61,7 @@ end subroutine
 
 ! Reading from contiguous pointer in array expression
 ! CHECK-LABEL: func @_QParr_contig_ptr_read(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {fir.contiguous})
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {{{.*}}, fir.contiguous})
 subroutine arr_contig_ptr_read(p)
   real, pointer, contiguous :: p(:)
   real :: x(100)
@@ -76,7 +76,7 @@ end subroutine
 ! Assigning to pointer target in array expression
 
   ! CHECK-LABEL: func @_QParr_ptr_target_write(
-  ! CHECK-SAME:                                %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>) {
+  ! CHECK-SAME:                                %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}) {
   ! CHECK:         %[[VAL_1:.*]] = arith.constant 100 : index
   ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.array<100xf32> {bindc_name = "x", uniq_name = "_QFarr_ptr_target_writeEx"}
   ! CHECK:         %[[VAL_3:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
@@ -120,7 +120,7 @@ end subroutine
 ! Assigning to contiguous pointer target in array expression
 
   ! CHECK-LABEL: func @_QParr_contig_ptr_target_write(
-  ! CHECK-SAME:                                       %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {fir.contiguous}) {
+  ! CHECK-SAME:                                       %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>> {{{.*}}, fir.contiguous}) {
   ! CHECK:         %[[VAL_1:.*]] = arith.constant 100 : index
   ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.array<100xf32> {bindc_name = "x", uniq_name = "_QFarr_contig_ptr_target_writeEx"}
   ! CHECK:         %[[VAL_3:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>

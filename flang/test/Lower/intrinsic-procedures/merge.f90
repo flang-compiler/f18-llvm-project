@@ -1,11 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: merge_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1>>, 
-! CHECK-SAME: %[[arg1:.*]]: index, 
-! CHECK-SAME: %[[arg2:[^:]+]]: !fir.boxchar<1>, 
-! CHECK-SAME: %[[arg3:[^:]+]]: !fir.boxchar<1>, 
-! CHECK-SAME: %[[arg4:.*]]: !fir.ref<!fir.logical<4>>) -> !fir.boxchar<1> {
+! CHECK-LABEL: func @_QPmerge_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.char<1>>{{.*}}, %[[arg1:.*]]: index{{.*}},  %[[arg2:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[arg3:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[arg4:.*]]: !fir.ref<!fir.logical<4>>{{.*}}) -> !fir.boxchar<1> {
 function merge_test(o1, o2, mask)
 character :: o1, o2, merge_test
 logical :: mask
@@ -18,10 +14,8 @@ merge_test = merge(o1, o2, mask)
 ! CHECK-DAG:  %{{.*}} = fir.convert %[[a4]] : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
 end
 
-! CHECK-LABEL: merge_test2
-! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<i32>, 
-! CHECK-SAME: %[[arg1:[^:]+]]: !fir.ref<i32>, 
-! CHECK-SAME: %[[arg2:.*]]: !fir.ref<!fir.logical<4>>) -> i32 {
+! CHECK-LABEL: func @_QPmerge_test2(
+! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg1:[^:]+]]: !fir.ref<i32>{{.*}}, %[[arg2:.*]]: !fir.ref<!fir.logical<4>>{{.*}}) -> i32 {
 function merge_test2(o1, o2, mask)
 integer :: o1, o2, merge_test2
 logical :: mask
@@ -33,11 +27,8 @@ merge_test2 = merge(o1, o2, mask)
 ! CHECK:  %{{.*}} = select %[[a4]], %[[a1]], %[[a2]] : i32
 end
 
-! CHECK-LABEL: merge_test3
-! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<!fir.array<10x!fir.type<_QFmerge_test3Tt{i:i32}>>>, 
-! CHECK-SAME: %[[arg1:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>, 
-! CHECK-SAME: %[[arg2:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>, 
-! CHECK-SAME: %[[arg3:.*]]: !fir.ref<!fir.logical<4>>) {
+! CHECK-LABEL: func @_QPmerge_test3(
+! CHECK-SAME: %[[arg0:[^:]+]]: !fir.ref<!fir.array<10x!fir.type<_QFmerge_test3Tt{i:i32}>>>{{.*}}, %[[arg1:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>{{.*}}, %[[arg2:[^:]+]]: !fir.ref<!fir.type<_QFmerge_test3Tt{i:i32}>>{{.*}}, %[[arg3:.*]]: !fir.ref<!fir.logical<4>>{{.*}}) {
 subroutine merge_test3(result, o1, o2, mask)
 type t
   integer :: i

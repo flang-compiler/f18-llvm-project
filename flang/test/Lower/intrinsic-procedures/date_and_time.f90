@@ -1,10 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPdate_and_time_test(
-! CHECK-SAME: %[[date:[^:]+]]: !fir.boxchar<1>,
-! CHECK-SAME: %[[time:[^:]+]]: !fir.boxchar<1>,
-! CHECK-SAME: %[[zone:.*]]: !fir.boxchar<1>,
-! CHECK-SAME: %[[values:.*]]: !fir.box<!fir.array<?xi64>>) {
+! CHECK-SAME: %[[date:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[time:[^:]+]]: !fir.boxchar<1>{{.*}}, %[[zone:.*]]: !fir.boxchar<1>{{.*}}, %[[values:.*]]: !fir.box<!fir.array<?xi64>>{{.*}}) {
 subroutine date_and_time_test(date, time, zone, values)
   character(*) :: date, time, zone
   integer(8) :: values(:)
@@ -23,7 +20,7 @@ subroutine date_and_time_test(date, time, zone, values)
 end subroutine
 
 ! CHECK-LABEL: func @_QPdate_and_time_test2(
-! CHECK-SAME: %[[date:.*]]: !fir.boxchar<1>)
+! CHECK-SAME: %[[date:.*]]: !fir.boxchar<1>{{.*}})
 subroutine date_and_time_test2(date)
   character(*) :: date
   ! CHECK: %[[dateUnbox:.*]]:2 = fir.unboxchar %[[date]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)

@@ -6,7 +6,8 @@
       RETURN
       END
       
-! CHECK: func @_QPpow_wrapper(%arg0: !fir.ref<f64>, %arg1: !fir.ref<f64>, %arg2: !fir.ref<f32>)
+! CHECK-LABEL: func @_QPpow_wrapper(
+! CHECK-SAME: %{{.*}}: !fir.ref<f64>{{.*}}, %{{.*}}: !fir.ref<f64>{{.*}}, %{{.*}}: !fir.ref<f32>{{.*}}) {
 ! CHECK-NEXT:   %0 = fir.load %arg0 : !fir.ref<f64>
 ! CHECK-NEXT:   %1 = fir.load %arg1 : !fir.ref<f64>
 ! CHECK-NEXT:   %2 = fir.call @llvm.pow.f64(%0, %1) : (f64, f64) -> f64
@@ -17,7 +18,8 @@
       RETURN
       END
 
-! CHECK: func @_QPpowf_wrapper(%arg0: !fir.ref<f32>, %arg1: !fir.ref<f32>, %arg2: !fir.ref<f32>)
+! CHECK-LABEL: func @_QPpowf_wrapper(
+! CHECK-SAME: %{{.*}}: !fir.ref<f32>{{.*}}, %{{.*}}: !fir.ref<f32>{{.*}}, %{{.*}}: !fir.ref<f32>{{.*}}) {
 ! CHECK-NEXT:   %0 = fir.load %arg0 : !fir.ref<f32>
 ! CHECK-NEXT:   %1 = fir.load %arg1 : !fir.ref<f32>
 ! CHECK-NEXT:   %2 = fir.call @llvm.pow.f32(%0, %1) : (f32, f32) -> f32

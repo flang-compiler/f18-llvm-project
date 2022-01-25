@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPabs_testi
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<i32>
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>
 subroutine abs_testi(a, b)
 ! CHECK:  %[[VAL_2:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! CHECK:  %[[VAL_3:.*]] = arith.constant 31 : i32
@@ -16,8 +15,7 @@ subroutine abs_testi(a, b)
 end subroutine
 
 ! CHECK-LABEL: func @_QPabs_testr(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<f32>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<f32>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<f32>{{.*}}) {
 subroutine abs_testr(a, b)
 ! CHECK: %[[VAL_2:.*]] = fir.load %[[VAL_0]] : !fir.ref<f32>
 ! CHECK: %[[VAL_3:.*]] = fir.call @llvm.fabs.f32(%[[VAL_2]]) : (f32) -> f32
@@ -28,8 +26,7 @@ subroutine abs_testr(a, b)
 end subroutine
 
 ! CHECK-LABEL: func @_QPabs_testz(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.complex<4>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<f32>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.complex<4>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<f32>{{.*}}) {
 subroutine abs_testz(a, b)
 ! CHECK:  %[[VAL_2:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.complex<4>>
 ! CHECK:  %[[VAL_3:.*]] = fir.extract_value %[[VAL_2]], [0 : index] : (!fir.complex<4>) -> f32

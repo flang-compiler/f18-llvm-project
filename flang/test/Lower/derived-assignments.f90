@@ -44,8 +44,7 @@ contains
 
   ! Swap elements on assignment.
   ! CHECK-LABEL: func @_QMm2Pt_to_t(
-  ! CHECK-SAME: %[[a1:[^:]*]]: !fir.ref<!fir.type<_QMm2Tt{a:i32,b:i32}>>,
-  ! CHECK-SAME: %[[b1:[^:]*]]: !fir.ref<!fir.type<_QMm2Tt{a:i32,b:i32}>>)
+  ! CHECK-SAME: %[[a1:[^:]*]]: !fir.ref<!fir.type<_QMm2Tt{a:i32,b:i32}>>{{.*}}, %[[b1:[^:]*]]: !fir.ref<!fir.type<_QMm2Tt{a:i32,b:i32}>>{{.*}}) {
   subroutine t_to_t(a1,b1)
     type(t), intent(out) :: a1
     type(t), intent(in) :: b1
@@ -97,8 +96,7 @@ subroutine test3
 end subroutine test3
 
 ! CHECK-LABEL: func @_QPtest_array_comp(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.type<_QFtest_array_compTt{m_x:!fir.array<10xf32>,m_i:i32}>>,
-! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<!fir.type<_QFtest_array_compTt{m_x:!fir.array<10xf32>,m_i:i32}>>)
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.type<_QFtest_array_compTt{m_x:!fir.array<10xf32>,m_i:i32}>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.type<_QFtest_array_compTt{m_x:!fir.array<10xf32>,m_i:i32}>>{{.*}}) {
 subroutine test_array_comp(t1, t2)
   type t
      real :: m_x(10)
@@ -127,8 +125,7 @@ subroutine test_array_comp(t1, t2)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_ptr_comp(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.type<_QFtest_ptr_compTt{ptr:!fir.box<!fir.ptr<!fir.array<?x!fir.complex<4>>>>,m_i:i32}>>,
-! CHECK-SAME: %[[VAL_1]]: !fir.ref<!fir.type<_QFtest_ptr_compTt{ptr:!fir.box<!fir.ptr<!fir.array<?x!fir.complex<4>>>>,m_i:i32}>>)
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.type<_QFtest_ptr_compTt{ptr:!fir.box<!fir.ptr<!fir.array<?x!fir.complex<4>>>>,m_i:i32}>>{{.*}}, %[[VAL_1]]: !fir.ref<!fir.type<_QFtest_ptr_compTt{ptr:!fir.box<!fir.ptr<!fir.array<?x!fir.complex<4>>>>,m_i:i32}>>{{.*}}) {
 subroutine test_ptr_comp(t1, t2)
   type t
      complex, pointer :: ptr(:)
@@ -150,8 +147,7 @@ subroutine test_ptr_comp(t1, t2)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_box_assign(
-! CHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFtest_box_assignTt{i:i32}>>>>,
-! CHECK-SAME: %[[t2:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFtest_box_assignTt{i:i32}>>>>)
+! CHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFtest_box_assignTt{i:i32}>>>>{{.*}}, %[[t2:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFtest_box_assignTt{i:i32}>>>>{{.*}}) {
 subroutine test_box_assign(t1, t2)
   type t
      integer :: i
@@ -171,8 +167,7 @@ subroutine test_box_assign(t1, t2)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_alloc_comp(
-! CHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.type<_QFtest_alloc_compTt{x:!fir.box<!fir.heap<!fir.array<?x?xf32>>>,i:i32}>>,
-! CHECK-SAME: %[[t2:.*]]: !fir.ref<!fir.type<_QFtest_alloc_compTt{x:!fir.box<!fir.heap<!fir.array<?x?xf32>>>,i:i32}>>)
+! CHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.type<_QFtest_alloc_compTt{x:!fir.box<!fir.heap<!fir.array<?x?xf32>>>,i:i32}>>{{.*}}, %[[t2:.*]]: !fir.ref<!fir.type<_QFtest_alloc_compTt{x:!fir.box<!fir.heap<!fir.array<?x?xf32>>>,i:i32}>>{{.*}}) {
 subroutine test_alloc_comp(t1, t2)
 ! Test that derived type assignment with allocatable components are using the
 ! runtime to handle the deep copy.
@@ -218,8 +213,7 @@ end subroutine
 
 !contains
 !  ! cHECK-LABEL: func @_QMcomponent_with_user_def_assignPtest(
-!  ! cHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.type<_QMcomponent_with_user_def_assignTt{a:!fir.type<_QMcomponent_with_user_def_assignTt0{i:i32,j:i32}>,i:i32}>>,
-!  ! cHECK-SAME: %[[t2:.*]]: !fir.ref<!fir.type<_QMcomponent_with_user_def_assignTt{a:!fir.type<_QMcomponent_with_user_def_assignTt0{i:i32,j:i32}>,i:i32}>>)
+!  ! cHECK-SAME: %[[t1:.*]]: !fir.ref<!fir.type<_QMcomponent_with_user_def_assignTt{a:!fir.type<_QMcomponent_with_user_def_assignTt0{i:i32,j:i32}>,i:i32}>>{{.*}}, %[[t2:.*]]: !fir.ref<!fir.type<_QMcomponent_with_user_def_assignTt{a:!fir.type<_QMcomponent_with_user_def_assignTt0{i:i32,j:i32}>,i:i32}>>{{.*}}) {
 !  subroutine test(t1, t2)
 !    type(t) :: t1, t2
 !    ! cHECK: %[[tmpBox:.*]] = fir.alloca !fir.box<!fir.type<_QMcomponent_with_user_def_assignTt{{.*}}>>

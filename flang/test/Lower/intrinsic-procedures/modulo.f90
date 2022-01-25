@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: modulo_testr
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<f64>, %[[arg1:.*]]: !fir.ref<f64>, %[[arg2:.*]]: !fir.ref<f64>)
+! CHECK-LABEL: func @_QPmodulo_testr(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<f64>{{.*}}, %[[arg1:.*]]: !fir.ref<f64>{{.*}}, %[[arg2:.*]]: !fir.ref<f64>{{.*}}) {
 subroutine modulo_testr(r, a, p)
   real(8) :: r, a, p
   ! CHECK-DAG: %[[a:.*]] = fir.load %[[arg1]] : !fir.ref<f64>
@@ -19,8 +19,8 @@ subroutine modulo_testr(r, a, p)
   r = modulo(a, p)
 end subroutine
 
-! CHECK-LABEL: modulo_testi
-! CHECK-SAME: (%[[arg0:.*]]: !fir.ref<i64>, %[[arg1:.*]]: !fir.ref<i64>, %[[arg2:.*]]: !fir.ref<i64>)
+! CHECK-LABEL: func @_QPmodulo_testi(
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i64>{{.*}}, %[[arg1:.*]]: !fir.ref<i64>{{.*}}, %[[arg2:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine modulo_testi(r, a, p)
   integer(8) :: r, a, p
   ! CHECK-DAG: %[[a:.*]] = fir.load %[[arg1]] : !fir.ref<i64>

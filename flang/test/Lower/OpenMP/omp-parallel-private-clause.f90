@@ -4,7 +4,7 @@
 ! RUN: bbc -fopenmp -emit-fir %s -o - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
-!FIRDialect: func @_QPprivate_clause(%[[ARG1:.*]]: !fir.ref<i32>, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>, %[[ARG3:.*]]: !fir.boxchar<1>, %[[ARG4:.*]]: !fir.boxchar<1>) {
+!FIRDialect: func @_QPprivate_clause(%[[ARG1:.*]]: !fir.ref<i32>{{.*}}, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[ARG3:.*]]: !fir.boxchar<1>{{.*}}, %[[ARG4:.*]]: !fir.boxchar<1>{{.*}}) {
 !FIRDialect-DAG: %[[ALPHA:.*]] = fir.alloca i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"}
 !FIRDialect-DAG: %[[ALPHA_ARRAY:.*]] = fir.alloca !fir.array<10xi32> {{{.*}}, uniq_name = "{{.*}}Ealpha_array"}
 !FIRDialect-DAG: %[[BETA:.*]] = fir.alloca !fir.char<1,5> {{{.*}}, uniq_name = "{{.*}}Ebeta"}

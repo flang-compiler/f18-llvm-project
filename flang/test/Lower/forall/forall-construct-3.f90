@@ -13,9 +13,7 @@ subroutine test3_forall_construct(a,b, mask)
 end subroutine test3_forall_construct
 
 ! CHECK-LABEL: func @_QPtest3_forall_construct(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.array<100x400xf32>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<200x200xf32>>,
-! CHECK-SAME:                                  %[[VAL_2:.*]]: !fir.ref<!fir.array<100x200x!fir.logical<4>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<100x400xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<200x200xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<100x200x!fir.logical<4>>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_4:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_5:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}

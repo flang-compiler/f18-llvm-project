@@ -11,7 +11,7 @@ subroutine test_forall_stmt(x, mask)
 end subroutine test_forall_stmt
 
 ! CHECK-LABEL: func @_QPtest_forall_stmt(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<200xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<200x!fir.logical<4>>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<200xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<200x!fir.logical<4>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 200 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : i32

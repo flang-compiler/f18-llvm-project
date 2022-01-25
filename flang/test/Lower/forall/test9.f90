@@ -16,7 +16,7 @@ subroutine test9(a,b,n)
 end subroutine test9
 
 ! CHECK-LABEL: func @_QPtest9(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i32) -> i64

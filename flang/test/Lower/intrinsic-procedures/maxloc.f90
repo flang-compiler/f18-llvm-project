@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: maxloc_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>
+! CHECK-LABEL: func @_QPmaxloc_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine maxloc_test(arr,res)
   integer :: arr(:)
   integer :: res(:)
@@ -20,8 +19,8 @@ subroutine maxloc_test(arr,res)
 ! CHECK-DAG: fir.freemem %[[a14]] : !fir.heap<!fir.array<?xi32>>
 end subroutine
 
-! CHECK-LABEL: maxloc_test2
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>, %[[arg2:.*]]: !fir.ref<i32>
+! CHECK-LABEL: func @_QPmaxloc_test2(
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[arg2:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine maxloc_test2(arr,res,d)
   integer :: arr(:)
   integer :: res(:)

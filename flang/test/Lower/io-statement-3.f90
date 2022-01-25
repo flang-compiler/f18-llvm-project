@@ -1,8 +1,8 @@
 ! Test lowering of IO read SIZE control-spec (12.6.2.15)
 ! RUN: bbc -emit-fir -o - %s | FileCheck %s
 
-! CHECK-LABEL: @_QPtest_read_size(
-! CHECK-SAME: %[[sizeVar:[^:]+]]: !fir.ref<i32>,
+! CHECK-LABEL: func @_QPtest_read_size(
+! CHECK-SAME: %[[sizeVar:[^:]+]]: !fir.ref<i32>{{[^,]*}},
 subroutine test_read_size(size, c1, c2, unit, stat)
   integer :: unit, size, stat
   character(*) :: c1, c2

@@ -27,7 +27,7 @@ subroutine pass_assumed_len_char_array(carray)
 end
 
 ! CHECK-LABEL: func @_QPpass_array_slice_read(
-! CHECK-SAME:            %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME:            %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 5 : i32
 ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]] : (!fir.ref<!fir.char<1,{{[0-9]+}}>>) -> !fir.ref<i8>
@@ -53,7 +53,7 @@ subroutine pass_array_slice_read(x)
 end
 
 ! CHECK-LABEL: func @_QPpass_array_slice_write(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 1 : i32
 ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]] : (!fir.ref<!fir.char<1,{{[0-9]+}}>>) -> !fir.ref<i8>
@@ -83,7 +83,7 @@ end
 
 
 ! CHECK-LABEL: func @_QPpass_vector_subscript_write(
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<100xf32>>, %[[j:.*]]: !fir.ref<!fir.array<10xi32>>)
+! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[j:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}})
 subroutine pass_vector_subscript_write(x, j)
   ! Check that a temp is made for array with vector subscript in output IO.
   integer :: j(10)

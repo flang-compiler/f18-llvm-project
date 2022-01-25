@@ -1,6 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: func @_QPchar_return_callee(%arg0: !fir.ref<!fir.char<1,10>>, %arg1: index, %arg2: !fir.ref<i32>) -> !fir.boxchar<1>
+! CHECK-LABEL: func @_QPchar_return_callee(
+! CHECK-SAME: %{{.*}}: !fir.ref<!fir.char<1,10>>{{.*}}, %{{.*}}: index{{.*}}, %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.boxchar<1> {
 function char_return_callee(i)
   character(10) :: char_return_callee
   integer :: i

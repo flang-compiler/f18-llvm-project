@@ -494,8 +494,9 @@ private:
     return {};
   }
 
-  /// Add the symbol to the local map. If the symbol is already in the map, it
-  /// is not updated. Instead the value `false` is returned.
+  /// Add the symbol to the local map and return `true`. If the symbol is
+  /// already in the map and \p forced is `false`, the map is not updated.
+  /// Instead the value `false` is returned.
   bool addSymbol(const Fortran::semantics::SymbolRef sym, mlir::Value val,
                  bool forced = false) {
     if (!forced && lookupSymbol(sym))
@@ -2406,12 +2407,12 @@ private:
   /// result is also mapped. The symbol map is used to hold this mapping.
   void mapDummiesAndResults(Fortran::lower::pft::FunctionLikeUnit &funit,
                             const Fortran::lower::CalleeInterface &callee) {
-    assert(builder && "need a builder at this point");
+    assert(builder && "require a builder object at this point");
     using PassBy = Fortran::lower::CalleeInterface::PassEntityBy;
     auto mapPassedEntity = [&](const auto arg) -> void {
       if (arg.passBy == PassBy::AddressAndLength) {
         // TODO: now that fir call has some attributes regarding character
-        // return, this should PassBy::AddressAndLength should be retired.
+        // return, PassBy::AddressAndLength should be retired.
         mlir::Location loc = toLocation();
         fir::factory::CharacterExprHelper charHelp{*builder, loc};
         mlir::Value box =

@@ -16,8 +16,7 @@ elemental integer function elem_by_valueref(a,b) result(r)
 end function
 
 ! CHECK-LABEL: func @_QMscalar_in_elemPtest_elem_by_ref(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<100xi32>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.array<100xi32>>
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 subroutine test_elem_by_ref(i, j)
   integer :: i(100), j(100)
   ! CHECK: %[[tmp:.*]] = fir.alloca f32
@@ -32,8 +31,7 @@ subroutine test_elem_by_ref(i, j)
 end
 
 ! CHECK-LABEL: func @_QMscalar_in_elemPtest_elem_by_valueref(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<100xi32>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.array<100xi32>>
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 subroutine test_elem_by_valueref(i, j)
   integer :: i(100), j(100)
   ! CHECK-DAG: %[[tmpA:.*]] = fir.alloca i32 {adapt.valuebyref}
@@ -69,8 +67,7 @@ subroutine test_loop_order(i, j)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_loop_order(
-! CHECK-SAME:                           %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                           %[[VAL_1:.*]]: !fir.box<!fir.array<?xi32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_3:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_2]] : (!fir.box<!fir.array<?xi32>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_4:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.array<?xi32>

@@ -1,6 +1,6 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: mvbits_test
+! CHECK-LABEL: func @_QPmvbits_test(
 function mvbits_test(from, frompos, len, to, topos)
   ! CHECK: %[[result:.*]] = fir.alloca i32 {bindc_name = "mvbits_test"
   ! CHECK-DAG: %[[from:.*]] = fir.load %arg0 : !fir.ref<i32>
@@ -34,7 +34,7 @@ function mvbits_test(from, frompos, len, to, topos)
 end
 
 ! CHECK-LABEL: func @_QPmvbits_array_test(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>, %[[VAL_1:.*]]: !fir.ref<i32>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.box<!fir.array<?xi32>>, %[[VAL_4:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_4:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_6:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_5]] : (!fir.box<!fir.array<?xi32>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_7:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.array<?xi32>

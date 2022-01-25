@@ -2,7 +2,7 @@
 
 ! RUN: bbc -fopenmp -emit-fir %s -o - | FileCheck %s --check-prefix=FIRDialect
 
-!FIRDialect: func @_QPfirstprivate_character(%[[ARG1:.*]]: !fir.boxchar<1>) {
+!FIRDialect: func @_QPfirstprivate_character(%[[ARG1:.*]]: !fir.boxchar<1>{{.*}}) {
 !FIRDialect-DAG: %[[ARG1_UNBOX:.*]]:2 = fir.unboxchar %[[ARG1]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 !FIRDialect-DAG: %[[FIVE:.*]] = arith.constant 5 : index
 !FIRDialect-DAG: omp.parallel {
@@ -39,7 +39,7 @@ subroutine firstprivate_character(arg1)
 
 end subroutine
 
-!FIRDialect: func @_QPfirstprivate_complex(%[[ARG1:.*]]: !fir.ref<!fir.complex<4>>, %[[ARG2:.*]]: !fir.ref<!fir.complex<8>>) {
+!FIRDialect: func @_QPfirstprivate_complex(%[[ARG1:.*]]: !fir.ref<!fir.complex<4>>{{.*}}, %[[ARG2:.*]]: !fir.ref<!fir.complex<8>>{{.*}}) {
 !FIRDialect-DAG:   omp.parallel {
 !FIRDialect-DAG:     %[[ARG1_PVT:.*]] = fir.alloca !fir.complex<4> {bindc_name = "arg1", pinned, uniq_name = "_QFfirstprivate_complexEarg1"}
 !FIRDialect-DAG:     %[[ARG1_VAL:.*]] = fir.load %arg0 : !fir.ref<!fir.complex<4>>
@@ -69,7 +69,7 @@ subroutine firstprivate_complex(arg1, arg2)
 
 end subroutine
 
-!FIRDialect: func @_QPfirstprivate_integer(%[[ARG1:.*]]: !fir.ref<i32>, %[[ARG2:.*]]: !fir.ref<i8>, %[[ARG3:.*]]: !fir.ref<i16>, %[[ARG4:.*]]: !fir.ref<i32>, %[[ARG5:.*]]: !fir.ref<i64>, %[[ARG6:.*]]: !fir.ref<i128>) {
+!FIRDialect: func @_QPfirstprivate_integer(%[[ARG1:.*]]: !fir.ref<i32>{{.*}}, %[[ARG2:.*]]: !fir.ref<i8>{{.*}}, %[[ARG3:.*]]: !fir.ref<i16>{{.*}}, %[[ARG4:.*]]: !fir.ref<i32>{{.*}}, %[[ARG5:.*]]: !fir.ref<i64>{{.*}}, %[[ARG6:.*]]: !fir.ref<i128>{{.*}}) {
 !FIRDialect-DAG:  omp.parallel {
 !FIRDialect-DAG:    %[[ARG1_PVT:.*]] = fir.alloca i32 {bindc_name = "arg1", pinned, uniq_name = "_QFfirstprivate_integerEarg1"}
 !FIRDialect-DAG:    %[[ARG1_VAL:.*]] = fir.load %[[ARG1]] : !fir.ref<i32>
@@ -119,7 +119,7 @@ subroutine firstprivate_integer(arg1, arg2, arg3, arg4, arg5, arg6)
 
 end subroutine
 
-!FIRDialect: func @_QPfirstprivate_logical(%[[ARG1:.*]]: !fir.ref<!fir.logical<4>>, %[[ARG2:.*]]: !fir.ref<!fir.logical<1>>, %[[ARG3:.*]]: !fir.ref<!fir.logical<2>>, %[[ARG4:.*]]: !fir.ref<!fir.logical<4>>, %[[ARG5:.*]]: !fir.ref<!fir.logical<8>>) {
+!FIRDialect: func @_QPfirstprivate_logical(%[[ARG1:.*]]: !fir.ref<!fir.logical<4>>{{.*}}, %[[ARG2:.*]]: !fir.ref<!fir.logical<1>>{{.*}}, %[[ARG3:.*]]: !fir.ref<!fir.logical<2>>{{.*}}, %[[ARG4:.*]]: !fir.ref<!fir.logical<4>>{{.*}}, %[[ARG5:.*]]: !fir.ref<!fir.logical<8>>{{.*}}) {
 !FIRDialect-DAG:   omp.parallel {
 !FIRDialect-DAG:     %[[ARG1_PVT:.*]] = fir.alloca !fir.logical<4> {bindc_name = "arg1", pinned, uniq_name = "_QFfirstprivate_logicalEarg1"}
 !FIRDialect-DAG:     %[[ARG1_VAL:.*]] = fir.load %[[ARG1]] : !fir.ref<!fir.logical<4>>
@@ -168,7 +168,7 @@ subroutine firstprivate_logical(arg1, arg2, arg3, arg4, arg5)
 
 end subroutine
 
-!FIRDialect-DAG: func @_QPfirstprivate_real(%[[ARG1:.*]]: !fir.ref<f32>, %[[ARG2:.*]]: !fir.ref<f16>, %[[ARG3:.*]]: !fir.ref<f32>, %[[ARG4:.*]]: !fir.ref<f64>, %[[ARG5:.*]]: !fir.ref<f80>, %[[ARG6:.*]]: !fir.ref<f128>) {
+!FIRDialect-DAG: func @_QPfirstprivate_real(%[[ARG1:.*]]: !fir.ref<f32>{{.*}}, %[[ARG2:.*]]: !fir.ref<f16>{{.*}}, %[[ARG3:.*]]: !fir.ref<f32>{{.*}}, %[[ARG4:.*]]: !fir.ref<f64>{{.*}}, %[[ARG5:.*]]: !fir.ref<f80>{{.*}}, %[[ARG6:.*]]: !fir.ref<f128>{{.*}}) {
 !FIRDialect-DAG:   omp.parallel {
 !FIRDialect-DAG:     %[[ARG1_PVT:.*]] = fir.alloca f32 {bindc_name = "arg1", pinned, uniq_name = "_QFfirstprivate_realEarg1"}
 !FIRDialect-DAG:     %[[ARG1_VAL:.*]] = fir.load %[[ARG1]] : !fir.ref<f32>
