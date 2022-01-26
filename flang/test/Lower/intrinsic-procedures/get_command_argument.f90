@@ -2,7 +2,7 @@
 ! RUN: flang-new -fc1 -fdefault-integer-8 -emit-fir %s -o - | FileCheck --check-prefixes=CHECK,CHECK-64 -DDEFAULT_INTEGER_SIZE=64 %s
 
 ! CHECK-LABEL: func @_QPnumber_only(
-! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>) {
+! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}) {
 subroutine number_only(num)
     integer :: num
     call get_command_argument(num)
@@ -12,8 +12,7 @@ subroutine number_only(num)
 end subroutine number_only
 
 ! CHECK-LABEL: func @_QPnumber_and_value_only(
-! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[value:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[value:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine number_and_value_only(num, value)
 integer :: num
 character(len=32) :: value
@@ -31,11 +30,7 @@ call get_command_argument(num, value)
 end subroutine number_and_value_only
 
 ! CHECK-LABEL: func @_QPall_arguments(
-! CHECK-SAME: %[[num:[^:]*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[value:.*]]: !fir.boxchar<1>,
-! CHECK-SAME: %[[length:[^:]*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[status:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[errmsg:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME: %[[num:[^:]*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[value:.*]]: !fir.boxchar<1>{{.*}}, %[[length:[^:]*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[status:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[errmsg:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine all_arguments(num, value, length, status, errmsg)
     integer :: num, length, status
     character(len=32) :: value, errmsg
@@ -62,8 +57,7 @@ subroutine all_arguments(num, value, length, status, errmsg)
 end subroutine all_arguments
 
 ! CHECK-LABEL: func @_QPnumber_and_length_only(
-! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[length:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>) {
+! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[length:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}) {
 subroutine number_and_length_only(num, length)
     integer :: num, length
     call get_command_argument(num, LENGTH=length)
@@ -78,8 +72,7 @@ subroutine number_and_length_only(num, length)
 end subroutine number_and_length_only
 
 ! CHECK-LABEL: func @_QPnumber_and_status_only(
-! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[status:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>) {
+! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[status:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}) {
 subroutine number_and_status_only(num, status)
     integer :: num, status
     call get_command_argument(num, STATUS=status)
@@ -95,8 +88,7 @@ subroutine number_and_status_only(num, status)
 end subroutine number_and_status_only
 
 ! CHECK-LABEL: func @_QPnumber_and_errmsg_only(
-! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>,
-! CHECK-SAME: %[[errmsg:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME: %[[num:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}, %[[errmsg:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine number_and_errmsg_only(num, errmsg)
     integer :: num
     character(len=32) :: errmsg
