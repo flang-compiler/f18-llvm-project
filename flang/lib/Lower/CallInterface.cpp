@@ -686,10 +686,9 @@ private:
     addFirResult(boxCharTy, resultPosition, Property::BoxChar);
   }
 
-  /// Return an ArrayRef with an attribute with the name of the argument if this
+  /// Return a vector with an attribute with the name of the argument if this
   /// is a callee interface and the name is available. Otherwise, just return
-  /// llvm::None. The storage for the ArrayRef is provided by the caller and
-  /// passed as \p vector.
+  /// an empty vector.
   llvm::SmallVector<mlir::NamedAttribute>
   dummyNameAttr(const FortranEntity &entity) {
     if constexpr (std::is_same_v<FortranEntity,
