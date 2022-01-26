@@ -84,7 +84,6 @@ struct DriverOptions {
   bool verbose{false}; // -v
   bool compileOnly{false}; // -c
   std::string outputPath; // -o path
-  std::vector<std::string> searchDirectories; // -I dir
   std::string moduleDirectory{"."s}; // -module dir
   std::string moduleFileSuffix{".mod"}; // -moduleSuffix suff
   bool forcedForm{false}; // -Mfixed or -Mfree appeared
@@ -196,7 +195,8 @@ std::string CompileFortran(std::string path, Fortran::parser::Options options,
       defaultKinds, options.features, allCookedSources};
   semanticsContext.set_moduleDirectory(driver.moduleDirectory)
       .set_moduleFileSuffix(driver.moduleFileSuffix)
-      .set_searchDirectories(driver.searchDirectories)
+      .set_searchDirectories(options.searchDirectories)
+      .set_intrinsicModuleDirectories(options.intrinsicModuleDirectories)
       .set_warnOnNonstandardUsage(driver.warnOnNonstandardUsage)
       .set_warningsAreErrors(driver.warningsAreErrors);
   if (!driver.forcedForm) {
@@ -206,7 +206,6 @@ std::string CompileFortran(std::string path, Fortran::parser::Options options,
       options.isFixedForm = suffix == "f" || suffix == "F" || suffix == "ff";
     }
   }
-  options.searchDirectories = driver.searchDirectories;
   Fortran::parser::Parsing parsing{allCookedSources};
   parsing.Prescan(path, options);
   if (!parsing.messages().empty() &&
@@ -439,7 +438,7 @@ int main(int argc, char *const argv[]) {
 
   // Add the default intrinsic module directory to the list of search
   // directories
-  driver.searchDirectories.push_back(getIntrinsicDir());
+  options.intrinsicModuleDirectories.push_back(getIntrinsicDir());
 
   while (!args.empty()) {
     std::string arg{std::move(args.front())};
@@ -618,16 +617,15 @@ int main(int argc, char *const argv[]) {
       args.pop_front();
     } else if (arg == "-module-dir") {
       driver.moduleDirectory = args.front();
-      driver.searchDirectories.push_back(driver.moduleDirectory);
+      options.searchDirectories.push_back(driver.moduleDirectory);
       args.pop_front();
     } else if (arg == "-module-suffix") {
       driver.moduleFileSuffix = args.front();
       args.pop_front();
     } else if (arg == "-intrinsic-module-directory" ||
         arg == "-fintrinsic-modules-path") {
-      // prepend to the list of search directories
-      driver.searchDirectories.insert(
-          driver.searchDirectories.begin(), args.front());
+      options.intrinsicModuleDirectories.insert(
+          options.intrinsicModuleDirectories.begin(), args.front());
       args.pop_front();
     } else if (arg == "-futf-8") {
       driver.encoding = Fortran::parser::Encoding::UTF_8;
@@ -729,18 +727,18 @@ int main(int argc, char *const argv[]) {
         }
       } else if (arg == "-I") {
         driver.F18_FCArgs.push_back(args.front());
-        driver.searchDirectories.push_back(args.front());
+        options.searchDirectories.push_back(args.front());
         args.pop_front();
       } else if (arg.substr(0, 2) == "-I") {
-        driver.searchDirectories.push_back(arg.substr(2));
+        options.searchDirectories.push_back(arg.substr(2));
       } else if (arg == "-J") {
         driver.F18_FCArgs.push_back(args.front());
         driver.moduleDirectory = args.front();
-        driver.searchDirectories.push_back(driver.moduleDirectory);
+        options.searchDirectories.push_back(driver.moduleDirectory);
         args.pop_front();
       } else if (arg.substr(0, 2) == "-J") {
         driver.moduleDirectory = arg.substr(2);
-        driver.searchDirectories.push_back(driver.moduleDirectory);
+        options.searchDirectories.push_back(driver.moduleDirectory);
       }
     }
   }

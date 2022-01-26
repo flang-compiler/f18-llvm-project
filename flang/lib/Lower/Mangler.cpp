@@ -24,9 +24,8 @@
 // recursively build the vector of module scopes
 static void moduleNames(const Fortran::semantics::Scope &scope,
                         llvm::SmallVector<llvm::StringRef> &result) {
-  if (scope.kind() == Fortran::semantics::Scope::Kind::Global) {
+  if (scope.IsTopLevel())
     return;
-  }
   moduleNames(scope.parent(), result);
   if (scope.kind() == Fortran::semantics::Scope::Kind::Module)
     if (const Fortran::semantics::Symbol *symbol = scope.symbol())

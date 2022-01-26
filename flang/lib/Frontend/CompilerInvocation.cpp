@@ -666,8 +666,8 @@ void CompilerInvocation::setFortranOpts() {
       preprocessorOptions.searchDirectoriesFromIntrModPath.begin(),
       preprocessorOptions.searchDirectoriesFromIntrModPath.end());
 
-  //  Add the default intrinsic module directory at the end
-  fortranOptions.searchDirectories.emplace_back(getIntrinsicDir());
+  //  Add the default intrinsic module directory
+  fortranOptions.intrinsicModuleDirectories.emplace_back(getIntrinsicDir());
 
   // Add the directory supplied through -J/-module-dir to the list of search
   // directories
@@ -694,6 +694,7 @@ void CompilerInvocation::setSemanticsOpts(
 
   semanticsContext_->set_moduleDirectory(moduleDir())
       .set_searchDirectories(fortranOptions.searchDirectories)
+      .set_intrinsicModuleDirectories(fortranOptions.intrinsicModuleDirectories)
       .set_warnOnNonstandardUsage(enableConformanceChecks())
       .set_warningsAreErrors(warnAsErr())
       .set_moduleFileSuffix(moduleFileSuffix());

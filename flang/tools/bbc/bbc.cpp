@@ -72,12 +72,19 @@ static llvm::cl::opt<std::string>
                    llvm::cl::value_desc("filename"));
 
 static llvm::cl::list<std::string>
-    includeDirs("I", llvm::cl::desc("include search paths"));
+    includeDirs("I", llvm::cl::desc("include module search paths"));
+
+static llvm::cl::alias includeAlias("module-directory",
+                                    llvm::cl::desc("module search directory"),
+                                    llvm::cl::aliasopt(includeDirs));
+
+static llvm::cl::list<std::string>
+    intrinsicIncludeDirs("J", llvm::cl::desc("intrinsic module search paths"));
 
 static llvm::cl::alias
-    includeAlias("intrinsic-module-directory",
-                 llvm::cl::desc("intrinsic module directory"),
-                 llvm::cl::aliasopt(includeDirs));
+    intrinsicIncludeAlias("intrinsic-module-directory",
+                          llvm::cl::desc("intrinsic module directory"),
+                          llvm::cl::aliasopt(intrinsicIncludeDirs));
 
 static llvm::cl::opt<std::string>
     moduleDir("module", llvm::cl::desc("module output directory (default .)"),
@@ -168,6 +175,7 @@ static mlir::LogicalResult convertFortranSourceToMLIR(
 
   // prep for prescan and parse
   options.searchDirectories = includeDirs;
+  options.intrinsicModuleDirectories = intrinsicIncludeDirs;
   Fortran::parser::Parsing parsing{semanticsContext.allCookedSources()};
   parsing.Prescan(path, options);
   if (!parsing.messages().empty() &&
@@ -303,7 +311,7 @@ int main(int argc, char **argv) {
     includeDirs.push_back(".");
     // Default Fortran modules should be installed in include/flang (a sibling
     // to the bin) directory.
-    includeDirs.push_back(
+    intrinsicIncludeDirs.push_back(
         llvm::sys::path::parent_path(
             llvm::sys::path::parent_path(
                 llvm::sys::fs::getMainExecutable(argv[0], nullptr)))
@@ -340,6 +348,7 @@ int main(int argc, char **argv) {
   semanticsContext.set_moduleDirectory(moduleDir)
       .set_moduleFileSuffix(moduleSuffix)
       .set_searchDirectories(includeDirs)
+      .set_intrinsicModuleDirectories(intrinsicIncludeDirs)
       .set_warnOnNonstandardUsage(warnStdViolation)
       .set_warningsAreErrors(warnIsError);
 

@@ -1,4 +1,4 @@
-! RUN: bbc -I %moddir -pft-test -o %t %s | FileCheck %s
+! RUN: bbc -J %moddir -pft-test -o %t %s | FileCheck %s
 
 ! Test Pre-FIR Tree captures all the coarray related statements
 
