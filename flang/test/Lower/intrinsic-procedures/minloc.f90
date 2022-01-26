@@ -39,3 +39,51 @@ subroutine minloc_test2(arr,res,d)
 ! CHECK:  %[[a13:.*]] = fir.box_addr %[[a12]] : (!fir.box<!fir.heap<i32>>) -> !fir.heap<i32>
 ! CHECK:  fir.freemem %[[a13]] : !fir.heap<i32>
 end subroutine
+
+! CHECK-LABEL: func @_QPtest_minloc_optional_scalar_mask(
+! CHECK-SAME:  %[[VAL_0:[^:]+]]: !fir.ref<!fir.logical<4>>
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.logical<4>>
+subroutine test_minloc_optional_scalar_mask(mask, back, array)
+  integer :: array(:)
+  logical, optional :: mask
+  logical, optional :: back
+  print *, minloc(array, mask=mask, back=back)
+! CHECK:  %[[VAL_9:.*]] = fir.is_present %[[VAL_0]] : (!fir.ref<!fir.logical<4>>) -> i1
+! CHECK:  %[[VAL_10:.*]] = fir.embox %[[VAL_0]] : (!fir.ref<!fir.logical<4>>) -> !fir.box<!fir.logical<4>>
+! CHECK:  %[[VAL_11:.*]] = fir.absent !fir.box<!fir.logical<4>>
+! CHECK:  %[[VAL_12:.*]] = select %[[VAL_9]], %[[VAL_10]], %[[VAL_11]] : !fir.box<!fir.logical<4>>
+! CHECK:  %[[VAL_13:.*]] = fir.is_present %[[VAL_1]] : (!fir.ref<!fir.logical<4>>) -> i1
+! CHECK:  %[[VAL_14:.*]] = fir.if %[[VAL_13]] -> (!fir.logical<4>) {
+  ! CHECK:  %[[VAL_15:.*]] = fir.load %[[VAL_1]] : !fir.ref<!fir.logical<4>>
+  ! CHECK:  fir.result %[[VAL_15]] : !fir.logical<4>
+! CHECK:  } else {
+  ! CHECK:  %[[VAL_16:.*]] = arith.constant false
+  ! CHECK:  %[[VAL_17:.*]] = fir.convert %[[VAL_16]] : (i1) -> !fir.logical<4>
+  ! CHECK:  fir.result %[[VAL_17]] : !fir.logical<4>
+! CHECK:  }
+! CHECK:  %[[VAL_29:.*]] = fir.convert %[[VAL_12]] : (!fir.box<!fir.logical<4>>) -> !fir.box<none>
+! CHECK:  %[[VAL_30:.*]] = fir.convert %[[VAL_14]] : (!fir.logical<4>) -> i1
+! CHECK:  fir.call @_FortranAMinloc(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %[[VAL_29]], %[[VAL_30]]) : (!fir.ref<!fir.box<none>>, !fir.box<none>, i32, !fir.ref<i8>, i32, !fir.box<none>, i1) -> none
+end subroutine
+
+! CHECK-LABEL: func @_QPtest_minloc_optional_array_mask(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.logical<4>>
+subroutine test_minloc_optional_array_mask(mask, back, array)
+  integer :: array(:)
+  logical, optional :: mask(:)
+  logical, optional :: back
+  print *, minloc(array, mask=mask, back=back)
+! CHECK:  %[[VAL_9:.*]] = fir.is_present %[[VAL_1]] : (!fir.ref<!fir.logical<4>>) -> i1
+! CHECK:  %[[VAL_10:.*]] = fir.if %[[VAL_9]] -> (!fir.logical<4>) {
+  ! CHECK:  %[[VAL_11:.*]] = fir.load %[[VAL_1]] : !fir.ref<!fir.logical<4>>
+  ! CHECK:  fir.result %[[VAL_11]] : !fir.logical<4>
+! CHECK:  } else {
+  ! CHECK:  %[[VAL_12:.*]] = arith.constant false
+  ! CHECK:  %[[VAL_13:.*]] = fir.convert %[[VAL_12]] : (i1) -> !fir.logical<4>
+  ! CHECK:  fir.result %[[VAL_13]] : !fir.logical<4>
+! CHECK:  }
+! CHECK:  %[[VAL_25:.*]] = fir.convert %[[VAL_0]] : (!fir.box<!fir.array<?x!fir.logical<4>>>) -> !fir.box<none>
+! CHECK:  %[[VAL_26:.*]] = fir.convert %[[VAL_10]] : (!fir.logical<4>) -> i1
+! CHECK:  fir.call @_FortranAMinloc(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %[[VAL_25]], %[[VAL_26]]) : (!fir.ref<!fir.box<none>>, !fir.box<none>, i32, !fir.ref<i8>, i32, !fir.box<none>, i1) -> none
+end subroutine

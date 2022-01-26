@@ -49,4 +49,32 @@ integer function index_test3(s, i)
   index_test3 = index(s, char(i))
 end function
 
-
+! CHECK-LABEL: func @_QPtest_optional(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.boxchar<1>
+! CHECK-SAME:  %[[VAL_2:.*]]: !fir.box<!fir.array<?x!fir.logical<4>>>
+subroutine test_optional(string, substring, back)
+  character (*) :: string(:), substring
+  logical, optional :: back(:)
+  print *, index(string, substring, back)
+! CHECK:  %[[VAL_11:.*]] = fir.is_present %[[VAL_2]] : (!fir.box<!fir.array<?x!fir.logical<4>>>) -> i1
+! CHECK:  %[[VAL_12:.*]] = fir.zero_bits !fir.ref<!fir.array<?x!fir.logical<4>>>
+! CHECK:  %[[VAL_13:.*]] = arith.constant 0 : index
+! CHECK:  %[[VAL_14:.*]] = fir.shape %[[VAL_13]] : (index) -> !fir.shape<1>
+! CHECK:  %[[VAL_15:.*]] = fir.embox %[[VAL_12]](%[[VAL_14]]) : (!fir.ref<!fir.array<?x!fir.logical<4>>>, !fir.shape<1>) -> !fir.box<!fir.array<?x!fir.logical<4>>>
+! CHECK:  %[[VAL_16:.*]] = select %[[VAL_11]], %[[VAL_2]], %[[VAL_15]] : !fir.box<!fir.array<?x!fir.logical<4>>>
+! CHECK:  %[[VAL_17:.*]] = fir.array_load %[[VAL_16]] {fir.optional} : (!fir.box<!fir.array<?x!fir.logical<4>>>) -> !fir.array<?x!fir.logical<4>>
+! CHECK:  %[[VAL_24:.*]] = fir.do_loop %[[VAL_25:.*]] = %{{.*}} to %{{.*}} step %{{.*}} unordered iter_args(%[[VAL_26:.*]] = %{{.*}}) -> (!fir.array<?xi32>) {
+  ! CHECK:  %[[VAL_31:.*]] = fir.if %[[VAL_11]] -> (!fir.logical<4>) {
+    ! CHECK:  %[[VAL_32:.*]] = fir.array_fetch %[[VAL_17]], %[[VAL_25]] : (!fir.array<?x!fir.logical<4>>, index) -> !fir.logical<4>
+    ! CHECK:  fir.result %[[VAL_32]] : !fir.logical<4>
+  ! CHECK:  } else {
+    ! CHECK:  %[[VAL_33:.*]] = arith.constant false
+    ! CHECK:  %[[VAL_34:.*]] = fir.convert %[[VAL_33]] : (i1) -> !fir.logical<4>
+    ! CHECK:  fir.result %[[VAL_34]] : !fir.logical<4>
+  ! CHECK:  }
+  ! CHECK:  %[[VAL_39:.*]] = fir.convert %[[VAL_31]] : (!fir.logical<4>) -> i1
+  ! CHECK:  fir.call @_FortranAIndex1(%{{.*}}, %{{.*}}, %{{.*}}, %{{.*}}, %[[VAL_39]]) : (!fir.ref<i8>, i64, !fir.ref<i8>, i64, i1) -> i64
+! CHECK:  }
+! CHECK:  fir.array_merge_store
+end subroutine

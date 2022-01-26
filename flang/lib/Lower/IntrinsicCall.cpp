@@ -114,6 +114,9 @@ static bool isAbsent(const fir::ExtendedValue &exv) {
 static bool isAbsent(llvm::ArrayRef<fir::ExtendedValue> args, size_t argIndex) {
   return args.size() <= argIndex || isAbsent(args[argIndex]);
 }
+static bool isAbsent(llvm::ArrayRef<mlir::Value> args, size_t argIndex) {
+  return args.size() <= argIndex || !args[argIndex];
+}
 
 /// Test if an ExtendedValue is present.
 static bool isPresent(const fir::ExtendedValue &exv) { return !isAbsent(exv); }
@@ -311,8 +314,7 @@ static fir::ExtendedValue genExtremumloc(
 
   // Handle required array argument
   mlir::Value array = builder.createBox(loc, args[0]);
-  fir::BoxValue arryTmp = builder.createBox(loc, args[0]);
-  unsigned rank = arryTmp.rank();
+  unsigned rank = fir::BoxValue(array).rank();
   assert(rank >= 1);
 
   // Handle optional mask argument
@@ -456,6 +458,7 @@ struct IntrinsicLibrary {
   template <mlir::arith::CmpIPredicate pred>
   fir::ExtendedValue genCharacterCompare(mlir::Type,
                                          llvm::ArrayRef<fir::ExtendedValue>);
+  mlir::Value genCmplx(mlir::Type, llvm::ArrayRef<mlir::Value>);
   mlir::Value genConjg(mlir::Type, llvm::ArrayRef<mlir::Value>);
   fir::ExtendedValue genCount(mlir::Type, llvm::ArrayRef<fir::ExtendedValue>);
   void genCpuTime(llvm::ArrayRef<fir::ExtendedValue>);
@@ -603,7 +606,9 @@ struct IntrinsicDummyArgument {
   const char *name = nullptr;
   Fortran::lower::LowerIntrinsicArgAs lowerAs =
       Fortran::lower::LowerIntrinsicArgAs::Value;
+  bool handleDynamicOptional = false;
 };
+
 struct Fortran::lower::IntrinsicArgumentLoweringRules {
   /// There is no more than 7 non repeated arguments in Fortran intrinsics.
   IntrinsicDummyArgument args[7];
@@ -626,6 +631,11 @@ constexpr auto asAddr = Fortran::lower::LowerIntrinsicArgAs::Addr;
 constexpr auto asBox = Fortran::lower::LowerIntrinsicArgAs::Box;
 constexpr auto asInquired = Fortran::lower::LowerIntrinsicArgAs::Inquired;
 using I = IntrinsicLibrary;
+
+/// Flag to indicate that an intrinsic argument has to be handled as
+/// being dynamically optional (e.g. special handling when actual
+/// argument is an optional variable in the current scope).
+static constexpr bool handleDynamicOptional = true;
 
 /// Table that drives the fir generation depending on the intrinsic.
 /// one to one mapping with Fortran arguments. If no mapping is
@@ -667,6 +677,9 @@ static constexpr IntrinsicHandler handlers[]{
     {"btest", &I::genBtest},
     {"ceiling", &I::genCeiling},
     {"char", &I::genChar},
+    {"cmplx",
+     &I::genCmplx,
+     {{{"x", asValue}, {"y", asValue, handleDynamicOptional}}}},
     {"command_argument_count", &I::genCommandArgumentCount},
     {"conjg", &I::genConjg},
     {"count",
@@ -683,10 +696,10 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"date_and_time",
      &I::genDateAndTime,
-     {{{"date", asAddr},
-       {"time", asAddr},
-       {"zone", asAddr},
-       {"values", asBox}}},
+     {{{"date", asAddr, handleDynamicOptional},
+       {"time", asAddr, handleDynamicOptional},
+       {"zone", asAddr, handleDynamicOptional},
+       {"values", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"dble", &I::genConversion},
     {"dim", &I::genDim},
@@ -697,9 +710,9 @@ static constexpr IntrinsicHandler handlers[]{
     {"dprod", &I::genDprod},
     {"eoshift",
      &I::genEoshift,
-     {{{"array", asAddr},
+     {{{"array", asBox},
        {"shift", asAddr},
-       {"boundary", asAddr},
+       {"boundary", asBox, handleDynamicOptional},
        {"dim", asValue}}},
      /*isElemental=*/false},
     {"exit",
@@ -728,7 +741,7 @@ static constexpr IntrinsicHandler handlers[]{
      &I::genIndex,
      {{{"string", asAddr},
        {"substring", asAddr},
-       {"back", asValue},
+       {"back", asValue, handleDynamicOptional},
        {"kind", asValue}}}},
     {"ior", &I::genIor},
     {"ishft", &I::genIshft},
@@ -750,29 +763,33 @@ static constexpr IntrinsicHandler handlers[]{
     {"max", &I::genExtremum<Extremum::Max, ExtremumBehavior::MinMaxss>},
     {"maxloc",
      &I::genMaxloc,
-     {{{"array", asAddr},
+     {{{"array", asBox},
        {"dim", asValue},
-       {"mask", asAddr},
+       {"mask", asBox, handleDynamicOptional},
        {"kind", asValue},
-       {"back", asValue}}},
+       {"back", asValue, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"maxval",
      &I::genMaxval,
-     {{{"array", asAddr}, {"dim", asValue}, {"mask", asAddr}}},
+     {{{"array", asBox},
+       {"dim", asValue},
+       {"mask", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"merge", &I::genMerge},
     {"min", &I::genExtremum<Extremum::Min, ExtremumBehavior::MinMaxss>},
     {"minloc",
      &I::genMinloc,
-     {{{"array", asAddr},
+     {{{"array", asBox},
        {"dim", asValue},
-       {"mask", asAddr},
+       {"mask", asBox, handleDynamicOptional},
        {"kind", asValue},
-       {"back", asValue}}},
+       {"back", asValue, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"minval",
      &I::genMinval,
-     {{{"array", asAddr}, {"dim", asValue}, {"mask", asAddr}}},
+     {{{"array", asBox},
+       {"dim", asValue},
+       {"mask", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"mod", &I::genMod},
     {"modulo", &I::genModulo},
@@ -789,7 +806,9 @@ static constexpr IntrinsicHandler handlers[]{
     {"null", &I::genNull, {{{"mold", asInquired}}}, /*isElemental=*/false},
     {"pack",
      &I::genPack,
-     {{{"array", asAddr}, {"mask", asAddr}, {"vector", asAddr}}},
+     {{{"array", asBox},
+       {"mask", asBox},
+       {"vector", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"present",
      &I::genPresent,
@@ -797,7 +816,9 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"product",
      &I::genProduct,
-     {{{"array", asBox}, {"dim", asValue}, {"mask", asBox}}},
+     {{{"array", asBox},
+       {"dim", asValue},
+       {"mask", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"random_init",
      &I::genRandomInit,
@@ -817,10 +838,10 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"reshape",
      &I::genReshape,
-     {{{"source", asAddr},
-       {"shape", asAddr},
-       {"pad", asAddr},
-       {"order", asAddr}}},
+     {{{"source", asBox},
+       {"shape", asBox},
+       {"pad", asBox, handleDynamicOptional},
+       {"order", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"rrspacing", &I::genRRSpacing},
     {"scale",
@@ -831,7 +852,7 @@ static constexpr IntrinsicHandler handlers[]{
      &I::genScan,
      {{{"string", asAddr},
        {"set", asAddr},
-       {"back", asValue},
+       {"back", asValue, handleDynamicOptional},
        {"kind", asValue}}},
      /*isElemental=*/true},
     {"set_exponent", &I::genSetExponent},
@@ -847,7 +868,9 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"sum",
      &I::genSum,
-     {{{"array", asBox}, {"dim", asValue}, {"mask", asBox}}},
+     {{{"array", asBox},
+       {"dim", asValue},
+       {"mask", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"system_clock",
      &I::genSystemClock,
@@ -868,13 +891,13 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"unpack",
      &I::genUnpack,
-     {{{"vector", asAddr}, {"mask", asAddr}, {"field", asAddr}}},
+     {{{"vector", asBox}, {"mask", asBox}, {"field", asBox}}},
      /*isElemental=*/false},
     {"verify",
      &I::genVerify,
      {{{"string", asAddr},
        {"set", asAddr},
-       {"back", asValue},
+       {"back", asValue, handleDynamicOptional},
        {"kind", asValue}}},
      /*isElemental=*/true},
 };
@@ -2004,6 +2027,20 @@ IntrinsicLibrary::genChar(mlir::Type type,
   return fir::CharBoxValue{cast, len};
 }
 
+// CMPLX
+mlir::Value IntrinsicLibrary::genCmplx(mlir::Type resultType,
+                                       llvm::ArrayRef<mlir::Value> args) {
+  assert(args.size() >= 1);
+  fir::factory::Complex complexHelper(builder, loc);
+  mlir::Type partType = complexHelper.getComplexPartType(resultType);
+  mlir::Value real = builder.createConvert(loc, partType, args[0]);
+  mlir::Value imag = isAbsent(args, 1)
+                         ? builder.createRealZeroConstant(loc, partType)
+                         : builder.createConvert(loc, partType, args[1]);
+  return fir::factory::Complex{builder, loc}.createComplex(resultType, real,
+                                                           imag);
+}
+
 // COMMAND_ARGUMENT_COUNT
 fir::ExtendedValue IntrinsicLibrary::genCommandArgumentCount(
     mlir::Type resultType, llvm::ArrayRef<fir::ExtendedValue> args) {
@@ -2951,9 +2988,7 @@ IntrinsicLibrary::genReshape(mlir::Type resultType,
 
   // Handle shape argument
   mlir::Value shape = builder.createBox(loc, args[1]);
-  fir::BoxValue shapeTmp = shape;
-  [[maybe_unused]] auto shapeRank = shapeTmp.rank();
-  assert(shapeRank == 1);
+  assert(fir::BoxValue(shape).rank() == 1);
   mlir::Type shapeTy = shape.getType();
   mlir::Type shapeArrTy = fir::dyn_cast_ptrOrBoxEleTy(shapeTy);
   auto resultRank = shapeArrTy.cast<fir::SequenceType>().getShape();
@@ -3411,7 +3446,6 @@ IntrinsicLibrary::genUnpack(mlir::Type resultType,
 
   // Handle required vector argument
   mlir::Value vector = builder.createBox(loc, args[0]);
-  fir::BoxValue vectorTmp = builder.createBox(loc, args[0]);
 
   // Handle required mask argument
   fir::BoxValue maskBox = builder.createBox(loc, args[1]);
@@ -3575,12 +3609,12 @@ Fortran::lower::getIntrinsicArgumentLowering(llvm::StringRef intrinsicName) {
 
 /// Return how argument \p argName should be lowered given the rules for the
 /// intrinsic function.
-Fortran::lower::LowerIntrinsicArgAs Fortran::lower::lowerIntrinsicArgumentAs(
+Fortran::lower::ArgLoweringRule Fortran::lower::lowerIntrinsicArgumentAs(
     mlir::Location loc, const IntrinsicArgumentLoweringRules &rules,
     llvm::StringRef argName) {
   for (const auto &arg : rules.args) {
     if (arg.name && arg.name == argName)
-      return arg.lowerAs;
+      return {arg.lowerAs, arg.handleDynamicOptional};
   }
   fir::emitFatalError(
       loc, "internal: unknown intrinsic argument name in lowering '" + argName +

@@ -25,3 +25,32 @@ subroutine reshape_test(x, source, pd, sh, ord)
 ! CHECK-DAG:  fir.freemem %[[a18]] : !fir.heap<!fir.array<?x?xi32>>
 end subroutine
 
+! CHECK-LABEL: func @_QPtest_reshape_optional(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+subroutine test_reshape_optional(pad, order, source, shape)
+  real, pointer :: pad(:, :) 
+  integer, pointer :: order(:) 
+  real :: source(:, :, :)
+  integer :: shape(4) 
+  print *, reshape(source=source, shape=shape, pad=pad, order=order)  
+! CHECK:  %[[VAL_13:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>
+! CHECK:  %[[VAL_14:.*]] = fir.box_addr %[[VAL_13]] : (!fir.box<!fir.ptr<!fir.array<?x?xf32>>>) -> !fir.ptr<!fir.array<?x?xf32>>
+! CHECK:  %[[VAL_15:.*]] = fir.convert %[[VAL_14]] : (!fir.ptr<!fir.array<?x?xf32>>) -> i64
+! CHECK:  %[[VAL_16:.*]] = arith.constant 0 : i64
+! CHECK:  %[[VAL_17:.*]] = arith.cmpi ne, %[[VAL_15]], %[[VAL_16]] : i64
+! CHECK:  %[[VAL_18:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>
+! CHECK:  %[[VAL_19:.*]] = fir.absent !fir.box<!fir.ptr<!fir.array<?x?xf32>>>
+! CHECK:  %[[VAL_20:.*]] = select %[[VAL_17]], %[[VAL_18]], %[[VAL_19]] : !fir.box<!fir.ptr<!fir.array<?x?xf32>>>
+! CHECK:  %[[VAL_21:.*]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:  %[[VAL_22:.*]] = fir.box_addr %[[VAL_21]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>) -> !fir.ptr<!fir.array<?xi32>>
+! CHECK:  %[[VAL_23:.*]] = fir.convert %[[VAL_22]] : (!fir.ptr<!fir.array<?xi32>>) -> i64
+! CHECK:  %[[VAL_24:.*]] = arith.constant 0 : i64
+! CHECK:  %[[VAL_25:.*]] = arith.cmpi ne, %[[VAL_23]], %[[VAL_24]] : i64
+! CHECK:  %[[VAL_26:.*]] = fir.load %[[VAL_1]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>
+! CHECK:  %[[VAL_27:.*]] = fir.absent !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:  %[[VAL_28:.*]] = select %[[VAL_25]], %[[VAL_26]], %[[VAL_27]] : !fir.box<!fir.ptr<!fir.array<?xi32>>>
+! CHECK:  %[[VAL_38:.*]] = fir.convert %[[VAL_20]] : (!fir.box<!fir.ptr<!fir.array<?x?xf32>>>) -> !fir.box<none>
+! CHECK:  %[[VAL_39:.*]] = fir.convert %[[VAL_28]] : (!fir.box<!fir.ptr<!fir.array<?xi32>>>) -> !fir.box<none>
+! CHECK:  %[[VAL_41:.*]] = fir.call @_FortranAReshape({{.*}}, {{.*}}, %{{.*}}, %[[VAL_38]], %[[VAL_39]], %{{.*}}, %{{.*}}) : (!fir.ref<!fir.box<none>>, !fir.box<none>, !fir.box<none>, !fir.box<none>, !fir.box<none>, !fir.ref<i8>, i32) -> none
+end subroutine

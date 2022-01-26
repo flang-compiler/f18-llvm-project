@@ -50,7 +50,24 @@ enum class LowerIntrinsicArgAs {
   Inquired
 };
 
-/// Opaque class defining the argument lowering rules for an intrinsic.
+/// Define how a given intrinsic argument must be lowered.
+struct ArgLoweringRule {
+  LowerIntrinsicArgAs lowerAs;
+  /// Value:
+  //    - Numerical: 0
+  //    - Logical : false
+  //    - Derived/character: not possible. Need custom intrinsic lowering.
+  //  Addr:
+  //    - nullptr
+  //  Box:
+  //    - absent box
+  //  AsInquired:
+  //    - no-op
+  bool handleDynamicOptional;
+};
+
+/// Opaque class defining the argument lowering rules for all the argument of
+/// an intrinsic.
 struct IntrinsicArgumentLoweringRules;
 
 /// Return argument lowering rules for an intrinsic.
@@ -60,9 +77,9 @@ getIntrinsicArgumentLowering(llvm::StringRef intrinsicName);
 
 /// Return how argument \p argName should be lowered given the rules for the
 /// intrinsic function. The argument names are the one defined by the standard.
-LowerIntrinsicArgAs
-lowerIntrinsicArgumentAs(mlir::Location, const IntrinsicArgumentLoweringRules &,
-                         llvm::StringRef argName);
+ArgLoweringRule lowerIntrinsicArgumentAs(mlir::Location,
+                                         const IntrinsicArgumentLoweringRules &,
+                                         llvm::StringRef argName);
 
 /// Return place-holder for absent intrinsic arguments.
 fir::ExtendedValue getAbsentIntrinsicArgument();
