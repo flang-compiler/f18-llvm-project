@@ -37,6 +37,7 @@
 #include "flang/Semantics/runtime-type-info.h"
 #include "flang/Semantics/semantics.h"
 #include "flang/Semantics/unparse-with-symbols.h"
+#include "flang/Version.inc"
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/IR/AsmState.h"
 #include "mlir/IR/BuiltinOps.h"
@@ -233,13 +234,13 @@ int main(int argc, char **argv) {
   programPrefix = argv[0] + ": "s;
 
   Fortran::parser::Options options;
-  options.predefinitions.emplace_back("__F18", "1");
-  options.predefinitions.emplace_back("__F18_MAJOR__", "1");
-  options.predefinitions.emplace_back("__F18_MINOR__", "1");
-  options.predefinitions.emplace_back("__F18_PATCHLEVEL__", "1");
-#if __x86_64__
-  options.predefinitions.emplace_back("__x86_64__", "1");
-#endif
+  options.predefinitions.emplace_back("__flang__", "1");
+  options.predefinitions.emplace_back(
+      "__flang_major__", FLANG_VERSION_MAJOR_STRING);
+  options.predefinitions.emplace_back(
+      "__flang_minor__", FLANG_VERSION_MINOR_STRING);
+  options.predefinitions.emplace_back(
+      "__flang_patchlevel__", FLANG_VERSION_PATCHLEVEL_STRING);
 
   Fortran::common::IntrinsicTypeDefaultKinds defaultKinds;
   Fortran::parser::AllSources allSources;

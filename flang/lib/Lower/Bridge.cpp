@@ -16,6 +16,7 @@
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/SymbolMap.h"
+#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Support/FIRContext.h"
 #include "mlir/IR/PatternMatch.h"
 #include "mlir/Transforms/RegionUtils.h"
@@ -71,12 +72,12 @@ public:
 
   mlir::Value genExprAddr(const Fortran::lower::SomeExpr &expr,
                           mlir::Location *loc = nullptr) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Value
   genExprValue(const Fortran::lower::SomeExpr &expr,
                mlir::Location *loc = nullptr) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
 
   Fortran::evaluate::FoldingContext &getFoldingContext() override final {
@@ -84,22 +85,22 @@ public:
   }
 
   mlir::Type genType(const Fortran::evaluate::DataRef &) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Type genType(const Fortran::lower::SomeExpr &) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Type genType(Fortran::lower::SymbolRef) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Type genType(Fortran::common::TypeCategory tc) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Type genType(Fortran::common::TypeCategory tc, int kind) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
   mlir::Type genType(const Fortran::lower::pft::Variable &) override final {
-    return {};
+    TODO_NOLOC("Not implemented. Needed for more complex expression lowering");
   }
 
   void setCurrentPosition(const Fortran::parser::CharBlock &position) {
