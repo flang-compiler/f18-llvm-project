@@ -1505,20 +1505,22 @@ public:
     return std::visit([&](const auto &x) { return genval(x); }, dref.u);
   }
 
-  // Helper function to turn the left-recursive Component structure into a list
-  // that does not contain allocatable or pointer components other than the last
-  // one.
-  // Returns the object used as the base coordinate for the component chain.
+  // Helper function to turn the Component structure into a list of nested
+  // components, ordered from largest/leftmost to smallest/rightmost:
+  //  - where only the smallest/rightmost item may be allocatable or a pointer
+  //    (nested allocatable/pointer components require nested coordinate_of ops)
+  //  - that does not contain any parent components
+  //    (the front end places parent components directly in the object)
+  // Return the object used as the base coordinate for the component chain.
   static Fortran::evaluate::DataRef const *
   reverseComponents(const Fortran::evaluate::Component &cmpt,
                     std::list<const Fortran::evaluate::Component *> &list) {
-    list.push_front(&cmpt);
+    if (!cmpt.GetLastSymbol().test(
+            Fortran::semantics::Symbol::Flag::ParentComp))
+      list.push_front(&cmpt);
     return std::visit(
         Fortran::common::visitors{
             [&](const Fortran::evaluate::Component &x) {
-              // Stop the list when a component is an allocatable or pointer
-              // because the component cannot be lowered into a single
-              // fir.coordinate_of.
               if (Fortran::semantics::IsAllocatableOrPointer(x.GetLastSymbol()))
                 return &cmpt.base();
               return reverseComponents(x, list);

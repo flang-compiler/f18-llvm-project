@@ -229,3 +229,61 @@ subroutine elemental_char_section(a, i)
   ! CHECK: br ^bb1(%[[VAL_46]], %[[VAL_57]] : index, index)
   i = scan(a%c, "hello")
 end subroutine
+
+! CHECK-LABEL: extended_type_components
+subroutine extended_type_components
+  type t1
+    integer :: t1i = 1
+  end type t1
+  type, extends(t1) :: t2
+    integer :: t2i = 2
+  end type t2
+  type, extends(t2) :: t3
+    integer :: t3i = 3
+  end type t3
+  type, extends(t3) :: t4
+    integer :: t4i = 4
+  end type t4
+
+  type u1
+    integer :: u1i = 11
+  end type u1
+  type, extends(u1) :: u2
+    integer :: u2i = 22
+    type(t3) :: u2t3
+    type(t3) :: u2t4
+  end type u2
+  type, extends(u2) :: u3
+    integer :: u3i = 33
+  end type u3
+
+  ! CHECK: %[[u3v:.*]] = fir.alloca !fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}> {bindc_name = "u3v", uniq_name = "_QFextended_type_componentsEu3v"}
+  type(u3) :: u3v
+
+  ! CHECK: %[[VAL_10:.*]] = fir.call @_FortranAioBeginExternalListOutput(%{{.*}}, %{{.*}}, %{{.*}}) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[VAL_11:.*]] = fir.field_index u2t3, !fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}>
+  ! CHECK: %[[VAL_12:.*]] = fir.field_index t1i, !fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>
+  ! CHECK: %[[VAL_13:.*]] = fir.coordinate_of %[[u3v]], %[[VAL_11]], %[[VAL_12]] : (!fir.ref<!fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}>>, !fir.field, !fir.field) -> !fir.ref<i32>
+  ! CHECK: %[[VAL_14:.*]] = fir.load %[[VAL_13]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_15:.*]] = fir.call @_FortranAioOutputInteger32(%[[VAL_10]], %[[VAL_14]]) : (!fir.ref<i8>, i32) -> i1
+  print*, u3v%u2t3%t1i
+
+  ! CHECK: %[[VAL_20:.*]] = fir.call @_FortranAioBeginExternalListOutput(%{{.*}}, %{{.*}}, %{{.*}}) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[VAL_21:.*]] = fir.load %[[VAL_13]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_22:.*]] = fir.call @_FortranAioOutputInteger32(%[[VAL_20]], %[[VAL_21]]) : (!fir.ref<i8>, i32) -> i1
+  print*, u3v%u2%u2t3%t2%t1%t1i ! different syntax for the previous value
+
+  ! CHECK: %[[VAL_30:.*]] = fir.call @_FortranAioBeginExternalListOutput(%{{.*}}, %{{.*}}, %{{.*}}) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[VAL_31:.*]] = fir.field_index u2t4, !fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}>
+  ! CHECK: %[[VAL_32:.*]] = fir.coordinate_of %[[u3v]], %[[VAL_31]], %[[VAL_12]] : (!fir.ref<!fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}>>, !fir.field, !fir.field) -> !fir.ref<i32>
+  ! CHECK: %[[VAL_33:.*]] = fir.load %[[VAL_32]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_34:.*]] = fir.call @_FortranAioOutputInteger32(%[[VAL_30]], %[[VAL_33]]) : (!fir.ref<i8>, i32) -> i1
+  print*, u3v%u2t4%t1i
+
+  ! CHECK: %[[VAL_40:.*]] = fir.call @_FortranAioBeginExternalListOutput(%{{.*}}, %{{.*}}, %{{.*}}) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[VAL_41:.*]] = fir.field_index t2i, !fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>
+  ! CHECK: %[[VAL_42:.*]] = fir.coordinate_of %[[u3v]], %[[VAL_31]], %[[VAL_41]] : (!fir.ref<!fir.type<_QFextended_type_componentsTu3{u1i:i32,u2i:i32,u2t3:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u2t4:!fir.type<_QFextended_type_componentsTt3{t1i:i32,t2i:i32,t3i:i32}>,u3i:i32}>>, !fir.field, !fir.field) -> !fir.ref<i32>
+  ! CHECK: %[[VAL_43:.*]] = fir.load %[[VAL_42]] : !fir.ref<i32>
+  ! CHECK: %[[VAL_44:.*]] = fir.call @_FortranAioOutputInteger32(%[[VAL_40]], %[[VAL_43]]) : (!fir.ref<i8>, i32) -> i1
+  print*, u3v%u2t4%t2i
+  end subroutine extended_type_components
