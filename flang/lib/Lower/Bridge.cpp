@@ -1675,9 +1675,11 @@ private:
 
   void genFIR(const Fortran::parser::AssociateConstruct &) {
     Fortran::lower::StatementContext stmtCtx;
-    for (Fortran::lower::pft::Evaluation &e :
-         getEval().getNestedEvaluations()) {
+    Fortran::lower::pft::Evaluation &eval = getEval();
+    for (Fortran::lower::pft::Evaluation &e : eval.getNestedEvaluations()) {
       if (auto *stmt = e.getIf<Fortran::parser::AssociateStmt>()) {
+        if (eval.lowerAsUnstructured())
+          maybeStartBlock(e.block);
         localSymbols.pushScope();
         for (const Fortran::parser::Association &assoc :
              std::get<std::list<Fortran::parser::Association>>(stmt->t)) {

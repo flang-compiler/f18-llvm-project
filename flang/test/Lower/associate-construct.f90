@@ -2,7 +2,8 @@
 
 ! CHECK-LABEL: func @_QQmain
 program p
-  ! CHECK: [[N:%[0-9]+]] = fir.alloca i32 {{{.*}}uniq_name = "_QFEn"}
+  ! CHECK-DAG: [[I:%[0-9]+]] = fir.alloca i32 {{{.*}}uniq_name = "_QFEi"}
+  ! CHECK-DAG: [[N:%[0-9]+]] = fir.alloca i32 {{{.*}}uniq_name = "_QFEn"}
   ! CHECK: [[T:%[0-9]+]] = fir.address_of(@_QFEt) : !fir.ref<!fir.array<3xi32>>
   integer :: n, foo, t(3)
   ! CHECK: [[N]]
@@ -35,6 +36,26 @@ program p
     ! CHECK: fir.load [[D]]
     print*, n, t, a, b, c, d ! expected output: 102 111 223 333 102 105 223 7
   end associate
+
+  do i=1,4
+    associate (x=>i)
+      ! CHECK: [[IVAL:%[0-9]+]] = fir.load [[I]] : !fir.ref<i32>
+      ! CHECK: [[TWO:%.*]] = arith.constant 2 : i32
+      ! CHECK: arith.cmpi eq, [[IVAL]], [[TWO]] : i32
+      ! CHECK: ^bb
+      if (x==2) goto 9
+      ! CHECK: [[IVAL:%[0-9]+]] = fir.load [[I]] : !fir.ref<i32>
+      ! CHECK: [[THREE:%.*]] = arith.constant 3 : i32
+      ! CHECK: arith.cmpi eq, [[IVAL]], [[THREE]] : i32
+      ! CHECK: ^bb
+      ! CHECK: fir.call @_FortranAStopStatementText
+      ! CHECK: fir.unreachable
+      ! CHECK: ^bb
+      if (x==3) stop 'Halt'
+      ! CHECK: fir.call @_FortranAioOutputAscii
+      print*, "ok"
+  9 end associate
+  enddo
 end
 
 ! CHECK-LABEL: func @_QPfoo
