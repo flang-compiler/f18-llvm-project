@@ -395,7 +395,10 @@ getOrDeclareFunction(llvm::StringRef name,
                      const Fortran::evaluate::ProcedureDesignator &,
                      Fortran::lower::AbstractConverter &);
 
-/// Return the type of an argument that is a dummy procedure.
+/// Return the type of an argument that is a dummy procedure. This may be an
+/// mlir::FunctionType, but it can also be a more elaborate type based on the
+/// function type (like a tuple<function type, length type> for character
+/// functions).
 mlir::Type getDummyProcedureType(const Fortran::semantics::Symbol &dummyProc,
                                  Fortran::lower::AbstractConverter &);
 

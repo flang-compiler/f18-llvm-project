@@ -188,3 +188,58 @@ subroutine call_explicit_length_with_iface(bar10)
 ! CHECK:  fir.call %[[VAL_8]](%[[VAL_7]], %[[VAL_5]], %[[VAL_1]]) : (!fir.ref<!fir.char<1,?>>, index, !fir.ref<i64>) -> !fir.boxchar<1>
   call test(bar10(42_8))
 end subroutine
+
+
+! CHECK-LABEL: func @_QPhost(
+! CHECK-SAME:  %[[VAL_0:.*]]: tuple<() -> (), i64>
+subroutine host(f)
+  character*(*) :: f
+  external :: f
+  ! CHECK:  %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_1:.*]], %{{.*}} : (!fir.ref<tuple<tuple<() -> (), i64>>>, i32) -> !fir.ref<tuple<() -> (), i64>>
+  ! CHECK:  fir.store %[[VAL_0]] to %[[VAL_3]] : !fir.ref<tuple<() -> (), i64>>
+  ! CHECK: fir.call @_QFhostPintern(%[[VAL_1]])
+  call intern()
+contains
+! CHECK-LABEL: func @_QFhostPintern(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<tuple<tuple<() -> (), i64>>> {fir.host_assoc})
+  subroutine intern()
+! CHECK:  %[[VAL_1:.*]] = arith.constant 0 : i32
+! CHECK:  %[[VAL_2:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_1]] : (!fir.ref<tuple<tuple<() -> (), i64>>>, i32) -> !fir.ref<tuple<() -> (), i64>>
+! CHECK:  %[[VAL_3:.*]] = fir.load %[[VAL_2]] : !fir.ref<tuple<() -> (), i64>>
+! CHECK:  %[[VAL_4:.*]] = fir.extract_value %[[VAL_3]], [0 : index] : (tuple<() -> (), i64>) -> (() -> ())
+! CHECK:  %[[VAL_5:.*]] = fir.extract_value %[[VAL_3]], [1 : index] : (tuple<() -> (), i64>) -> i64
+! CHECK:  %[[VAL_7:.*]] = fir.alloca !fir.char<1,?>(%[[VAL_5]] : i64) {bindc_name = ".result"}
+! CHECK:  %[[VAL_8:.*]] = fir.convert %[[VAL_4]] : (() -> ()) -> ((!fir.ref<!fir.char<1,?>>, index) -> !fir.boxchar<1>)
+! CHECK:  %[[VAL_9:.*]] = fir.convert %[[VAL_5]] : (i64) -> index
+! CHECK:  fir.call %[[VAL_8]](%[[VAL_7]], %[[VAL_9]]) : (!fir.ref<!fir.char<1,?>>, index) -> !fir.boxchar<1>
+    call test(f())
+  end subroutine
+end subroutine
+
+! CHECK-LABEL: func @_QPhost2(
+! CHECK-SAME:  %[[VAL_0:.*]]: tuple<() -> (), i64> {fir.char_proc})
+subroutine host2(f)
+  ! Test that dummy length is overridden by local length even when used
+  ! in the internal procedure. 
+  character*(42) :: f
+  external :: f
+  ! CHECK:  %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_1:.*]], %{{.*}} : (!fir.ref<tuple<tuple<() -> (), i64>>>, i32) -> !fir.ref<tuple<() -> (), i64>>
+  ! CHECK:  fir.store %[[VAL_0]] to %[[VAL_3]] : !fir.ref<tuple<() -> (), i64>>
+  ! CHECK: fir.call @_QFhost2Pintern(%[[VAL_1]])
+  call intern()
+contains
+! CHECK-LABEL: func @_QFhost2Pintern(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<tuple<tuple<() -> (), i64>>> {fir.host_assoc})
+  subroutine intern()
+    ! CHECK:  %[[VAL_1:.*]] = fir.alloca !fir.char<1,42> {bindc_name = ".result"}
+    ! CHECK:  %[[VAL_2:.*]] = arith.constant 0 : i32
+    ! CHECK:  %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_2]] : (!fir.ref<tuple<tuple<() -> (), i64>>>, i32) -> !fir.ref<tuple<() -> (), i64>>
+    ! CHECK:  %[[VAL_4:.*]] = fir.load %[[VAL_3]] : !fir.ref<tuple<() -> (), i64>>
+    ! CHECK:  %[[VAL_5:.*]] = fir.extract_value %[[VAL_4]], [0 : index] : (tuple<() -> (), i64>) -> (() -> ())
+    ! CHECK:  %[[VAL_6:.*]] = arith.constant 42 : i64
+    ! CHECK:  %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
+    ! CHECK:  %[[VAL_9:.*]] = fir.convert %[[VAL_5]] : (() -> ()) -> ((!fir.ref<!fir.char<1,42>>, index) -> !fir.boxchar<1>)
+    ! CHECK:  fir.call %[[VAL_9]](%[[VAL_1]], %[[VAL_7]]) : (!fir.ref<!fir.char<1,42>>, index) -> !fir.boxchar<1>
+    call test(f())
+  end subroutine
+end subroutine

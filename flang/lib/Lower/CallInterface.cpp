@@ -34,9 +34,9 @@ static std::string getMangledName(const Fortran::semantics::Symbol &symbol) {
 
 /// Return the type of a dummy procedure given its characteristic (if it has
 /// one).
-mlir::Type
-getDummyProcedureTypeImpl(const Fortran::evaluate::characteristics::Procedure *,
-                          Fortran::lower::AbstractConverter &converter) {
+mlir::Type getProcedureDesignatorType(
+    const Fortran::evaluate::characteristics::Procedure *,
+    Fortran::lower::AbstractConverter &converter) {
   // TODO: Get actual function type of the dummy procedure, at least when an
   // interface is given.
   // In general, that is a nice to have but we cannot guarantee to find the
@@ -865,7 +865,7 @@ private:
     const Fortran::evaluate::characteristics::Procedure &procedure =
         proc.procedure.value();
     mlir::Type funcType =
-        getDummyProcedureTypeImpl(&proc.procedure.value(), interface.converter);
+        getProcedureDesignatorType(&procedure, interface.converter);
     llvm::Optional<Fortran::evaluate::DynamicType> resultTy =
         getResultDynamicType(procedure);
     if (resultTy && mustPassLengthWithDummyProcedure(procedure)) {
@@ -1165,14 +1165,14 @@ mlir::FuncOp Fortran::lower::getOrDeclareFunction(
   return newFunc;
 }
 
-mlir::Type Fortran::lower::getDummyProcedureType(
-    const Fortran::semantics::Symbol &dummyProc,
-    Fortran::lower::AbstractConverter &converter) {
-  std::optional<Fortran::evaluate::characteristics::Procedure> iface =
-      Fortran::evaluate::characteristics::Procedure::Characterize(
-          dummyProc, converter.getFoldingContext());
-  return getDummyProcedureTypeImpl(iface.has_value() ? &*iface : nullptr,
-                                   converter);
+// Is it required to pass a dummy procedure with \p characteristics as a tuple
+// containing the function address and the result length ?
+static bool mustPassLengthWithDummyProcedure(
+    const std::optional<Fortran::evaluate::characteristics::Procedure>
+        &characteristics) {
+  return characteristics &&
+         Fortran::lower::CallInterfaceImpl<SignatureBuilder>::
+             mustPassLengthWithDummyProcedure(*characteristics);
 }
 
 bool Fortran::lower::mustPassLengthWithDummyProcedure(
@@ -1181,7 +1181,18 @@ bool Fortran::lower::mustPassLengthWithDummyProcedure(
   std::optional<Fortran::evaluate::characteristics::Procedure> characteristics =
       Fortran::evaluate::characteristics::Procedure::Characterize(
           procedure, converter.getFoldingContext());
-  return characteristics &&
-         CallInterfaceImpl<SignatureBuilder>::mustPassLengthWithDummyProcedure(
-             *characteristics);
+  return ::mustPassLengthWithDummyProcedure(characteristics);
+}
+
+mlir::Type Fortran::lower::getDummyProcedureType(
+    const Fortran::semantics::Symbol &dummyProc,
+    Fortran::lower::AbstractConverter &converter) {
+  std::optional<Fortran::evaluate::characteristics::Procedure> iface =
+      Fortran::evaluate::characteristics::Procedure::Characterize(
+          dummyProc, converter.getFoldingContext());
+  mlir::Type procType = getProcedureDesignatorType(
+      iface.has_value() ? &*iface : nullptr, converter);
+  if (::mustPassLengthWithDummyProcedure(iface))
+    return fir::factory::getCharacterProcedureTupleType(procType);
+  return procType;
 }
