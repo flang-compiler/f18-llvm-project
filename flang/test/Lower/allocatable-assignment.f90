@@ -509,7 +509,9 @@ subroutine test_scalar_rhs(x, y)
   ! CHECK:   fir.if %false -> {{.*}} {
   ! CHECK:   }
   ! CHECK: } else {
-  ! TODO: runtime error if unallocated
+  ! CHECK: %[[error_msg_addr:.*]] = fir.address_of(@[[error_message:.*]]) : !fir.ref<!fir.char<1,76>>
+  ! CHECK: %[[msg_addr_cast:.*]] = fir.convert %[[error_msg_addr]] : (!fir.ref<!fir.char<1,76>>) -> !fir.ref<i8>
+  ! CHECK: %15 = fir.call @_FortranAReportFatalUserError(%[[msg_addr_cast]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i32) -> none
   ! CHECK-NOT: allocmem
   ! CHECK: }
   x = y
@@ -661,6 +663,11 @@ subroutine test_dyn_char(x, n, c)
 ! CHECK:  }
   x = c
 end subroutine
+
+! CHECK: fir.global linkonce @[[error_message]] constant : !fir.char<1,76> {
+! CHECK:   %[[msg:.*]] = fir.string_lit "array left hand side must be allocated when the right hand side is a scalar\00"(76) : !fir.char<1,76>
+! CHECK:   fir.has_value %[[msg:.*]] : !fir.char<1,76>
+! CHECK: }
 
 end module
 
