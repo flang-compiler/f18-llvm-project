@@ -338,3 +338,10 @@ func private @foo3(%arg : !fir.tdesc<!fir.type<derived7{f1:f32,f2:f32}>>)
 func private @foo0(%arg0: !fir.len)
 // CHECK-LABEL: foo0
 // CHECK-SAME: i64
+
+// -----
+
+// Test nested tuple types
+func private @foo0(%arg0: tuple<i64, tuple<f32, i64>>)
+// CHECK-LABEL: foo0
+// CHECK-SAME: !llvm.struct<(i64, struct<(f32, i64)>)>
