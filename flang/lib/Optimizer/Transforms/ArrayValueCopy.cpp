@@ -820,6 +820,9 @@ static mlir::Value getOrReadExtentsAndShapeOp(
     mlir::Location loc, mlir::PatternRewriter &rewriter, ArrayLoadOp arrLoad,
     llvm::SmallVectorImpl<mlir::Value> &result, bool &copyUsingSlice) {
   assert(result.empty());
+  if (arrLoad->hasAttr(fir::getOptionalAttrName()))
+    fir::emitFatalError(
+        loc, "shapes from array load of OPTIONAL arrays must not be used");
   if (auto boxTy = arrLoad.memref().getType().dyn_cast<BoxType>()) {
     auto rank =
         dyn_cast_ptrOrBoxEleTy(boxTy).cast<SequenceType>().getDimension();
