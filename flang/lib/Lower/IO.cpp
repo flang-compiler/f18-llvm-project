@@ -1432,11 +1432,19 @@ genFormat(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
     // character expression
     return lowerStringLit(converter, loc, stmtCtx, *pExpr, strTy, lenTy);
 
-  // integer variable containing an ASSIGN label
-  assert(Fortran::semantics::ExprHasTypeCategory(
-      *e, Fortran::common::TypeCategory::Integer));
-  return lowerReferenceAsStringSelect(converter, loc, *e, strTy, lenTy,
-                                      stmtCtx);
+  if (Fortran::semantics::ExprHasTypeCategory(
+          *e, Fortran::common::TypeCategory::Integer) &&
+      e->Rank() == 0 && Fortran::evaluate::UnwrapWholeSymbolDataRef(*e)) {
+    // Treat as a scalar integer variable containing an ASSIGN label.
+    return lowerReferenceAsStringSelect(converter, loc, *e, strTy, lenTy,
+                                        stmtCtx);
+  }
+
+  // Legacy extension: it is possible that `*e` is not a scalar INTEGER
+  // variable containing a label value. The output appears to be the source text
+  // that initialized the variable? Needs more investigatation.
+  TODO(loc, "io-control-spec contains a reference to a non-integer, "
+            "non-scalar, or non-variable");
 }
 
 template <typename A>
