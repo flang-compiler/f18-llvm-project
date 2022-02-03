@@ -21,7 +21,6 @@ TEST(Inquiry, Lbound) {
       std::vector<int>{2, 3}, std::vector<std::int32_t>{1, 2, 3, 4, 5, 6})};
   array->GetDimension(0).SetLowerBound(0);
   array->GetDimension(1).SetLowerBound(-1);
-  StaticDescriptor<2, true> statDesc;
 
   EXPECT_EQ(RTNAME(LboundDim)(*array, 1, __FILE__, __LINE__), std::int64_t{0});
   EXPECT_EQ(RTNAME(LboundDim)(*array, 2, __FILE__, __LINE__), std::int64_t{-1});
@@ -34,7 +33,6 @@ TEST(Inquiry, Size) {
       std::vector<int>{2, 3}, std::vector<std::int32_t>{1, 2, 3, 4, 5, 6})};
   array->GetDimension(0).SetLowerBound(0); // shouldn't matter
   array->GetDimension(1).SetLowerBound(-1);
-  StaticDescriptor<2, true> statDesc;
 
   EXPECT_EQ(RTNAME(SizeDim)(*array, 1, __FILE__, __LINE__), std::int64_t{2});
   EXPECT_EQ(RTNAME(SizeDim)(*array, 2, __FILE__, __LINE__), std::int64_t{3});
