@@ -12,7 +12,7 @@ subroutine exit_test1
 end subroutine exit_test1
 
 ! CHECK-LABEL: func @_QPexit_test2(
-! CHECK-SAME: %[[statusArg:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>) {
+! CHECK-SAME: %[[statusArg:.*]]: !fir.ref<i[[DEFAULT_INTEGER_SIZE]]>{{.*}}) {
 subroutine exit_test2(status)
   integer :: status
   call exit(status)

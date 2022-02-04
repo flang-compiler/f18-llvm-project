@@ -27,7 +27,7 @@ module defined_assignments
 end module
 
 ! CHECK-LABEL: func @_QPtest_derived(
-! CHECK-SAME:                        %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMdefined_assignmentsTt{i:i32}>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMdefined_assignmentsTt{i:i32}>>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_2:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_3:.*]] = fir.array_load %[[VAL_0]](%[[VAL_2]]) : (!fir.ref<!fir.array<100x!fir.type<_QMdefined_assignmentsTt{i:i32}>>>, !fir.shape<1>) -> !fir.array<100x!fir.type<_QMdefined_assignmentsTt{i:i32}>>
@@ -54,7 +54,7 @@ end module
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_intrinsic(
-! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>) {
+! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = fir.alloca !fir.logical<4>
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_3:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
@@ -86,8 +86,7 @@ end module
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_intrinsic_2(
-! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.logical<4>>>,
-! CHECK-SAME:                            %[[VAL_1:.*]]: !fir.ref<!fir.array<100xf32>>) {
+! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca f32
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
@@ -110,8 +109,7 @@ end module
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPfrom_char(
-! CHECK-SAME:                     %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                     %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>) {
+! CHECK-SAME:                     %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_3:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_2]] : (!fir.box<!fir.array<?xi32>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_4:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xi32>>) -> !fir.array<?xi32>
@@ -132,8 +130,7 @@ end module
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPto_char(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                   %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>) {
+! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_4:.*]]:3 = fir.box_dims %[[VAL_1]], %[[VAL_3]] : (!fir.box<!fir.array<?x!fir.char<1,?>>>, index) -> (index, index, index)
@@ -203,8 +200,7 @@ end subroutine
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest_in_forall_1(
-! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>,
-! CHECK-SAME:                            %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca f32
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -242,8 +238,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_in_forall_2(
-! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>,
-! CHECK-SAME:                            %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.logical<4>
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -281,9 +276,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_intrinsic_where_1(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>,
-! CHECK-SAME:                                  %[[VAL_2:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>) {
+! CHECK-SAME:             %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca f32
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 10 : index
@@ -335,9 +328,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_intrinsic_where_2(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>,
-! CHECK-SAME:                                  %[[VAL_2:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>) {
+! CHECK-SAME:           %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.logical<4>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 10 : index
@@ -391,8 +382,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_scalar_func_but_not_elemental(
-! CHECK-SAME:                                              %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.logical<4>>>,
-! CHECK-SAME:                                              %[[VAL_1:.*]]: !fir.ref<!fir.array<100xi32>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<100x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
@@ -430,8 +420,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPtest_in_forall_with_cleanup(
-! CHECK-SAME:                                       %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>,
-! CHECK-SAME:                                       %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME:       %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<f32>> {bindc_name = ".result"}
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -530,8 +519,7 @@ subroutine test_in_forall_with_cleanup(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_forall_array(
-! CHECK-SAME:                             %[[VAL_0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>,
-! CHECK-SAME:                             %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<4>>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca f32
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : i32
@@ -598,8 +586,7 @@ subroutine test_forall_array(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfrom_char_forall(
-! CHECK-SAME:                            %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                            %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>) {
+! CHECK-SAME:       %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : i32
 ! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i32) -> index
@@ -633,8 +620,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPto_char_forall(
-! CHECK-SAME:                          %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME:                          %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : i32
@@ -694,8 +680,7 @@ subroutine to_char_forall(i, c)
 end subroutine
 
 ! CHECK-LABEL: func @_QPfrom_char_forall_array(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xi32>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?x!fir.char<1,?>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : i32
 ! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i32) -> index
@@ -755,8 +740,7 @@ end subroutine
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPto_char_forall_array(
-! CHECK-SAME:                                %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xi32>>,
-! CHECK-SAME:                                %[[VAL_1:.*]]: !fir.box<!fir.array<?x?x!fir.char<1,?>>>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.box<!fir.array<?x?xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x?x!fir.char<1,?>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : i32

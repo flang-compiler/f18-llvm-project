@@ -3,7 +3,7 @@
 
 ! Nominal test
 ! CHECK-LABEL: func @_QPtest_assumed_shape_to_array(
-! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_assumed_shape_to_array(x)
   real :: x(:)
 ! Creating temp
@@ -44,7 +44,7 @@ end subroutine
 ! Test that copy-in/copy-out does not trigger the re-evaluation of
 ! the designator expression.
 ! CHECK-LABEL: func @_QPeval_expr_only_once(
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<200xf32>>) {
+! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<200xf32>>{{.*}}) {
 subroutine eval_expr_only_once(x)
   integer :: only_once
   real :: x(200)
@@ -80,7 +80,7 @@ end subroutine
 
 ! Test the parenthesis are preventing copy-out.
 ! CHECK: func @_QPtest_parenthesis(
-! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_parenthesis(x)
   real :: x(:)
 ! CHECK: %[[dim:.*]]:3 = fir.box_dims %[[x]], %c0{{.*}} : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
@@ -96,7 +96,7 @@ end subroutine
 
 ! Test copy-in in is skipped for intent(out) arguments.
 ! CHECK: func @_QPtest_intent_out(
-! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_intent_out(x)
   real :: x(:)
   interface
@@ -117,7 +117,7 @@ end subroutine
 
 ! Test copy-out is skipped for intent(out) arguments.
 ! CHECK: func @_QPtest_intent_in(
-! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_intent_in(x)
   real :: x(:)
   interface
@@ -138,7 +138,7 @@ end subroutine
 
 ! Test copy-in/copy-out is done for intent(inout)
 ! CHECK: func @_QPtest_intent_inout(
-! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_intent_inout(x)
   real :: x(:)
   interface
@@ -159,7 +159,7 @@ end subroutine
 
 ! Test characters are handled correctly
 ! CHECK-LABEL: func @_QPtest_char(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,10>>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.char<1,10>>>{{.*}}) {
 subroutine test_char(x)
   ! CHECK: %[[VAL_1:.*]] = arith.constant 10 : index
   ! CHECK: %[[VAL_2:.*]] = arith.constant 0 : index
@@ -235,7 +235,7 @@ subroutine test_scalar_substring_does_no_trigger_copy_inout(c, i, j)
 end subroutine
 
 ! CHECK-LABEL: func @_QPissue871(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFissue871Tt{i:i32}>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.type<_QFissue871Tt{i:i32}>>>>{{.*}})
 subroutine issue871(p)
   ! Test passing implicit derived from scalar pointer (no copy-in/out).
   type t

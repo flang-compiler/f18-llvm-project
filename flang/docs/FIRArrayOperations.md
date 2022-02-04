@@ -18,7 +18,17 @@
 The array operations in FIR model the copy-in/copy-out semantics over Fortran
 statements.
 
-They are currently 6 array operations:
+Fortran language semantics sometimes require the compiler to make a temporary 
+copy of an array or array slice. Situations where this can occur include:
+
+* Passing a non-contiguous array to a procedure that does not declare it as
+  assumed-shape.
+* Array expressions, especially those involving `RESHAPE`, `PACK`, and `MERGE`.
+* Assignments of arrays where the array appears on both the left and right-hand
+  sides of the assignment.
+* Assignments of `POINTER` arrays.
+
+There are currently the following operations:
 - `fir.array_load`
 - `fir.array_merge_store`
 - `fir.array_fetch`
@@ -33,11 +43,17 @@ of the array copies.
 values of elements from loaded array copies. These have "GEP-like" syntax and
 semantics.
 
+Fortran arrays are implicitly memory bound as are some other Fortran type/kind
+entities. For entities that can be atomically promoted to the value domain,
+we use `array_fetch` and `array_update`.
+
 `array_access` and `array_amend` are defined to work as getter/setter pairs on
 references to elements in loaded array copies. `array_access` has "GEP-like"
 syntax. `array_amend` annotates which loaded array copy is being written to.
-It is invalid to update an array copy without array_amend; doing so will result
-in undefined behavior.
+It is invalid to update an array copy without `array_amend`; doing so will
+result in undefined behavior.
+For those type/kinds that cannot be promoted to values, we must leave them in a
+memory reference domain, and we use `array_access` and `array_amend`.
 
 ## array_load
 
@@ -62,12 +78,12 @@ Load an entire array as a single SSA value.
 One can use `fir.array_load` to produce an ssa-value that captures an
 immutable value of the entire array `a`, as in the Fortran array expression
 shown above. Subsequent changes to the memory containing the array do not
-alter its composite value. This operation let's one load an array as a
+alter its composite value. This operation lets one load an array as a
 value while applying a runtime shape, shift, or slice to the memory
 reference, and its semantics guarantee immutability.
 
 ```mlir
-%s = fir.shape_shift %o, %n, %p, %m : (index, index, index, index) -> !fir.shape<2>
+%s = fir.shape_shift %lb1, %ex1, %lb2, %ex2 : (index, index, index, index) -> !fir.shape<2>
 // load the entire array 'a'
 %v = fir.array_load %a(%s) : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>) -> !fir.array<?x?xf32>
 // a fir.store here into array %a does not change %v
@@ -75,7 +91,7 @@ reference, and its semantics guarantee immutability.
 
 # array_merge_store
 
-The `array_merge_store` operation store a merged array value to memory. 
+The `array_merge_store` operation stores a merged array value to memory. 
 
 
 ```fortran
@@ -95,6 +111,15 @@ array expression as shown above.
 
 This operation merges the original loaded array value, `%v`, with the
 chained updates, `%r`, and stores the result to the array at address, `%a`.
+
+This operation taken with `array_load`'s captures Fortran's
+copy-in/copy-out semantics. The first operands of `array_merge_store` is the
+result of the initial `array_load` operation. While this value could be
+retrieved by reference chasiing through the different array operations it is
+useful to have it on hand directly for analysis passes since this directly
+defines the "bounds" of the Fortran statement represented by these operations.
+The intention is to allow copy-in/copy-out regions to be easily delineated,
+analyzed, and optimized.
 
 ## array_fetch
 
@@ -119,7 +144,9 @@ element `a(r,s+1)` in the second expression.
   %1 = fir.array_fetch %v, %i, %j : (!fir.array<?x?xf32>, index, index) -> f32
 ```
 
-It is only possible to use `array_fetch` on an `array_load` result value.
+It is only possible to use `array_fetch` on an `array_load` result value or a
+value that can be trace back transitively to an `array_load` as the dominating
+source. Other array operation such as `array_update` can be in between.
 
 ## array_update
 
@@ -151,10 +178,19 @@ An array value update behaves as if a mapping function from the indices
 to the new value has been added, replacing the previous mapping. These
 mappings can be added to the ssa-value, but will not be materialized in
 memory until the `fir.array_merge_store` is performed.
+`fir.array_update` can be seen as an array access with a notion that the array
+will be changed at the accessed position when `fir.array_merge_store` is
+performed.
 
 ## array_access
 
-The `array_access` operationis used to fetch the memory reference of an element
+The `array_access` provides a reference to a single element from an array value.
+This is *not* a view in the immutable array, otherwise it couldn't be stored to.
+It can be see as a logical copy of the element and its position in the array.
+Tis reference can be written to and modified withoiut changing the original
+array.
+
+The `array_access` operation is used to fetch the memory reference of an element
 in an array value.
 
 ```fortran
@@ -177,13 +213,67 @@ expression.
   %1 = fir.array_access %v, %i, %j : (!fir.array<?x?xf32>, index, index) -> !fir.ref<f32>
 ```
 
-It is only possible to use `array_access` on an `array_load` result value.
+It is only possible to use `array_access` on an `array_load` result value or a
+value that can be trace back transitively to an `array_load` as the dominating
+source. Other array operation such as `array_amend` can be in between.
+
+`array_access` if mainly used with `character`'s arrays and arrays of derived
+types where because they might have a non-compile time sizes that would be
+useless too load entirely or too big to load. 
+
+Here is a simple example with a `character` array assignment. 
+
+Fortran
+```
+subroutine foo(c1, c2, n)
+  integer(8) :: n
+  character(n) :: c1(:), c2(:)
+  c1 = c2
+end subroutine
+```
+
+It results in this cleaned-up FIR:
+```
+func @_QPfoo(%arg0: !fir.box<!fir.array<?x!fir.char<1,?>>>, %arg1: !fir.box<!fir.array<?x!fir.char<1,?>>>, %arg2: !fir.ref<i64>) {
+    %0 = fir.load %arg2 : !fir.ref<i64>
+    %c0 = arith.constant 0 : index
+    %1:3 = fir.box_dims %arg0, %c0 : (!fir.box<!fir.array<?x!fir.char<1,?>>>, index) -> (index, index, index)
+    %2 = fir.array_load %arg0 : (!fir.box<!fir.array<?x!fir.char<1,?>>>) -> !fir.array<?x!fir.char<1,?>>
+    %3 = fir.array_load %arg1 : (!fir.box<!fir.array<?x!fir.char<1,?>>>) -> !fir.array<?x!fir.char<1,?>>
+    %c1 = arith.constant 1 : index
+    %4 = arith.subi %1#1, %c1 : index
+    %5 = fir.do_loop %arg3 = %c0 to %4 step %c1 unordered iter_args(%arg4 = %2) -> (!fir.array<?x!fir.char<1,?>>) {
+      %6 = fir.array_access %3, %arg3 : (!fir.array<?x!fir.char<1,?>>, index) -> !fir.ref<!fir.char<1,?>>
+      %7 = fir.array_access %arg4, %arg3 : (!fir.array<?x!fir.char<1,?>>, index) -> !fir.ref<!fir.char<1,?>>
+      %false = arith.constant false
+      %8 = fir.convert %7 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
+      %9 = fir.convert %6 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
+      fir.call @llvm.memmove.p0i8.p0i8.i64(%8, %9, %0, %false) : (!fir.ref<i8>, !fir.ref<i8>, i64, i1) -> ()
+      %10 = fir.array_amend %arg4, %7 : (!fir.array<?x!fir.char<1,?>>, !fir.ref<!fir.char<1,?>>) -> !fir.array<?x!fir.char<1,?>>
+      fir.result %10 : !fir.array<?x!fir.char<1,?>>
+    }
+    fir.array_merge_store %2, %5 to %arg0 : !fir.array<?x!fir.char<1,?>>, !fir.array<?x!fir.char<1,?>>, !fir.box<!fir.array<?x!fir.char<1,?>>>
+    return
+  }
+  func private @llvm.memmove.p0i8.p0i8.i64(!fir.ref<i8>, !fir.ref<i8>, i64, i1)
+}
+```
+
+`fir.array_access` and `fir.array_amend` split the two purposes of
+`fir.array_update` into two distinct operations to work on type/kind that must
+reside in the memory reference domain. `fir.array_access` captures the array
+access semantics and `fir.array_amend` denotes which `fir.array_access` is the
+lhs.
+
+We do not want to start loading the entire `!fir.ref<!fir.char<1,?>>` here since
+it has dynamic length, and even if constant, could be too long to do so.
 
 ## array_amend
 
-The `array_amend` operation marks an array value as having been changed via its
-reference. The reference into the array value is obtained via a
-`fir.array_access` op.
+The `array_amend` operation marks an array value as having been changed via a 
+reference obtain by an `array_access`. It acts as a logical transaction log
+that is used to merge the final result back with an `array_merge_store`
+operation.
 
 ```mlir
   // fetch the value of one of the array value's elements
@@ -194,37 +284,11 @@ reference. The reference into the array value is obtained via a
   %new_v = fir.array_amend %v, %2 : (!fir.array<?x?xT>, !fir.ref<T>) -> !fir.array<?x?xT>
 ```
 
-## Array value copy pass
+## Example
 
-One of the main purpose of the array operations present in FIR is to be able to
-perform the dependence analysis and elide copies where possible with a MLIR
-pass. This pass is called the `array-value-copy` pass.
-The analysis detects if there are any conflicts. A conflicts is when one of the
-following cases occurs:
-
-1. There is an `array_update`/`array_amend` to an array value/reference, a_j,
-   such that a_j was loaded from the same array memory reference (array_j) but
-   with a different shape as the other array values a_i, where i != j.
-   [Possible overlapping arrays.]
-2. There is either an `array_fetch`/`array_access` or
-   `array_update`/`array_amend` of a_j with a different set of index values.
-   [Possible loop-carried dependence.]
-
-`array_update` writes an entire element in the loaded array value. So an 
-`array_update` that does not change any of the arrays fetched from or updates 
-the exact same element that was read on the current iteration does not
-introduce a dependence.
-
-`array_amend` may be a partial update to an element, such as a substring. In
-that case, there is no dependence if all the other `array_access` ops are
-referencing other arrays. We conservatively assume there may be an
-overlap like in s(:)(1:4) = s(:)(3:6) where s is an array of characters.
-
-If none of the array values overlap in storage and the accesses are not
-loop-carried, then the arrays are conflict-free and no copies are required.
-
-Below is an example of the FIR/MLIR code before and after the `array-value-copy`
-pass.
+Here is an example of a FIR code using several array operations together. The
+example below is a simplified version of the FIR code comiing from the
+following Fortran code snippet.
 
 ```fortran
 subroutine s(a,l,u)
@@ -241,112 +305,38 @@ end
 
 ```
 func @_QPs(%arg0: !fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, %arg1: !fir.ref<i32>, %arg2: !fir.ref<i32>) {
-  %0 = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
-  %1 = fir.load %arg1 : !fir.ref<i32>
-  %2 = fir.convert %1 : (i32) -> index
-  %3 = fir.load %arg2 : !fir.ref<i32>
-  %4 = fir.convert %3 : (i32) -> index
+  %l = fir.load %arg1 : !fir.ref<i32>
+  %l_index = fir.convert %l : (i32) -> index
+  %u = fir.load %arg2 : !fir.ref<i32>
+  %u_index = fir.convert %u : (i32) -> index
   %c1 = arith.constant 1 : index
-  %5 = fir.array_load %arg0 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-  %6 = fir.array_load %arg0 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-  %7 = fir.do_loop %arg3 = %2 to %4 step %c1 unordered iter_args(%arg4 = %5) -> (!fir.array<?x!fir.type<_QFsTt{m:i32}>>) {
-    %8 = fir.convert %arg3 : (index) -> i32
-    fir.store %8 to %0 : !fir.ref<i32>
-    %c1_i32 = arith.constant 1 : i32
-    %9 = fir.load %arg2 : !fir.ref<i32>
-    %10 = fir.load %0 : !fir.ref<i32>
-    %11 = arith.subi %9, %10 : i32
-    %12 = arith.addi %11, %c1_i32 : i32
-    %13 = fir.convert %12 : (i32) -> i64
-    %14 = fir.convert %13 : (i64) -> index
-    %15 = fir.array_access %6, %14 {Fortran.offsets} : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-    %16 = fir.load %0 : !fir.ref<i32>
-    %17 = fir.convert %16 : (i32) -> i64
-    %18 = fir.convert %17 : (i64) -> index
-    %19 = fir.array_access %arg4, %18 {Fortran.offsets} : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-    %20 = fir.load %15 : !fir.ref<!fir.type<_QFsTt{m:i32}>>
-    fir.store %20 to %19 : !fir.ref<!fir.type<_QFsTt{m:i32}>>
-    %21 = fir.array_amend %arg4, %19 : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.ref<!fir.type<_QFsTt{m:i32}>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-    fir.result %21 : !fir.array<?x!fir.type<_QFsTt{m:i32}>>
+  // This is the "copy-in" array used on the RHS of the expression. It will be indexed into and loaded at each iteration.
+  %array_a_src = fir.array_load %arg0 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
+
+  // This is the "seed" for the "copy-out" array on the LHS. It'll flow from iteration to iteration and gets
+  // updated at each iteration.
+  %array_a_dest_init = fir.array_load %arg0 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
+  
+  %array_a_final = fir.do_loop %i = %l_index to %u_index step %c1 unordered iter_args(%array_a_dest = %array_a_dest_init) -> (!fir.array<?x!fir.type<_QFsTt{m:i32}>>) {
+    // Compute indexing for the RHS and array the element.
+    %u_minus_i = arith.subi %u_index, %i : index // u-i
+    %u_minus_i_plus_one = arith.addi %u_minus_i, %c1: index // u-i+1
+    %a_src_ref = fir.array_access %array_a_src, %u_minus_i_plus_one {Fortran.offsets} : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
+    %a_src_elt = fir.load %a_src_ref : !fir.ref<!fir.type<_QFsTt{m:i32}>>
+
+    // Get the reference to the element in the array on the LHS
+    %a_dst_ref = fir.array_access %array_a_dest, %i {Fortran.offsets} : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
+
+    // Store the value, and update the array
+    fir.store %a_src_elt to %a_dst_ref : !fir.ref<!fir.type<_QFsTt{m:i32}>>
+    %updated_array_a = fir.array_amend %array_a_dest, %a_dst_ref : (!fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.ref<!fir.type<_QFsTt{m:i32}>>) -> !fir.array<?x!fir.type<_QFsTt{m:i32}>>
+
+    // Forward the current updated array to the next iteration.
+    fir.result %updated_array_a : !fir.array<?x!fir.type<_QFsTt{m:i32}>>
   }
-  fir.array_merge_store %5, %7 to %arg0 : !fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>
+  // Store back the result by merging the initial value loaded before the loop
+  // with the final one produced by the loop.
+  fir.array_merge_store %array_a_dest_init, %array_a_final to %arg0 : !fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.array<?x!fir.type<_QFsTt{m:i32}>>, !fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>
   return
 }
-```
-
-```
-func @_QPs(%arg0: !fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, %arg1: !fir.ref<i32>, %arg2: !fir.ref<i32>) {
-    %0 = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
-    %1 = fir.load %arg1 : !fir.ref<i32>
-    %2 = fir.convert %1 : (i32) -> index
-    %3 = fir.load %arg2 : !fir.ref<i32>
-    %4 = fir.convert %3 : (i32) -> index
-    %c1 = arith.constant 1 : index
-    %c0 = arith.constant 0 : index
-    %5:3 = fir.box_dims %arg0, %c0 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, index) -> (index, index, index)
-    %6 = fir.shape %5#1 : (index) -> !fir.shape<1>
-    // Allocate copy
-    %7 = fir.allocmem !fir.array<?x!fir.type<_QFsTt{m:i32}>>, %5#1
-    %8 = fir.convert %5#1 : (index) -> index
-    %c0_0 = arith.constant 0 : index
-    %c1_1 = arith.constant 1 : index
-    %9 = arith.subi %8, %c1_1 : index
-    // Initialize copy
-    fir.do_loop %arg3 = %c0_0 to %9 step %c1_1 {
-      %c1_4 = arith.constant 1 : index
-      %15 = arith.addi %arg3, %c1_4 : index
-      %16 = fir.array_coor %arg0(%6) %15 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, !fir.shape<1>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %c1_5 = arith.constant 1 : index
-      %17 = arith.addi %arg3, %c1_5 : index
-      %18 = fir.array_coor %7(%6) %17 : (!fir.heap<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, !fir.shape<1>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %19 = fir.field_index m, !fir.type<_QFsTt{m:i32}>
-      %20 = fir.coordinate_of %16, %19 : (!fir.ref<!fir.type<_QFsTt{m:i32}>>, !fir.field) -> !fir.ref<i32>
-      %21 = fir.coordinate_of %18, %19 : (!fir.ref<!fir.type<_QFsTt{m:i32}>>, !fir.field) -> !fir.ref<i32>
-      %22 = fir.load %20 : !fir.ref<i32>
-      fir.store %22 to %21 : !fir.ref<i32>
-    }
-    %10 = fir.undefined !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-    %11 = fir.undefined !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-    // Perform the actual work
-    %12 = fir.do_loop %arg3 = %2 to %4 step %c1 unordered iter_args(%arg4 = %10) -> (!fir.array<?x!fir.type<_QFsTt{m:i32}>>) {
-      %15 = fir.convert %arg3 : (index) -> i32
-      fir.store %15 to %0 : !fir.ref<i32>
-      %c1_i32 = arith.constant 1 : i32
-      %16 = fir.load %arg2 : !fir.ref<i32>
-      %17 = fir.load %0 : !fir.ref<i32>
-      %18 = arith.subi %16, %17 : i32
-      %19 = arith.addi %18, %c1_i32 : i32
-      %20 = fir.convert %19 : (i32) -> i64
-      %21 = fir.convert %20 : (i64) -> index
-      %22 = fir.array_coor %arg0 %21 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %23 = fir.load %0 : !fir.ref<i32>
-      %24 = fir.convert %23 : (i32) -> i64
-      %25 = fir.convert %24 : (i64) -> index
-      %26 = fir.array_coor %7(%6) %25 : (!fir.heap<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, !fir.shape<1>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %27 = fir.load %22 : !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      fir.store %27 to %26 : !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %28 = fir.undefined !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-      fir.result %28 : !fir.array<?x!fir.type<_QFsTt{m:i32}>>
-    }
-    %13 = fir.convert %5#1 : (index) -> index
-    %c0_2 = arith.constant 0 : index
-    %c1_3 = arith.constant 1 : index
-    %14 = arith.subi %13, %c1_3 : index
-    // Move tha value back from the copy to the original array
-    fir.do_loop %arg3 = %c0_2 to %14 step %c1_3 {
-      %c1_4 = arith.constant 1 : index
-      %15 = arith.addi %arg3, %c1_4 : index
-      %16 = fir.array_coor %7(%6) %15 : (!fir.heap<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, !fir.shape<1>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %c1_5 = arith.constant 1 : index
-      %17 = arith.addi %arg3, %c1_5 : index
-      %18 = fir.array_coor %arg0(%6) %17 : (!fir.box<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>, !fir.shape<1>, index) -> !fir.ref<!fir.type<_QFsTt{m:i32}>>
-      %19 = fir.field_index m, !fir.type<_QFsTt{m:i32}>
-      %20 = fir.coordinate_of %16, %19 : (!fir.ref<!fir.type<_QFsTt{m:i32}>>, !fir.field) -> !fir.ref<i32>
-      %21 = fir.coordinate_of %18, %19 : (!fir.ref<!fir.type<_QFsTt{m:i32}>>, !fir.field) -> !fir.ref<i32>
-      %22 = fir.load %20 : !fir.ref<i32>
-      fir.store %22 to %21 : !fir.ref<i32>
-    }
-    fir.freemem %7 : !fir.heap<!fir.array<?x!fir.type<_QFsTt{m:i32}>>>
-    return
-  }
 ```

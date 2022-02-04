@@ -3,6 +3,11 @@
 ! RUN: %bbc -fopenmp -emit-fir %s -o  - | \
 ! RUN:   FileCheck %s --check-prefix=FIRDialect
 
+module mod1
+  integer :: z
+  !$omp threadprivate(z)
+end
+
 program main
   integer, save :: x, y
 

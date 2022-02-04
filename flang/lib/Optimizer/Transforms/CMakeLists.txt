@@ -3,6 +3,7 @@ add_flang_library(FIRTransforms
   AbstractResult.cpp
   AffineDemotion.cpp
   AffinePromotion.cpp
+  AnnotateConstant.cpp
   ArrayValueCopy.cpp
   CharacterConversion.cpp
   ControlFlowConverter.cpp

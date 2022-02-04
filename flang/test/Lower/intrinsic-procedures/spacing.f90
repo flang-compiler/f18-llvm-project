@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: @_QPspacing_test
-! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f32>) -> f32
+! CHECK-LABEL: func @_QPspacing_test(
+! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f32>{{.*}}) -> f32
 real*4 function spacing_test(x)
   real*4 :: x
   spacing_test = spacing(x)
@@ -9,8 +9,8 @@ real*4 function spacing_test(x)
 ! CHECK: %{{.*}} = fir.call @_FortranASpacing4(%[[a1]]) : (f32) -> f32
 end function
 
-! CHECK-LABEL: @_QPspacing_test2
-! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f80>) -> f80
+! CHECK-LABEL: func @_QPspacing_test2(
+! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f80>{{.*}}) -> f80
 real*10 function spacing_test2(x)
   real*10 :: x
   spacing_test2 = spacing(x)

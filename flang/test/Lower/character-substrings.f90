@@ -3,8 +3,7 @@
 
 ! Test substring lower where the parent is a scalar-char-literal-constant
 ! CHECK-LABEL: func @_QPscalar_substring_embox(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i64>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i64>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i64>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine scalar_substring_embox(i, j)
   ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QQcl.{{.*}}) : !fir.ref<!fir.char<1,18>>
   ! CHECK:         %[[VAL_3:.*]] = fir.load %[[VAL_0]] : !fir.ref<i64>
@@ -30,7 +29,7 @@ subroutine scalar_substring_embox(i, j)
 end subroutine scalar_substring_embox
 
 ! CHECK-LABEL: func @_QParray_substring_embox(
-! CHECK-SAME:                                 %[[VAL_0:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_2:.*]] = fir.convert %[[VAL_1]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<4x!fir.char<1,7>>>
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 4 : index
@@ -68,8 +67,7 @@ subroutine array_substring_embox(arr)
 end subroutine array_substring_embox
 
 ! CHECK-LABEL: func @_QPsubstring_assignment(
-! CHECK-SAME:                                %[[VAL_0:.*]]: !fir.boxchar<1>,
-! CHECK-SAME:                                %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine substring_assignment(a,b)
   ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
   ! CHECK:         %[[VAL_3:.*]]:2 = fir.unboxchar %[[VAL_1]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
@@ -129,7 +127,7 @@ subroutine substring_assignment(a,b)
 end subroutine substring_assignment
 
 ! CHECK-LABEL: func @_QParray_substring_assignment(
-! CHECK-SAME:                                      %[[VAL_0:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_2:.*]] = fir.convert %[[VAL_1]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<6x!fir.char<1,5>>>
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 6 : index
@@ -222,7 +220,7 @@ subroutine array_substring_assignment(a)
 end subroutine array_substring_assignment
 
 ! CHECK-LABEL: func @_QParray_substring_assignment2(
-! CHECK-SAME:                                       %[[VAL_0:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment2Tt{ch:!fir.char<1,7>}>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment2Tt{ch:!fir.char<1,7>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 8 : index
 ! CHECK:         %[[VAL_2:.*]] = fir.field_index ch, !fir.type<_QFarray_substring_assignment2Tt{ch:!fir.char<1,7>}>
 ! CHECK:         %[[VAL_3:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
@@ -307,7 +305,7 @@ subroutine array_substring_assignment2(a)
 end subroutine array_substring_assignment2
 
 ! CHECK-LABEL: func @_QParray_substring_assignment3(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 8 : index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 8 : index
 ! CHECK:         %[[VAL_4:.*]] = fir.field_index ch, !fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>

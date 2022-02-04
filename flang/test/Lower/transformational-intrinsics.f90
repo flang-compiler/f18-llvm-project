@@ -18,7 +18,7 @@ end interface
 contains
 
 ! CHECK-LABEL: func @_QMtest2Pin_io(
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>) {
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>{{.*}}) {
 subroutine in_io(x)
   logical(1) :: x(:, :)
   ! CHECK: %[[res_desc:.]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.logical<1>>>>
@@ -37,7 +37,7 @@ subroutine in_io(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMtest2Pin_call(
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>) {
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>{{.*}}) {
 subroutine in_call(x)
   implicit none
   logical(1) :: x(:, :)
@@ -56,7 +56,7 @@ subroutine in_call(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMtest2Pin_implicit_call(
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>) {
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>{{.*}}) {
 subroutine in_implicit_call(x)
   logical(1) :: x(:, :)
   ! CHECK: %[[res_desc:.]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.logical<1>>>>
@@ -70,8 +70,7 @@ subroutine in_implicit_call(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMtest2Pin_assignment(
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>{{.*}})
 subroutine in_assignment(x, y)
   logical(1) :: x(:, :), y(:)
   ! CHECK: %[[res_desc:.]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.logical<1>>>>
@@ -94,9 +93,7 @@ subroutine in_assignment(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QMtest2Pin_elem_expr(
-! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>,
-! CHECK-SAME: %[[arg2:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.box<!fir.array<?x?x!fir.logical<1>>>{{.*}}, %[[arg1:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>{{.*}}, %[[arg2:.*]]: !fir.box<!fir.array<?x!fir.logical<1>>>{{.*}})
 subroutine in_elem_expr(x, y, z)
   logical(1) :: x(:, :), y(:), z(:)
   ! CHECK: %[[res_desc:.]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.logical<1>>>>

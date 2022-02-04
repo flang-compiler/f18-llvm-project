@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest1(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>, %[[VAL_1:.*]]: !fir.ref<i32>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_5:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_6:.*]] = fir.convert %[[VAL_5]] : (i32) -> i64
@@ -35,7 +35,7 @@ subroutine test1(a,i,j,k)
 end subroutine test1
 
 ! CHECK-LABEL: func @_QPtest2(
-! CHECK-SAME: %[[nadd:.*]]: !fir.ref<i32>)
+! CHECK-SAME: %[[nadd:.*]]: !fir.ref<i32>{{.*}})
 subroutine test2(n)
   integer :: n
   integer, external :: foo

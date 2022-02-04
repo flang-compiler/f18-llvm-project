@@ -2,8 +2,7 @@
 
 subroutine trans_test(store, word)
   ! CHECK-LABEL: func @_QPtrans_test(
-  ! CHECK-SAME:                      %[[VAL_0:.*]]: !fir.ref<i32>,
-  ! CHECK-SAME:                      %[[VAL_1:.*]]: !fir.ref<f32>) {
+  ! CHECK-SAME:                      %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<f32>{{.*}}) {
   ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<i32>>
   ! CHECK:         %[[VAL_3:.*]] = fir.embox %[[VAL_1]] : (!fir.ref<f32>) -> !fir.box<f32>
   ! CHECK:         %[[VAL_4:.*]] = fir.embox %[[VAL_0]] : (!fir.ref<i32>) -> !fir.box<i32>
@@ -30,8 +29,7 @@ subroutine trans_test(store, word)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtrans_test2(
-! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<3xi32>>,
-! CHECK-SAME:        %[[VAL_1:.*]]: !fir.ref<f32>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<f32>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 3 : index
 ! CHECK:         %[[VAL_4:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
@@ -80,7 +78,7 @@ end subroutine
 
 integer function trans_test3(p)
   ! CHECK-LABEL: func @_QPtrans_test3(
-  ! CHECK-SAME:                       %[[VAL_0:.*]]: !fir.ref<i32>) -> i32 {
+  ! CHECK-SAME:                       %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}) -> i32 {
   ! CHECK:         %[[VAL_1:.*]] = fir.alloca !fir.box<!fir.type<_QFtrans_test3Tobj{x:i32}>>
   ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<!fir.type<_QFtrans_test3Tobj{x:i32}>>>
   ! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.type<_QFtrans_test3Tobj{x:i32}> {bindc_name = "t", uniq_name = "_QFtrans_test3Et"}

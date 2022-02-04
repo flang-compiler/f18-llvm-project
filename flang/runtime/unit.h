@@ -50,7 +50,7 @@ public:
   static ExternalFileUnit *LookUp(const char *path);
   static ExternalFileUnit &CreateNew(int unit, const Terminator &);
   static ExternalFileUnit *LookUpForClose(int unit);
-  static ExternalFileUnit &NewUnit(const Terminator &, bool forChildIo = false);
+  static ExternalFileUnit &NewUnit(const Terminator &, bool forChildIo);
   static void CloseAll(IoErrorHandler &);
   static void FlushAll(IoErrorHandler &);
 
@@ -183,7 +183,7 @@ private:
       ChildListIoStatementState<Direction::Output>,
       ChildListIoStatementState<Direction::Input>,
       ChildUnformattedIoStatementState<Direction::Output>,
-      ChildUnformattedIoStatementState<Direction::Input>>
+      ChildUnformattedIoStatementState<Direction::Input>, InquireUnitState>
       u_;
   std::optional<IoStatementState> io_;
 };

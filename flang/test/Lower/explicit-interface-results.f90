@@ -8,7 +8,8 @@ function return_cst_array()
   real :: return_cst_array(20, 30)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_dyn_array(%{{.*}}: !fir.ref<i32>, %{{.*}}: !fir.ref<i32>) -> !fir.array<?x?xf32>
+! CHECK-LABEL: func @_QMcalleePreturn_dyn_array(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}, %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.array<?x?xf32>
 function return_dyn_array(m, n)
   integer :: m, n
   real :: return_dyn_array(m, n)
@@ -19,19 +20,22 @@ function return_cst_char_cst_array()
   character(10) :: return_cst_char_cst_array(20, 30)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_cst_array(%{{.*}}: !fir.ref<i32>) -> !fir.array<20x30x!fir.char<1,?>>
+! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_cst_array(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.array<20x30x!fir.char<1,?>>
 function return_dyn_char_cst_array(l)
   integer :: l
   character(l) :: return_dyn_char_cst_array(20, 30)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_cst_char_dyn_array(%{{.*}}: !fir.ref<i32>, %{{.*}}: !fir.ref<i32>) -> !fir.array<?x?x!fir.char<1,10>>
+! CHECK-LABEL: func @_QMcalleePreturn_cst_char_dyn_array(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}, %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.array<?x?x!fir.char<1,10>>
 function return_cst_char_dyn_array(m, n)
   integer :: m, n
   character(10) :: return_cst_char_dyn_array(m, n)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_dyn_array(%{{.*}}: !fir.ref<i32>, %{{.*}}: !fir.ref<i32>, %{{.*}}: !fir.ref<i32>) -> !fir.array<?x?x!fir.char<1,?>>
+! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_dyn_array(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}, %{{.*}}: !fir.ref<i32>{{.*}}, %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.array<?x?x!fir.char<1,?>>
 function return_dyn_char_dyn_array(l, m, n)
   integer :: l, m, n
   character(l) :: return_dyn_char_dyn_array(m, n)
@@ -47,7 +51,8 @@ function return_cst_char_alloc()
   character(10), allocatable :: return_cst_char_alloc(:)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_alloc(%{{.*}}: !fir.ref<i32>) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
+! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_alloc(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
 function return_dyn_char_alloc(l)
   integer :: l
   character(l), allocatable :: return_dyn_char_alloc(:)
@@ -68,7 +73,8 @@ function return_cst_char_pointer()
   character(10), pointer :: return_cst_char_pointer(:)
 end function
 
-! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_pointer(%{{.*}}: !fir.ref<i32>) -> !fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>
+! CHECK-LABEL: func @_QMcalleePreturn_dyn_char_pointer(
+! CHECK-SAME: %{{.*}}: !fir.ref<i32>{{.*}}) -> !fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>
 function return_dyn_char_pointer(l)
   integer :: l
   character(l), pointer :: return_dyn_char_pointer(:)
@@ -171,8 +177,8 @@ subroutine def_char_pointer()
   ! CHECK-NOT: fir.freemem
 end subroutine
 
-! CHECK-LABEL: func @_QMcallerPdyn_array
-! CHECK-SAME: (%[[m:.*]]: !fir.ref<i32>, %[[n:.*]]: !fir.ref<i32>)
+! CHECK-LABEL: func @_QMcallerPdyn_array(
+! CHECK-SAME: %[[m:.*]]: !fir.ref<i32>{{.*}}, %[[n:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine dyn_array(m, n)
   integer :: m, n
   ! CHECK-DAG: %[[mload:.*]] = fir.load %[[m]] : !fir.ref<i32>
@@ -192,8 +198,8 @@ subroutine dyn_array(m, n)
   print *, return_dyn_array(m, n)
 end subroutine
 
-! CHECK-LABEL: func @_QMcallerPdyn_char_cst_array
-! CHECK-SAME: (%[[l:.*]]: !fir.ref<i32>)
+! CHECK-LABEL: func @_QMcallerPdyn_char_cst_array(
+! CHECK-SAME: %[[l:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine dyn_char_cst_array(l)
   integer :: l
   ! CHECK: %[[lload:.*]] = fir.load %[[l]] : !fir.ref<i32>
@@ -206,8 +212,8 @@ subroutine dyn_char_cst_array(l)
   print *, return_dyn_char_cst_array(l)
 end subroutine
 
-! CHECK-LABEL: func @_QMcallerPcst_char_dyn_array
-! CHECK-SAME: (%[[m:.*]]: !fir.ref<i32>, %[[n:.*]]: !fir.ref<i32>)
+! CHECK-LABEL: func @_QMcallerPcst_char_dyn_array(
+! CHECK-SAME: %[[m:.*]]: !fir.ref<i32>{{.*}}, %[[n:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine cst_char_dyn_array(m, n)
   integer :: m, n
   ! CHECK-DAG: %[[mload:.*]] = fir.load %[[m]] : !fir.ref<i32>
@@ -227,8 +233,8 @@ subroutine cst_char_dyn_array(m, n)
   print *, return_cst_char_dyn_array(m, n)
 end subroutine
 
-! CHECK-LABEL: func @_QMcallerPdyn_char_dyn_array
-! CHECK-SAME: (%[[l:.*]]: !fir.ref<i32>, %[[m:.*]]: !fir.ref<i32>, %[[n:.*]]: !fir.ref<i32>)
+! CHECK-LABEL: func @_QMcallerPdyn_char_dyn_array(
+! CHECK-SAME: %[[l:.*]]: !fir.ref<i32>{{.*}}, %[[m:.*]]: !fir.ref<i32>{{.*}}, %[[n:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine dyn_char_dyn_array(l, m, n)
   ! CHECK-DAG: %[[mload:.*]] = fir.load %[[m]] : !fir.ref<i32>
   ! CHECK-DAG: %[[mcast:.*]] = fir.convert %[[mload]] : (i32) -> i64
@@ -306,8 +312,8 @@ subroutine test_result_depends_on_equiv_sym()
   print *, result_depends_on_equiv_sym()
 end subroutine
 
-! CHECK-LABEL: func @_QPtest_depends_on_descriptor
-! CHECK-SAME: (%[[x:.*]]: !fir.box<!fir.array<?xf32>>)
+! CHECK-LABEL: func @_QPtest_depends_on_descriptor(
+! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 subroutine test_depends_on_descriptor(x)
   interface
     function depends_on_descriptor(x)
@@ -323,8 +329,8 @@ subroutine test_depends_on_descriptor(x)
   print *, depends_on_descriptor(x)
 end subroutine
 
-! CHECK-LABEL: func @_QPtest_symbol_indirection
-! CHECK-SAME: (%[[n:.*]]: !fir.ref<i64>)
+! CHECK-LABEL: func @_QPtest_symbol_indirection(
+! CHECK-SAME: %[[n:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine test_symbol_indirection(n)
   interface
     function symbol_indirection(c, n)
@@ -344,8 +350,8 @@ subroutine test_symbol_indirection(n)
   print *, symbol_indirection(c, n)
 end subroutine
 
-! CHECK-LABEL: func @_QPtest_recursion
-! CHECK-SAME: (%[[res:.*]]: !fir.ref<!fir.char<1,?>>, %[[resLen:.*]]: index, %[[n:.*]]: !fir.ref<i64>)
+! CHECK-LABEL: func @_QPtest_recursion(
+! CHECK-SAME: %[[res:.*]]: !fir.ref<!fir.char<1,?>>{{.*}}, %[[resLen:.*]]: index{{.*}}, %[[n:.*]]: !fir.ref<i64>{{.*}}) -> !fir.boxchar<1> {
 function test_recursion(n) result(res)
   integer(8) :: n
   character(n) :: res
@@ -389,14 +395,14 @@ function test_recursion(n) result(res)
 end function
 
 ! Test call to character function for which only the result type is explicit
-!CHECK-LABEL:func @_QPtest_not_entirely_explicit_interface(
-!CHECK-SAME: %[[n_arg:.*]]: !fir.ref<i64>) {
+! CHECK-LABEL:func @_QPtest_not_entirely_explicit_interface(
+! CHECK-SAME: %[[n_arg:.*]]: !fir.ref<i64>{{.*}}) {
 subroutine test_not_entirely_explicit_interface(n)
   integer(8) :: n
   character(n) :: return_dyn_char_2
   print *, return_dyn_char_2(10)
-  !CHECK: %[[n:.*]] = fir.load %[[n_arg]] : !fir.ref<i64>
-  !CHECK: %[[len:.*]] = fir.convert %[[n]] : (i64) -> index
-  !CHECK: %[[result:.*]] = fir.alloca !fir.char<1,?>(%[[len]] : index) {bindc_name = ".result"}
-  !CHECK: fir.call @_QPreturn_dyn_char_2(%[[result]], %[[len]], %{{.*}}) : (!fir.ref<!fir.char<1,?>>, index, !fir.ref<i32>) -> !fir.boxchar<1>
+  ! CHECK: %[[n:.*]] = fir.load %[[n_arg]] : !fir.ref<i64>
+  ! CHECK: %[[len:.*]] = fir.convert %[[n]] : (i64) -> index
+  ! CHECK: %[[result:.*]] = fir.alloca !fir.char<1,?>(%[[len]] : index) {bindc_name = ".result"}
+  ! CHECK: fir.call @_QPreturn_dyn_char_2(%[[result]], %[[len]], %{{.*}}) : (!fir.ref<!fir.char<1,?>>, index, !fir.ref<i32>) -> !fir.boxchar<1>
 end subroutine

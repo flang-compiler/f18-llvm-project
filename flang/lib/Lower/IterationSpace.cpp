@@ -607,6 +607,8 @@ public:
   /// Get the list of bases.
   llvm::ArrayRef<Fortran::lower::ExplicitIterSpace::ArrayBases>
   getBases() const {
+    LLVM_DEBUG(llvm::dbgs()
+               << "number of array bases found: " << bases.size() << '\n');
     return bases;
   }
 
@@ -628,6 +630,8 @@ private:
     return found;
   }
   RT find(const Fortran::evaluate::ArrayRef &x) {
+    for (const auto &sub : x.subscript())
+      (void)find(sub);
     if (x.base().IsSymbol()) {
       if (x.Rank() > 0 || intersection(x.subscript())) {
         bases.push_back(&x);
@@ -643,6 +647,17 @@ private:
     }
     return found;
   }
+  RT find(const Fortran::evaluate::Triplet &x) {
+    if (const auto *lower = x.GetLower())
+      (void)find(*lower);
+    if (const auto *upper = x.GetUpper())
+      (void)find(*upper);
+    return find(x.GetStride());
+  }
+  RT find(const Fortran::evaluate::IndirectSubscriptIntegerExpr &x) {
+    return find(x.value());
+  }
+  RT find(const Fortran::evaluate::Subscript &x) { return find(x.u); }
   RT find(const Fortran::evaluate::DataRef &x) { return find(x.u); }
   RT find(const Fortran::evaluate::CoarrayRef &x) {
     assert(false && "coarray reference");
@@ -810,8 +825,10 @@ void Fortran::lower::ExplicitIterSpace::exprBase(Fortran::lower::FrontEndExpr x,
       lhsBases.push_back(llvm::None);
       return;
     }
-    assert(bases.size() == 1);
-    lhsBases.push_back(bases.front());
+    assert(bases.size() >= 1 && "must detect an array reference on lhs");
+    if (bases.size() > 1)
+      rhsBases.back().append(bases.begin(), bases.end() - 1);
+    lhsBases.push_back(bases.back());
     return;
   }
   rhsBases.back().append(bases.begin(), bases.end());

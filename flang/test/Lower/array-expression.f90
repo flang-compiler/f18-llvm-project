@@ -38,7 +38,7 @@ subroutine test1b(a,b,c,d,n)
 end subroutine test1b
 
 ! CHECK-LABEL: func @_QPtest2(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>, %[[VAL_1:.*]]: !fir.box<!fir.array<?xf32>>, %[[VAL_2:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 0 : index
 ! CHECK:         %[[VAL_4:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_3]] : (!fir.box<!fir.array<?xf32>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_5:.*]] = fir.array_load %[[VAL_0]] : (!fir.box<!fir.array<?xf32>>) -> !fir.array<?xf32>
@@ -112,7 +112,7 @@ subroutine test5(a,b,c)
 end subroutine test5
 
 ! CHECK-LABEL: func @_QPtest6(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_2:.*]]: !fir.ref<f32>, %[[VAL_3:.*]]: !fir.ref<i32>, %[[VAL_4:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_4:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_5:.*]] = fir.load %[[VAL_3]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_6:.*]] = fir.convert %[[VAL_5]] : (i32) -> i64
 ! CHECK:         %[[VAL_7:.*]] = fir.convert %[[VAL_6]] : (i64) -> index
@@ -159,8 +159,7 @@ subroutine test6(a,b,c,n,m)
 end subroutine test6
 
 ! CHECK-LABEL: func @_QPtest6a(
-! CHECK-SAME:                  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x50xf32>>,
-! CHECK-SAME:                  %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x50xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 50 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -200,8 +199,7 @@ subroutine test6a(a,b)
 end subroutine test6a
 
 ! CHECK-LABEL: func @_QPtest6b(
-! CHECK-SAME:                  %[[VAL_0:.*]]: !fir.ref<!fir.array<10x50xf32>>,
-! CHECK-SAME:                  %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x50xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 50 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -247,7 +245,7 @@ subroutine test6b(a,b)
 end subroutine test6b
 
 ! CHECK-LABEL: func @_QPtest7(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i32) -> i64
 ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i64) -> index
@@ -284,8 +282,7 @@ subroutine test7(a,b,n)
 end subroutine test7
 
 ! CHECK-LABEL: func @_QPtest8(
-! CHECK-SAME:                 %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>,
-! CHECK-SAME:                 %[[VAL_1:.*]]: !fir.ref<!fir.array<100xi32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_3:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_4:.*]] = fir.array_load %[[VAL_0]](%[[VAL_3]]) : (!fir.ref<!fir.array<100xi32>>, !fir.shape<1>) -> !fir.array<100xi32>
@@ -330,7 +327,7 @@ subroutine test10(a,b,c,d)
 end subroutine test10
 
 ! CHECK-LABEL: func @_QPtest11(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<100xf32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<100xf32>>, %[[VAL_3:.*]]: !fir.ref<!fir.array<100xf32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[VAL_3:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 100 : index
@@ -435,8 +432,7 @@ end subroutine test13
 
 ! Test elemental call to function f
 ! CHECK-LABEL: func @_QPtest14(
-! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[b:.*]]: !fir.ref<!fir.array<100xf32>>)
+! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[b:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}})
 subroutine test14(a,b)
   ! CHECK: %[[barr:.*]] = fir.array_load %[[b]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
   interface
@@ -457,8 +453,7 @@ end subroutine test14
 
 ! Test elemental intrinsic function (abs)
 ! CHECK-LABEL: func @_QPtest15(
-! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[b:.*]]: !fir.ref<!fir.array<100xf32>>)
+! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[b:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}})
 subroutine test15(a,b)
   ! CHECK-DAG: %[[barr:.*]] = fir.array_load %[[b]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
   ! CHECK-DAG: %[[aarr:.*]] = fir.array_load %[[a]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
@@ -474,8 +469,7 @@ end subroutine test15
 
 ! Test elemental call to function f2 with VALUE attribute
 ! CHECK-LABEL: func @_QPtest16(
-! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[b:.*]]: !fir.ref<!fir.array<100xf32>>)
+! CHECK-SAME: %[[a:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[b:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}})
 subroutine test16(a,b)
   ! CHECK: %[[tmp:.*]] = fir.alloca f32 {adapt.valuebyref
   ! CHECK-DAG: %[[aarr:.*]] = fir.array_load %[[a]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
@@ -499,9 +493,7 @@ end subroutine test16
 ! Test elemental impure call to function f3.
 !
 ! CHECK-LABEL: func @_QPtest17(
-! CHECK-SAME: %[[a:[^:]+]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[b:[^:]+]]: !fir.ref<!fir.array<100xf32>>,
-! CHECK-SAME: %[[c:.*]]: !fir.ref<!fir.array<100xf32>>)
+! CHECK-SAME: %[[a:[^:]+]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[b:[^:]+]]: !fir.ref<!fir.array<100xf32>>{{.*}}, %[[c:.*]]: !fir.ref<!fir.array<100xf32>>{{.*}})
 subroutine test17(a,b,c)
   ! CHECK-DAG: %[[aarr:.*]] = fir.array_load %[[a]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
   ! CHECK-DAG: %[[barr:.*]] = fir.array_load %[[b]](%{{.*}}) : (!fir.ref<!fir.array<100xf32>>, !fir.shapeshift<1>) -> !fir.array<100xf32>
@@ -568,7 +560,7 @@ subroutine test18
 end subroutine test18
 
 ! CHECK-LABEL: func @_QPtest_column_and_row_order(
-! CHECK-SAME:              %[[VAL_0:.*]]: !fir.ref<!fir.array<2x3xf32>>) {
+! CHECK-SAME:              %[[VAL_0:.*]]: !fir.ref<!fir.array<2x3xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 2 : index
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 3 : index
 ! CHECK:         %[[VAL_3:.*]] = fir.shape %[[VAL_1]], %[[VAL_2]] : (index, index) -> !fir.shape<2>
@@ -596,7 +588,7 @@ subroutine test_column_and_row_order(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_assigning_to_assumed_shape_slices(
-! CHECK-SAME:                %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>) {
+! CHECK-SAME:                %[[VAL_0:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 2 : i64
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]] : (i64) -> index
@@ -630,7 +622,7 @@ subroutine test_assigning_to_assumed_shape_slices(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest19a(
-! CHECK-SAME:      %[[VAL_0:.*]]: !fir.boxchar<1>, %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<10x!fir.char<1,10>>>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -669,8 +661,7 @@ subroutine test19a(a,b)
 end subroutine test19a
 
 ! CHECK-LABEL: func @_QPtest19b(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.boxchar<2>,
-! CHECK-SAME:                   %[[VAL_1:.*]]: !fir.boxchar<2>) {
+! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.boxchar<2>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<2>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<2>) -> (!fir.ref<!fir.char<2,?>>, index)
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<2,?>>) -> !fir.ref<!fir.array<20x!fir.char<2,8>>>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 20 : index
@@ -723,7 +714,7 @@ subroutine test19b(a,b)
 end subroutine test19b
 
 ! CHECK-LABEL: func @_QPtest19c(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<4>, %[[VAL_1:.*]]: !fir.boxchar<4>, %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<4>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<4>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]]:2 = fir.unboxchar %[[VAL_1]] : (!fir.boxchar<4>) -> (!fir.ref<!fir.char<4,?>>, index)
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_3]]#0 : (!fir.ref<!fir.char<4,?>>) -> !fir.ref<!fir.array<30x!fir.char<4,10>>>
@@ -781,7 +772,7 @@ subroutine test19c(a,b,i)
 end subroutine test19c
 
 ! CHECK-LABEL: func @_QPtest19d(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<1>, %[[VAL_1:.*]]: !fir.boxchar<1>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_5:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 0 : i32
@@ -843,8 +834,7 @@ subroutine test19d(a,b,i,j)
 end subroutine test19d
 
 ! CHECK-LABEL: func @_QPtest19e(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.boxchar<1>,
-! CHECK-SAME:                   %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<50x!fir.char<1,?>>>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 50 : index
@@ -895,8 +885,7 @@ subroutine test19e(a,b)
 end subroutine test19e
 
 ! CHECK-LABEL: func @_QPtest19f(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.boxchar<1>,
-! CHECK-SAME:                   %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<60x!fir.char<1,?>>>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 60 : index
@@ -969,9 +958,7 @@ subroutine test19f(a,b)
 end subroutine test19f
 
 ! CHECK-LABEL: func @_QPtest19g(
-! CHECK-SAME:                   %[[VAL_0:.*]]: !fir.boxchar<4>,
-! CHECK-SAME:                   %[[VAL_1:.*]]: !fir.boxchar<2>,
-! CHECK-SAME:                   %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:            %[[VAL_0:.*]]: !fir.boxchar<4>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<2>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]]:2 = fir.unboxchar %[[VAL_1]] : (!fir.boxchar<2>) -> (!fir.ref<!fir.char<2,?>>, index)
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 13 : index
 ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_3]]#0 : (!fir.ref<!fir.char<2,?>>) -> !fir.ref<!fir.array<140x!fir.char<2,13>>>
@@ -1054,7 +1041,7 @@ subroutine test19g(a,b,i)
 end subroutine test19g
 
 ! CHECK-LABEL: func @_QPtest19h(
-! CHECK-SAME:       %[[VAL_0:.*]]: !fir.boxchar<1>, %[[VAL_1:.*]]: !fir.boxchar<1>, %[[VAL_2:.*]]: !fir.ref<i32>, %[[VAL_3:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:       %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_3:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_5:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 0 : i32
@@ -1120,7 +1107,7 @@ subroutine test19h(a,b,i,j)
 end subroutine test19h
 
 ! CHECK-LABEL: func @_QPtest_elemental_character_intrinsic(
-! CHECK-SAME:        %[[VAL_0:.*]]: !fir.boxchar<1>, %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]]:2 = fir.unboxchar %[[VAL_0]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:         %[[VAL_3:.*]] = fir.convert %[[VAL_2]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<10x!fir.char<1,?>>>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index

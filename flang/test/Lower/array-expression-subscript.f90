@@ -1,7 +1,7 @@
 ! RUN: bbc --emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest1a(
-! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 20 : index
@@ -49,7 +49,7 @@ subroutine test1a(a,b,c)
 end subroutine test1a
 
 ! CHECK-LABEL: func @_QPtest1b(
-! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 20 : index
@@ -97,7 +97,7 @@ subroutine test1b(a,b,c)
 end subroutine test1b
 
 ! CHECK-LABEL: func @_QPtest2a(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 10 : index
@@ -141,7 +141,7 @@ subroutine test2a(a,b,c,d)
 end subroutine test2a
 
 ! CHECK-LABEL: func @_QPtest2b(
-! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-SAME:      %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_5:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 10 : index
@@ -185,7 +185,7 @@ subroutine test2b(a,b,c,d)
 end subroutine test2b
 
 ! CHECK-LABEL: func @_QPtest1c(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<20xi32>>{{.*}}, %[[VAL_3:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 ! CHECK:         return
 ! CHECK:       }
 subroutine test1c(a,b,c,d)

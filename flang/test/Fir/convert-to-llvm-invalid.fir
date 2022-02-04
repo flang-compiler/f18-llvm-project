@@ -122,3 +122,10 @@ func @bar_select_type(%arg : !fir.box<!fir.ref<f32>>) -> i32 {
   %zero = arith.constant 0 : i32
   return %zero : i32
 }
+
+// -----
+
+// Verify that `fir.dt_entry` requires a parent op
+
+// expected-error@+1{{'fir.dt_entry' op expects parent op 'fir.dispatch_table'}}
+fir.dt_entry "method", @method_impl

@@ -86,6 +86,7 @@ public:
   mlir::Value getBuffer() const { return getAddr(); }
 
   mlir::Value getLen() const { return len; }
+
   friend llvm::raw_ostream &operator<<(llvm::raw_ostream &,
                                        const CharBoxValue &);
   LLVM_DUMP_METHOD void dump() const { llvm::errs() << *this; }
@@ -438,10 +439,7 @@ public:
         auto type = b->getType();
         if (type.template isa<fir::BoxCharType>())
           fir::emitFatalError(b->getLoc(), "BoxChar should be unboxed");
-        if (auto refType = type.template dyn_cast<fir::ReferenceType>())
-          type = refType.getEleTy();
-        if (auto seqType = type.template dyn_cast<fir::SequenceType>())
-          type = seqType.getEleTy();
+        type = fir::unwrapSequenceType(fir::unwrapRefType(type));
         if (fir::isa_char(type))
           fir::emitFatalError(b->getLoc(),
                               "character buffer should be in CharBoxValue");
@@ -488,10 +486,26 @@ inline bool isUnboxedValue(const ExtendedValue &exv) {
       [](const auto &) { return false; });
 }
 
+/// Returns the base type of \p exv. This is the type of \p exv
+/// without any memory or box type. The sequence type, if any, is kept.
+inline mlir::Type getBaseTypeOf(const ExtendedValue &exv) {
+  return exv.match(
+      [](const fir::MutableBoxValue &box) { return box.getBaseTy(); },
+      [](const fir::BoxValue &box) { return box.getBaseTy(); },
+      [&](const auto &) {
+        return fir::unwrapRefType(fir::getBase(exv).getType());
+      });
+}
+
+/// Return the scalar type of \p exv type. This removes all
+/// reference, box, or sequence type from \p exv base.
+inline mlir::Type getElementTypeOf(const ExtendedValue &exv) {
+  return fir::unwrapSequenceType(getBaseTypeOf(exv));
+}
+
 /// Is the extended value `exv` a derived type with length parameters ?
 inline bool isDerivedWithLengthParameters(const ExtendedValue &exv) {
-  auto type = fir::unwrapPassByRefType(fir::getBase(exv).getType());
-  auto record = fir::unwrapSequenceType(type).dyn_cast<fir::RecordType>();
+  auto record = getElementTypeOf(exv).dyn_cast<fir::RecordType>();
   return record && record.getNumLenParams() != 0;
 }
 

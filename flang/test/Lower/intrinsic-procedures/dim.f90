@@ -1,9 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: func @_QPdim_testr(
-! CHECK-SAME:                     %[[VAL_0:[a-z]+[0-9]]]: !fir.ref<f32>,
-! CHECK-SAME:                     %[[VAL_1:.*]]: !fir.ref<f32>,
-! CHECK-SAME:                     %[[VAL_2:.*]]: !fir.ref<f32>) {
+! CHECK-SAME:                     %[[VAL_0:[a-z]+[0-9]]]: !fir.ref<f32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_2:.*]]: !fir.ref<f32>{{.*}}) {
 subroutine dim_testr(x, y, z)
 ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_0]] : !fir.ref<f32>
 ! CHECK: %[[VAL_4:.*]] = fir.load %[[VAL_1]] : !fir.ref<f32>
@@ -18,9 +16,7 @@ subroutine dim_testr(x, y, z)
 end subroutine
 
 ! CHECK-LABEL: func @_QPdim_testi(
-! CHECK-SAME: %[[VAL_0:[a-z]+[0-9]]]: !fir.ref<i32>,
-! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_0:[a-z]+[0-9]]]: !fir.ref<i32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine dim_testi(i, j, k)
 ! CHECK: %[[VAL_3:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! CHECK: %[[VAL_4:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>

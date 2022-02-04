@@ -3,7 +3,7 @@
 ! Test allocatable dummy argument on callee side
 
 ! CHECK-LABEL: func @_QPtest_scalar(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>{{.*}})
 subroutine test_scalar(x)
   real, allocatable :: x
 
@@ -14,7 +14,7 @@ subroutine test_scalar(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xi32>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xi32>>>>{{.*}})
 subroutine test_array(x)
   integer, allocatable :: x(:,:)
 
@@ -26,7 +26,7 @@ subroutine test_array(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_scalar_deferred(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>{{.*}})
 subroutine test_char_scalar_deferred(c)
   character(:), allocatable :: c
   external foo1
@@ -40,7 +40,7 @@ subroutine test_char_scalar_deferred(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_scalar_explicit_cst(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,10>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,10>>>>{{.*}})
 subroutine test_char_scalar_explicit_cst(c)
   character(10), allocatable :: c
   external foo1
@@ -53,7 +53,7 @@ subroutine test_char_scalar_explicit_cst(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_scalar_explicit_dynamic(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>, %[[arg1:.*]]: !fir.ref<i32>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>{{.*}})
 subroutine test_char_scalar_explicit_dynamic(c, n)
   integer :: n
   character(n), allocatable :: c
@@ -72,7 +72,7 @@ subroutine test_char_scalar_explicit_dynamic(c, n)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_array_deferred(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>{{.*}})
 subroutine test_char_array_deferred(c)
   character(:), allocatable :: c(:)
   external foo1
@@ -87,7 +87,7 @@ subroutine test_char_array_deferred(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_array_explicit_cst(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>>{{.*}})
 subroutine test_char_array_explicit_cst(c)
   character(10), allocatable :: c(:)
   external foo1
@@ -100,7 +100,7 @@ subroutine test_char_array_explicit_cst(c)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_char_array_explicit_dynamic(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>, %[[arg1:.*]]: !fir.ref<i32>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>{{.*}})
 subroutine test_char_array_explicit_dynamic(c, n)
   integer :: n
   character(n), allocatable :: c(:)
@@ -123,7 +123,7 @@ end subroutine
 ! into account when the kind is not 1.
 
 ! CHECK-LABEL: func @_QPtest_char_scalar_deferred_k2(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<2,?>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<2,?>>>>{{.*}})
 subroutine test_char_scalar_deferred_k2(c)
   character(kind=2, len=:), allocatable :: c
   external foo2

@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: repeat_test
-! CHECK-SAME: (%[[arg0:.*]]: !fir.boxchar<1>, %[[arg1:.*]]: !fir.ref<i32>)
+! CHECK-LABEL: func @_QPrepeat_test(
+! CHECK-SAME: %[[arg0:.*]]: !fir.boxchar<1>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine repeat_test(c, n)
   character(*) :: c
   integer :: n

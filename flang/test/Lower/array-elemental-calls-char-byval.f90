@@ -14,9 +14,7 @@ end interface
 
 contains
 ! CHECK-LABEL: func @_QMchar_elem_byvalPfoo1(
-! CHECK-SAME: %[[VAL_22:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_19:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_5:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME: %[[VAL_22:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_19:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_5:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine foo1(i, j, c)
   integer :: i(10), j(10)
   character(*) :: c(10)
@@ -52,9 +50,7 @@ subroutine foo1(i, j, c)
 end subroutine
 
 ! CHECK-LABEL: func @_QMchar_elem_byvalPfoo2(
-! CHECK-SAME: %[[VAL_44:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_41:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_29:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME: %[[VAL_44:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_41:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_29:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine foo2(i, j, c)
   integer :: i(10), j(10)
   character(*) :: c
@@ -88,8 +84,7 @@ subroutine foo2(i, j, c)
 end subroutine
 
 ! CHECK-LABEL: func @_QMchar_elem_byvalPfoo3(
-! CHECK-SAME: %[[VAL_65:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_55:[^:]+]]: !fir.ref<!fir.array<10xi32>>)
+! CHECK-SAME: %[[VAL_65:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_55:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine foo3(i, j)
   integer :: i(10), j(10)
 ! CHECK-DAG:   %[[VAL_46:.*]] = arith.constant 10 : index
@@ -122,8 +117,7 @@ subroutine foo3(i, j)
 end subroutine
 
 ! CHECK-LABEL: func @_QMchar_elem_byvalPfoo4(
-! CHECK-SAME: %[[VAL_93:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_74:[^:]+]]: !fir.ref<!fir.array<10xi32>>)
+! CHECK-SAME: %[[VAL_93:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_74:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine foo4(i, j)
   integer :: i(10), j(10)
 ! CHECK-DAG:   %[[VAL_67:.*]] = arith.constant 0 : i64
@@ -167,8 +161,7 @@ end subroutine
 ! modified on the caller side.
 
 ! CHECK-LABEL: func @_QMchar_elem_byvalPfoo5(
-! CHECK-SAME: %[[VAL_116:[^:]+]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_113:[^:]+]]: !fir.ref<!fir.array<10xi32>>)
+! CHECK-SAME: %[[VAL_116:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_113:[^:]+]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 subroutine foo5(i, j)
   integer :: i(10), j(10)
 ! CHECK-DAG:   %[[VAL_95:.*]] = arith.constant 5 : index

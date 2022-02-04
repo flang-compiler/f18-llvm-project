@@ -1,7 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
-! CHECK-LABEL: rrspacing_test2
-! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f128>) -> f128
+! CHECK-LABEL: func @_QPrrspacing_test2(
+! CHECK-SAME: %[[x:[^:]+]]: !fir.ref<f128>{{.*}}) -> f128
 real*16 function rrspacing_test2(x)
   real*16 :: x
   rrspacing_test2 = rrspacing(x)

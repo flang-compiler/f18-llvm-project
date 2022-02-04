@@ -677,7 +677,11 @@ Expr<Type<TypeCategory::Integer, KIND>> FoldIntrinsicFunction(
       return std::visit(
           [&](auto &kx) {
             if (auto len{kx.LEN()}) {
-              return Fold(context, ConvertToType<T>(*std::move(len)));
+              if (IsConstantExpr(*len)) {
+                return Fold(context, ConvertToType<T>(*std::move(len)));
+              } else {
+                return Expr<T>{std::move(funcRef)};
+              }
             } else {
               return Expr<T>{std::move(funcRef)};
             }
@@ -1020,6 +1024,9 @@ std::optional<std::int64_t> ToInt64(const Expr<SomeType> &expr) {
   }
 }
 
+#ifdef _MSC_VER // disable bogus warning about missing definitions
+#pragma warning(disable : 4661)
+#endif
 FOR_EACH_INTEGER_KIND(template class ExpressionBase, )
 template class ExpressionBase<SomeInteger>;
 } // namespace Fortran::evaluate

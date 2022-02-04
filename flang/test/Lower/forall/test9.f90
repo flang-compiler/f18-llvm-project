@@ -16,7 +16,7 @@ subroutine test9(a,b,n)
 end subroutine test9
 
 ! CHECK-LABEL: func @_QPtest9(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>, %[[VAL_2:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<?xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<i32>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i32) -> i64
@@ -54,8 +54,8 @@ end subroutine test9
 ! CHECK:           %[[VAL_38:.*]] = fir.array_fetch %[[VAL_22]], %[[VAL_36]] : (!fir.array<?xf32>, index) -> f32
 ! CHECK:           %[[VAL_39:.*]] = arith.addf %[[VAL_37]], %[[VAL_38]] : f32
 ! CHECK:           %[[VAL_40:.*]] = arith.constant 1 : index
-! CHECK:           %[[VAL_41:.*]] = fir.load %[[VAL_3]] : !fir.ref<i32>
-! CHECK:           %[[VAL_42:.*]] = arith.constant 1 : i32
+! CHECK-DAG:       %[[VAL_41:.*]] = fir.load %[[VAL_3]] : !fir.ref<i32>
+! CHECK-DAG:       %[[VAL_42:.*]] = arith.constant 1 : i32
 ! CHECK:           %[[VAL_43:.*]] = arith.addi %[[VAL_41]], %[[VAL_42]] : i32
 ! CHECK:           %[[VAL_44:.*]] = fir.convert %[[VAL_43]] : (i32) -> i64
 ! CHECK:           %[[VAL_45:.*]] = fir.convert %[[VAL_44]] : (i64) -> index

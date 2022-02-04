@@ -9,8 +9,7 @@
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest_scalar(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.ref<f32> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}}, %[[x:.*]]: !fir.ref<f32> {{{.*}}, fir.target})
 subroutine test_scalar(p, x)
   real, target :: x
   real, pointer :: p
@@ -20,8 +19,7 @@ subroutine test_scalar(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_scalar_char(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.boxchar<1> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>{{.*}}, %[[x:.*]]: !fir.boxchar<1> {{{.*}}, fir.target})
 subroutine test_scalar_char(p, x)
   character(*), target :: x
   character(:), pointer :: p
@@ -32,8 +30,7 @@ subroutine test_scalar_char(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<100xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}, %[[x:.*]]: !fir.ref<!fir.array<100xf32>> {{{.*}}, fir.target})
 subroutine test_array(p, x)
   real, target :: x(100)
   real, pointer :: p(:)
@@ -44,8 +41,7 @@ subroutine test_array(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array_char(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.boxchar<1> {fir.target}) {
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,?>>>>>{{.*}}, %[[x:.*]]: !fir.boxchar<1> {{{.*}}, fir.target}) {
 subroutine test_array_char(p, x)
   character(*), target :: x(100)
   character(:), pointer :: p(:)
@@ -90,8 +86,7 @@ end subroutine
 
 ! Test F2018 10.2.2.3 point 9: bounds remapping
 ! CHECK-LABEL: func @_QPtest_array_remap(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.ref<!fir.array<100xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>{{.*}}, %[[x:.*]]: !fir.ref<!fir.array<100xf32>> {{{.*}}, fir.target})
 subroutine test_array_remap(p, x)
   real, target :: x(100)
   real, pointer :: p(:, :)
@@ -111,8 +106,7 @@ subroutine test_array_remap(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array_char_remap(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?x!fir.char<1,?>>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.boxchar<1> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?x!fir.char<1,?>>>>>{{.*}}, %[[x:.*]]: !fir.boxchar<1> {{{.*}}, fir.target})
 subroutine test_array_char_remap(p, x)
   ! CHECK: %[[unbox:.*]]:2 = fir.unboxchar %[[x]]
   character(*), target :: x(100)
@@ -132,8 +126,7 @@ end subroutine
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest_array_non_contig_rhs(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}, %[[x:.*]]: !fir.box<!fir.array<?xf32>> {{{.*}}, fir.target})
 subroutine test_array_non_contig_rhs(p, x)
   real, target :: x(:)
   real, pointer :: p(:)
@@ -145,8 +138,7 @@ end subroutine
 ! Test 10.2.2.3 point 10: lower bounds requirements:
 ! pointer takes lbounds from rhs if no bounds spec.
 ! CHECK-LABEL: func @_QPtest_array_non_contig_rhs_lbs(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}, %[[x:.*]]: !fir.box<!fir.array<?xf32>> {{{.*}}, fir.target})
 subroutine test_array_non_contig_rhs_lbs(p, x)
   real, target :: x(7:)
   real, pointer :: p(:)
@@ -159,8 +151,7 @@ subroutine test_array_non_contig_rhs_lbs(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array_non_contig_rhs2(
-! CHECK-SAME:                                      %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME:                                      %[[VAL_1:.*]]: !fir.ref<!fir.array<200xf32>> {fir.target}) {
+! CHECK-SAME:                                      %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<200xf32>> {{{.*}}, fir.target}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 200 : index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : i64
 ! CHECK:         %[[VAL_4:.*]] = fir.convert %[[VAL_3]] : (i64) -> index
@@ -190,8 +181,7 @@ end subroutine
 ! Test 10.2.2.3 point 10: lower bounds requirements:
 ! pointer takes lbounds from bound spec if specified
 ! CHECK-LABEL: func @_QPtest_array_non_contig_rhs_new_lbs(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}}, %[[x:.*]]: !fir.box<!fir.array<?xf32>> {{{.*}}, fir.target})
 subroutine test_array_non_contig_rhs_new_lbs(p, x)
   real, target :: x(7:)
   real, pointer :: p(:)
@@ -204,8 +194,7 @@ end subroutine
 
 ! Test F2018 10.2.2.3 point 9: bounds remapping
 ! CHECK-LABEL: func @_QPtest_array_non_contig_remap(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>,
-! CHECK-SAME: %[[x:.*]]: !fir.box<!fir.array<?xf32>> {fir.target})
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>{{.*}}, %[[x:.*]]: !fir.box<!fir.array<?xf32>> {{{.*}}, fir.target})
 subroutine test_array_non_contig_remap(p, x)
   real, target :: x(:)
   real, pointer :: p(:, :)
@@ -222,8 +211,7 @@ end subroutine
 ! Test remapping a slice
 
 ! CHECK-LABEL: func @_QPtest_array_non_contig_remap_slice(
-! CHECK-SAME:                                             %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>,
-! CHECK-SAME:                                             %[[VAL_1:.*]]: !fir.ref<!fir.array<400xf32>> {fir.target}) {
+! CHECK-SAME:                                             %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?x?xf32>>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<400xf32>> {{{.*}}, fir.target}) {
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 400 : index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 2 : i64
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 11 : i64
@@ -352,7 +340,7 @@ subroutine issue857_char(rhs)
 end subroutine
 
 ! CHECK-LABEL: func @_QPissue1180(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32> {fir.target}) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32> {{{.*}}, fir.target}) {
 subroutine issue1180(x)
   integer, target :: x
   integer, pointer :: p

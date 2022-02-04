@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: allocated_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>{{.*}})
 subroutine allocated_test(scalar, array)
   real, allocatable  :: scalar, array(:)
   ! CHECK: %[[scalar:.*]] = fir.load %[[arg0]] : !fir.ref<!fir.box<!fir.heap<f32>>>

@@ -128,8 +128,9 @@ public:
     // Preliminary translation pass.
     //  - Declare all functions that have definitions so that definition
     //    signatures prevail over call site signatures.
-    //  - Define module variables so they are available before lowering any
-    //    function that may use them.
+    //  - Define module variables and OpenMP/OpenACC declarative construct so
+    //    that they are available before lowering any function that may use
+    //    them.
     //  - Translate block data programs so that common block definitions with
     //    data initializations take precedence over other definitions.
     for (Fortran::lower::pft::Program::Units &u : pft.getUnits()) {
@@ -139,7 +140,7 @@ public:
                 declareFunction(f);
               },
               [&](Fortran::lower::pft::ModuleLikeUnit &m) {
-                lowerModuleVariables(m);
+                lowerModuleDeclScope(m);
                 for (Fortran::lower::pft::FunctionLikeUnit &f :
                      m.nestedFunctions)
                   declareFunction(f);
@@ -493,8 +494,9 @@ private:
     return {};
   }
 
-  /// Add the symbol to the local map. If the symbol is already in the map, it
-  /// is not updated. Instead the value `false` is returned.
+  /// Add the symbol to the local map and return `true`. If the symbol is
+  /// already in the map and \p forced is `false`, the map is not updated.
+  /// Instead the value `false` is returned.
   bool addSymbol(const Fortran::semantics::SymbolRef sym, mlir::Value val,
                  bool forced = false) {
     if (!forced && lookupSymbol(sym))
@@ -1673,9 +1675,11 @@ private:
 
   void genFIR(const Fortran::parser::AssociateConstruct &) {
     Fortran::lower::StatementContext stmtCtx;
-    for (Fortran::lower::pft::Evaluation &e :
-         getEval().getNestedEvaluations()) {
+    Fortran::lower::pft::Evaluation &eval = getEval();
+    for (Fortran::lower::pft::Evaluation &e : eval.getNestedEvaluations()) {
       if (auto *stmt = e.getIf<Fortran::parser::AssociateStmt>()) {
+        if (eval.lowerAsUnstructured())
+          maybeStartBlock(e.block);
         localSymbols.pushScope();
         for (const Fortran::parser::Association &assoc :
              std::get<std::list<Fortran::parser::Association>>(stmt->t)) {
@@ -2405,12 +2409,12 @@ private:
   /// result is also mapped. The symbol map is used to hold this mapping.
   void mapDummiesAndResults(Fortran::lower::pft::FunctionLikeUnit &funit,
                             const Fortran::lower::CalleeInterface &callee) {
-    assert(builder && "need a builder at this point");
+    assert(builder && "require a builder object at this point");
     using PassBy = Fortran::lower::CalleeInterface::PassEntityBy;
     auto mapPassedEntity = [&](const auto arg) -> void {
       if (arg.passBy == PassBy::AddressAndLength) {
         // TODO: now that fir call has some attributes regarding character
-        // return, this should PassBy::AddressAndLength should be retired.
+        // return, PassBy::AddressAndLength should be retired.
         mlir::Location loc = toLocation();
         fir::factory::CharacterExprHelper charHelp{*builder, loc};
         mlir::Value box =
@@ -2694,8 +2698,9 @@ private:
       lowerFunc(f); // internal procedure
   }
 
-  /// Lower module variable definitions to fir::globalOp
-  void lowerModuleVariables(Fortran::lower::pft::ModuleLikeUnit &mod) {
+  /// Lower module variable definitions to fir::globalOp and OpenMP/OpenACC
+  /// declarative construct.
+  void lowerModuleDeclScope(Fortran::lower::pft::ModuleLikeUnit &mod) {
     // FIXME: get rid of the bogus function context and instantiate the
     // globals directly into the module.
     MLIRContext *context = &getMLIRContext();
@@ -2712,6 +2717,8 @@ private:
       if (!owningScope || mod.getScope() == *owningScope)
         Fortran::lower::defineModuleVariable(*this, var);
     }
+    for (auto &eval : mod.evaluationList)
+      genFIR(eval);
     if (mlir::Region *region = func.getCallableRegion())
       region->dropAllReferences();
     func.erase();

@@ -160,6 +160,8 @@ public:
       exitFunction();
     } else if constexpr (lower::pft::isConstruct<A> ||
                          lower::pft::isDirective<A>) {
+      if constexpr (lower::pft::isDeclConstruct<A>)
+        return;
       exitConstructOrDirective();
     }
   }
@@ -224,11 +226,14 @@ private:
     Fortran::lower::pft::ModuleLikeUnit &unit =
         addUnit(lower::pft::ModuleLikeUnit{func, pftParentStack.back()});
     functionList = &unit.nestedFunctions;
+    pushEvaluationList(&unit.evaluationList);
     pftParentStack.emplace_back(unit);
     return true;
   }
 
   void exitModule() {
+    if (!evaluationListStack.empty())
+      popEvaluationList();
     pftParentStack.pop_back();
     resetFunctionState();
   }
@@ -240,6 +245,11 @@ private:
     if (evaluationListStack.empty())
       return;
     auto evaluationList = evaluationListStack.back();
+    if (evaluationList->empty() &&
+        pftParentStack.back().getIf<lower::pft::ModuleLikeUnit>()) {
+      popEvaluationList();
+      return;
+    }
     if (evaluationList->empty() || !evaluationList->back().isEndStmt()) {
       const auto &endStmt =
           pftParentStack.back().get<lower::pft::FunctionLikeUnit>().endStmt;
@@ -306,6 +316,12 @@ private:
     pushEvaluationList(eval.evaluationList.get());
     pftParentStack.emplace_back(eval);
     constructAndDirectiveStack.emplace_back(&eval);
+    if constexpr (lower::pft::isDeclConstruct<A>) {
+      popEvaluationList();
+      pftParentStack.pop_back();
+      constructAndDirectiveStack.pop_back();
+      popEvaluationList();
+    }
     return true;
   }
 

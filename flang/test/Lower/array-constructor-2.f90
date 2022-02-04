@@ -20,8 +20,7 @@ end subroutine test1
 
 !  Dynamic array ctor with constant extent.
 ! CHECK-LABEL: func @_QPtest2(
-! CHECK-SAME: %[[a:[^:]*]]: !fir.ref<!fir.array<5xf32>>,
-! CHECK-SAME: %[[b:[^:]*]]: !fir.ref<f32>)
+! CHECK-SAME: %[[a:[^:]*]]: !fir.ref<!fir.array<5xf32>>{{.*}}, %[[b:[^:]*]]: !fir.ref<f32>{{.*}})
 subroutine test2(a, b)
   real :: a(5), b
   real, external :: f
@@ -55,7 +54,7 @@ end subroutine test2
 
 !  Dynamic array ctor with dynamic extent.
 ! CHECK-LABEL: func @_QPtest3(
-! CHECK-SAME: %[[a:.*]]: !fir.box<!fir.array<?xf32>>)
+! CHECK-SAME: %[[a:.*]]: !fir.box<!fir.array<?xf32>>{{.*}})
 subroutine test3(a)
   real :: a(:)
   real, allocatable :: b(:), c(:)
@@ -120,8 +119,7 @@ subroutine test4(a, b, n1, m1)
 end subroutine test4
 
 ! CHECK-LABEL: func @_QPtest5(
-! CHECK-SAME: %[[a:[^:]*]]: !fir.box<!fir.array<?xf32>>,
-! CHECK-SAME: %[[array2:[^:]*]]: !fir.ref<!fir.array<2xf32>>)
+! CHECK-SAME: %[[a:[^:]*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[array2:[^:]*]]: !fir.ref<!fir.array<2xf32>>{{.*}})
 subroutine test5(a, array2)
   real :: a(:)
   real, parameter :: const_array1(2) = [ 1.0, 2.0 ]
@@ -162,6 +160,17 @@ subroutine test6(c, d, e)
   ! CHECK: fir.freemem %{{.*}} : !fir.heap<!fir.array<2x!fir.char<1,5>>>
   c = (/ d, e /)
 end subroutine test6
+
+! CHECK-LABEL: func @_QPtest7(
+! CHECK: %[[i:.*]] = fir.convert %{{.*}} : (index) -> i8
+! CHECK: %[[und:.*]] = fir.undefined !fir.char<1>
+! CHECK: %[[scalar:.*]] = fir.insert_value %[[und]], %[[i]], [0 : index] : (!fir.char<1>, i8) -> !fir.char<1>
+! CHECK: ^bb{{[0-9]+}}(%{{.*}}: !fir.heap<!fir.char<1>>):  // 2 preds
+! CHECK: fir.store %[[scalar]] to %{{.*}} : !fir.ref<!fir.char<1>>
+subroutine test7(a, n)
+  character(1) :: a(n)
+  a = (/ (CHAR(i), i=1,n) /)
+end subroutine test7
 
 ! CHECK: fir.global internal @_QQro.3xr4.{{.*}}(dense<[1.000000e+00, 2.000000e+00, 3.000000e+00]> : tensor<3xf32>) constant : !fir.array<3xf32>
 

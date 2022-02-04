@@ -47,7 +47,7 @@ subroutine dyn_array_cst_len(n)
 end subroutine
 
 ! CHECK: func @_QPdyn_array_dyn_len
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>, %[[arg1:.*]]: !fir.ref<i32>
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i32>{{.*}}, %[[arg1:.*]]: !fir.ref<i32>
 subroutine dyn_array_dyn_len(l, n)
   integer :: l, n
   character(l) :: c(n)
@@ -89,7 +89,7 @@ subroutine dyn_array_cst_len_lb(n)
 end subroutine
 
 ! CHECK-LABEL: func @_QPdyn_array_dyn_len_lb
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i64>, %[[arg1:.*]]: !fir.ref<i64>
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<i64>{{.*}}, %[[arg1:.*]]: !fir.ref<i64>
 subroutine dyn_array_dyn_len_lb(l, n)
   integer(8) :: l, n
   character(l) :: c(11:n)

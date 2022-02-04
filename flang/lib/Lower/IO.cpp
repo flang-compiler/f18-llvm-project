@@ -417,15 +417,15 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
     llvm_unreachable("unknown OutputInteger kind");
   }
   if (auto ty = type.dyn_cast<mlir::FloatType>()) {
-    if (auto width = ty.getWidth(); width <= 32)
+    if (auto width = ty.getWidth(); width == 32)
       return getIORuntimeFunc<mkIOKey(OutputReal32)>(loc, builder);
-    else if (width <= 64)
+    else if (width == 64)
       return getIORuntimeFunc<mkIOKey(OutputReal64)>(loc, builder);
   }
   if (auto ty = type.dyn_cast<fir::ComplexType>()) {
-    if (auto kind = ty.getFKind(); kind <= 4)
+    if (auto kind = ty.getFKind(); kind == 4)
       return getIORuntimeFunc<mkIOKey(OutputComplex32)>(loc, builder);
-    else if (kind <= 8)
+    else if (kind == 8)
       return getIORuntimeFunc<mkIOKey(OutputComplex64)>(loc, builder);
   }
   if (type.isa<fir::LogicalType>())
@@ -851,7 +851,15 @@ mlir::Value genCharIOOption(Fortran::lower::AbstractConverter &converter,
 template <typename A>
 mlir::Value genIOOption(Fortran::lower::AbstractConverter &converter,
                         mlir::Location loc, mlir::Value cookie, const A &spec) {
-  // default case: do nothing
+  // These specifiers are processed in advance elsewhere - skip them here.
+  using PreprocessedSpecs =
+      std::tuple<Fortran::parser::EndLabel, Fortran::parser::EorLabel,
+                 Fortran::parser::ErrLabel, Fortran::parser::FileUnitNumber,
+                 Fortran::parser::Format, Fortran::parser::IoUnit,
+                 Fortran::parser::MsgVariable, Fortran::parser::Name,
+                 Fortran::parser::StatVariable>;
+  static_assert(Fortran::common::HasMember<A, PreprocessedSpecs>,
+                "missing genIOOPtion specialization");
   return {};
 }
 
@@ -939,6 +947,24 @@ mlir::Value genIOOption<Fortran::parser::ConnectSpec::Recl>(
     Fortran::lower::AbstractConverter &converter, mlir::Location loc,
     mlir::Value cookie, const Fortran::parser::ConnectSpec::Recl &spec) {
   return genIntIOOption<mkIOKey(SetRecl)>(converter, loc, cookie, spec);
+}
+
+template <>
+mlir::Value genIOOption<Fortran::parser::ConnectSpec::Newunit>(
+    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+    mlir::Value cookie, const Fortran::parser::ConnectSpec::Newunit &spec) {
+  Fortran::lower::StatementContext stmtCtx;
+  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+  mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(GetNewUnit)>(loc, builder);
+  mlir::FunctionType ioFuncTy = ioFunc.getType();
+  const auto *var = Fortran::semantics::GetExpr(spec);
+  mlir::Value addr = builder.createConvert(
+      loc, ioFuncTy.getInput(1),
+      fir::getBase(converter.genExprAddr(var, stmtCtx, loc)));
+  auto kind = builder.createIntegerConstant(loc, ioFuncTy.getInput(2),
+                                            var->GetType().value().kind());
+  llvm::SmallVector<mlir::Value> ioArgs = {cookie, addr, kind};
+  return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
 }
 
 template <>

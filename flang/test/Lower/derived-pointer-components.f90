@@ -74,10 +74,7 @@ contains
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QMpcompPref_scalar_real_p(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p0{p:!fir.box<!fir.ptr<f32>>}>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>,
-! CHECK-SAME: %[[arg2:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p0{p:!fir.box<!fir.ptr<f32>>}>>>,
-! CHECK-SAME: %[[arg3:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p0{p:!fir.box<!fir.ptr<f32>>}>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>{{.*}}, %[[arg2:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p0{p:!fir.box<!fir.ptr<f32>>}>>>{{.*}}, %[[arg3:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>{{.*}}) {
 subroutine ref_scalar_real_p(p0_0, p1_0, p0_1, p1_1)
   type(real_p0) :: p0_0, p0_1(100)
   type(real_p1) :: p1_0, p1_1(100)
@@ -122,8 +119,7 @@ subroutine ref_scalar_real_p(p0_0, p1_0, p0_1, p1_1)
 end subroutine
 
 ! CHECK-LABEL: func @_QMpcompPref_array_real_p(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>) {
+! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.field_index p, !fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>
 ! CHECK:         %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_2]] : (!fir.ref<!fir.type<_QMpcompTreal_p1{p:!fir.box<!fir.ptr<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>
 ! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>

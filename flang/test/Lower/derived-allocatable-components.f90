@@ -74,10 +74,7 @@ contains
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QMacompPref_scalar_real_a(
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a0{p:!fir.box<!fir.heap<f32>>}>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>,
-! CHECK-SAME: %[[arg2:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a0{p:!fir.box<!fir.heap<f32>>}>>>,
-! CHECK-SAME: %[[arg3:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a0{p:!fir.box<!fir.heap<f32>>}>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>{{.*}}, %[[arg2:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a0{p:!fir.box<!fir.heap<f32>>}>>>{{.*}}, %[[arg3:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}) {
 subroutine ref_scalar_real_a(a0_0, a1_0, a0_1, a1_1)
   type(real_a0) :: a0_0, a0_1(100)
   type(real_a1) :: a1_0, a1_1(100)
@@ -124,8 +121,7 @@ subroutine ref_scalar_real_a(a0_0, a1_0, a0_1, a1_1)
 end subroutine
 
 ! CHECK-LABEL: func @_QMacompPref_array_real_a(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<100x!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.field_index p, !fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>
 ! CHECK:         %[[VAL_3:.*]] = fir.coordinate_of %[[VAL_0]], %[[VAL_2]] : (!fir.ref<!fir.type<_QMacompTreal_a1{p:!fir.box<!fir.heap<!fir.array<?xf32>>>}>>, !fir.field) -> !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>
 ! CHECK:         %[[VAL_4:.*]] = fir.load %[[VAL_3]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xf32>>>>

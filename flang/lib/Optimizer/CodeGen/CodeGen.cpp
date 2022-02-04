@@ -1231,8 +1231,7 @@ struct EmboxCommonConversion : public FIROpConversion<OP> {
   mlir::Value
   getTypeDescriptor(BOX box, mlir::ConversionPatternRewriter &rewriter,
                     mlir::Location loc, fir::RecordType recType) const {
-    auto split = recType.getName().split('T');
-    std::string name = (split.first + "E.dt." + split.second).str();
+    std::string name = recType.translateNameToFrontendMangledName();
     auto module = box->template getParentOfType<mlir::ModuleOp>();
     if (auto global = module.template lookupSymbol<fir::GlobalOp>(name)) {
       auto ty = mlir::LLVM::LLVMPointerType::get(
@@ -2432,40 +2431,44 @@ struct CoordinateOpConversion
   }
 }; // namespace
 
-/// convert a field index to a runtime function that computes the byte offset
-/// of the dynamic field
+/// Convert `fir.field_index`. The conversion depends on whether the size of
+/// the record is static or dynamic.
 struct FieldIndexOpConversion : public FIROpConversion<fir::FieldIndexOp> {
   using FIROpConversion::FIROpConversion;
 
   // NB: most field references should be resolved by this point
   mlir::LogicalResult
-  matchAndRewrite(fir::FieldIndexOp field, OperandTy operands,
+  matchAndRewrite(fir::FieldIndexOp field, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto recTy = field.on_type().cast<fir::RecordType>();
-    auto index = recTy.getFieldIndex(field.field_id());
+    unsigned index = recTy.getFieldIndex(field.field_id());
+
     if (!fir::hasDynamicSize(recTy)) {
-      // Derived type has compile-time constant layout. Returns index of the
+      // Derived type has compile-time constant layout. Return index of the
       // component type in the parent type (to be used in GEP).
       rewriter.replaceOp(field, mlir::ValueRange{genConstantOffset(
                                     field.getLoc(), rewriter, index)});
-    } else {
-      // Call the compiler generated function to determine the byte offset of
-      // the field at runtime. This returns a non-constant.
-      auto symAttr = mlir::SymbolRefAttr::get(
-          field.getContext(), methodName(recTy, field.field_id()));
-      auto callAttr = rewriter.getNamedAttr("callee", symAttr);
-      auto fieldAttr = rewriter.getNamedAttr(
-          "field", mlir::IntegerAttr::get(lowerTy().indexType(), index));
-      rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(
-          field, lowerTy().offsetType(), operands,
-          llvm::ArrayRef<mlir::NamedAttribute>{callAttr, fieldAttr});
+      return success();
     }
+
+    // Derived type has compile-time constant layout. Call the compiler
+    // generated function to determine the byte offset of the field at runtime.
+    // This returns a non-constant.
+    FlatSymbolRefAttr symAttr = mlir::SymbolRefAttr::get(
+        field.getContext(), getOffsetMethodName(recTy, field.field_id()));
+    NamedAttribute callAttr = rewriter.getNamedAttr("callee", symAttr);
+    NamedAttribute fieldAttr = rewriter.getNamedAttr(
+        "field", mlir::IntegerAttr::get(lowerTy().indexType(), index));
+    rewriter.replaceOpWithNewOp<mlir::LLVM::CallOp>(
+        field, lowerTy().offsetType(), adaptor.getOperands(),
+        llvm::ArrayRef<mlir::NamedAttribute>{callAttr, fieldAttr});
     return success();
   }
 
-  // constructing the name of the method
-  inline static std::string methodName(fir::RecordType recTy,
-                                       llvm::StringRef field) {
+  // Re-Construct the name of the compiler generated method that calculates the
+  // offset
+  inline static std::string getOffsetMethodName(fir::RecordType recTy,
+                                                llvm::StringRef field) {
     return recTy.getName().str() + "P." + field.str() + ".offset";
   }
 };

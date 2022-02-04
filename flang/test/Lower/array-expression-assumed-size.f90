@@ -15,7 +15,7 @@ subroutine assumed_size_forall_test(b)
 end subroutine assumed_size_forall_test
 
 ! CHECK-LABEL: func @_QPassumed_size_test(
-! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_2:.*]] = fir.undefined index
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
@@ -75,7 +75,7 @@ end subroutine assumed_size_forall_test
 ! CHECK:       }
 
 ! CHECK-LABEL: func @_QPassumed_size_forall_test(
-! CHECK-SAME:       %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>) {
+! CHECK-SAME:       %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_2:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_3:.*]] = fir.undefined index
@@ -138,7 +138,7 @@ end subroutine assumed_size_forall_test
 ! CHECK:       }
 
 ! PostOpt-LABEL: func @_QPassumed_size_test(
-! PostOpt-SAME:                             %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>) {
+! PostOpt-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>{{.*}}) {
 ! PostOpt:         %[[VAL_1:.*]] = arith.constant 10 : index
 ! PostOpt:         %[[VAL_2:.*]] = arith.constant 1 : index
 ! PostOpt:         %[[VAL_3:.*]] = arith.constant 2 : index
@@ -216,7 +216,7 @@ end subroutine assumed_size_forall_test
 ! PostOpt:       }
 
 ! PostOpt-LABEL: func @_QPassumed_size_forall_test(
-! PostOpt-SAME:                                    %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>) {
+! PostOpt-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<10x?xi32>>{{.*}}) {
 ! PostOpt:         %[[VAL_1:.*]] = arith.constant 3 : index
 ! PostOpt:         %[[VAL_2:.*]] = arith.constant 10 : index
 ! PostOpt:         %[[VAL_3:.*]] = arith.constant 2 : index

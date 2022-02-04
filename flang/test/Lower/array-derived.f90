@@ -17,8 +17,7 @@ module cs
 contains
 
   ! CHECK: func @_QMcsPc1(
-  ! CHECK-SAME: %[[arg0:[^:]+]]: !fir.box<!fir.array<?x!fir.type<_QMcsTr{n:i32,d:i32}>>>,
-  ! CHECK-SAME: %[[arg1:[^:]+]]: !fir.box<!fir.array<?x!fir.type<_QMcsTr{n:i32,d:i32}>>>)
+  ! CHECK-SAME:   %[[arg0:[^:]+]]: !fir.box<!fir.array<?x!fir.type<_QMcsTr{n:i32,d:i32}>>>{{.*}}, %[[arg1:[^:]+]]: !fir.box<!fir.array<?x!fir.type<_QMcsTr{n:i32,d:i32}>>>{{.*}})
   function c1(e, c)
     type(r), intent(in) :: e(:), c(:)
     ! CHECK-DAG: fir.alloca !fir.logical<1> {bindc_name = "c1", uniq_name = "_QMcsFc1Ec1"}
@@ -35,8 +34,7 @@ contains
   end function c1
 
 ! CHECK-LABEL: func @_QMcsPtest2(
-! CHECK-SAME:                    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>,
-! CHECK-SAME:                    %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>{{.*}}) {
 ! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
 ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 4 : index
 ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 0 : index
@@ -79,8 +77,7 @@ contains
   end subroutine test2
 
 ! CHECK-LABEL: func @_QMcsPtest3(
-! CHECK-SAME:                    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>,
-! CHECK-SAME:                    %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>) {
+! CHECK-SAME:    %[[VAL_0:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>{{.*}}) {
 ! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
 ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 3 : index
 ! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 4 : i32

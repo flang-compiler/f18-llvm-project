@@ -61,6 +61,8 @@ private:
   void setPC(bool isImplicit);
 };
 
+/// Examine each subscript expression of \p x and return true if and only if any
+/// of the subscripts is a vector or has a rank greater than 0.
 bool isRankedArrayAccess(const Fortran::evaluate::ArrayRef &x);
 
 } // namespace Fortran::lower

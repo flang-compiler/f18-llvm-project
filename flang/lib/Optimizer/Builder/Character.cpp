@@ -459,9 +459,11 @@ fir::CharBoxValue fir::factory::CharacterExprHelper::createTempFrom(
 void fir::factory::CharacterExprHelper::createLengthOneAssign(
     const fir::CharBoxValue &lhs, const fir::CharBoxValue &rhs) {
   auto addr = lhs.getBuffer();
-  mlir::Value val = builder.create<fir::LoadOp>(loc, rhs.getBuffer());
-  auto addrTy = builder.getRefType(val.getType());
-  addr = builder.createConvert(loc, addrTy, addr);
+  auto toTy = fir::unwrapRefType(addr.getType());
+  mlir::Value val = rhs.getBuffer();
+  if (fir::isa_ref_type(val.getType()))
+    val = builder.create<fir::LoadOp>(loc, val);
+  val = builder.createConvert(loc, toTy, val);
   builder.create<fir::StoreOp>(loc, val, addr);
 }
 
@@ -748,4 +750,52 @@ mlir::Value fir::factory::CharacterExprHelper::getLength(mlir::Value memref) {
 
   // Length cannot be deduced from memref.
   return {};
+}
+
+std::pair<mlir::Value, mlir::Value>
+fir::factory::extractCharacterProcedureTuple(fir::FirOpBuilder &builder,
+                                             mlir::Location loc,
+                                             mlir::Value tuple) {
+  mlir::TupleType tupleType = tuple.getType().cast<mlir::TupleType>();
+  mlir::Value addr = builder.create<fir::ExtractValueOp>(
+      loc, tupleType.getType(0), tuple,
+      builder.getArrayAttr(
+          {builder.getIntegerAttr(builder.getIndexType(), 0)}));
+  mlir::Value len = builder.create<fir::ExtractValueOp>(
+      loc, tupleType.getType(1), tuple,
+      builder.getArrayAttr(
+          {builder.getIntegerAttr(builder.getIndexType(), 1)}));
+  return {addr, len};
+}
+
+mlir::Value fir::factory::createCharacterProcedureTuple(
+    fir::FirOpBuilder &builder, mlir::Location loc, mlir::Type argTy,
+    mlir::Value addr, mlir::Value len) {
+  mlir::TupleType tupleType = argTy.cast<mlir::TupleType>();
+  addr = builder.createConvert(loc, tupleType.getType(0), addr);
+  len = builder.createConvert(loc, tupleType.getType(1), len);
+  mlir::Value tuple = builder.create<fir::UndefOp>(loc, tupleType);
+  tuple = builder.create<fir::InsertValueOp>(
+      loc, tupleType, tuple, addr,
+      builder.getArrayAttr(
+          {builder.getIntegerAttr(builder.getIndexType(), 0)}));
+  tuple = builder.create<fir::InsertValueOp>(
+      loc, tupleType, tuple, len,
+      builder.getArrayAttr(
+          {builder.getIntegerAttr(builder.getIndexType(), 1)}));
+  return tuple;
+}
+
+bool fir::factory::isCharacterProcedureTuple(mlir::Type ty) {
+  mlir::TupleType tuple = ty.dyn_cast<mlir::TupleType>();
+  return tuple && tuple.size() == 2 &&
+         tuple.getType(0).isa<mlir::FunctionType>() &&
+         fir::isa_integer(tuple.getType(1));
+}
+
+mlir::Type
+fir::factory::getCharacterProcedureTupleType(mlir::Type funcPointerType) {
+  mlir::MLIRContext *context = funcPointerType.getContext();
+  mlir::Type lenType = mlir::IntegerType::get(context, 64);
+  return mlir::TupleType::get(context, {funcPointerType, lenType});
 }

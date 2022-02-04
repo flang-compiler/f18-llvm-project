@@ -28,7 +28,7 @@ module m_struct_ctor
   end type
 contains
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_simple(
-  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>)
+  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>{{.*}})
   subroutine test_simple(x)
     real :: x
     ! CHECK: %[[tmp:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_simple{x:f32}>
@@ -40,7 +40,7 @@ contains
   end subroutine
 
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_char_scalar(
-  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>)
+  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>{{.*}})
   subroutine test_char_scalar(x)
     ! CHECK: %[[tmp:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_char_scalar{x:f32,c:!fir.char<1,3>}>
     ! CHECK: %[[xfield:.*]] = fir.field_index x, !fir.type<_QMm_struct_ctorTt_char_scalar{x:f32,c:!fir.char<1,3>}>
@@ -59,7 +59,7 @@ contains
   end subroutine
 
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_simple_array(
-  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>, %[[j:.*]]: !fir.ref<!fir.array<5xi32>>)
+  ! CHECK-SAME: %[[x:.*]]: !fir.ref<f32>{{.*}}, %[[j:.*]]: !fir.ref<!fir.array<5xi32>>{{.*}})
   subroutine test_simple_array(x, j)
     real :: x
     integer :: j(5)
@@ -84,8 +84,7 @@ contains
   end subroutine
 
 ! CHECK-LABEL: func @_QMm_struct_ctorPtest_char_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<f32>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
   subroutine test_char_array(x, c1)
   ! CHECK: %[[VAL_3:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_char_array{x:f32,c:!fir.array<5x!fir.char<1,3>>}>
   ! CHECK: %[[VAL_4:.*]]:2 = fir.unboxchar %[[VAL_1]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
@@ -130,8 +129,7 @@ contains
   end subroutine
 
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_ptr(
-  ! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<f32>,
-  ! CHECK-SAME:    %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xi32>> {fir.target}) {
+  ! CHECK-SAME:    %[[VAL_0:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xi32>> {{{.*}}, fir.target}) {
   ! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
   ! CHECK:         %[[VAL_4:.*]] = fir.field_index x, !fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>
   ! CHECK:         %[[VAL_5:.*]] = fir.coordinate_of %[[VAL_3]], %[[VAL_4]] : (!fir.ref<!fir.type<_QMm_struct_ctorTt_ptr{x:f32,p:!fir.box<!fir.ptr<!fir.array<?x?xi32>>>}>>, !fir.field) -> !fir.ref<f32>
@@ -166,8 +164,7 @@ contains
   end subroutine
 
   ! CHECK-LABEL: func @_QMm_struct_ctorPtest_nested(
-  ! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<f32>,
-  ! CHECK-SAME: %[[VAL_1:.*]]: !fir.ref<!fir.type<_QMm_struct_ctorTt_array{x:f32,i:!fir.array<5xi32>}>>
+  ! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<f32>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.type<_QMm_struct_ctorTt_array{x:f32,i:!fir.array<5xi32>}>>
   subroutine test_nested(x, d)
     real :: x
     type(t_array) :: d

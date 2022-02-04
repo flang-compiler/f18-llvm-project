@@ -493,13 +493,18 @@ static bool mutuallyExclusiveSliceRange(ArrayLoadOp ld, ArrayMergeStoreOp st) {
   };
 
   for (std::remove_const_t<decltype(size)> i = 0; i < size; i += 3) {
+    // If both are loop invariant, skip to the next triple.
+    if (mlir::isa_and_nonnull<fir::UndefOp>(ldTriples[i + 1].getDefiningOp()) &&
+        mlir::isa_and_nonnull<fir::UndefOp>(stTriples[i + 1].getDefiningOp())) {
+      // Unless either is a vector index, then be conservative.
+      if (mlir::isa_and_nonnull<fir::UndefOp>(ldTriples[i].getDefiningOp()) ||
+          mlir::isa_and_nonnull<fir::UndefOp>(stTriples[i].getDefiningOp()))
+        return false;
+      continue;
+    }
     // If identical, skip to the next triple.
     if (ldTriples[i] == stTriples[i] && ldTriples[i + 1] == stTriples[i + 1] &&
         ldTriples[i + 2] == stTriples[i + 2])
-      continue;
-    // If both are loop invariant, skip to the next triple.
-    if (mlir::isa_and_nonnull<fir::UndefOp>(ldTriples[i + 1].getDefiningOp()) &&
-        mlir::isa_and_nonnull<fir::UndefOp>(stTriples[i + 1].getDefiningOp()))
       continue;
     // If ubound and lbound are the same with a constant offset, skip to the
     // next triple.
@@ -815,6 +820,9 @@ static mlir::Value getOrReadExtentsAndShapeOp(
     mlir::Location loc, mlir::PatternRewriter &rewriter, ArrayLoadOp arrLoad,
     llvm::SmallVectorImpl<mlir::Value> &result, bool &copyUsingSlice) {
   assert(result.empty());
+  if (arrLoad->hasAttr(fir::getOptionalAttrName()))
+    fir::emitFatalError(
+        loc, "shapes from array load of OPTIONAL arrays must not be used");
   if (auto boxTy = arrLoad.memref().getType().dyn_cast<BoxType>()) {
     auto rank =
         dyn_cast_ptrOrBoxEleTy(boxTy).cast<SequenceType>().getDimension();

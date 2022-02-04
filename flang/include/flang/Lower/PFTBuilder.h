@@ -138,6 +138,9 @@ using Directives =
                parser::OpenACCDeclarativeConstruct, parser::OpenMPConstruct,
                parser::OpenMPDeclarativeConstruct, parser::OmpEndLoopDirective>;
 
+using DeclConstructs = std::tuple<parser::OpenMPDeclarativeConstruct,
+                                  parser::OpenACCDeclarativeConstruct>;
+
 template <typename A>
 static constexpr bool isActionStmt{common::HasMember<A, ActionStmts>};
 
@@ -155,6 +158,9 @@ static constexpr bool isConstruct{common::HasMember<A, Constructs>};
 
 template <typename A>
 static constexpr bool isDirective{common::HasMember<A, Directives>};
+
+template <typename A>
+static constexpr bool isDeclConstruct{common::HasMember<A, DeclConstructs>};
 
 template <typename A>
 static constexpr bool isIntermediateConstructStmt{common::HasMember<
@@ -701,6 +707,7 @@ struct ModuleLikeUnit : public ProgramUnit {
   ModuleStatement beginStmt;
   ModuleStatement endStmt;
   std::list<FunctionLikeUnit> nestedFunctions;
+  EvaluationList evaluationList;
   std::vector<std::vector<Variable>> varList;
 };
 

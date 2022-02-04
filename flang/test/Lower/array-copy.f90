@@ -120,3 +120,25 @@ subroutine test8(a,b)
 
   a(:)(2:5) = b(:)(3:6)
 end subroutine test8
+
+! Do make a copy. Assume vector subscripts cause dependences.
+! CHECK-LABEL: func @_QPtest9(
+! CHECK-SAME: %[[a:[^:]+]]: !fir.ref<!fir.array<?x?xf32>>
+! CHECK: %[[und:.*]] = fir.undefined index
+! CHECK: %[[slice:.*]] = fir.slice %[[und]], %[[und]], %[[und]],
+! CHECK: %[[heap:.*]] = fir.allocmem !fir.array<?x?xf32>, %{{.*}}, %{{.*}}
+! CHECK: ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK:   ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK: ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK:   ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK: = fir.array_coor %[[a]](%{{.*}}) [%[[slice]]] %{{.*}}, %{{.*}} : (!fir.ref<!fir.array<?x?xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+! CHECK: = fir.array_coor %[[heap]](%{{.*}}) [%[[slice]]] %{{.*}}, %{{.*}} : (!fir.heap<!fir.array<?x?xf32>>, !fir.shape<2>, !fir.slice<2>, index, index) -> !fir.ref<f32>
+! CHECK: ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK:   ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK-NOT: ^bb{{[0-9]+}}(%{{.*}}: index, %{{.*}}: index):
+! CHECK: fir.freemem %[[heap]]
+subroutine test9(a,v1,v2,n)
+  real :: a(n,n)
+  integer :: v1(n), v2(n)
+  a(v1,:) = a(v2,:)
+end subroutine test9

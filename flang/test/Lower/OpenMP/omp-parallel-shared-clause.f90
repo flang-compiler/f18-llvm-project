@@ -7,7 +7,7 @@
 ! RUN:   tco --disable-llvm --print-ir-after=fir-to-llvm-ir 2>&1 | \
 ! RUN:   FileCheck %s --check-prefix=LLVMIRDialect
 
-!FIRDialect: func @_QPshared_clause(%[[ARG1:.*]]: !fir.ref<i32>, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>) {
+!FIRDialect: func @_QPshared_clause(%[[ARG1:.*]]: !fir.ref<i32>{{.*}}, %[[ARG2:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}) {
 !FIRDialect-DAG: %[[ALPHA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Ealpha"}
 !FIRDialect-DAG: %[[BETA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Ebeta"}
 !FIRDialect-DAG: %[[GAMA:.*]] = fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Egama"}
@@ -17,7 +17,7 @@
 !FIRDialect:    omp.terminator
 !FIRDialect:  }
 
-!LLVMDialect: llvm.func @_QPshared_clause(%[[ARG1:.*]]: !llvm.ptr<i32>, %[[ARG2:.*]]: !llvm.ptr<array<10 x i32>>) {
+!LLVMDialect: llvm.func @_QPshared_clause(%[[ARG1:.*]]: !llvm.ptr<i32>{{.*}}, %[[ARG2:.*]]: !llvm.ptr<array<10 x i32>>{{.*}}) {
 !LLVMIRDialect-DAG:  %[[ALPHA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Ealpha"} : (i64) -> !llvm.ptr<i32>
 !LLVMIRDialect-DAG:  %[[BETA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Ebeta"} : (i64) -> !llvm.ptr<i32>
 !LLVMIRDialect-DAG:  %[[GAMA:.*]] = llvm.alloca %{{.*}} x i32 {{{.*}}, uniq_name = "{{.*}}Egama"} : (i64) -> !llvm.ptr<i32>

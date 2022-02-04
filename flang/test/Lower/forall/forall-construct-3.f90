@@ -13,9 +13,7 @@ subroutine test3_forall_construct(a,b, mask)
 end subroutine test3_forall_construct
 
 ! CHECK-LABEL: func @_QPtest3_forall_construct(
-! CHECK-SAME:                                  %[[VAL_0:.*]]: !fir.ref<!fir.array<100x400xf32>>,
-! CHECK-SAME:                                  %[[VAL_1:.*]]: !fir.ref<!fir.array<200x200xf32>>,
-! CHECK-SAME:                                  %[[VAL_2:.*]]: !fir.ref<!fir.array<100x200x!fir.logical<4>>>) {
+! CHECK-SAME:        %[[VAL_0:.*]]: !fir.ref<!fir.array<100x400xf32>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<200x200xf32>>{{.*}}, %[[VAL_2:.*]]: !fir.ref<!fir.array<100x200x!fir.logical<4>>>{{.*}}) {
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
 ! CHECK:         %[[VAL_4:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_5:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "j"}
@@ -68,8 +66,8 @@ end subroutine test3_forall_construct
 ! CHECK:               %[[VAL_54:.*]] = fir.convert %[[VAL_53]] : (i64) -> index
 ! CHECK:               %[[VAL_55:.*]] = arith.subi %[[VAL_54]], %[[VAL_47]] : index
 ! CHECK:               %[[VAL_56:.*]] = arith.constant 1 : index
-! CHECK:               %[[VAL_57:.*]] = fir.load %[[VAL_6]] : !fir.ref<i32>
-! CHECK:               %[[VAL_58:.*]] = arith.constant 1 : i32
+! CHECK-DAG:           %[[VAL_57:.*]] = fir.load %[[VAL_6]] : !fir.ref<i32>
+! CHECK-DAG:           %[[VAL_58:.*]] = arith.constant 1 : i32
 ! CHECK:               %[[VAL_59:.*]] = arith.addi %[[VAL_57]], %[[VAL_58]] : i32
 ! CHECK:               %[[VAL_60:.*]] = fir.convert %[[VAL_59]] : (i32) -> i64
 ! CHECK:               %[[VAL_61:.*]] = fir.convert %[[VAL_60]] : (i64) -> index

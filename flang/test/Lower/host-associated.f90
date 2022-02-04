@@ -7,7 +7,7 @@
 
 !!! Test scalar (with implicit none)
 
-! CHECK: func @_QPtest1(
+! CHECK-LABEL: func @_QPtest1(
 subroutine test1
   implicit none
   integer i
@@ -19,7 +19,8 @@ subroutine test1
   call test1_internal
   print *, i
 contains
-  ! CHECK: func @_QFtest1Ptest1_internal(%[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<i32>>> {fir.host_assoc}) {
+  ! CHECK-LABEL: func @_QFtest1Ptest1_internal(
+  ! CHECK-SAME: %[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<i32>>> {fir.host_assoc}) {
   ! CHECK: %[[iaddr:.*]] = fir.coordinate_of %[[arg]], %c0
   ! CHECK: %[[i:.*]] = fir.load %[[iaddr]] : !fir.llvm_ptr<!fir.ref<i32>>
   ! CHECK: %[[val:.*]] = fir.call @_QPifoo() : () -> i32
@@ -32,7 +33,7 @@ end subroutine test1
 
 !!! Test scalar
 
-! CHECK: func @_QPtest2() {
+! CHECK-LABEL: func @_QPtest2() {
 subroutine test2
   a = 1.0
   b = 2.0
@@ -45,7 +46,8 @@ subroutine test2
   call test2_internal
   print *, a, b
 contains
-  ! CHECK: func @_QFtest2Ptest2_internal(%[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<f32>, !fir.ref<f32>>> {fir.host_assoc}) {
+  ! CHECK-LABEL: func @_QFtest2Ptest2_internal(
+  ! CHECK-SAME: %[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<f32>, !fir.ref<f32>>> {fir.host_assoc}) {
   subroutine test2_internal
     ! CHECK: %[[a:.*]] = fir.coordinate_of %[[arg]], %c0
     ! CHECK: %[[aa:.*]] = fir.load %[[a]] : !fir.llvm_ptr<!fir.ref<f32>>
@@ -59,7 +61,8 @@ contains
     call test2_inner
   end subroutine test2_internal
 
-  ! CHECK: func @_QFtest2Ptest2_inner(%[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<f32>, !fir.ref<f32>>> {fir.host_assoc}) {
+  ! CHECK-LABEL: func @_QFtest2Ptest2_inner(
+  ! CHECK-SAME: %[[arg:[^:]*]]: !fir.ref<tuple<!fir.ref<f32>, !fir.ref<f32>>> {fir.host_assoc}) {
   subroutine test2_inner
     ! CHECK: %[[a:.*]] = fir.coordinate_of %[[arg]], %c0
     ! CHECK: %[[aa:.*]] = fir.load %[[a]] : !fir.llvm_ptr<!fir.ref<f32>>
@@ -107,9 +110,7 @@ end subroutine test6
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest3(
-! CHECK-SAME: %[[p:[^:]+]]: !fir.box<!fir.array<?xf32>>,
-! CHECK-SAME: %[[q:.*]]: !fir.box<!fir.array<?xf32>>,
-! CHECK-SAME: %[[i:.*]]: !fir.ref<i64>
+! CHECK-SAME: %[[p:[^:]+]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[q:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[i:.*]]: !fir.ref<i64>
 subroutine test3(p,q,i)
   integer(8) :: i
   real :: p(i:)
@@ -160,7 +161,7 @@ contains
 end subroutine test3
 
 ! CHECK-LABEL: func @_QPtest3a(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.array<10xf32>>) {
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.array<10xf32>>{{.*}}) {
 subroutine test3a(p)
   real :: p(10)
   real :: q(10)
@@ -293,8 +294,7 @@ end subroutine test5
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest7(
-! CHECK-SAME: %[[j:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[k:.*]]: !fir.box<!fir.array<?xi32>>
+! CHECK-SAME: %[[j:.*]]: !fir.ref<i32>{{.*}}, %[[k:.*]]: !fir.box<!fir.array<?xi32>>
 subroutine test7(j, k)
   implicit none
   integer :: j
@@ -309,8 +309,7 @@ subroutine test7(j, k)
 contains
 
 ! CHECK-LABEL: func @_QFtest7Ptest7_inner(
-! CHECK-SAME: %[[i:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[tup:.*]]: !fir.ref<tuple<!fir.ref<i32>>> {fir.host_assoc}) -> i32 {
+! CHECK-SAME: %[[i:.*]]: !fir.ref<i32>{{.*}}, %[[tup:.*]]: !fir.ref<tuple<!fir.ref<i32>>> {fir.host_assoc}) -> i32 {
 elemental integer function test7_inner(i)
   implicit none
   integer, intent(in) :: i
@@ -405,7 +404,7 @@ end subroutine
 
 ! Test capture of namelist
 ! CHECK-LABEL: func @_QPtest10(
-! CHECK-SAME: %[[i:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>) {
+! CHECK-SAME: %[[i:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xi32>>>>{{.*}}) {
 subroutine test10(i)
  implicit none
  integer, pointer :: i(:)

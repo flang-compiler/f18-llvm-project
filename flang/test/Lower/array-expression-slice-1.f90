@@ -381,7 +381,7 @@ program p
 end program p
 
 ! CHECK-LABEL: func @_QPsub(
-! CHECK-SAME:               %[[VAL_0:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:               %[[VAL_0:.*]]: !fir.boxchar<1>{{.*}}) {
 ! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant 5 : index
 ! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
 ! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 1 : index

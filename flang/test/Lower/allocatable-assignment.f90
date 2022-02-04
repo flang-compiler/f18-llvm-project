@@ -12,7 +12,7 @@ contains
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_simple_scalar(
-! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>) {
+! CHECK-SAME: %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<f32>>>{{.*}}) {
 subroutine test_simple_scalar(x)
   real, allocatable  :: x
 ! CHECK:  %[[VAL_1:.*]] = arith.constant 4.200000e+01 : f32
@@ -86,7 +86,7 @@ end subroutine
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_deferred_char_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>{{.*}}) {
 subroutine test_deferred_char_scalar(x)
   character(:), allocatable  :: x
 ! CHECK:  %[[VAL_1:.*]] = fir.address_of(@_QQ{{.*}}) : !fir.ref<!fir.char<1,12>>
@@ -130,7 +130,7 @@ subroutine test_deferred_char_scalar(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_cst_char_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,10>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,10>>>>{{.*}}) {
 subroutine test_cst_char_scalar(x)
   character(10), allocatable  :: x
 ! CHECK:  %[[VAL_1:.*]] = arith.constant 10 : index
@@ -172,8 +172,8 @@ subroutine test_cst_char_scalar(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_dyn_char_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine test_dyn_char_scalar(x, n)
   integer :: n
   character(n), allocatable  :: x
@@ -219,8 +219,8 @@ subroutine test_dyn_char_scalar(x, n)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_derived_scalar(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.type<_QMalloc_assignTt{i:i32}>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.type<_QMalloc_assignTt{i:i32}>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.type<_QMalloc_assignTt{i:i32}>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.type<_QMalloc_assignTt{i:i32}>>{{.*}}) {
 subroutine test_derived_scalar(x, s)
   type(t), allocatable  :: x
   type(t) :: s
@@ -263,8 +263,8 @@ end subroutine
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_from_cst_shape_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.array<2x3xf32>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<!fir.array<2x3xf32>>{{.*}}) {
 subroutine test_from_cst_shape_array(x, y)
   real, allocatable  :: x(:, :)
   real :: y(2, 3)
@@ -315,8 +315,8 @@ subroutine test_from_cst_shape_array(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_from_dyn_shape_array(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}) {
 subroutine test_from_dyn_shape_array(x, y)
   real, allocatable  :: x(:, :)
   real :: y(:, :)
@@ -369,8 +369,8 @@ subroutine test_from_dyn_shape_array(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_with_lbounds(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}) {
 subroutine test_with_lbounds(x, y)
   real, allocatable  :: x(:, :)
   real :: y(10:, 20:)
@@ -427,7 +427,7 @@ subroutine test_with_lbounds(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_runtime_shape(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x?xf32>>>>{{.*}}) {
 subroutine test_runtime_shape(x)
   real, allocatable  :: x(:, :)
   interface
@@ -509,7 +509,9 @@ subroutine test_scalar_rhs(x, y)
   ! CHECK:   fir.if %false -> {{.*}} {
   ! CHECK:   }
   ! CHECK: } else {
-  ! TODO: runtime error if unallocated
+  ! CHECK: %[[error_msg_addr:.*]] = fir.address_of(@[[error_message:.*]]) : !fir.ref<!fir.char<1,76>>
+  ! CHECK: %[[msg_addr_cast:.*]] = fir.convert %[[error_msg_addr]] : (!fir.ref<!fir.char<1,76>>) -> !fir.ref<i8>
+  ! CHECK: %15 = fir.call @_FortranAReportFatalUserError(%[[msg_addr_cast]], %{{.*}}, %{{.*}}) : (!fir.ref<i8>, !fir.ref<i8>, i32) -> none
   ! CHECK-NOT: allocmem
   ! CHECK: }
   x = y
@@ -561,8 +563,8 @@ end subroutine
 !end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_cst_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,10>>>>>{{.*}},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine test_cst_char(x, c)
   character(10), allocatable  :: x(:)
   character(12) :: c(20)
@@ -609,9 +611,7 @@ subroutine test_cst_char(x, c)
 end subroutine
 
 ! CHECK-LABEL: func @_QMalloc_assignPtest_dyn_char(
-! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>,
-! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i32>,
-! CHECK-SAME:  %[[VAL_2:.*]]: !fir.boxchar<1>) {
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_2:.*]]: !fir.boxchar<1>{{.*}}) {
 subroutine test_dyn_char(x, n, c)
   integer :: n
   character(n), allocatable  :: x(:)
@@ -663,6 +663,11 @@ subroutine test_dyn_char(x, n, c)
 ! CHECK:  }
   x = c
 end subroutine
+
+! CHECK: fir.global linkonce @[[error_message]] constant : !fir.char<1,76> {
+! CHECK:   %[[msg:.*]] = fir.string_lit "array left hand side must be allocated when the right hand side is a scalar\00"(76) : !fir.char<1,76>
+! CHECK:   fir.has_value %[[msg:.*]] : !fir.char<1,76>
+! CHECK: }
 
 end module
 

@@ -11,7 +11,7 @@ subroutine forall_with_allocatable(a1)
 end subroutine forall_with_allocatable
 
 ! CHECK-LABEL: func @_QPforall_with_allocatable(
-! CHECK-SAME:                                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>) {
+! CHECK-SAME:                                   %[[VAL_0:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}) {
 ! CHECK:         %[[VAL_1:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xf32>>> {bindc_name = "arr", uniq_name = "_QFforall_with_allocatableEarr"}
 ! CHECK:         %[[VAL_3:.*]] = fir.alloca !fir.heap<!fir.array<?xf32>> {uniq_name = "_QFforall_with_allocatableEarr.addr"}

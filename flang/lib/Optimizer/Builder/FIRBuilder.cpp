@@ -265,7 +265,7 @@ fir::GlobalOp fir::FirOpBuilder::createGlobal(
 mlir::Value
 fir::FirOpBuilder::convertWithSemantics(mlir::Location loc, mlir::Type toTy,
                                         mlir::Value val,
-                                        bool allowConversionsWithCharacters) {
+                                        bool allowCharacterConversion) {
   assert(toTy && "store location must be typed");
   auto fromTy = val.getType();
   if (fromTy == toTy)
@@ -287,7 +287,7 @@ fir::FirOpBuilder::convertWithSemantics(mlir::Location loc, mlir::Type toTy,
     auto rp = helper.extractComplexPart(val, /*isImagPart=*/false);
     return createConvert(loc, toTy, rp);
   }
-  if (allowConversionsWithCharacters) {
+  if (allowCharacterConversion) {
     if (fromTy.isa<fir::BoxCharType>()) {
       // Extract the address of the character string and pass it
       fir::factory::CharacterExprHelper charHelper{*this, loc};
@@ -302,10 +302,18 @@ fir::FirOpBuilder::convertWithSemantics(mlir::Location loc, mlir::Type toTy,
       // argument in characters and use it as the length of the string
       auto refType = getRefType(boxType.getEleTy());
       mlir::Value charBase = createConvert(loc, refType, val);
-      mlir::Value unknownLen = this->create<fir::UndefOp>(loc, getIndexType());
+      mlir::Value unknownLen = create<fir::UndefOp>(loc, getIndexType());
       fir::factory::CharacterExprHelper charHelper{*this, loc};
       return charHelper.createEmboxChar(charBase, unknownLen);
     }
+  }
+  if (fir::isa_ref_type(toTy) && fir::isa_box_type(fromTy)) {
+    // Call is expecting a raw data pointer, not a box. Get the data pointer out
+    // of the box and pass that.
+    assert((fir::unwrapRefType(toTy) ==
+                fir::unwrapRefType(fir::unwrapPassByRefType(fromTy)) &&
+            "element types expected to match"));
+    return create<fir::BoxAddrOp>(loc, toTy, val);
   }
 
   return createConvert(loc, toTy, val);
@@ -1100,4 +1108,23 @@ mlir::Value fir::factory::genLenOfCharacter(
     return typeParams.front();
   }
   TODO(loc, "LEN of character must be computed at runtime");
+}
+
+mlir::Value fir::factory::createZeroValue(fir::FirOpBuilder &builder,
+                                          mlir::Location loc, mlir::Type type) {
+  mlir::Type i1 = builder.getIntegerType(1);
+  if (type.isa<fir::LogicalType>() || type == i1)
+    return builder.createConvert(loc, type, builder.createBool(loc, false));
+  if (fir::isa_integer(type))
+    return builder.createIntegerConstant(loc, type, 0);
+  if (fir::isa_real(type))
+    return builder.createRealZeroConstant(loc, type);
+  if (fir::isa_complex(type)) {
+    fir::factory::Complex complexHelper(builder, loc);
+    mlir::Type partType = complexHelper.getComplexPartType(type);
+    mlir::Value zeroPart = builder.createRealZeroConstant(loc, partType);
+    return complexHelper.createComplex(type, zeroPart, zeroPart);
+  }
+  fir::emitFatalError(loc, "internal: trying to generate zero value of non "
+                           "numeric or logical type");
 }

@@ -2,8 +2,7 @@
 ! RUN: bbc %s -o - -I nowhere | FileCheck %s
 
 ! CHECK-LABEL: func @_QPsimple(
-! CHECK-SAME: %[[VAL_20:.*]]: !fir.ref<!fir.array<10xi32>>,
-! CHECK-SAME: %[[VAL_16:.*]]: !fir.ref<!fir.array<3xi32>>)
+! CHECK-SAME: %[[VAL_20:.*]]: !fir.ref<!fir.array<10xi32>>{{.*}}, %[[VAL_16:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}) {
 subroutine simple(x, y)
   integer :: y(3)
   integer :: x(10)
@@ -39,7 +38,7 @@ subroutine simple(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPonly_once(
-! CHECK-SAME: %[[VAL_51:.*]]: !fir.box<!fir.array<?x?xf32>>)
+! CHECK-SAME: %[[VAL_51:.*]]: !fir.box<!fir.array<?x?xf32>>{{.*}}) {
 subroutine only_once(x)
   interface
     function get_vector()
@@ -97,8 +96,7 @@ subroutine only_once(x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPwith_assumed_shapes(
-! CHECK-SAME: %[[VAL_78:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME: %[[VAL_69:.*]]: !fir.box<!fir.array<?xi32>>) {
+! CHECK-SAME: %[[VAL_78:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_69:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine with_assumed_shapes(x, y)
   integer :: y(:)
   integer :: x(:)
@@ -132,8 +130,7 @@ subroutine with_assumed_shapes(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPlower_bounds(
-! CHECK-SAME: %[[VAL_108:.*]]: !fir.ref<!fir.array<4x6xi32>>,
-! CHECK-SAME: %[[VAL_104:.*]]: !fir.ref<!fir.array<3xi32>>) {
+! CHECK-SAME: %[[VAL_108:.*]]: !fir.ref<!fir.array<4x6xi32>>{{.*}}, %[[VAL_104:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}) {
 subroutine lower_bounds(x, y)
   integer :: y(3)
   integer :: x(2:5,3:8)
@@ -173,9 +170,7 @@ subroutine lower_bounds(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtwo_vectors(
-! CHECK-SAME: %[[VAL_140:.*]]: !fir.ref<!fir.array<4x4xf32>>,
-! CHECK-SAME: %[[VAL_132:.*]]: !fir.ref<!fir.array<3xi32>>,
-! CHECK-SAME: %[[VAL_136:.*]]: !fir.ref<!fir.array<3xi32>>) {
+! CHECK-SAME: %[[VAL_140:.*]]: !fir.ref<!fir.array<4x4xf32>>{{.*}}, %[[VAL_132:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}, %[[VAL_136:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}) {
 subroutine two_vectors(x, y1, y2)
   integer :: y1(3), y2(3)
   real :: x(4, 4)
@@ -219,8 +214,7 @@ subroutine two_vectors(x, y1, y2)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtriplets_and_vector(
-! CHECK-SAME: %[[VAL_170:.*]]: !fir.ref<!fir.array<4x4x!fir.complex<4>>>,
-! CHECK-SAME: %[[VAL_166:.*]]: !fir.ref<!fir.array<3xi32>>) {
+! CHECK-SAME:    %[[VAL_170:.*]]: !fir.ref<!fir.array<4x4x!fir.complex<4>>>{{.*}}, %[[VAL_166:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}) {
 subroutine triplets_and_vector(x, y)
   integer :: y(3)
   complex :: x(4, 4)
@@ -263,8 +257,7 @@ subroutine triplets_and_vector(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPsimple_char(
-! CHECK-SAME: %[[VAL_185:.*]]: !fir.boxchar<1>,
-! CHECK-SAME: %[[VAL_196:.*]]: !fir.ref<!fir.array<3xi32>>) {
+! CHECK-SAME: %[[VAL_185:.*]]: !fir.boxchar<1>{{.*}}, %[[VAL_196:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}) {
 subroutine simple_char(x, y)
   integer :: y(3)
   character(*) :: x(3:8)
@@ -302,10 +295,7 @@ subroutine simple_char(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPsubstring(
-! CHECK-SAME: %[[VAL_229:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>,
-! CHECK-SAME: %[[VAL_225:.*]]: !fir.ref<!fir.array<3xi32>>,
-! CHECK-SAME: %[[VAL_215:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[VAL_218:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_229:.*]]: !fir.box<!fir.array<?x!fir.char<1,?>>>{{.*}}, %[[VAL_225:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}, %[[VAL_215:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_218:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine substring(x, y, i, j)
   integer :: y(3), i, j
   character(*) :: x(:)
@@ -351,8 +341,7 @@ subroutine substring(x, y, i, j)
 end subroutine
 
 ! CHECK-LABEL: func @_QPcomplex_part(
-! CHECK-SAME: %[[VAL_262:.*]]: !fir.box<!fir.array<?x!fir.complex<4>>>,
-! CHECK-SAME: %[[VAL_253:.*]]: !fir.box<!fir.array<?xi32>>) {
+! CHECK-SAME: %[[VAL_262:.*]]: !fir.box<!fir.array<?x!fir.complex<4>>>{{.*}}, %[[VAL_253:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine complex_part(z, y)
   integer :: y(:)
   complex :: z(:)
@@ -395,8 +384,7 @@ module derived_types
 end module
 
 ! CHECK-LABEL: func @_QPsimple_derived(
-! CHECK-SAME: %[[VAL_287:.*]]: !fir.ref<!fir.array<6x!fir.type<_QMderived_typesTt{i:i32,c:!fir.char<1,2>}>>>,
-! CHECK-SAME: %[[VAL_283:.*]]: !fir.ref<!fir.array<4xi32>>) {
+! CHECK-SAME: %[[VAL_287:.*]]: !fir.ref<!fir.array<6x!fir.type<_QMderived_typesTt{i:i32,c:!fir.char<1,2>}>>>{{.*}}, %[[VAL_283:.*]]: !fir.ref<!fir.array<4xi32>>{{.*}}) {
 subroutine simple_derived(x, y)
   use derived_types
   integer :: y(4)
@@ -434,8 +422,7 @@ subroutine simple_derived(x, y)
 end subroutine
 
 ! CHECK-LABEL: func @_QPwith_path(
-! CHECK-SAME: [[VAL_326:.*]]: !fir.box<!fir.array<?x?x?x!fir.type<_QMderived_typesTt2{a:!fir.array<5x5x!fir.type<_QMderived_typesTt{i:i32,c:!fir.char<1,2>}>>}>>>,
-! CHECK-SAME: [[VAL_310:.*]]: !fir.box<!fir.array<?xi32>>) {
+! CHECK-SAME: [[VAL_326:.*]]: !fir.box<!fir.array<?x?x?x!fir.type<_QMderived_typesTt2{a:!fir.array<5x5x!fir.type<_QMderived_typesTt{i:i32,c:!fir.char<1,2>}>>}>>>{{.*}}, [[VAL_310:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}) {
 subroutine with_path(b, i)
   use derived_types
   type(t2) :: b(4:, 4:, 4:)
@@ -488,10 +475,7 @@ subroutine with_path(b, i)
 end subroutine
 
 ! CHECK-LABEL: func @_QPsimple_iostat(
-! CHECK-SAME: %[[VAL_357:.*]]: !fir.box<!fir.array<?xf32>>,
-! CHECK-SAME: %[[VAL_346:.*]]: !fir.box<!fir.array<?xi32>>,
-! CHECK-SAME: %[[VAL_361:.*]]: !fir.ref<i32>,
-! CHECK-SAME: %[[VAL_364:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_357:.*]]: !fir.box<!fir.array<?xf32>>{{.*}}, %[[VAL_346:.*]]: !fir.box<!fir.array<?xi32>>{{.*}}, %[[VAL_361:.*]]: !fir.ref<i32>{{.*}}, %[[VAL_364:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine simple_iostat(x, y, j, stat)
   integer :: j, y(:), stat
   real :: x(:)
@@ -535,9 +519,7 @@ subroutine simple_iostat(x, y, j, stat)
 end subroutine
 
 ! CHECK-LABEL: func @_QPiostat_in_io_loop(
-! CHECK-SAME: %[[VAL_400:.*]]: !fir.ref<!fir.array<3x5xi32>>,
-! CHECK-SAME: %[[VAL_396:.*]]: !fir.ref<!fir.array<3xi32>>,
-! CHECK-SAME: %[[VAL_408:.*]]: !fir.ref<i32>) {
+! CHECK-SAME: %[[VAL_400:.*]]: !fir.ref<!fir.array<3x5xi32>>{{.*}}, %[[VAL_396:.*]]: !fir.ref<!fir.array<3xi32>>{{.*}}, %[[VAL_408:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine iostat_in_io_loop(k, j, stat)
   integer :: k(3, 5)
   integer :: j(3)

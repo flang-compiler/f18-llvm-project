@@ -1,8 +1,7 @@
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 
 ! CHECK-LABEL: associated_test
-! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>,
-! CHECK-SAME: %[[arg1:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[arg0:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}}, %[[arg1:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine associated_test(scalar, array)
   real, pointer :: scalar, array(:)
   real, target :: ziel

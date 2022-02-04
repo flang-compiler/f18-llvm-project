@@ -6,8 +6,8 @@
 //
 //===----------------------------------------------------------------------===//
 
-// This file defines some shared command-line options that can be used when
-// debugging the test tools. This file must be included into the tool.
+/// This file defines some shared command-line options that can be used when
+/// debugging the test tools. This file must be included into the tool.
 
 #include "mlir/Conversion/SCFToStandard/SCFToStandard.h"
 #include "mlir/Pass/PassManager.h"
@@ -38,14 +38,14 @@ static llvm::cl::opt<std::size_t> arrayStackAllocationThreshold(
     llvm::cl::init(~static_cast<std::size_t>(0)), llvm::cl::Hidden);
 
 namespace {
-// Optimizer Passes
+/// Optimizer Passes
 DisableOption(FirCse, "fir-cse", "CSE for FIR dialect");
 DisableOption(CfgConversion, "cfg-conversion", "disable FIR to CFG pass");
 DisableOption(FirAvc, "avc", "array value copy analysis and transformation");
 DisableOption(
     FirMao, "memory-allocation-opt", "memory allocation optimization");
 
-// CodeGen Passes
+/// CodeGen Passes
 #if !defined(FLANG_EXCLUDE_CODEGEN)
 DisableOption(CodeGenRewrite, "codegen-rewrite", "rewrite FIR for codegen");
 DisableOption(TargetRewrite, "target-rewrite", "rewrite FIR for target");
@@ -53,7 +53,7 @@ DisableOption(FirToLlvmIr, "fir-to-llvmir", "FIR to LLVM-IR dialect");
 DisableOption(LlvmIrToLlvm, "llvm", "conversion to LLVM");
 #endif
 
-// Generic for adding a pass to the pass manager if it is not disabled.
+/// Generic for adding a pass to the pass manager if it is not disabled.
 template <typename F>
 void addPassConditionally(
     mlir::PassManager &pm, llvm::cl::opt<bool> &disabled, F ctor) {

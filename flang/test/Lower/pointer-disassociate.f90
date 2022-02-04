@@ -8,7 +8,7 @@
 
 
 ! CHECK-LABEL: func @_QPtest_scalar(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{.*}})
 subroutine test_scalar(p)
   real, pointer :: p
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<f32>
@@ -18,7 +18,7 @@ subroutine test_scalar(p)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_scalar_char(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>{{.*}})
 subroutine test_scalar_char(p)
   character(:), pointer :: p
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<!fir.char<1,?>>
@@ -28,7 +28,7 @@ subroutine test_scalar_char(p)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine test_array(p)
   real, pointer :: p(:)
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<!fir.array<?xf32>>
@@ -40,7 +40,7 @@ end subroutine
 
 ! Test p(lb, ub) => NULL() which is none sens but is not illegal.
 ! CHECK-LABEL: func @_QPtest_array_remap(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>)
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{.*}})
 subroutine test_array_remap(p)
   real, pointer :: p(:)
   ! CHECK: %[[null:.*]] = fir.zero_bits !fir.ptr<!fir.array<?xf32>>
@@ -55,7 +55,7 @@ end subroutine
 ! -----------------------------------------------------------------------------
 
 ! CHECK-LABEL: func @_QPtest_scalar_mold(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>,
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<f32>>>{{[^,]*}},
 subroutine test_scalar_mold(p, x)
   real, pointer :: p, x
   ! CHECK: %[[VAL_0:.*]] = fir.alloca !fir.box<!fir.ptr<f32>>
@@ -70,7 +70,7 @@ subroutine test_scalar_mold(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_scalar_char_mold(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>,
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.char<1,?>>>>{{[^,]*}},
 subroutine test_scalar_char_mold(p, x)
   character(:), pointer :: p, x
   ! CHECK: %[[VAL_7:.*]] = fir.alloca !fir.box<!fir.ptr<!fir.char<1,?>>>
@@ -87,7 +87,7 @@ subroutine test_scalar_char_mold(p, x)
 end subroutine
 
 ! CHECK-LABEL: func @_QPtest_array_mold(
-! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>,
+! CHECK-SAME: %[[p:.*]]: !fir.ref<!fir.box<!fir.ptr<!fir.array<?xf32>>>>{{[^,]*}},
 subroutine test_array_mold(p, x)
   real, pointer :: p(:), x(:)
   ! CHECK: %[[VAL_0:.*]] = fir.alloca !fir.box<!fir.ptr<!fir.array<?xf32>>>

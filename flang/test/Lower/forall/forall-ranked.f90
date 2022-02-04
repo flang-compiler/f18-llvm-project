@@ -34,8 +34,8 @@
 ! CHECK:           %[[VAL_30:.*]] = arith.cmpi sgt, %[[VAL_29]], %[[VAL_26]] : index
 ! CHECK:           %[[VAL_31:.*]] = select %[[VAL_30]], %[[VAL_29]], %[[VAL_26]] : index
 ! CHECK:           %[[VAL_32:.*]] = fir.field_index arr, !fir.type<_QFtest_forall_with_ranked_dimensionTt{arr:!fir.array<11xi32>}>
-! CHECK:           %[[VAL_33:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! CHECK:           %[[VAL_34:.*]] = arith.constant 4 : i32
+! CHECK-DAG:       %[[VAL_33:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
+! CHECK-DAG:       %[[VAL_34:.*]] = arith.constant 4 : i32
 ! CHECK:           %[[VAL_35:.*]] = arith.addi %[[VAL_33]], %[[VAL_34]] : i32
 ! CHECK:           %[[VAL_36:.*]] = fir.convert %[[VAL_35]] : (i32) -> i64
 ! CHECK:           %[[VAL_37:.*]] = fir.convert %[[VAL_36]] : (i64) -> index

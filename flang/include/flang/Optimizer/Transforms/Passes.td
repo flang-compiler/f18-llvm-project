@@ -55,11 +55,36 @@ def AffineDialectDemotion : FunctionPass<"demote-affine"> {
   ];
 }
 
+def AnnotateConstantOperands : Pass<"annotate-constant"> {
+  let summary = "Annotate constant operands to all FIR operations";
+  let description = [{
+    The MLIR canonicalizer makes a distinction between constants based on how
+    they are packaged in the IR. A constant value is wrapped in an Attr and that
+    Attr can be attached to an Op. There is a distinguished Op, ConstantOp, that
+    merely has one of these Attr attached.
+
+    The MLIR canonicalizer treats constants referenced by an Op and constants
+    referenced through a ConstantOp as having distinct semantics. This pass
+    eliminates that distinction, so hashconsing of Ops, basic blocks, etc.
+    behaves as one would expect.
+  }];
+  let constructor = "::fir::createAnnotateConstantOperandsPass()";
+  let dependentDialects = [
+    "fir::FIROpsDialect", "mlir::StandardOpsDialect"
+  ];
+}
+
 def FirLoopResultOpt : FunctionPass<"fir-loop-result-opt"> {
   let summary =
     "Optimizes `fir.do_loop` by removing unused final iteration values.";
   let description = [{
     TODO - do we need this if we overhaul fir.do_loop a bit?
+
+    It's not fir.do_loop's job to figure out if the iteration variable is
+    live-out of the loop to the rest of the function.
+
+    That said, doing live-out analysis, removing dead stores, etc. can be done
+    more generally and does not need to be a separate pass.
   }];
   let constructor = "::fir::createFirLoopResultOptPass()";
   let dependentDialects = [

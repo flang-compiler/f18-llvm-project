@@ -107,7 +107,10 @@ public:
     Value,
     /// ValueAttribute means dummy has the the Fortran VALUE attribute.
     BaseAddressValueAttribute,
-    CharBoxValueAttribute // BoxChar with VALUE
+    CharBoxValueAttribute, // BoxChar with VALUE
+    // Passing a character procedure as a <procedure address, result length>
+    // tuple.
+    CharProcTuple
   };
   /// Different properties of an entity that can be passed/returned.
   /// One-to-One mapping with PassEntityBy but for
@@ -117,6 +120,7 @@ public:
     BoxChar,
     CharAddress,
     CharLength,
+    CharProcTuple,
     Box,
     MutableBox,
     Value
@@ -391,9 +395,19 @@ getOrDeclareFunction(llvm::StringRef name,
                      const Fortran::evaluate::ProcedureDesignator &,
                      Fortran::lower::AbstractConverter &);
 
-/// Return the type of an argument that is a dummy procedure.
+/// Return the type of an argument that is a dummy procedure. This may be an
+/// mlir::FunctionType, but it can also be a more elaborate type based on the
+/// function type (like a tuple<function type, length type> for character
+/// functions).
 mlir::Type getDummyProcedureType(const Fortran::semantics::Symbol &dummyProc,
                                  Fortran::lower::AbstractConverter &);
+
+/// Is it required to pass \p proc as a tuple<function address, result length> ?
+// This is required to convey  the length of character functions passed as dummy
+// procedures.
+bool mustPassLengthWithDummyProcedure(
+    const Fortran::evaluate::ProcedureDesignator &proc,
+    Fortran::lower::AbstractConverter &);
 
 } // namespace Fortran::lower
 

@@ -137,7 +137,7 @@ void createEmptyRegionBlocks(
         // }
       }
     }
-    if (eval.hasNestedEvaluations())
+    if (!eval.isDirective() && eval.hasNestedEvaluations())
       createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
   }
 }
@@ -161,11 +161,12 @@ static mlir::Type getLoopVarType(Fortran::lower::AbstractConverter &converter,
 }
 
 template <typename Op>
-static void createBodyOfOp(
-    Op &op, Fortran::lower::AbstractConverter &converter, mlir::Location &loc,
-    Fortran::lower::pft::Evaluation &eval,
-    const Fortran::parser::OmpClauseList *clauses = nullptr,
-    const SmallVector<const Fortran::semantics::Symbol *> &args = {}) {
+static void
+createBodyOfOp(Op &op, Fortran::lower::AbstractConverter &converter,
+               mlir::Location &loc, Fortran::lower::pft::Evaluation &eval,
+               const Fortran::parser::OmpClauseList *clauses = nullptr,
+               const SmallVector<const Fortran::semantics::Symbol *> &args = {},
+               bool outerCombined = false) {
   fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
   // If an argument for the region is provided then create the block with that
   // argument. Also update the symbol's address with the mlir argument value.
@@ -205,21 +206,28 @@ static void createBodyOfOp(
   // the end of the block works for both.
   mlir::Block &block = op.getRegion().back();
   firOpBuilder.setInsertionPointToEnd(&block);
-  if (eval.lowerAsUnstructured())
+
+  // If it is an unstructured region and is not the outer region of a combined
+  // construct, create empty blocks for all evaluations.
+  if (eval.lowerAsUnstructured() && !outerCombined)
     createEmptyRegionBlocks(firOpBuilder, eval.getNestedEvaluations());
-  // Ensure the block is well-formed by inserting terminators.
+
+  // Insert the terminator.
   if constexpr (std::is_same_v<Op, omp::WsLoopOp>) {
     mlir::ValueRange results;
     firOpBuilder.create<mlir::omp::YieldOp>(loc, results);
   } else {
     firOpBuilder.create<mlir::omp::TerminatorOp>(loc);
   }
+
   // Reset the insert point to before the terminator.
   if (storeOp)
     firOpBuilder.setInsertionPointAfter(storeOp);
   else
     firOpBuilder.setInsertionPointToStart(&block);
-  if (clauses)
+
+  // Handle privatization. Do not privatize if this is the outer operation.
+  if (clauses && !outerCombined)
     privatizeVars(converter, *clauses);
 }
 
@@ -403,11 +411,8 @@ static void createParallelOp(Fortran::lower::AbstractConverter &converter,
     }
   }
 
-  // Avoid multiple privatization: If Parallel is part of a combined construct
-  // then privatization will be performed later when the other part of the
-  // combined construct is processed.
   createBodyOfOp<omp::ParallelOp>(parallelOp, converter, currentLocation, eval,
-                                  isCombined ? nullptr : &opClauseList);
+                                  &opClauseList, {}, isCombined);
 }
 
 static void

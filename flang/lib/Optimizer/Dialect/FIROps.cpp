@@ -806,9 +806,10 @@ static mlir::LogicalResult verify(fir::ConstcOp &op) {
 
 void fir::ConvertOp::getCanonicalizationPatterns(
     OwningRewritePatternList &results, MLIRContext *context) {
-  results.insert<ConvertConvertOptPattern, RedundantConvertOptPattern,
-                 CombineConvertOptPattern, ForwardConstantConvertPattern>(
-      context);
+  results.insert<ConvertConvertOptPattern, ConvertAscendingIndexOptPattern,
+                 ConvertDescendingIndexOptPattern, RedundantConvertOptPattern,
+                 CombineConvertOptPattern, CombineConvertTruncOptPattern,
+                 ForwardConstantConvertPattern>(context);
 }
 
 mlir::OpFoldResult fir::ConvertOp::fold(llvm::ArrayRef<mlir::Attribute> opnds) {

@@ -18,7 +18,7 @@ subroutine test_forall_with_array_assignment(aa,bb)
 end subroutine test_forall_with_array_assignment
 
 ! CHECK-LABEL: func @_QPtest_forall_with_array_assignment(
-! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>) {
+! CHECK-SAME:     %[[VAL_0:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>{{.*}}, %[[VAL_1:.*]]: !fir.ref<!fir.array<10x!fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>>>{{.*}}) {
 ! CHECK:         %[[VAL_2:.*]] = fir.alloca i32 {adapt.valuebyref, bindc_name = "i"}
 ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : index
@@ -44,8 +44,8 @@ end subroutine test_forall_with_array_assignment
 ! CHECK:           %[[VAL_25:.*]] = arith.constant 64 : i64
 ! CHECK:           %[[VAL_26:.*]] = fir.convert %[[VAL_25]] : (i64) -> index
 ! CHECK:           %[[VAL_27:.*]] = arith.constant 1 : index
-! CHECK:           %[[VAL_28:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
-! CHECK:           %[[VAL_29:.*]] = arith.constant 1 : i32
+! CHECK-DAG:       %[[VAL_28:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
+! CHECK-DAG:       %[[VAL_29:.*]] = arith.constant 1 : i32
 ! CHECK:           %[[VAL_30:.*]] = arith.addi %[[VAL_28]], %[[VAL_29]] : i32
 ! CHECK:           %[[VAL_31:.*]] = fir.convert %[[VAL_30]] : (i32) -> i64
 ! CHECK:           %[[VAL_32:.*]] = fir.convert %[[VAL_31]] : (i64) -> index

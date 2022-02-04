@@ -4,7 +4,7 @@
 ! RUN: bbc -emit-fir -o - %s | FileCheck %s
 
 ! CHECK-LABEL: func @_QPtest_temp_io_options(
-! CHECK-SAME:   %[[VAL_0:.*]]: !fir.ref<i32>) {
+! CHECK-SAME:   %[[VAL_0:.*]]: !fir.ref<i32>{{.*}}) {
 subroutine test_temp_io_options(status)
   interface
     function gen_temp_character()

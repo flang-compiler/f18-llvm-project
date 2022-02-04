@@ -12,7 +12,9 @@
 #include "flang/Lower/Mangler.h"
 #include "flang/Lower/PFTBuilder.h"
 #include "flang/Lower/StatementContext.h"
+#include "flang/Lower/Support/Utils.h"
 #include "flang/Lower/Todo.h"
+#include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROpsSupport.h"
@@ -32,9 +34,9 @@ static std::string getMangledName(const Fortran::semantics::Symbol &symbol) {
 
 /// Return the type of a dummy procedure given its characteristic (if it has
 /// one).
-mlir::Type
-getDummyProcedureTypeImpl(const Fortran::evaluate::characteristics::Procedure *,
-                          Fortran::lower::AbstractConverter &converter) {
+mlir::Type getProcedureDesignatorType(
+    const Fortran::evaluate::characteristics::Procedure *,
+    Fortran::lower::AbstractConverter &converter) {
   // TODO: Get actual function type of the dummy procedure, at least when an
   // interface is given.
   // In general, that is a nice to have but we cannot guarantee to find the
@@ -194,11 +196,6 @@ bool Fortran::lower::CallerInterface::verifyActualInputs() const {
   return true;
 }
 
-template <typename T>
-static inline auto AsGenericExpr(T e) {
-  return Fortran::evaluate::AsGenericExpr(Fortran::common::Clone(e));
-}
-
 void Fortran::lower::CallerInterface::walkResultLengths(
     ExprVisitor visitor) const {
   assert(characteristic && "characteristic was not computed");
@@ -212,7 +209,7 @@ void Fortran::lower::CallerInterface::walkResultLengths(
   if (dynamicType.category() == Fortran::common::TypeCategory::Character) {
     if (std::optional<Fortran::evaluate::ExtentExpr> length =
             dynamicType.GetCharLength())
-      visitor(AsGenericExpr(*length));
+      visitor(toEvExpr(*length));
   } else if (dynamicType.category() == common::TypeCategory::Derived) {
     const Fortran::semantics::DerivedTypeSpec &derivedTypeSpec =
         dynamicType.GetDerivedTypeSpec();
@@ -606,6 +603,40 @@ public:
                      interface.side().getHostAssociatedTuple(), emptyValue()});
   }
 
+  static llvm::Optional<Fortran::evaluate::DynamicType> getResultDynamicType(
+      const Fortran::evaluate::characteristics::Procedure &procedure) {
+    if (const std::optional<Fortran::evaluate::characteristics::FunctionResult>
+            &result = procedure.functionResult)
+      if (const auto *resultTypeAndShape = result->GetTypeAndShape())
+        return resultTypeAndShape->type();
+    return llvm::None;
+  }
+
+  static bool mustPassLengthWithDummyProcedure(
+      const Fortran::evaluate::characteristics::Procedure &procedure) {
+    // When passing a character function designator `bar` as dummy procedure to
+    // `foo` (e.g. `foo(bar)`), pass the result length of `bar` to `foo` so that
+    // `bar` can be called inside `foo` even if its length is assumed there.
+    // From an ABI perspective, the extra length argument must be handled
+    // exactly as if passing a character object. Using an argument of
+    // fir.boxchar type gives the expected behavior: after codegen, the
+    // fir.boxchar lengths are added after all the arguments as extra value
+    // arguments (the extra arguments order is the order of the fir.boxchar).
+
+    // This ABI is compatible with ifort, nag, nvfortran, and xlf, but not
+    // gfortran. Gfortran does not pass the length and is therefore unable to
+    // handle later call to `bar` in `foo` where the length would be assumed. If
+    // the result is an array, nag and ifort and xlf still pass the length, but
+    // not nvfortran (and gfortran). It is not clear it is possible to call an
+    // array function with assumed length (f18 forbides defining such
+    // interfaces). Hence, passing the length is most likely useless, but stick
+    // with ifort/nag/xlf interface here.
+    if (llvm::Optional<Fortran::evaluate::DynamicType> type =
+            getResultDynamicType(procedure))
+      return type->category() == Fortran::common::TypeCategory::Character;
+    return false;
+  }
+
 private:
   void handleImplicitResult(
       const Fortran::evaluate::characteristics::FunctionResult &result) {
@@ -643,13 +674,37 @@ private:
     setPassedResult(PassEntityBy::AddressAndLength,
                     getResultEntity(interface.side().getCallDescription()));
     mlir::Type lenTy = mlir::IndexType::get(&mlirContext);
+    std::optional<std::int64_t> constantLen = type.knownLength();
+    fir::CharacterType::LenType len =
+        constantLen ? *constantLen : fir::CharacterType::unknownLen();
     mlir::Type charRefTy = fir::ReferenceType::get(
-        fir::CharacterType::getUnknownLen(&mlirContext, type.kind()));
+        fir::CharacterType::get(&mlirContext, type.kind(), len));
     mlir::Type boxCharTy = fir::BoxCharType::get(&mlirContext, type.kind());
     addFirOperand(charRefTy, resultPosition, Property::CharAddress);
     addFirOperand(lenTy, resultPosition, Property::CharLength);
     /// For now, also return it by boxchar
     addFirResult(boxCharTy, resultPosition, Property::BoxChar);
+  }
+
+  /// Return a vector with an attribute with the name of the argument if this
+  /// is a callee interface and the name is available. Otherwise, just return
+  /// an empty vector.
+  llvm::SmallVector<mlir::NamedAttribute>
+  dummyNameAttr(const FortranEntity &entity) {
+    if constexpr (std::is_same_v<FortranEntity,
+                                 std::optional<Fortran::common::Reference<
+                                     const Fortran::semantics::Symbol>>>) {
+      if (entity.has_value()) {
+        const Fortran::semantics::Symbol *argument = &*entity.value();
+        // "fir.bindc_name" is used for arguments for the sake of consistency
+        // with other attributes carrying surface syntax names in FIR.
+        return {mlir::NamedAttribute(
+            mlir::Identifier::get("fir.bindc_name", &mlirContext),
+            mlir::StringAttr::get(&mlirContext,
+                                  toStringRef(argument->name())))};
+      }
+    }
+    return {};
   }
 
   void handleImplicitDummy(
@@ -660,7 +715,8 @@ private:
     if (dynamicType.category() == Fortran::common::TypeCategory::Character) {
       mlir::Type boxCharTy =
           fir::BoxCharType::get(&mlirContext, dynamicType.kind());
-      addFirOperand(boxCharTy, nextPassedArgPosition(), Property::BoxChar);
+      addFirOperand(boxCharTy, nextPassedArgPosition(), Property::BoxChar,
+                    dummyNameAttr(entity));
       addPassedArg(PassEntityBy::BoxChar, entity, characteristics);
     } else {
       // non-PDT derived type allowed in implicit interface.
@@ -669,7 +725,8 @@ private:
       if (!bounds.empty())
         type = fir::SequenceType::get(bounds, type);
       mlir::Type refType = fir::ReferenceType::get(type);
-      addFirOperand(refType, nextPassedArgPosition(), Property::BaseAddress);
+      addFirOperand(refType, nextPassedArgPosition(), Property::BaseAddress,
+                    dummyNameAttr(entity));
       addPassedArg(PassEntityBy::BaseAddress, entity, characteristics);
     }
   }
@@ -723,10 +780,10 @@ private:
     bool isValueAttr = false;
     [[maybe_unused]] mlir::Location loc =
         interface.converter.getCurrentLocation();
-    llvm::SmallVector<mlir::NamedAttribute> attrs;
+    llvm::SmallVector<mlir::NamedAttribute> attrs = dummyNameAttr(entity);
     auto addMLIRAttr = [&](llvm::StringRef attr) {
       attrs.emplace_back(mlir::Identifier::get(attr, &mlirContext),
-                         UnitAttr::get(&mlirContext));
+                         mlir::UnitAttr::get(&mlirContext));
     };
     if (obj.attrs.test(Attrs::Optional))
       addMLIRAttr(fir::getOptionalAttrName());
@@ -804,10 +861,27 @@ private:
             Fortran::evaluate::characteristics::DummyProcedure::Attr::Pointer))
       TODO(interface.converter.getCurrentLocation(),
            "procedure pointer arguments");
-    // Otherwise, it is a dummy procedure
+    // Otherwise, it is a dummy procedure.
+    const Fortran::evaluate::characteristics::Procedure &procedure =
+        proc.procedure.value();
     mlir::Type funcType =
-        getDummyProcedureTypeImpl(&proc.procedure.value(), interface.converter);
-
+        getProcedureDesignatorType(&procedure, interface.converter);
+    llvm::Optional<Fortran::evaluate::DynamicType> resultTy =
+        getResultDynamicType(procedure);
+    if (resultTy && mustPassLengthWithDummyProcedure(procedure)) {
+      // The result length of dummy procedures that are character functions must
+      // be passed so that the dummy procedure can be called if it has assumed
+      // length on the callee side.
+      mlir::Type tupleType =
+          fir::factory::getCharacterProcedureTupleType(funcType);
+      llvm::StringRef charProcAttr = fir::getCharacterProcedureDummyAttrName();
+      addFirOperand(tupleType, nextPassedArgPosition(), Property::CharProcTuple,
+                    {mlir::NamedAttribute{
+                        mlir::Identifier::get(charProcAttr, &mlirContext),
+                        mlir::UnitAttr::get(&mlirContext)}});
+      addPassedArg(PassEntityBy::CharProcTuple, entity, characteristics);
+      return;
+    }
     addFirOperand(funcType, nextPassedArgPosition(), Property::BaseAddress);
     addPassedArg(PassEntityBy::BaseAddress, entity, characteristics);
   }
@@ -864,7 +938,7 @@ private:
               expr) {
     if (expr)
       return Fortran::evaluate::ToInt64(Fortran::evaluate::Fold(
-          getConverter().getFoldingContext(), AsGenericExpr(*expr)));
+          getConverter().getFoldingContext(), toEvExpr(*expr)));
     return std::nullopt;
   }
   void
@@ -1091,12 +1165,34 @@ mlir::FuncOp Fortran::lower::getOrDeclareFunction(
   return newFunc;
 }
 
+// Is it required to pass a dummy procedure with \p characteristics as a tuple
+// containing the function address and the result length ?
+static bool mustPassLengthWithDummyProcedure(
+    const std::optional<Fortran::evaluate::characteristics::Procedure>
+        &characteristics) {
+  return characteristics &&
+         Fortran::lower::CallInterfaceImpl<SignatureBuilder>::
+             mustPassLengthWithDummyProcedure(*characteristics);
+}
+
+bool Fortran::lower::mustPassLengthWithDummyProcedure(
+    const Fortran::evaluate::ProcedureDesignator &procedure,
+    Fortran::lower::AbstractConverter &converter) {
+  std::optional<Fortran::evaluate::characteristics::Procedure> characteristics =
+      Fortran::evaluate::characteristics::Procedure::Characterize(
+          procedure, converter.getFoldingContext());
+  return ::mustPassLengthWithDummyProcedure(characteristics);
+}
+
 mlir::Type Fortran::lower::getDummyProcedureType(
     const Fortran::semantics::Symbol &dummyProc,
     Fortran::lower::AbstractConverter &converter) {
   std::optional<Fortran::evaluate::characteristics::Procedure> iface =
       Fortran::evaluate::characteristics::Procedure::Characterize(
           dummyProc, converter.getFoldingContext());
-  return getDummyProcedureTypeImpl(iface.has_value() ? &*iface : nullptr,
-                                   converter);
+  mlir::Type procType = getProcedureDesignatorType(
+      iface.has_value() ? &*iface : nullptr, converter);
+  if (::mustPassLengthWithDummyProcedure(iface))
+    return fir::factory::getCharacterProcedureTupleType(procType);
+  return procType;
 }
