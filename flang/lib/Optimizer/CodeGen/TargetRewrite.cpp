@@ -171,6 +171,7 @@ public:
     } else {
       assert(m.size() == 2);
       // COMPLEX is split into 2 separate arguments
+      auto iTy = rewriter->getIntegerType(32);
       for (auto e : llvm::enumerate(m)) {
         auto &tup = e.value();
         auto ty = std::get<mlir::Type>(tup);
