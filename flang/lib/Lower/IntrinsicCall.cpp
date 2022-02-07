@@ -1288,8 +1288,30 @@ static mlir::FuncOp getRuntimeFunction(mlir::Location loc,
     return exactMatch;
 
   if (bestNearMatch != nullptr) {
-    assert(!bestMatchDistance.isLosingPrecision() &&
-           "runtime selection loses precision");
+    if (bestMatchDistance.isLosingPrecision()) {
+      // Using this runtime version requires narrowing the arguments
+      // or extending the result. It is not numerically safe. There
+      // is currently no quad math library that was described in
+      // lowering and could be used here. Emit an error and continue
+      // generating the code with the narrowing cast so that the user
+      // can get a complete list of the problematic intrinsic calls.
+      std::string message("TODO: no math runtime available for '");
+      llvm::raw_string_ostream sstream(message);
+      if (name == "pow") {
+        assert(funcType.getNumInputs() == 2 &&
+               "power operator has two arguments");
+        sstream << funcType.getInput(0) << " ** " << funcType.getInput(1);
+      } else {
+        sstream << name << "(";
+        if (funcType.getNumInputs() > 0)
+          sstream << funcType.getInput(0);
+        for (mlir::Type argType : funcType.getInputs().drop_front())
+          sstream << ", " << argType;
+        sstream << ")";
+      }
+      sstream << "'";
+      mlir::emitError(loc, message);
+    }
     return getFuncOp(loc, builder, *bestNearMatch);
   }
   return {};
