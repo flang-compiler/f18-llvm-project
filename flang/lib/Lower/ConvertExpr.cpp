@@ -1967,11 +1967,10 @@ public:
           procRef, intrinsic, resultType, prepareOptionalArg, prepareOtherArg,
           converter);
 
-      llvm::StringRef name = intrinsic.name;
       auto getArgument = [&](std::size_t i) -> ExtValue {
         if (fir::conformsWithPassByRef(
                 fir::getBase(operands[i].first).getType()))
-          return ::genLoad(builder, loc, operands[i].first);
+          return genLoad(operands[i].first);
         return operands[i].first;
       };
       auto isPresent = [&](std::size_t i) -> llvm::Optional<mlir::Value> {
@@ -5627,7 +5626,7 @@ private:
 
   /// Generate a continuation to pass \p expr to an OPTIONAL argument of an
   /// elemental procedure. This is meant to handle the cases where \p expr might
-  /// be dynamically absent (i.e. when it is a POINTER, and ALLOCATABLE or an
+  /// be dynamically absent (i.e. when it is a POINTER, an ALLOCATABLE or an
   /// OPTIONAL variable). If p\ expr is guaranteed to be present genarr() can
   /// directly be called instead.
   CC genarrForwardOptionalArgumentToCall(const Fortran::lower::SomeExpr &expr) {

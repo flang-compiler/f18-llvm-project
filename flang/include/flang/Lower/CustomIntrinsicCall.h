@@ -38,7 +38,7 @@ struct SpecificIntrinsic;
 namespace lower {
 
 /// Does the call \p procRef to \p intrinsic need to be handle via this custom
-/// framework due to optional arguments. Otherwise, the tools form
+/// framework due to optional arguments. Otherwise, the tools from
 /// IntrinsicCall.cpp should be used directly.
 bool intrinsicRequiresCustomOptionalHandling(
     const Fortran::evaluate::ProcedureRef &procRef,
@@ -50,10 +50,10 @@ bool intrinsicRequiresCustomOptionalHandling(
 using OperandPrepare = std::function<void(const Fortran::lower::SomeExpr &)>;
 
 /// Type of the callback to inquire about an argument presence, once the call
-/// prepartion was done. An absent optional means the argument is statically
+/// preparation was done. An absent optional means the argument is statically
 /// present. An mlir::Value means the presence must be checked at runtime, and
 /// that the value contains the "is present" boolean value.
-using OperandInquiry = std::function<llvm::Optional<mlir::Value>(std::size_t)>;
+using OperandPresent = std::function<llvm::Optional<mlir::Value>(std::size_t)>;
 
 /// Type of the callback to generate an argument reference after the call
 /// preparation was done. For optional arguments, the utility guarantees
@@ -70,7 +70,7 @@ using OperandGetter = std::function<fir::ExtendedValue(std::size_t)>;
 /// It is up to the caller to decide what argument preparation means,
 /// the only contract is that it should later allow the caller to provide
 /// callbacks to generate argument reference given an argument index without
-/// any further knowledge of the argument. The function simply visit
+/// any further knowledge of the argument. The function simply visits
 /// the actual arguments, deciding which ones are dynamically optional,
 /// and calling the callbacks accordingly in argument order.
 void prepareCustomIntrinsicArgument(
@@ -90,7 +90,7 @@ void prepareCustomIntrinsicArgument(
 fir::ExtendedValue
 lowerCustomIntrinsic(fir::FirOpBuilder &builder, mlir::Location loc,
                      llvm::StringRef name, llvm::Optional<mlir::Type> retTy,
-                     const OperandInquiry &isPresentCheck,
+                     const OperandPresent &isPresentCheck,
                      const OperandGetter &getOperand, std::size_t numOperands,
                      Fortran::lower::StatementContext &stmtCtx);
 } // namespace lower

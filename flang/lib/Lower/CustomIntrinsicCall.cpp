@@ -17,12 +17,6 @@
 #include "flang/Lower/IntrinsicCall.h"
 #include "flang/Lower/Todo.h"
 
-// CC genMinMaxWithOptionalArgs(const Fortran::evaluate::ProcedureRef &procRef,
-// const Fortran::evaluate::SpecificIntrinsic &intrinsic,
-// llvm::Optional<mlir::Type> retTy) {
-//   };
-// }
-
 /// Is this a call to MIN or MAX intrinsic with arguments that may be absent at
 /// runtime? This is a special case because MIN and MAX can have any number of
 /// arguments.
@@ -122,7 +116,7 @@ static void prepareMinOrMaxArguments(
 static fir::ExtendedValue
 lowerMinOrMax(fir::FirOpBuilder &builder, mlir::Location loc,
               llvm::StringRef name, llvm::Optional<mlir::Type> retTy,
-              const Fortran::lower::OperandInquiry &isPresentCheck,
+              const Fortran::lower::OperandPresent &isPresentCheck,
               const Fortran::lower::OperandGetter &getOperand,
               std::size_t numOperands,
               Fortran::lower::StatementContext &stmtCtx) {
@@ -193,7 +187,7 @@ static void prepareIshftcArguments(
 static fir::ExtendedValue
 lowerIshftc(fir::FirOpBuilder &builder, mlir::Location loc,
             llvm::StringRef name, llvm::Optional<mlir::Type> retTy,
-            const Fortran::lower::OperandInquiry &isPresentCheck,
+            const Fortran::lower::OperandPresent &isPresentCheck,
             const Fortran::lower::OperandGetter &getOperand,
             std::size_t numOperands,
             Fortran::lower::StatementContext &stmtCtx) {
@@ -247,7 +241,7 @@ void Fortran::lower::prepareCustomIntrinsicArgument(
 
 fir::ExtendedValue Fortran::lower::lowerCustomIntrinsic(
     fir::FirOpBuilder &builder, mlir::Location loc, llvm::StringRef name,
-    llvm::Optional<mlir::Type> retTy, const OperandInquiry &isPresentCheck,
+    llvm::Optional<mlir::Type> retTy, const OperandPresent &isPresentCheck,
     const OperandGetter &getOperand, std::size_t numOperands,
     Fortran::lower::StatementContext &stmtCtx) {
   if (name == "min" || name == "max")
