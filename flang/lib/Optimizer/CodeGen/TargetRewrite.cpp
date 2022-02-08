@@ -415,6 +415,8 @@ public:
     auto newTy = rewriter->getFunctionType(newInTys, newResTys);
     auto newOp =
         rewriter->create<AddrOfOp>(addrOp.getLoc(), newTy, addrOp.symbol());
+    LLVM_DEBUG(llvm::dbgs()
+                << "replacing " << addrOp << " with " << newOp << '\n');
     replaceOp(addrOp, newOp.getResult());
   }
 
