@@ -23,6 +23,7 @@ jobs:
       matrix:
         os:
           - macOS-latest
+          - ubuntu-latest
     steps:
     - name: Install Ninja
       uses: llvm/actions/install-ninja@main
