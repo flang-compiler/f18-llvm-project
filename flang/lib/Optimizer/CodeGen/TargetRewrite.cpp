@@ -416,7 +416,7 @@ public:
     auto newOp =
         rewriter->create<AddrOfOp>(addrOp.getLoc(), newTy, addrOp.symbol());
     LLVM_DEBUG(llvm::dbgs()
-                << "replacing " << addrOp << " with " << newOp << '\n');
+               << "replacing " << addrOp << " with " << newOp << '\n');
     replaceOp(addrOp, newOp.getResult());
   }
 
