@@ -2,6 +2,7 @@
 // RUN: fir-opt --target-rewrite="target=x86_64-unknown-linux-gnu" %s | FileCheck %s --check-prefix=X64
 // RUN: fir-opt --target-rewrite="target=aarch64-unknown-linux-gnu" %s | FileCheck %s --check-prefix=AARCH64
 // RUN: fir-opt --target-rewrite="target=powerpc64le-unknown-linux-gnu" %s | FileCheck %s --check-prefix=PPC
+// UNSUPPORTED: darwin
 
 // Test that we rewrite the signature and body of a function that returns a
 // complex<4>.
