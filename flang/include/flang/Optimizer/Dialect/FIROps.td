@@ -2084,16 +2084,11 @@ def fir_LenParamIndexOp : fir_OneResultOp<"len_param_index", [NoSideEffect]> {
   >];
 
   let extraClassDeclaration = [{
-<<<<<<< HEAD
     static constexpr llvm::StringRef getFieldAttrName() { return "field_id"; }
     static constexpr llvm::StringRef getTypeAttrName() { return "on_type"; }
-    mlir::Type getOnType() {
+    mlir::Type getOnTypeAttrType() {
       return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
     }
-=======
-    static constexpr llvm::StringRef fieldAttrName() { return "field_id"; }
-    static constexpr llvm::StringRef typeAttrName() { return "on_type"; }
->>>>>>> 3012f35f8727... [flang] Updated FIR dialect to _Both
   }];
 }
 
@@ -2175,10 +2170,10 @@ def fir_DoLoopOp : region_Op<"do_loop",
   ];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef getUnorderedAttrName() {
+    static constexpr llvm::StringRef getUnorderedAttrNameStr() {
       return "unordered";
     }
-    static constexpr llvm::StringRef getFinalValueAttrName() {
+    static constexpr llvm::StringRef getFinalValueAttrNameStr() {
       return "finalValue";
     }
 
@@ -2815,16 +2810,16 @@ def fir_GlobalOp : fir_Op<"global", [IsolatedFromAbove, Symbol]> {
   ];
 
   let extraClassDeclaration = [{
-    static constexpr llvm::StringRef getSymbolAttrName() { return "symref"; }
-    static constexpr llvm::StringRef getConstantAttrName() {
+    static constexpr llvm::StringRef getSymbolAttrNameStr() { return "symref"; }
+    static constexpr llvm::StringRef getConstantAttrNameStr() {
       return "constant";
     }
-    static constexpr llvm::StringRef getInitValAttrName() { return "initVal"; }
-    static constexpr llvm::StringRef getLinkageAttrName() { return "linkName"; }
-    static constexpr llvm::StringRef getTypeAttrName() { return "type"; }
+    static constexpr llvm::StringRef getInitValAttrNameStr() { return "initVal"; }
+    static constexpr llvm::StringRef getLinkageAttrNameStr() { return "linkName"; }
+    static constexpr llvm::StringRef getTypeAttrNameStr() { return "type"; }
 
     /// The printable type of the global
-    mlir::Type getType() {
+    mlir::Type getTypeAttrType() {
       return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
     }
 

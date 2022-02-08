@@ -407,7 +407,7 @@ void ArrayCopyAnalysis::arrayMentions(
       mentions.push_back(owner);
       appendToQueue(amend.getResult());
     } else if (auto br = mlir::dyn_cast<mlir::BranchOp>(owner)) {
-      branchOp(br.getDest(), br.getDestOperands());
+      branchOp(br.getDest(), br.destOperands());
     } else if (auto br = mlir::dyn_cast<mlir::CondBranchOp>(owner)) {
       branchOp(br.getTrueDest(), br.getTrueOperands());
       branchOp(br.getFalseDest(), br.getFalseOperands());

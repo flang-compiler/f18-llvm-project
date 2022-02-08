@@ -148,7 +148,7 @@ TEST_F(FIRBuilderTest, createRealZeroConstant) {
   auto cstOp = dyn_cast<mlir::arith::ConstantOp>(cst.getDefiningOp());
   EXPECT_EQ(realTy, cstOp.getType());
   EXPECT_EQ(
-      0u, cstOp.getValue().cast<FloatAttr>().getValue().convertToDouble());
+      0u, cstOp.value().cast<FloatAttr>().getValue().convertToDouble());
 }
 
 TEST_F(FIRBuilderTest, createBool) {

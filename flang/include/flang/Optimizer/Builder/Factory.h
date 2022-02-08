@@ -147,8 +147,10 @@ void genCharacterCopy(mlir::Value src, mlir::Value srcLen, mlir::Value dst,
 inline std::vector<mlir::Value> getExtents(mlir::Value shapeVal) {
   if (shapeVal)
     if (auto *shapeOp = shapeVal.getDefiningOp()) {
-      if (auto shOp = mlir::dyn_cast<fir::ShapeOp>(shapeOp))
-        return shOp.getExtents();
+      if (auto shOp = mlir::dyn_cast<fir::ShapeOp>(shapeOp)) {
+        auto operands = shOp.getExtents();
+        return {operands.begin(), operands.end()};
+      }
       if (auto shOp = mlir::dyn_cast<fir::ShapeShiftOp>(shapeOp))
         return shOp.getExtents();
     }
@@ -162,8 +164,10 @@ inline std::vector<mlir::Value> getOrigins(mlir::Value shapeVal) {
     if (auto *shapeOp = shapeVal.getDefiningOp()) {
       if (auto shOp = mlir::dyn_cast<fir::ShapeShiftOp>(shapeOp))
         return shOp.getOrigins();
-      if (auto shOp = mlir::dyn_cast<fir::ShiftOp>(shapeOp))
-        return shOp.getOrigins();
+      if (auto shOp = mlir::dyn_cast<fir::ShiftOp>(shapeOp)) {
+        auto operands = shOp.getOrigins();
+        return {operands.begin(), operands.end()};
+      }
     }
   return {};
 }

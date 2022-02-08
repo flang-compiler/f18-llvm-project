@@ -49,7 +49,7 @@ TEST_F(DoLoopHelperTest, createLoopWithCountTest) {
       mlir::isa<mlir::arith::SubIOp>(loop.upperBound().getDefiningOp()));
   auto subOp = dyn_cast<mlir::arith::SubIOp>(loop.upperBound().getDefiningOp());
   EXPECT_EQ(c10, subOp.lhs());
-  checkConstantValue(subOp.getRhs(), 1);
+  checkConstantValue(subOp.rhs(), 1);
   checkConstantValue(loop.getStep(), 1);
 }
 
