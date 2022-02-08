@@ -15,7 +15,6 @@
 #include "tools.h"
 #include "flang/Runtime/descriptor.h"
 #include <algorithm>
-#include <stdio.h>
 
 namespace Fortran::runtime {
 
@@ -28,6 +27,31 @@ std::int64_t RTNAME(LboundDim)(
   }
   const Dimension &dimension{array.GetDimension(dim - 1)};
   return static_cast<std::int64_t>(dimension.LowerBound());
+}
+
+void RTNAME(Ubound)(Descriptor &result, const Descriptor &array, int kind,
+    const char *sourceFile, int line) {
+  SubscriptValue extent[1]{array.rank()};
+  result.Establish(TypeCategory::Integer, kind, nullptr, 1, extent,
+      CFI_attribute_allocatable);
+  // The array returned by UBOUND has a lower bound of 1 and an extent equal to
+  // the rank of its input array.
+  result.GetDimension(0).SetBounds(1, array.rank());
+  Terminator terminator{sourceFile, line};
+  if (int stat{result.Allocate()}) {
+    terminator.Crash(
+        "UBOUND: could not allocate memory for result; STAT=%d", stat);
+  }
+  auto storeIntegerAt = [&](std::size_t atIndex, std::int64_t value) {
+    Fortran::runtime::ApplyIntegerKind<StoreIntegerAt, void>(
+        kind, terminator, result, atIndex, value);
+  };
+
+  INTERNAL_CHECK(result.rank() == 1);
+  for (SubscriptValue i{0}; i < array.rank(); ++i) {
+    const Dimension &dimension{array.GetDimension(i)};
+    storeIntegerAt(i, dimension.UpperBound());
+  }
 }
 
 std::int64_t RTNAME(Size)(

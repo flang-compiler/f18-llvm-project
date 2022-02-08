@@ -3305,13 +3305,36 @@ IntrinsicLibrary::genLbound(mlir::Type resultType,
 fir::ExtendedValue
 IntrinsicLibrary::genUbound(mlir::Type resultType,
                             llvm::ArrayRef<fir::ExtendedValue> args) {
-  assert(args.size() == 3);
-  mlir::Value extent = fir::getBase(genSize(resultType, args));
-  mlir::Value lbound = fir::getBase(genLbound(resultType, args));
+  assert(args.size() == 3 || args.size() == 2);
+  if (args.size() == 3) {
+    // Handle calls to UBOUND with the DIM argument, which return a scalar
+    mlir::Value extent = fir::getBase(genSize(resultType, args));
+    mlir::Value lbound = fir::getBase(genLbound(resultType, args));
 
-  mlir::Value one = builder.createIntegerConstant(loc, resultType, 1);
-  mlir::Value ubound = builder.create<mlir::arith::SubIOp>(loc, lbound, one);
-  return builder.create<mlir::arith::AddIOp>(loc, ubound, extent);
+    mlir::Value one = builder.createIntegerConstant(loc, resultType, 1);
+    mlir::Value ubound = builder.create<mlir::arith::SubIOp>(loc, lbound, one);
+    return builder.create<mlir::arith::AddIOp>(loc, ubound, extent);
+  } else {
+    // Handle calls to UBOUND without the DIM argument, which return an array
+    mlir::Value kind = isAbsent(args[1])
+                           ? builder.createIntegerConstant(
+                                 loc, builder.getIndexType(),
+                                 builder.getKindMap().defaultIntegerKind())
+                           : fir::getBase(args[1]);
+
+    // Create mutable fir.box to be passed to the runtime for the result.
+    mlir::Type type = builder.getVarLenSeqTy(resultType, /*rank=*/1);
+    fir::MutableBoxValue resultMutableBox =
+        fir::factory::createTempMutableBox(builder, loc, type);
+    mlir::Value resultIrBox =
+        fir::factory::getMutableIRBox(builder, loc, resultMutableBox);
+
+    fir::runtime::genUbound(builder, loc, resultIrBox, fir::getBase(args[0]),
+                            kind);
+
+    return readAndAddCleanUp(resultMutableBox, resultType, "UBOUND");
+  }
+  return mlir::Value();
 }
 
 // SPACING

@@ -28,6 +28,23 @@ mlir::Value fir::runtime::genLboundDim(fir::FirOpBuilder &builder,
   return builder.create<fir::CallOp>(loc, lboundFunc, args).getResult(0);
 }
 
+/// Generate call to `Ubound` runtime routine.  Calls to UBOUND with a DIM
+/// argument get transformed into an expression equivalent to
+/// SIZE() + LBOUND() - 1, so they don't have an intrinsic in the runtime.
+void fir::runtime::genUbound(fir::FirOpBuilder &builder, mlir::Location loc,
+                             mlir::Value resultBox, mlir::Value array,
+                             mlir::Value kind) {
+  mlir::FuncOp uboundFunc =
+      fir::runtime::getRuntimeFunc<mkRTKey(Ubound)>(loc, builder);
+  auto fTy = uboundFunc.getType();
+  auto sourceFile = fir::factory::locationToFilename(builder, loc);
+  auto sourceLine =
+      fir::factory::locationToLineNo(builder, loc, fTy.getInput(2));
+  auto args = fir::runtime::createArguments(builder, loc, fTy, resultBox, array,
+                                            kind, sourceFile, sourceLine);
+  builder.create<fir::CallOp>(loc, uboundFunc, args).getResult(0);
+}
+
 /// Generate call to `Size` runtime routine. This routine is a version when
 /// the DIM argument is present.
 mlir::Value fir::runtime::genSizeDim(fir::FirOpBuilder &builder,

@@ -26,6 +26,12 @@ namespace fir::runtime {
 mlir::Value genLboundDim(fir::FirOpBuilder &builder, mlir::Location loc,
                          mlir::Value array, mlir::Value dim);
 
+/// Generate call to general `Ubound` runtime routine.  Calls to UBOUND
+/// with a DIM argument get transformed into an expression equivalent to
+/// SIZE() + LBOUND() - 1, so they don't have an intrinsic in the runtime.
+void genUbound(fir::FirOpBuilder &builder, mlir::Location loc,
+               mlir::Value resultBox, mlir::Value array, mlir::Value kind);
+
 /// Generate call to `Size` runtime routine. This routine is a specialized
 /// version when the DIM argument is not specified by the user.
 mlir::Value genSize(fir::FirOpBuilder &builder, mlir::Location loc,
