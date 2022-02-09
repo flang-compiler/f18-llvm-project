@@ -246,27 +246,11 @@ bool hasDynamicSize(mlir::Type t) {
   return false;
 }
 
-bool isPointerType(mlir::Type ty) {
-  if (auto refTy = fir::dyn_cast_ptrEleTy(ty))
-    ty = refTy;
-  if (auto boxTy = ty.dyn_cast<fir::BoxType>())
-    return boxTy.getEleTy().isa<fir::PointerType>();
-  return false;
-}
-
 bool isAllocatableType(mlir::Type ty) {
   if (auto refTy = fir::dyn_cast_ptrEleTy(ty))
     ty = refTy;
   if (auto boxTy = ty.dyn_cast<fir::BoxType>())
     return boxTy.getEleTy().isa<fir::HeapType>();
-  return false;
-}
-
-bool isUnlimitedPolymorphicType(mlir::Type ty) {
-  if (auto refTy = fir::dyn_cast_ptrEleTy(ty))
-    ty = refTy;
-  if (auto boxTy = ty.dyn_cast<fir::BoxType>())
-    return boxTy.getEleTy().isa<mlir::NoneType>();
   return false;
 }
 
