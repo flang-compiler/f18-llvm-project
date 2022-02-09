@@ -1366,7 +1366,7 @@ fir::ExtendedValue toExtendedValue(mlir::Value val, fir::FirOpBuilder &builder,
     if (extents.size() + 1 < arrayType.getShape().size())
       mlir::emitError(loc, "cannot retrieve array extents from type");
   } else if (type.isa<fir::BoxType>() || type.isa<fir::RecordType>()) {
-    mlir::emitError(loc, "descriptor or derived type not yet handled");
+    fir::emitFatalError(loc, "descriptor or derived type not yet handled");
   }
 
   if (!extents.empty())
@@ -2733,14 +2733,7 @@ IntrinsicLibrary::genLen(mlir::Type resultType,
                          llvm::ArrayRef<fir::ExtendedValue> args) {
   // Optional KIND argument reflected in result type and otherwise ignored.
   assert(args.size() == 1 || args.size() == 2);
-  mlir::Value len = args[0].match(
-      [](const fir::CharBoxValue &box) { return box.getLen(); },
-      [](const fir::CharArrayBoxValue &box) { return box.getLen(); },
-      [&](const auto &) {
-        return fir::factory::CharacterExprHelper(builder, loc)
-            .createUnboxChar(fir::getBase(args[0]))
-            .second;
-      });
+  mlir::Value len = fir::factory::readCharLen(builder, loc, args[0]);
   return builder.createConvert(loc, resultType, len);
 }
 
