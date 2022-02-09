@@ -1690,6 +1690,8 @@ private:
           localSymbols.addSymbol(sym, genAssociateSelector(selector, stmtCtx));
         }
       } else if (e.getIf<Fortran::parser::EndAssociateStmt>()) {
+        if (eval.lowerAsUnstructured())
+          maybeStartBlock(e.block);
         stmtCtx.finalize();
         localSymbols.popScope();
       } else {

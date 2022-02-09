@@ -34,8 +34,10 @@ program p
     ! CHECK: fir.load [[B]]
     ! CHECK: fir.load [[C]]
     ! CHECK: fir.load [[D]]
-    print*, n, t, a, b, c, d ! expected output: 102 111 223 333 102 105 223 7
+    print*, n, t, a, b, c, d ! expect: 102 111 223 333 102 105 223 7
   end associate
+
+  call nest
 
   do i=1,4
     associate (x=>i)
@@ -65,3 +67,29 @@ integer function foo(x)
   i = i + x
   foo = i
 end function foo
+
+! CHECK-LABEL: func @_QPnest(
+subroutine nest
+  integer, parameter :: n = 10
+  integer :: a(5), b(n)
+  associate (s => sequence(size(a)))
+    a = s
+    associate(t => sequence(n))
+      b = t
+      ! CHECK:   cond_br %{{.*}}, [[BB1:\^bb[0-9]]], [[BB2:\^bb[0-9]]]
+      ! CHECK: [[BB1]]:
+      ! CHECK:   br [[BB3:\^bb[0-9]]]
+      ! CHECK: [[BB2]]:
+      if (a(1) > b(1)) goto 9
+    end associate
+    a = a * a
+  end associate
+  ! CHECK:   br [[BB3]]
+  ! CHECK: [[BB3]]:
+9 print *, sum(a), sum(b) ! expect: 55 55
+contains
+  function sequence(n)
+    integer sequence(n)
+    sequence = [(i,i=1,n)]
+  end function
+end subroutine nest

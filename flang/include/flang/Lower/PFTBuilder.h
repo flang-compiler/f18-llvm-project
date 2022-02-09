@@ -169,10 +169,9 @@ static constexpr bool isIntermediateConstructStmt{common::HasMember<
 
 template <typename A>
 static constexpr bool isNopConstructStmt{common::HasMember<
-    A, std::tuple<parser::EndAssociateStmt, parser::CaseStmt,
-                  parser::EndSelectStmt, parser::ElseIfStmt, parser::ElseStmt,
-                  parser::EndIfStmt, parser::SelectRankCaseStmt,
-                  parser::TypeGuardStmt>>};
+    A, std::tuple<parser::CaseStmt, parser::EndSelectStmt, parser::ElseIfStmt,
+                  parser::ElseStmt, parser::EndIfStmt,
+                  parser::SelectRankCaseStmt, parser::TypeGuardStmt>>};
 
 template <typename A>
 static constexpr bool isExecutableDirective{common::HasMember<
