@@ -3470,8 +3470,13 @@ public:
       return iters.innerArgument();
     };
 
-    // Lower the array expression now.
+    // Lower the array expression now. Clean-up any temps that may have
+    // been generated when lowering `expr` right after the lowered value
+    // was stored to the ragged array temporary. The local temps will not
+    // be needed afterwards.
+    stmtCtx.pushScope();
     [[maybe_unused]] ExtValue loopRes = lowerArrayExpression(expr);
+    stmtCtx.finalize(/*popScope=*/true);
     assert(fir::getBase(loopRes));
   }
 
