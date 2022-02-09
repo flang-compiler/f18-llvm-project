@@ -677,7 +677,7 @@ Expr<Type<TypeCategory::Integer, KIND>> FoldIntrinsicFunction(
       return std::visit(
           [&](auto &kx) {
             if (auto len{kx.LEN()}) {
-              if (IsConstantExpr(*len)) {
+              if (IsScopeInvariantExpr(*len)) {
                 return Fold(context, ConvertToType<T>(*std::move(len)));
               } else {
                 return Expr<T>{std::move(funcRef)};
