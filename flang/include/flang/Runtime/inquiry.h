@@ -23,7 +23,7 @@ extern "C" {
 
 std::int64_t RTNAME(LboundDim)(const Descriptor &array, int dim,
     const char *sourceFile = nullptr, int line = 0);
-void RTNAME(Ubound)(Descriptor &result, const Descriptor &descriptor, int kind,
+void RTNAME(Ubound)(Descriptor &result, const Descriptor &array, int kind,
     const char *sourceFile = nullptr, int line = 0);
 std::int64_t RTNAME(Size)(
     const Descriptor &array, const char *sourceFile = nullptr, int line = 0);

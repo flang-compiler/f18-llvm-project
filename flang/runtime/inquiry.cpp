@@ -56,7 +56,7 @@ void RTNAME(Ubound)(Descriptor &result, const Descriptor &array, int kind,
 
 std::int64_t RTNAME(Size)(
     const Descriptor &array, const char *sourceFile, int line) {
-  SubscriptValue result{1};
+  std::int64_t result{1};
   for (int i = 0; i < array.rank(); ++i) {
     const Dimension &dimension{array.GetDimension(i)};
     result *= dimension.Extent();
