@@ -83,7 +83,7 @@ public:
   void runOnFunction() override {
     auto *context = &getContext();
     auto function = getFunction();
-    mlir::OwningRewritePatternList patterns(context);
+    mlir::RewritePatternSet patterns(context);
     patterns.insert<LoopResultRemoval>(context);
     mlir::ConversionTarget target = *context;
     target.addLegalDialect<fir::FIROpsDialect, mlir::arith::ArithmeticDialect,

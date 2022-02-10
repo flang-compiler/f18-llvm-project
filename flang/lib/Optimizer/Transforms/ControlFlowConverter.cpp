@@ -142,7 +142,7 @@ public:
     if (disableControlFlowLowering)
       return;
     auto &context = getContext();
-    mlir::OwningRewritePatternList patterns(&context);
+    mlir::RewritePatternSet patterns(&context);
     patterns.insert<SelectTypeOpConversion>(&context);
     mlir::populateAffineToStdConversionPatterns(patterns);
     mlir::ConversionTarget target(context);

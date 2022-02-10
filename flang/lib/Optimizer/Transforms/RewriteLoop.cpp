@@ -296,7 +296,7 @@ class CfgConversion : public CFGConversionBase<CfgConversion> {
 public:
   void runOnFunction() override {
     auto *context = &getContext();
-    mlir::OwningRewritePatternList patterns(context);
+    mlir::RewritePatternSet patterns(context);
     mlir::ConversionTarget target(*context);
     target.addLegalDialect<mlir::AffineDialect, FIROpsDialect,
                            mlir::arith::ArithmeticDialect,

@@ -1132,7 +1132,7 @@ struct TestMergeBlocksPatternDriver
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    mlir::RewritePatternSet patterns(context);
+    mlir::RewritePatternSet patterns(&context);
     patterns.add<TestMergeBlock, TestUndoBlocksMerge, TestMergeSingleBlockOps>(
         context);
     ConversionTarget target(*context);
@@ -1205,7 +1205,7 @@ struct TestSelectiveReplacementPatternDriver
   }
   void runOnOperation() override {
     MLIRContext *context = &getContext();
-    mlir::RewritePatternSet patterns(context);
+    mlir::RewritePatternSet patterns(&context);
     patterns.add<TestSelectiveOpReplacementPattern>(context);
     (void)applyPatternsAndFoldGreedily(getOperation()->getRegions(),
                                        std::move(patterns));

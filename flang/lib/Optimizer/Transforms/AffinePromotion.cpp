@@ -584,7 +584,7 @@ public:
     auto function = getFunction();
     markAllAnalysesPreserved();
     auto functionAnalysis = AffineFunctionAnalysis(function);
-    mlir::OwningRewritePatternList patterns(context);
+    mlir::RewritePatternSet patterns(context);
     patterns.insert<AffineIfConversion>(context, functionAnalysis);
     patterns.insert<AffineLoopConversion>(context, functionAnalysis);
     mlir::ConversionTarget target = *context;
