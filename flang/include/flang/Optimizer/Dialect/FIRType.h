@@ -197,6 +197,13 @@ bool isAllocatableType(mlir::Type ty);
 /// Return true iff `ty` is a RecordType with members that are allocatable.
 bool isRecordWithAllocatableMember(mlir::Type ty);
 
+/// Return true iff `ty` is a RecordType with type parameters.
+inline bool isRecordWithTypeParameters(mlir::Type ty) {
+  if (auto recTy = ty.dyn_cast_or_null<fir::RecordType>())
+    return recTy.getNumLenParams() != 0;
+  return false;
+}
+
 /// Apply the components specified by `path` to `rootTy` to determine the type
 /// of the resulting component element. `rootTy` should be an aggregate type.
 /// Returns null on error.

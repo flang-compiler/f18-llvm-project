@@ -244,8 +244,7 @@ public:
   bool isDerived() const { return getEleTy().isa<fir::RecordType>(); };
 
   bool isDerivedWithLengthParameters() const {
-    auto record = getEleTy().dyn_cast<fir::RecordType>();
-    return record && record.getNumLenParams() != 0;
+    return fir::isRecordWithTypeParameters(getEleTy());
   };
   /// Is this a CLASS(*)/TYPE(*) ?
   bool isUnlimitedPolymorphic() const {
