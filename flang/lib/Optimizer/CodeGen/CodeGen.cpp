@@ -454,15 +454,27 @@ struct AllocMemOpConversion : public FIROpConversion<fir::AllocMemOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::AllocMemOp heap, OperandTy operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto ty = convertType(heap.getType());
+    auto heapTy = heap.getType();
+    auto ty = convertType(heapTy);
     auto mallocFunc = getMalloc(heap, rewriter);
     auto loc = heap.getLoc();
     auto ity = lowerTy().indexType();
-    if (auto recTy =
-            fir::unwrapSequenceType(heap.getType()).dyn_cast<fir::RecordType>())
-      if (recTy.getNumLenParams() != 0)
-        TODO(loc, "fir.allocmem of derived type with length parameters");
+    if (fir::isRecordWithTypeParameters(fir::unwrapSequenceType(heapTy)))
+      TODO(loc, "fir.allocmem of derived type with length parameters");
     auto size = genTypeSizeInBytes(loc, ity, rewriter, ty);
+    // !fir.array<NxMx!fir.char<K,?>> sets `size` to the width of !fir.char<K>.
+    // So multiple the constant dimensions here.
+    auto dataTy = fir::unwrapRefType(heapTy);
+    if (fir::hasDynamicSize(dataTy))
+      if (auto seqTy = dataTy.dyn_cast<fir::SequenceType>())
+        if (fir::characterWithDynamicLen(seqTy.getEleTy())) {
+          fir::SequenceType::Extent arrSize = 1;
+          for (auto d : seqTy.getShape())
+            if (d != fir::SequenceType::getUnknownExtent())
+              arrSize *= d;
+          size = rewriter.create<mlir::LLVM::MulOp>(
+              loc, ity, size, genConstantIndex(loc, ity, rewriter, arrSize));
+        }
     for (auto opnd : operands)
       size = rewriter.create<mlir::LLVM::MulOp>(
           loc, ity, size, integerCast(loc, rewriter, ity, opnd));

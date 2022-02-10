@@ -58,3 +58,24 @@ func @array_with_holes(%0 : index, %1 : index) -> !fir.ref<!fir.array<4x?x3x?x5x
   %a = fir.alloca !fir.array<4x?x3x?x5xi32>, %0, %1
   return %a : !fir.ref<!fir.array<4x?x3x?x5xi32>>
 }
+
+// CHECK-LABEL: define void @allocmem_array_of_dynchar(
+// CHECK-SAME: i64 %[[arg:.*]])
+// CHECK: %[[mul:.*]] = mul i64 9, %[[arg]]
+// CHECK: %[[malloc:.*]] = call i8* @malloc(i64 %[[mul]])
+// CHECK: ret void
+func @allocmem_array_of_dynchar(%arg0: index) {
+  %1 = fir.allocmem !fir.array<3x3x!fir.char<1,?>>(%arg0 : index)
+  return
+}
+
+// CHECK-LABEL: define void @allocmem_dynarray_of_dynchar(
+// CHECK-SAME: i64 %[[len:.*]], i64 %[[extent:.*]])
+// CHECK: %[[a:.*]] = mul i64 24, %[[len]]
+// CHECK: %[[b:.*]] = mul i64 %[[a]], %[[extent]]
+// CHECK: %[[malloc:.*]] = call i8* @malloc(i64 %[[b]])
+// CHECK: ret void
+func @allocmem_dynarray_of_dynchar(%arg0: index, %arg1: index) {
+  %1 = fir.allocmem !fir.array<3x?x4x!fir.char<2,?>>(%arg0 : index), %arg1
+  return
+}
