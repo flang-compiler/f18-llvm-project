@@ -50,7 +50,7 @@ set(FLANG_TEST_DEPENDS
   opt llc
   tco bbc
   fir-opt
-  llvm-objdump
+  llvm-objdump llvm-dis
   FortranRuntime FortranDecimal Fortran_main
 )
 
