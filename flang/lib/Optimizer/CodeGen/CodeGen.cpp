@@ -459,12 +459,12 @@ struct AllocMemOpConversion : public FIROpConversion<fir::AllocMemOp> {
     auto mallocFunc = getMalloc(heap, rewriter);
     auto loc = heap.getLoc();
     auto ity = lowerTy().indexType();
-    if (fir::isRecordWithTypeParameters(fir::unwrapSequenceType(heapTy)))
+    auto dataTy = fir::unwrapRefType(heapTy);
+    if (fir::isRecordWithTypeParameters(fir::unwrapSequenceType(dataTy)))
       TODO(loc, "fir.allocmem of derived type with length parameters");
     auto size = genTypeSizeInBytes(loc, ity, rewriter, ty);
     // !fir.array<NxMx!fir.char<K,?>> sets `size` to the width of !fir.char<K>.
     // So multiple the constant dimensions here.
-    auto dataTy = fir::unwrapRefType(heapTy);
     if (fir::hasDynamicSize(dataTy))
       if (auto seqTy = dataTy.dyn_cast<fir::SequenceType>())
         if (fir::characterWithDynamicLen(seqTy.getEleTy())) {
