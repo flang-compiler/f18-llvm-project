@@ -464,7 +464,7 @@ struct AllocMemOpConversion : public FIROpConversion<fir::AllocMemOp> {
       TODO(loc, "fir.allocmem of derived type with length parameters");
     auto size = genTypeSizeInBytes(loc, ity, rewriter, ty);
     // !fir.array<NxMx!fir.char<K,?>> sets `size` to the width of !fir.char<K>.
-    // So multiple the constant dimensions here.
+    // So multiply the constant dimensions here.
     if (fir::hasDynamicSize(dataTy))
       if (auto seqTy = dataTy.dyn_cast<fir::SequenceType>())
         if (fir::characterWithDynamicLen(seqTy.getEleTy())) {
