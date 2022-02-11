@@ -1,4 +1,6 @@
-// RUN: fir-opt %s | tco | FileCheck %s
+// RUN: tco %s | FileCheck %s
+
+// UNSUPPORTED: system-windows
 
 // CHECK-LABEL: define i32* @f1()
 func @f1() -> !fir.ref<i32> {
