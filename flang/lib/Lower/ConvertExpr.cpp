@@ -6568,7 +6568,10 @@ private:
         return genImplicitArrayAccess(x, components);
     }
     bool atEnd = pathIsEmpty(components);
-    components.reversePath.push_back(&x);
+    if (!x.GetLastSymbol().test(Fortran::semantics::Symbol::Flag::ParentComp))
+      // Skip parent components; their components are placed directly in the
+      // object.
+      components.reversePath.push_back(&x);
     auto result = genarr(x.base(), components);
     if (components.applied)
       return result;
