@@ -10,21 +10,21 @@ subroutine foo()
   type(sometype), allocatable, save :: x(:)
 end subroutine
 
-! CHECK-DAG: fir.global internal @_QFfooE.n.num("num") : !fir.char<1,3>
-! CHECK-DAG: fir.global internal @_QFfooE.n.values("values") : !fir.char<1,6>
-! CHECK-DAG: fir.global internal @_QFfooE.di.sometype.num : i32
-! CHECK-DAG: fir.global internal @_QFfooE.n.sometype("sometype") : !fir.char<1,8>
+! CHECK-DAG: fir.global internal @_QFfooE.n.num("num") constant : !fir.char<1,3>
+! CHECK-DAG: fir.global internal @_QFfooE.n.values("values") constant : !fir.char<1,6>
+! CHECK-DAG: fir.global internal @_QFfooE.di.sometype.num constant : i32
+! CHECK-DAG: fir.global internal @_QFfooE.n.sometype("sometype") constant : !fir.char<1,8>
 
-! CHECK-LABEL: fir.global internal @_QFfooE.di.sometype.values : !fir.type<_QFfooT.dp.sometype.values{values:!fir.box<!fir.ptr<!fir.array<?x?xf32>>>}> {
+! CHECK-LABEL: fir.global internal @_QFfooE.di.sometype.values constant : !fir.type<_QFfooT.dp.sometype.values{values:!fir.box<!fir.ptr<!fir.array<?x?xf32>>>}> {
   ! CHECK: fir.address_of(@_QFfooEinit_values)
 ! CHECK: }
 
-! CHECK-LABEL: fir.global internal @_QFfooE.dt.sometype {{.*}} {
+! CHECK-LABEL: fir.global internal @_QFfooE.dt.sometype constant {{.*}} {
   !CHECK: fir.address_of(@_QFfooE.n.sometype)
   !CHECK: fir.address_of(@_QFfooE.c.sometype)
 ! CHECK:}
 
-! CHECK-LABEL: fir.global internal @_QFfooE.c.sometype {{.*}} {
+! CHECK-LABEL: fir.global internal @_QFfooE.c.sometype constant {{.*}} {
   ! CHECK: fir.address_of(@_QFfooE.n.num)
   ! CHECK: fir.address_of(@_QFfooE.di.sometype.num) : !fir.ref<i32>
   ! CHECK: fir.address_of(@_QFfooE.n.values)
@@ -39,7 +39,7 @@ subroutine char_comp_init()
   type(t) :: a
 end subroutine
 
-! CHECK-LABEL: fir.global internal @_QFchar_comp_initE.di.t.name("Empty   ") : !fir.char<1,8>
-! CHECK-LABEL: fir.global internal @_QFchar_comp_initE.c.t : {{.*}} {
+! CHECK-LABEL: fir.global internal @_QFchar_comp_initE.di.t.name("Empty   ") constant : !fir.char<1,8>
+! CHECK-LABEL: fir.global internal @_QFchar_comp_initE.c.t constant : {{.*}} {
   ! CHECK: fir.address_of(@_QFchar_comp_initE.di.t.name) : !fir.ref<!fir.char<1,8>>
 ! CHECK: }

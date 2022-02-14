@@ -118,6 +118,12 @@ genInitializerExprValue(Fortran::lower::AbstractConverter &converter,
                                                          emptyMap, stmtCtx);
 }
 
+/// Can this symbol constant be placed in read-only memory?
+static bool isConstant(const Fortran::semantics::Symbol &sym) {
+  return sym.attrs().test(Fortran::semantics::Attr::PARAMETER) ||
+         sym.test(Fortran::semantics::Symbol::Flag::ReadOnly);
+}
+
 /// Create the global op declaration without any initializer
 static fir::GlobalOp declareGlobal(Fortran::lower::AbstractConverter &converter,
                                    const Fortran::lower::pft::Variable &var,
@@ -135,7 +141,8 @@ static fir::GlobalOp declareGlobal(Fortran::lower::AbstractConverter &converter,
       !ultimate.has<Fortran::semantics::ProcEntityDetails>())
     mlir::emitError(loc, "lowering global declaration: symbol '")
         << toStringRef(sym.name()) << "' has unexpected details\n";
-  return builder.createGlobal(loc, converter.genType(var), globalName, linkage);
+  return builder.createGlobal(loc, converter.genType(var), globalName, linkage,
+                              mlir::Attribute{}, isConstant(ultimate));
 }
 
 /// Temporary helper to catch todos in initial data target lowering.
@@ -383,7 +390,7 @@ static fir::GlobalOp defineGlobal(Fortran::lower::AbstractConverter &converter,
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   const Fortran::semantics::Symbol &sym = var.getSymbol();
   mlir::Location loc = converter.genLocation(sym.name());
-  bool isConst = sym.attrs().test(Fortran::semantics::Attr::PARAMETER);
+  bool isConst = isConstant(sym);
   fir::GlobalOp global = builder.getNamedGlobal(globalName);
   mlir::Type symTy = converter.genType(var);
 
