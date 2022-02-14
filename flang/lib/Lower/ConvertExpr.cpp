@@ -3283,13 +3283,16 @@ public:
         mutableBox.isDerivedWithLengthParameters())
       TODO(loc, "gather rhs length parameters in assignment to allocatable");
 
-    // The allocatable must take lower bounds from the expr if reallocated.
-    // An expr has lbounds only if it is an array symbol or component.
+    // The allocatable must take lower bounds from the expr if it is
+    // reallocated and the right hand side is not a scalar.
+    const bool takeLboundsIfRealloc = rhs.Rank() > 0;
     llvm::SmallVector<mlir::Value> lbounds;
-    // takeLboundsIfRealloc is only true iff the rhs is a single dataref.
-    const bool takeLboundsIfRealloc =
-        Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(rhs);
-    if (takeLboundsIfRealloc && !arrayOperands.empty()) {
+    // When the reallocated LHS takes its lower bounds from the RHS,
+    // they will be non default only if the RHS is a whole array
+    // variable. Otherwise, lbounds is left empty and default lower bounds
+    // will be used.
+    if (takeLboundsIfRealloc &&
+        Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(rhs)) {
       assert(arrayOperands.size() == 1 &&
              "lbounds can only come from one array");
       std::vector<mlir::Value> lbs =
