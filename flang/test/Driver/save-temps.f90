@@ -30,11 +30,11 @@
 ! regardless of whether -o is specified.
 
 ! RUN: %flang -save-temps=obj -fno-integrated-as -o obj/dir/a.out %s -### 2>&1 | FileCheck %s -check-prefix=CHECK-OBJ
-! CHECK-OBJ: "-o" "obj/dir{{/|\\\\}}save-temps.i"
-! CHECK-OBJ-NEXT: "-o" "obj/dir{{/|\\\\}}save-temps.bc"
-! CHECK-OBJ-NEXT: "-o" "obj/dir{{/|\\\\}}save-temps.s"
-! CHECK-OBJ-NEXT: "-o" "obj/dir{{/|\\\\}}save-temps.o"
-! CHECK-OBJ-NEXT: "-o" "obj/dir{{/|\\\\}}a.out"
+! CHECK-OBJ: "-o" "obj/dir/save-temps.i"
+! CHECK-OBJ-NEXT: "-o" "obj/dir/save-temps.bc"
+! CHECK-OBJ-NEXT: "-o" "obj/dir/save-temps.s"
+! CHECK-OBJ-NEXT: "-o" "obj/dir/save-temps.o"
+! CHECK-OBJ-NEXT: "-o" "obj/dir/a.out"
 
 ! RUN: %flang -save-temps=obj -fno-integrated-as %s -### 2>&1 | FileCheck %s -check-prefix=CHECK-OBJ-NOO
 ! CHECK-OBJ-NOO: "-o" "save-temps.i"
