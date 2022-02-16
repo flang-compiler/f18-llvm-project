@@ -41,8 +41,7 @@ end subroutine test_forall_with_array_assignment
 ! CHECK:           %[[VAL_22:.*]] = fir.convert %[[VAL_21]] : (i64) -> index
 ! CHECK:           %[[VAL_23:.*]] = arith.subi %[[VAL_22]], %[[VAL_19]] : index
 ! CHECK:           %[[VAL_24:.*]] = fir.field_index block1, !fir.type<_QFtest_forall_with_array_assignmentTt{block1:!fir.array<64xi64>,block2:!fir.array<64xi64>}>
-! CHECK:           %[[VAL_25:.*]] = arith.constant 64 : i64
-! CHECK:           %[[VAL_26:.*]] = fir.convert %[[VAL_25]] : (i64) -> index
+! CHECK:           %[[VAL_26:.*]] = arith.constant 64 : index
 ! CHECK:           %[[VAL_27:.*]] = arith.constant 1 : index
 ! CHECK-DAG:       %[[VAL_28:.*]] = fir.load %[[VAL_2]] : !fir.ref<i32>
 ! CHECK-DAG:       %[[VAL_29:.*]] = arith.constant 1 : i32

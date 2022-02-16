@@ -5,8 +5,7 @@
   ! CHECK:         %[[VAL_1:.*]] = arith.constant 10 : index
   ! CHECK:         %[[VAL_2:.*]] = fir.address_of(@_QFEb) : !fir.ref<!fir.array<10xf32>>
   ! CHECK:         %[[VAL_3:.*]] = arith.constant 10 : index
-  ! CHECK:         %[[VAL_4:.*]] = arith.constant 10 : i64
-  ! CHECK:         %[[VAL_5:.*]] = fir.convert %[[VAL_4]] : (i64) -> index
+  ! CHECK:         %[[VAL_5:.*]] = arith.constant 10 : index
   ! CHECK:         %[[VAL_6:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
   ! CHECK:         %[[VAL_7:.*]] = fir.array_load %[[VAL_0]](%[[VAL_6]]) : (!fir.ref<!fir.array<10xf32>>, !fir.shape<1>) -> !fir.array<10xf32>
   ! CHECK:         %[[VAL_8:.*]] = arith.constant 4.000000e+00 : f32
@@ -50,8 +49,7 @@
   ! CHECK:         }
   ! CHECK:         fir.array_merge_store %[[VAL_25]], %[[VAL_44:.*]] to %[[VAL_2]] : !fir.array<10xf32>, !fir.array<10xf32>, !fir.ref<!fir.array<10xf32>>
   ! CHECK:         fir.freemem %[[VAL_9]] : !fir.heap<!fir.array<10x!fir.logical<4>>>
-  ! CHECK:         %[[VAL_45:.*]] = arith.constant 10 : i64
-  ! CHECK:         %[[VAL_46:.*]] = fir.convert %[[VAL_45]] : (i64) -> index
+  ! CHECK:         %[[VAL_46:.*]] = arith.constant 10 : index
   ! CHECK:         %[[VAL_47:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
   ! CHECK:         %[[VAL_48:.*]] = fir.array_load %[[VAL_0]](%[[VAL_47]]) : (!fir.ref<!fir.array<10xf32>>, !fir.shape<1>) -> !fir.array<10xf32>
   ! CHECK:         %[[VAL_49:.*]] = arith.constant 1.000000e+02 : f32
@@ -95,8 +93,7 @@
   ! CHECK:           fir.result %[[VAL_85:.*]] : !fir.array<10xf32>
   ! CHECK:         }
   ! CHECK:         fir.array_merge_store %[[VAL_66]], %[[VAL_86:.*]] to %[[VAL_2]] : !fir.array<10xf32>, !fir.array<10xf32>, !fir.ref<!fir.array<10xf32>>
-  ! CHECK:         %[[VAL_87:.*]] = arith.constant 10 : i64
-  ! CHECK:         %[[VAL_88:.*]] = fir.convert %[[VAL_87]] : (i64) -> index
+  ! CHECK:         %[[VAL_88:.*]] = arith.constant 10 : index
   ! CHECK:         %[[VAL_89:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
   ! CHECK:         %[[VAL_90:.*]] = fir.array_load %[[VAL_0]](%[[VAL_89]]) : (!fir.ref<!fir.array<10xf32>>, !fir.shape<1>) -> !fir.array<10xf32>
   ! CHECK:         %[[VAL_91:.*]] = arith.constant 5.000000e+01 : f32

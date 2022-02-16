@@ -193,19 +193,6 @@ translateFloatRelational(Fortran::common::RelationalOperator rop) {
   llvm_unreachable("unhandled REAL relational operator");
 }
 
-/// Lower `opt` (from front-end shape analysis) to MLIR. If `opt` is `nullopt`
-/// then issue an error.
-static mlir::Value
-convertOptExtentExpr(Fortran::lower::AbstractConverter &converter,
-                     Fortran::lower::StatementContext &stmtCtx,
-                     const Fortran::evaluate::MaybeExtentExpr &opt) {
-  mlir::Location loc = converter.getCurrentLocation();
-  if (!opt.has_value())
-    fir::emitFatalError(loc, "shape analysis failed to return an expression");
-  Fortran::lower::SomeExpr e = toEvExpr(*opt);
-  return fir::getBase(converter.genExprValue(&e, stmtCtx, loc));
-}
-
 static mlir::Value genActualIsPresentTest(fir::FirOpBuilder &builder,
                                           mlir::Location loc,
                                           fir::ExtendedValue actual) {
@@ -3268,12 +3255,12 @@ public:
     fir::MutableBoxValue mutableBox =
         createMutableBox(loc, converter, lhs, symMap);
     mlir::Type resultTy = converter.genType(rhs);
+    if (rhs.Rank() > 0)
+      determineShapeOfDest(rhs);
     auto rhsCC = [&]() {
       PushSemantics(ConstituentSemantics::RefTransparent);
       return genarr(rhs);
     }();
-    if (!arrayOperands.empty())
-      destShape = getShape(getInducingShapeArrayOperand());
 
     llvm::SmallVector<mlir::Value> lengthParams;
     // Currently no safe way to gather length from rhs (at least for
@@ -3629,9 +3616,13 @@ private:
       return;
     if (explicitSpaceIsActive() && determineShapeWithSlice(lhs))
       return;
-    if (std::optional<Fortran::evaluate::Shape> shape =
-            Fortran::evaluate::GetShape(converter.getFoldingContext(), lhs))
-      convertFEShape(shape.value(), destShape);
+    mlir::Type idxTy = builder.getIndexType();
+    mlir::Location loc = getLoc();
+    if (std::optional<Fortran::evaluate::ConstantSubscripts> constantShape =
+            Fortran::evaluate::GetConstantExtents(converter.getFoldingContext(),
+                                                  lhs))
+      for (Fortran::common::ConstantSubscript extent : *constantShape)
+        destShape.push_back(builder.createIntegerConstant(loc, idxTy, extent));
   }
 
   bool genShapeFromDataRef(const Fortran::semantics::Symbol &x) {
@@ -3705,26 +3696,6 @@ private:
     std::optional<Fortran::evaluate::DataRef> dref =
         Fortran::evaluate::ExtractDataRef(lhs);
     return dref.has_value() ? genShapeFromDataRef(*dref) : false;
-  }
-
-  /// Returns true iff the Ev::Shape is constant.
-  static bool evalShapeIsConstant(const Fortran::evaluate::Shape &shape) {
-    for (const auto &s : shape)
-      if (!s || !Fortran::evaluate::IsConstantExpr(*s))
-        return false;
-    return true;
-  }
-
-  /// Convert an Ev::Shape to IR values.
-  void convertFEShape(const Fortran::evaluate::Shape &shape,
-                      llvm::SmallVectorImpl<mlir::Value> &result) {
-    if (evalShapeIsConstant(shape)) {
-      mlir::IndexType idxTy = builder.getIndexType();
-      mlir::Location loc = getLoc();
-      for (const auto &s : shape)
-        result.emplace_back(builder.createConvert(
-            loc, idxTy, convertOptExtentExpr(converter, stmtCtx, s)));
-    }
   }
 
   /// CHARACTER and derived type elements are treated as memory references. The
@@ -5282,27 +5253,6 @@ private:
     }
     return result;
   }
-  llvm::SmallVector<mlir::Value>
-  getShape(const Fortran::semantics::SymbolRef &x) {
-    if (x.get().Rank() == 0)
-      return {};
-    return getFrontEndShape(x);
-  }
-  template <typename A>
-  llvm::SmallVector<mlir::Value> getShape(const A &x) {
-    if (x.Rank() == 0)
-      return {};
-    return getFrontEndShape(x);
-  }
-  template <typename A>
-  llvm::SmallVector<mlir::Value> getFrontEndShape(const A &x) {
-    if (auto optShape = Fortran::evaluate::GetShape(x)) {
-      llvm::SmallVector<mlir::Value> result;
-      convertFEShape(*optShape, result);
-      return result;
-    }
-    return {};
-  }
 
   CC genarr(const Fortran::semantics::SymbolRef &sym,
             ComponentPath &components) {
@@ -5325,17 +5275,6 @@ private:
     mlir::Type arrTy = fir::dyn_cast_ptrOrBoxEleTy(memref.getType());
     assert(arrTy.isa<fir::SequenceType>() && "memory ref must be an array");
     mlir::Value shape = builder.createShape(loc, extMemref);
-    if (destShape.empty()) {
-      if (shape) {
-        std::vector<mlir::Value, std::allocator<mlir::Value>> extents =
-            fir::factory::getExtents(shape);
-        destShape.assign(extents.begin(), extents.end());
-      } else {
-        llvm::SmallVector<mlir::Value> extents =
-            fir::factory::getExtents(builder, loc, extMemref);
-        destShape.assign(extents.begin(), extents.end());
-      }
-    }
     mlir::Value slice;
     if (components.isSlice()) {
       if (isBoxValue() && components.substring) {
@@ -5401,6 +5340,8 @@ private:
       }
     }
     arrayOperands.push_back(ArrayOperand{memref, shape, slice});
+    if (destShape.empty())
+      destShape = getShape(arrayOperands.back());
     if (isBoxValue()) {
       // Semantics are a reference to a boxed array.
       // This case just requires that an embox operation be created to box the

@@ -226,12 +226,18 @@ end subroutine array_substring_assignment
 ! CHECK:         %[[VAL_3:.*]] = fir.shape %[[VAL_1]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_4:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_5:.*]] = fir.slice %[[VAL_4]], %[[VAL_1]], %[[VAL_4]] path %[[VAL_2]] : (index, index, index, !fir.field) -> !fir.slice<1>
+! CHECK:         %[[c0:.*]] = arith.constant 0 : index
+! CHECK:         %[[sub:.*]] = arith.subi %[[VAL_1]], %[[VAL_4]] : index
+! CHECK:         %[[add:.*]] = arith.addi %[[sub]], %[[VAL_4]] : index
+! CHECK:         %[[div:.*]] = arith.divsi %4, %[[VAL_4]] : index
+! CHECK:         %[[cmp:.*]] = arith.cmpi sgt, %[[div]], %[[c0]] : index
+! CHECK:         %[[select:.*]] = select %[[cmp]], %[[div]], %[[c0]] : index
 ! CHECK:         %[[VAL_6:.*]] = fir.array_load %[[VAL_0]](%[[VAL_3]]) {{\[}}%[[VAL_5]]] : (!fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment2Tt{ch:!fir.char<1,7>}>>>, !fir.shape<1>, !fir.slice<1>) -> !fir.array<8x!fir.char<1,7>>
 ! CHECK:         %[[VAL_7:.*]] = fir.address_of(@_QQcl.6E696365) : !fir.ref<!fir.char<1,4>>
 ! CHECK:         %[[VAL_8:.*]] = arith.constant 4 : index
 ! CHECK:         %[[VAL_9:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_10:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_11:.*]] = arith.subi %[[VAL_1]], %[[VAL_9]] : index
+! CHECK:         %[[VAL_11:.*]] = arith.subi %[[select]], %[[VAL_9]] : index
 ! CHECK:         %[[VAL_12:.*]] = fir.do_loop %[[VAL_13:.*]] = %[[VAL_10]] to %[[VAL_11]] step %[[VAL_9]] unordered iter_args(%[[VAL_14:.*]] = %[[VAL_6]]) -> (!fir.array<8x!fir.char<1,7>>) {
 ! CHECK:           %[[VAL_15:.*]] = fir.array_access %[[VAL_14]], %[[VAL_13]] : (!fir.array<8x!fir.char<1,7>>, index) -> !fir.ref<!fir.char<1,7>>
 ! CHECK:           %[[VAL_16:.*]] = arith.constant 4 : i64
@@ -312,6 +318,12 @@ end subroutine array_substring_assignment2
 ! CHECK:         %[[VAL_5:.*]] = fir.shape %[[VAL_2]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_6:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_7:.*]] = fir.slice %[[VAL_6]], %[[VAL_2]], %[[VAL_6]] path %[[VAL_4]] : (index, index, index, !fir.field) -> !fir.slice<1>
+! CHECK:         %[[c0:.*]] = arith.constant 0 : index
+! CHECK:         %[[sub:.*]] = arith.subi %[[VAL_2]], %[[VAL_6]] : index
+! CHECK:         %[[add:.*]] = arith.addi %[[sub]], %[[VAL_6]] : index
+! CHECK:         %[[div:.*]] = arith.divsi %4, %[[VAL_6]] : index
+! CHECK:         %[[cmp:.*]] = arith.cmpi sgt, %[[div]], %[[c0]] : index
+! CHECK:         %[[select:.*]] = select %[[cmp]], %[[div]], %[[c0]] : index
 ! CHECK:         %[[VAL_8:.*]] = fir.array_load %[[VAL_0]](%[[VAL_5]]) {{\[}}%[[VAL_7]]] : (!fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>, !fir.shape<1>, !fir.slice<1>) -> !fir.array<8x!fir.char<1,7>>
 ! CHECK:         %[[VAL_9:.*]] = fir.field_index ch, !fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>
 ! CHECK:         %[[VAL_10:.*]] = fir.shape %[[VAL_3]] : (index) -> !fir.shape<1>
@@ -320,7 +332,7 @@ end subroutine array_substring_assignment2
 ! CHECK:         %[[VAL_13:.*]] = fir.array_load %[[VAL_1]](%[[VAL_10]]) {{\[}}%[[VAL_12]]] : (!fir.ref<!fir.array<8x!fir.type<_QFarray_substring_assignment3Tt{ch:!fir.char<1,7>}>>>, !fir.shape<1>, !fir.slice<1>) -> !fir.array<8x!fir.char<1,7>>
 ! CHECK:         %[[VAL_14:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_15:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_16:.*]] = arith.subi %[[VAL_2]], %[[VAL_14]] : index
+! CHECK:         %[[VAL_16:.*]] = arith.subi %[[select]], %[[VAL_14]] : index
 ! CHECK:         %[[VAL_17:.*]] = fir.do_loop %[[VAL_18:.*]] = %[[VAL_15]] to %[[VAL_16]] step %[[VAL_14]] unordered iter_args(%[[VAL_19:.*]] = %[[VAL_8]]) -> (!fir.array<8x!fir.char<1,7>>) {
 ! CHECK:           %[[VAL_20:.*]] = fir.array_access %[[VAL_13]], %[[VAL_18]] : (!fir.array<8x!fir.char<1,7>>, index) -> !fir.ref<!fir.char<1,7>>
 ! CHECK:           %[[VAL_21:.*]] = arith.constant 2 : i64

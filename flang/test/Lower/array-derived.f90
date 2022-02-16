@@ -43,12 +43,14 @@ contains
 ! CHECK:         %[[VAL_7:.*]] = fir.field_index d, !fir.type<_QMcsTr{n:i32,d:i32}>
 ! CHECK:         %[[VAL_8:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_4]] : (!fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_9:.*]] = fir.slice %[[VAL_5]], %[[VAL_8]]#1, %[[VAL_5]] path %[[VAL_6]], %[[VAL_7]] : (index, index, index, !fir.field, !fir.field) -> !fir.slice<1>
+! CHECK:         %[[VAL_8_2:.*]] = arith.cmpi sgt, %[[VAL_8]]#1, %[[VAL_4]] : index
+! CHECK:         %[[VAL_8_3:.*]] = select %[[VAL_8_2]], %[[VAL_8]]#1, %[[VAL_4]] : index
 ! CHECK:         %[[VAL_10:.*]] = fir.field_index f1, !fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>
 ! CHECK:         %[[VAL_11:.*]]:3 = fir.box_dims %[[VAL_1]], %[[VAL_4]] : (!fir.box<!fir.array<?x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_12:.*]] = fir.slice %[[VAL_5]], %[[VAL_11]]#1, %[[VAL_5]] path %[[VAL_10]], %[[VAL_4]] : (index, index, index, !fir.field, index) -> !fir.slice<1>
 ! CHECK:         %[[VAL_13:.*]] = fir.slice %[[VAL_5]], %[[VAL_11]]#1, %[[VAL_5]] path %[[VAL_10]], %[[VAL_3]] : (index, index, index, !fir.field, index) -> !fir.slice<1>
 ! CHECK:         %[[VAL_14:.*]] = fir.slice %[[VAL_5]], %[[VAL_11]]#1, %[[VAL_5]] path %[[VAL_10]], %[[VAL_2]] : (index, index, index, !fir.field, index) -> !fir.slice<1>
-! CHECK:         br ^bb1(%[[VAL_4]], %[[VAL_8]]#1 : index, index)
+! CHECK:         br ^bb1(%[[VAL_4]], %[[VAL_8_3]] : index, index)
 ! CHECK:       ^bb1(%[[VAL_15:.*]]: index, %[[VAL_16:.*]]: index):
 ! CHECK:         %[[VAL_17:.*]] = arith.cmpi sgt, %[[VAL_16]], %[[VAL_4]] : index
 ! CHECK:         cond_br %[[VAL_17]], ^bb2, ^bb3
@@ -88,10 +90,12 @@ contains
 ! CHECK:         %[[VAL_9:.*]] = fir.field_index n, !fir.type<_QMcsTr{n:i32,d:i32}>
 ! CHECK:         %[[VAL_10:.*]]:3 = fir.box_dims %[[VAL_0]], %[[VAL_6]] : (!fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_11:.*]] = fir.slice %[[VAL_5]], %[[VAL_10]]#1, %[[VAL_5]] path %[[VAL_7]], %[[VAL_6]], %[[VAL_6]], %[[VAL_8]], %[[VAL_9]] : (index, index, index, !fir.field, index, index, !fir.field, !fir.field) -> !fir.slice<1>
+! CHECK:         %[[VAL_10_2:.*]] = arith.cmpi sgt, %[[VAL_10]]#1, %[[VAL_6]] : index
+! CHECK:         %[[VAL_10_3:.*]] = select %[[VAL_10_2]], %[[VAL_10]]#1, %[[VAL_6]] : index
 ! CHECK:         %[[VAL_12:.*]] = fir.field_index f1, !fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>
 ! CHECK:         %[[VAL_13:.*]]:3 = fir.box_dims %[[VAL_1]], %[[VAL_6]] : (!fir.box<!fir.array<?x!fir.type<_QMcsTt3{f:!fir.array<3x3x!fir.type<_QMcsTt2{f1:!fir.array<5xi32>,f2:!fir.type<_QMcsTr{n:i32,d:i32}>}>>}>>>, index) -> (index, index, index)
 ! CHECK:         %[[VAL_14:.*]] = fir.slice %[[VAL_5]], %[[VAL_13]]#1, %[[VAL_5]] path %[[VAL_7]], %[[VAL_5]], %[[VAL_5]], %[[VAL_12]], %[[VAL_3]] : (index, index, index, !fir.field, index, index, !fir.field, index) -> !fir.slice<1>
-! CHECK:         br ^bb1(%[[VAL_6]], %[[VAL_10]]#1 : index, index)
+! CHECK:         br ^bb1(%[[VAL_6]], %[[VAL_10_3]] : index, index)
 ! CHECK:       ^bb1(%[[VAL_15:.*]]: index, %[[VAL_16:.*]]: index):
 ! CHECK:         %[[VAL_17:.*]] = arith.cmpi sgt, %[[VAL_16]], %[[VAL_6]] : index
 ! CHECK:         cond_br %[[VAL_17]], ^bb2, ^bb3
@@ -106,9 +110,11 @@ contains
 ! CHECK:         br ^bb1(%[[VAL_18]], %[[VAL_23]] : index, index)
 ! CHECK:       ^bb3:
 ! CHECK:         %[[VAL_24:.*]] = fir.slice %[[VAL_5]], %[[VAL_13]]#1, %[[VAL_5]] path %[[VAL_7]], %[[VAL_2]], %[[VAL_2]], %[[VAL_12]], %[[VAL_5]] : (index, index, index, !fir.field, index, index, !fir.field, index) -> !fir.slice<1>
+! CHECK:         %[[VAL_13_2:.*]] = arith.cmpi sgt, %[[VAL_13]]#1, %[[VAL_6]] : index
+! CHECK:         %[[VAL_13_3:.*]] = select %[[VAL_13_2]], %[[VAL_13]]#1, %[[VAL_6]] : index
 ! CHECK:         %[[VAL_25:.*]] = fir.field_index d, !fir.type<_QMcsTr{n:i32,d:i32}>
 ! CHECK:         %[[VAL_26:.*]] = fir.slice %[[VAL_5]], %[[VAL_10]]#1, %[[VAL_5]] path %[[VAL_7]], %[[VAL_6]], %[[VAL_5]], %[[VAL_8]], %[[VAL_25]] : (index, index, index, !fir.field, index, index, !fir.field, !fir.field) -> !fir.slice<1>
-! CHECK:         br ^bb4(%[[VAL_6]], %[[VAL_13]]#1 : index, index)
+! CHECK:         br ^bb4(%[[VAL_6]], %[[VAL_13_3]] : index, index)
 ! CHECK:       ^bb4(%[[VAL_27:.*]]: index, %[[VAL_28:.*]]: index):
 ! CHECK:         %[[VAL_29:.*]] = arith.cmpi sgt, %[[VAL_28]], %[[VAL_6]] : index
 ! CHECK:         cond_br %[[VAL_29]], ^bb5, ^bb6

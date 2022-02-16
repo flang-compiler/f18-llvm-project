@@ -336,18 +336,17 @@ end subroutine test10
 ! CHECK:         %[[VAL_9:.*]] = fir.array_load %[[VAL_0]](%[[VAL_8]]) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
 ! CHECK:         %[[VAL_10:.*]] = fir.shape %[[VAL_5]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_11:.*]] = fir.array_load %[[VAL_1]](%[[VAL_10]]) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
-! CHECK:         %[[VAL_12:.*]] = arith.constant 100 : i64
-! CHECK:         %[[VAL_13:.*]] = fir.convert %[[VAL_12]] : (i64) -> index
+! CHECK:         %[[VAL_12:.*]] = arith.constant 100 : index
 ! CHECK:         %[[VAL_14:.*]] = fir.shape %[[VAL_6]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_15:.*]] = fir.array_load %[[VAL_2]](%[[VAL_14]]) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
 ! CHECK:         %[[VAL_16:.*]] = fir.shape %[[VAL_7]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_17:.*]] = fir.array_load %[[VAL_3]](%[[VAL_16]]) : (!fir.ref<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
 ! CHECK:         %[[VAL_18:.*]] = fir.allocmem !fir.array<100xf32>
-! CHECK:         %[[VAL_19:.*]] = fir.shape %[[VAL_13]] : (index) -> !fir.shape<1>
+! CHECK:         %[[VAL_19:.*]] = fir.shape %[[VAL_12]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_20:.*]] = fir.array_load %[[VAL_18]](%[[VAL_19]]) : (!fir.heap<!fir.array<100xf32>>, !fir.shape<1>) -> !fir.array<100xf32>
 ! CHECK:         %[[VAL_21:.*]] = arith.constant 1 : index
 ! CHECK:         %[[VAL_22:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_23:.*]] = arith.subi %[[VAL_13]], %[[VAL_21]] : index
+! CHECK:         %[[VAL_23:.*]] = arith.subi %[[VAL_12]], %[[VAL_21]] : index
 ! CHECK:         %[[VAL_24:.*]] = fir.do_loop %[[VAL_25:.*]] = %[[VAL_22]] to %[[VAL_23]] step %[[VAL_21]] unordered iter_args(%[[VAL_26:.*]] = %[[VAL_20]]) -> (!fir.array<100xf32>) {
 ! CHECK:           %[[VAL_27:.*]] = fir.array_fetch %[[VAL_15]], %[[VAL_25]] : (!fir.array<100xf32>, index) -> f32
 ! CHECK:           %[[VAL_28:.*]] = fir.array_fetch %[[VAL_17]], %[[VAL_25]] : (!fir.array<100xf32>, index) -> f32
@@ -1120,8 +1119,7 @@ end subroutine test19h
 ! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (!fir.ref<!fir.char<1,{{.*}}>>) -> !fir.ref<i8>
 ! CHECK:         %[[VAL_12:.*]] = arith.constant {{.*}} : i32
 ! CHECK:         %[[VAL_13:.*]] = fir.call @_FortranAioBeginExternalListOutput(%[[VAL_9]], %[[VAL_11]], %[[VAL_12]]) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
-! CHECK:         %[[VAL_14:.*]] = arith.constant 10 : i64
-! CHECK:         %[[VAL_15:.*]] = fir.convert %[[VAL_14]] : (i64) -> index
+! CHECK:         %[[VAL_15:.*]] = arith.constant 10 : index
 ! CHECK:         %[[VAL_16:.*]] = fir.shape %[[VAL_4]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_17:.*]] = fir.shape_shift %[[VAL_7]], %[[VAL_8]] : (index, index) -> !fir.shapeshift<1>
 ! CHECK:         %[[VAL_18:.*]] = fir.allocmem !fir.array<10xi32>
