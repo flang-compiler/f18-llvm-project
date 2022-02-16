@@ -322,7 +322,7 @@ struct AddrOfOpConversion : public FIROpConversion<fir::AddrOfOp> {
                   mlir::ConversionPatternRewriter &rewriter) const override {
     auto ty = convertType(addr.getType());
     rewriter.replaceOpWithNewOp<mlir::LLVM::AddressOfOp>(
-        addr, ty, addr.symbol().getRootReference().getValue());
+        addr, ty, addr.getSymbol().getRootReference().getValue());
     return success();
   }
 };
@@ -432,7 +432,7 @@ struct BoxAddrOpConversion : public FIROpConversion<fir::BoxAddrOp> {
     mlir::Value a = adaptor.getOperands()[0];
     auto loc = boxaddr.getLoc();
     mlir::Type ty = convertType(boxaddr.getType());
-    if (auto argty = boxaddr.val().getType().dyn_cast<fir::BoxType>()) {
+    if (auto argty = boxaddr.getVal().getType().dyn_cast<fir::BoxType>()) {
       rewriter.replaceOp(boxaddr, loadBaseAddrFromBox(loc, ty, a, rewriter));
     } else {
       auto c0attr = rewriter.getI32IntegerAttr(0);
@@ -688,7 +688,7 @@ struct CmpcOpConversion : public FIROpConversion<fir::CmpcOp> {
   matchAndRewrite(fir::CmpcOp cmp, OperandTy operands,
                   mlir::ConversionPatternRewriter &rewriter) const override {
     mlir::MLIRContext *ctxt = cmp.getContext();
-    mlir::Type eleTy = convertType(getComplexEleTy(cmp.lhs().getType()));
+    mlir::Type eleTy = convertType(getComplexEleTy(cmp.getLhs().getType()));
     mlir::Type resTy = convertType(cmp.getType());
     mlir::Location loc = cmp.getLoc();
     auto pos0 = mlir::ArrayAttr::get(ctxt, rewriter.getI32IntegerAttr(0));
@@ -763,8 +763,8 @@ struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::ConvertOp convert, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto fromTy = convertType(convert.value().getType());
-    auto toTy = convertType(convert.res().getType());
+    auto fromTy = convertType(convert.getValue().getType());
+    auto toTy = convertType(convert.getRes().getType());
     mlir::Value op0 = adaptor.getOperands()[0];
     if (fromTy == toTy) {
       rewriter.replaceOp(convert, op0);
@@ -786,18 +786,18 @@ struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
       return rewriter.create<mlir::LLVM::FPExtOp>(loc, toTy, val);
     };
     // Complex to complex conversion.
-    if (fir::isa_complex(convert.value().getType()) &&
-        fir::isa_complex(convert.res().getType())) {
+    if (fir::isa_complex(convert.getValue().getType()) &&
+        fir::isa_complex(convert.getRes().getType())) {
       // Special case: handle the conversion of a complex such that both the
       // real and imaginary parts are converted together.
       auto zero = mlir::ArrayAttr::get(convert.getContext(),
                                        rewriter.getI32IntegerAttr(0));
       auto one = mlir::ArrayAttr::get(convert.getContext(),
                                       rewriter.getI32IntegerAttr(1));
-      auto ty = convertType(getComplexEleTy(convert.value().getType()));
+      auto ty = convertType(getComplexEleTy(convert.getValue().getType()));
       auto rp = rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, op0, zero);
       auto ip = rewriter.create<mlir::LLVM::ExtractValueOp>(loc, ty, op0, one);
-      auto nt = convertType(getComplexEleTy(convert.res().getType()));
+      auto nt = convertType(getComplexEleTy(convert.getRes().getType()));
       auto fromBits = mlir::LLVM::getPrimitiveTypeSizeInBits(ty);
       auto toBits = mlir::LLVM::getPrimitiveTypeSizeInBits(nt);
       auto rc = convertFpToFp(rp, fromBits, toBits, nt);
@@ -2907,7 +2907,7 @@ struct StoreOpConversion : public FIROpConversion<fir::StoreOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::StoreOp store, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    if (store.value().getType().isa<fir::BoxType>()) {
+    if (store.getValue().getType().isa<fir::BoxType>()) {
       // fir.box value is actually in memory, load it first before storing it.
       mlir::Location loc = store.getLoc();
       mlir::Type boxPtrTy = adaptor.getOperands()[0].getType();
@@ -3053,7 +3053,7 @@ struct IsPresentOpConversion : public FIROpConversion<fir::IsPresentOp> {
     mlir::Location loc = isPresent.getLoc();
     auto ptr = adaptor.getOperands()[0];
 
-    if (isPresent.val().getType().isa<fir::BoxCharType>()) {
+    if (isPresent.getVal().getType().isa<fir::BoxCharType>()) {
       auto structTy = ptr.getType().cast<mlir::LLVM::LLVMStructType>();
       assert(!structTy.isOpaque() && !structTy.getBody().empty());
 
