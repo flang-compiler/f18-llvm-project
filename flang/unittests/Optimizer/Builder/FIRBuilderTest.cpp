@@ -187,12 +187,11 @@ TEST_F(FIRBuilderTest, createGlobal1) {
   EXPECT_TRUE(mlir::isa<fir::GlobalOp>(global));
   EXPECT_EQ("global1", global.getSymName());
   EXPECT_TRUE(global.getConstant().hasValue());
-  EXPECT_EQ(i64Type, global.type());
+  EXPECT_EQ(i64Type, global.getType());
   EXPECT_TRUE(global.getLinkName().hasValue());
   EXPECT_EQ(builder.createInternalLinkage().getValue(),
       global.getLinkName().getValue());
   EXPECT_FALSE(global.getInitVal().hasValue());
-
   auto g1 = builder.getNamedGlobal("global1");
   EXPECT_EQ(global, g1);
   auto g2 = builder.getNamedGlobal("global7");
@@ -211,9 +210,12 @@ TEST_F(FIRBuilderTest, createGlobal2) {
   EXPECT_TRUE(mlir::isa<fir::GlobalOp>(global));
   EXPECT_EQ("global2", global.getSymName());
   EXPECT_FALSE(global.getConstant().hasValue());
-  EXPECT_EQ(i32Type, global.type());
+  EXPECT_EQ(i32Type, global.getType());
   EXPECT_TRUE(global.getInitVal().hasValue());
   EXPECT_TRUE(global.getInitVal().getValue().isa<mlir::IntegerAttr>());
+  EXPECT_EQ(
+      16, global.initVal().getValue().cast<mlir::IntegerAttr>().getValue());
+  EXPECT_TRUE(global.linkName().hasValue());
   EXPECT_EQ(
       16, global.getInitVal().getValue().cast<mlir::IntegerAttr>().getValue());
   EXPECT_TRUE(global.getLinkName().hasValue());
@@ -310,7 +312,7 @@ TEST_F(FIRBuilderTest, createStringLiteral) {
   EXPECT_EQ(builder.createLinkOnceLinkage().getValue(),
       global.getLinkName().getValue());
   EXPECT_EQ(fir::CharacterType::get(builder.getContext(), 1, strValue.size()),
-      global.type());
+      global.getType());
 
   auto stringLitOps = global.getRegion().front().getOps<fir::StringLitOp>();
   EXPECT_TRUE(llvm::hasSingleElement(stringLitOps));

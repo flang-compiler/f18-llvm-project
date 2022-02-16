@@ -2823,11 +2823,6 @@ def fir_GlobalOp : fir_Op<"global", [IsolatedFromAbove, Symbol]> {
     static constexpr llvm::StringRef getLinkageAttrNameStr() { return "linkName"; }
     static constexpr llvm::StringRef getTypeAttrNameStr() { return "type"; }
 
-    /// The printable type of the global
-    mlir::Type getTypeAttrType() {
-      return (*this)->getAttrOfType<TypeAttr>(getTypeAttrName()).getValue();
-    }
-
     /// The semantic type of the global
     mlir::Type resultType();
 
