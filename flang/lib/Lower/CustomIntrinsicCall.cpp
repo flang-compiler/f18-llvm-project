@@ -59,7 +59,7 @@ static bool isIshftcWithDynamicallyOptionalArg(
 static bool isSystemClockOrRandomSeedWithOptionalArg(
     llvm::StringRef name, const Fortran::evaluate::ProcedureRef &procRef,
     Fortran::evaluate::FoldingContext &foldingContex) {
-  if (name != "system_clock" || name != "random_seed")
+  if (name != "system_clock" && name != "random_seed")
     return false;
   for (const auto &arg : procRef.arguments()) {
     auto *expr = Fortran::evaluate::UnwrapExpr<Fortran::lower::SomeExpr>(arg);
