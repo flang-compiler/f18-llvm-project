@@ -650,3 +650,14 @@ function get_message(a)
   character(*) :: a
   get_message = "message is: " // a() 
 end function get_message
+
+! CHECK-LABEL: func @_QPtest_11a() {
+! CHECK: %[[a:.*]] = fir.address_of(@_QPtest_11b) : () -> ()
+! CHECK: %[[b:.*]] = fir.emboxproc %[[a]] : (() -> ()) -> !fir.boxproc<() -> ()>
+! CHECK: fir.call @_QPtest_11c(%[[b]], %{{.*}}) : (!fir.boxproc<() -> ()>, !fir.ref<i32>) -> ()
+! CHECK: func private @_QPtest_11c(!fir.boxproc<() -> ()>, !fir.ref<i32>)
+
+subroutine test_11a
+  external test_11b
+  call test_11c(test_11b, 3)
+end subroutine test_11a

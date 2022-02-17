@@ -44,6 +44,15 @@ public:
         memTys.push_back(convertType(ty));
       return mlir::TupleType::get(tupTy.getContext(), memTys);
     });
+    addConversion([&](mlir::FunctionType funcTy) {
+      llvm::SmallVector<mlir::Type> inTys;
+      llvm::SmallVector<mlir::Type> resTys;
+      for (auto ty : funcTy.getInputs())
+        inTys.push_back(convertType(ty));
+      for (auto ty : funcTy.getResults())
+        resTys.push_back(convertType(ty));
+      return mlir::FunctionType::get(funcTy.getContext(), inTys, resTys);
+    });
     addArgumentMaterialization(materializeProcedure);
     addSourceMaterialization(materializeProcedure);
     addTargetMaterialization(materializeProcedure);
@@ -99,6 +108,26 @@ public:
   }
 };
 
+class AddrOfConversion : public mlir::OpRewritePattern<AddrOfOp> {
+public:
+  using OpRewritePattern::OpRewritePattern;
+
+  AddrOfConversion(mlir::MLIRContext *ctx, BoxprocTypeRewriter &tc)
+      : OpRewritePattern(ctx), typeConverter(tc) {}
+
+  mlir::LogicalResult
+  matchAndRewrite(AddrOfOp addr,
+                  mlir::PatternRewriter &rewriter) const override {
+    rewriter.startRootUpdate(addr);
+    auto toTy = typeConverter.convertType(addr.getType());
+    addr.getResult().setType(toTy);
+    rewriter.finalizeRootUpdate(addr);
+    return mlir::success();
+  }
+
+  BoxprocTypeRewriter &typeConverter;
+};
+
 class FuncConversion : public mlir::OpRewritePattern<mlir::FuncOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
@@ -109,15 +138,10 @@ public:
   mlir::LogicalResult
   matchAndRewrite(mlir::FuncOp func,
                   mlir::PatternRewriter &rewriter) const override {
-    llvm::SmallVector<mlir::Type> inTys;
-    llvm::SmallVector<mlir::Type> resTys;
     rewriter.startRootUpdate(func);
-    mlir::FunctionType funcTy = func.getType();
-    for (auto ty : funcTy.getInputs())
-      inTys.push_back(typeConverter.convertType(ty));
-    for (auto ty : funcTy.getResults())
-      resTys.push_back(typeConverter.convertType(ty));
-    setTypeAndArguments(func, rewriter.getFunctionType(inTys, resTys));
+    auto funcTy = func.getType();
+    auto toTy = typeConverter.convertType(funcTy).cast<mlir::FunctionType>();
+    setTypeAndArguments(func, toTy);
     rewriter.finalizeRootUpdate(func);
     return mlir::success();
   }
@@ -206,14 +230,18 @@ class BoxaddrConversion : public mlir::OpRewritePattern<BoxAddrOp> {
 public:
   using OpRewritePattern::OpRewritePattern;
 
-  BoxaddrConversion(mlir::MLIRContext *ctx) : OpRewritePattern(ctx) {}
+  BoxaddrConversion(mlir::MLIRContext *ctx, BoxprocTypeRewriter &tc)
+      : OpRewritePattern(ctx), typeConverter(tc) {}
 
   mlir::LogicalResult
   matchAndRewrite(BoxAddrOp addr,
                   mlir::PatternRewriter &rewriter) const override {
-    rewriter.replaceOpWithNewOp<ConvertOp>(addr, addr.getType(), addr.val());
+    rewriter.replaceOpWithNewOp<ConvertOp>(
+        addr, typeConverter.convertType(addr.getType()), addr.val());
     return mlir::success();
   }
+
+  BoxprocTypeRewriter &typeConverter;
 };
 
 /// A `boxproc` is an abstraction for a Fortran procedure reference. Typically,
@@ -230,8 +258,7 @@ public:
 /// the frame pointer during execution. In LLVM IR, the frame pointer is
 /// designated with the `nest` attribute. The thunk's address will then be used
 /// as the call target instead of the original function's address directly.
-class BoxedProcedurePass
-    : public BoxedProcedurePassBase<BoxedProcedurePass> {
+class BoxedProcedurePass : public BoxedProcedurePassBase<BoxedProcedurePass> {
 public:
   BoxedProcedurePass() { options = {true}; }
   BoxedProcedurePass(bool useThunks) { options = {useThunks}; }
@@ -251,6 +278,18 @@ public:
 
   inline static bool usesBoxProc(mlir::Type ty) {
     return isBoxProc(ty) || isTupledBoxProc(ty);
+  }
+
+  inline static bool hasBoxProcArgs(mlir::Type ty) {
+    if (auto funcTy = ty.dyn_cast<mlir::FunctionType>()) {
+      for (auto t : funcTy.getInputs())
+        if (usesBoxProc(t))
+          return true;
+      for (auto t : funcTy.getResults())
+        if (usesBoxProc(t))
+          return true;
+    }
+    return false;
   }
 
   void runOnOperation() override final {
@@ -276,10 +315,15 @@ public:
           [&](InsertValueOp ins) { return !isTupledBoxProc(ins.getType()); });
       target.addDynamicallyLegalOp<ExtractValueOp>(
           [&](ExtractValueOp ext) { return !isBoxProc(ext.getType()); });
+      target.addDynamicallyLegalOp<AddrOfOp>([&](AddrOfOp addr) {
+        return !(usesBoxProc(addr.getType()) || hasBoxProcArgs(addr.getType()));
+      });
       target.addIllegalOp<EmboxProcOp>();
-      pattern.insert<EmboxprocConversion, BoxaddrConversion>(context);
-      pattern.insert<FuncConversion, UndefConversion, InsertValueConversion,
-                     ExtractValueConversion>(context, typeConverter);
+      pattern.insert<EmboxprocConversion>(context);
+      pattern
+          .insert<AddrOfConversion, BoxaddrConversion, ExtractValueConversion,
+                  FuncConversion, InsertValueConversion, UndefConversion>(
+              context, typeConverter);
       if (mlir::failed(mlir::applyPartialConversion(getModule(), target,
                                                     std::move(pattern))))
         signalPassFailure();
