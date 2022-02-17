@@ -64,8 +64,8 @@ def TargetRewrite : Pass<"target-rewrite", "mlir::ModuleOp"> {
   ];
 }
 
-def ProcedurePointerPass : Pass<"procedure-pointer", "mlir::ModuleOp"> {
-  let constructor = "::fir::createProcedurePointerPass()";
+def BoxedProcedurePass : Pass<"boxed-procedure", "mlir::ModuleOp"> {
+  let constructor = "::fir::createBoxedProcedurePass()";
   let options = [
     Option<"useThunks", "use-thunks",
            "bool", /*default=*/"true",

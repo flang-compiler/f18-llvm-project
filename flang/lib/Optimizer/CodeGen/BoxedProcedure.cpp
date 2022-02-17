@@ -1,4 +1,4 @@
-//===-- ProcedurePointer.cpp ----------------------------------------------===//
+//===-- BoxedProcedure.cpp ------------------------------------------------===//
 //
 // Part of the LLVM Project, under the Apache License v2.0 with LLVM Exceptions.
 // See https://llvm.org/LICENSE.txt for license information.
@@ -24,7 +24,7 @@ using namespace fir;
 
 namespace {
 /// Options to the procedure pointer pass.
-struct ProcedurePointerOptions {
+struct BoxedProcedureOptions {
   // Lower the boxproc abstraction to function pointers and thunks where
   // required.
   bool useThunks = true;
@@ -230,11 +230,11 @@ public:
 /// the frame pointer during execution. In LLVM IR, the frame pointer is
 /// designated with the `nest` attribute. The thunk's address will then be used
 /// as the call target instead of the original function's address directly.
-class ProcedurePointerPass
-    : public ProcedurePointerPassBase<ProcedurePointerPass> {
+class BoxedProcedurePass
+    : public BoxedProcedurePassBase<BoxedProcedurePass> {
 public:
-  ProcedurePointerPass() { options = {true}; }
-  ProcedurePointerPass(bool useThunks) { options = {useThunks}; }
+  BoxedProcedurePass() { options = {true}; }
+  BoxedProcedurePass(bool useThunks) { options = {useThunks}; }
 
   inline mlir::ModuleOp getModule() { return getOperation(); }
 
@@ -289,14 +289,14 @@ public:
   }
 
 private:
-  ProcedurePointerOptions options;
+  BoxedProcedureOptions options;
 };
 } // namespace
 
-std::unique_ptr<mlir::Pass> fir::createProcedurePointerPass() {
-  return std::make_unique<ProcedurePointerPass>();
+std::unique_ptr<mlir::Pass> fir::createBoxedProcedurePass() {
+  return std::make_unique<BoxedProcedurePass>();
 }
 
-std::unique_ptr<mlir::Pass> fir::createProcedurePointerPass(bool useThunks) {
-  return std::make_unique<ProcedurePointerPass>(useThunks);
+std::unique_ptr<mlir::Pass> fir::createBoxedProcedurePass(bool useThunks) {
+  return std::make_unique<BoxedProcedurePass>(useThunks);
 }

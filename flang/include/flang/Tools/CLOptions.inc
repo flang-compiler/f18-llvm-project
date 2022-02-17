@@ -51,8 +51,8 @@ DisableOption(CodeGenRewrite, "codegen-rewrite", "rewrite FIR for codegen");
 DisableOption(TargetRewrite, "target-rewrite", "rewrite FIR for target");
 DisableOption(FirToLlvmIr, "fir-to-llvmir", "FIR to LLVM-IR dialect");
 DisableOption(LlvmIrToLlvm, "llvm", "conversion to LLVM");
-DisableOption(ProcedurePointerRewrite, "procedure-pointer-rewrite",
-    "rewrite abstract procedure pointers");
+DisableOption(BoxedProcedureRewrite, "boxed-procedure-rewrite",
+    "rewrite boxed procedures");
 #endif
 
 /// Generic for adding a pass to the pass manager if it is not disabled.
@@ -124,9 +124,9 @@ inline void addLLVMDialectToLLVMPass(
       [&]() { return fir::createLLVMDialectToLLVMPass(output); });
 }
 
-inline void addProcedurePointerPass(mlir::PassManager &pm) {
-  addPassConditionally(pm, disableProcedurePointerRewrite,
-      [&]() { return fir::createProcedurePointerPass(); });
+inline void addBoxedProcedurePass(mlir::PassManager &pm) {
+  addPassConditionally(pm, disableBoxedProcedureRewrite,
+      [&]() { return fir::createBoxedProcedurePass(); });
 }
 #endif
 
@@ -165,7 +165,7 @@ inline void createDefaultFIROptimizerPassPipeline(mlir::PassManager &pm) {
 
 #if !defined(FLANG_EXCLUDE_CODEGEN)
 inline void createDefaultFIRCodeGenPassPipeline(mlir::PassManager &pm) {
-  fir::addProcedurePointerPass(pm);
+  fir::addBoxedProcedurePass(pm);
   pm.addNestedPass<mlir::FuncOp>(fir::createAbstractResultOptPass());
   fir::addCodeGenRewritePass(pm);
   fir::addTargetRewritePass(pm);
