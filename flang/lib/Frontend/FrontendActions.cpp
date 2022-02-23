@@ -200,8 +200,7 @@ void DebugDumpProvenanceAction::ExecuteAction() {
   this->instance().parsing().DumpProvenance(llvm::outs());
 }
 
-void ParseSyntaxOnlyAction::ExecuteAction() {
-}
+void ParseSyntaxOnlyAction::ExecuteAction() {}
 
 void DebugUnparseNoSemaAction::ExecuteAction() {
   auto &invoc = this->instance().invocation();
