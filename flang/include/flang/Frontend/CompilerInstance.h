@@ -136,11 +136,13 @@ public:
     semantics_ = std::move(semantics);
   }
 
+  /// Set the run-time derived type tables to \p tables
   void setRtTyTables(
       std::unique_ptr<Fortran::semantics::RuntimeDerivedTypeTables> tables) {
     rtTyTables_ = std::move(tables);
   }
 
+  /// Get the run-time derived type tables
   Fortran::semantics::RuntimeDerivedTypeTables &getRtTyTables() {
     assert(rtTyTables_ && "Missing runtime derived type tables!");
     return *rtTyTables_;

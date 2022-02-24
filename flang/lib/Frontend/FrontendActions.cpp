@@ -70,8 +70,13 @@ bool PrescanAndSemaDebugAction::BeginSourceFileAction() {
   // from exiting early (i.e. in the presence of semantic errors). We should
   // never do this in actions intended for end-users or otherwise regular
   // compiler workflows!
-  return RunPrescan() && RunParse() && (RunSemanticChecks() || true) &&
-      (GenerateRtTypeTables() || true);
+  if (RunPrescan() && RunParse()) {
+    (void)RunSemanticChecks();
+    (void)GenerateRtTypeTables();
+    return true;
+  }
+
+  return false;
 }
 
 bool CodeGenAction::BeginSourceFileAction() {
