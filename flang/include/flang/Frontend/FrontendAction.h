@@ -103,29 +103,29 @@ public:
 
   /// @}
 protected:
-  // Prescan the current input file. Return False if fatal errors are reported,
-  // True otherwise.
+  /// Prescan the current input file. Return False if fatal errors are reported,
+  /// True otherwise.
   bool RunPrescan();
-  // Parse the current input file. Return False if fatal errors are reported,
-  // True otherwise.
+  /// Parse the current input file. Return False if fatal errors are reported,
+  /// True otherwise.
   bool RunParse();
-  // Run semantic checks for the current input file. Return False if fatal
-  // errors are reported, True otherwise.
+  /// Run semantic checks for the current input file. Return False if fatal
+  /// errors are reported, True otherwise.
   bool RunSemanticChecks();
-  // Generate run-time type information for derived types. This may lead to new
-  // semantic errors. Return False if fatal errors are reported, True
-  // otherwise.
+  /// Generate run-time type information for derived types. This may lead to new
+  /// semantic errors. Return False if fatal errors are reported, True
+  /// otherwise.
   bool GenerateRtTypeTables();
 
-  // Report fatal semantic errors. Return True if present, false otherwise.
+  /// Report fatal semantic errors. Return True if present, false otherwise.
   bool reportFatalSemanticErrors();
 
-  // Report fatal scanning errors. Return True if present, false otherwise.
+  /// Report fatal scanning errors. Return True if present, false otherwise.
   inline bool reportFatalScanningErrors() {
     return reportFatalErrors("Could not scan %0");
   }
 
-  // Report fatal parsing errors. Return True if present, false otherwise
+  /// Report fatal parsing errors. Return True if present, false otherwise
   inline bool reportFatalParsingErrors() {
     return reportFatalErrors("Could not parse %0");
   }
