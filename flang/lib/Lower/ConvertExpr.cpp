@@ -6136,8 +6136,11 @@ private:
 
     // Return the continuation.
     if (fir::isa_char(seqTy.getEleTy())) {
-      auto len = builder.create<fir::LoadOp>(loc, charLen.getValue());
-      return genarr(fir::CharArrayBoxValue{mem, len, extents});
+      if (charLen.hasValue()) {
+        auto len = builder.create<fir::LoadOp>(loc, charLen.getValue());
+        return genarr(fir::CharArrayBoxValue{mem, len, extents});
+      }
+      return genarr(fir::CharArrayBoxValue{mem, zero, extents});
     }
     return genarr(fir::ArrayBoxValue{mem, extents});
   }

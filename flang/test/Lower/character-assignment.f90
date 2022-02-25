@@ -13,7 +13,7 @@ subroutine assign1(lhs, rhs)
 
   ! Copy of rhs into lhs
   ! CHECK: %[[count:.*]] = arith.muli %{{.*}}, %{{.*}} : i64
-  ! CHECk-DAG: %[[bug:.*]] = fir.convert %[[lhs]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
+  ! CHECK-DAG: %[[bug:.*]] = fir.convert %[[lhs]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
   ! CHECK-DAG: %[[src:.*]] = fir.convert %[[rhs]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<i8>
   ! CHECK: fir.call @llvm.memmove.p0i8.p0i8.i64(%{{.*}}, %[[src]], %[[count]], %false) : (!fir.ref<i8>, !fir.ref<i8>, i64, i1) -> ()
 
@@ -82,6 +82,25 @@ subroutine assign_constant(lhs)
     ! CHECK: fir.store %[[blank]] to %[[jhs_addr]]
   ! CHECK: }
 end subroutine
+
+  ! CHECK: func @_QPassign_zero_size_array
+  subroutine assign_zero_size_array(n)
+    ! CHECK:   %[[VAL_0:.*]] = fir.alloca !fir.heap<!fir.array<?x!fir.char<1,?>>> {uniq_name = "_QFassign_zero_size_arrayEa.addr"}
+    character(n), allocatable :: a(:)
+    ! CHECK:   fir.store %{{.*}} to %[[VAL_0]] : !fir.ref<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
+    ! CHECK:   %{{.*}} = fir.load %[[VAL_0]] : !fir.ref<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
+    ! CHECK:   %[[VAL_1:.*]] = arith.cmpi ne, %{{.*}}, %c0{{.*}} : i64
+    ! CHECK:   %[[VAL_2:.*]]:2 = fir.if %[[VAL_1]] -> (i1, !fir.heap<!fir.array<?x!fir.char<1,?>>>) {
+    ! CHECK:     %{{.*}} = fir.if %{{.*}} -> (!fir.heap<!fir.array<?x!fir.char<1,?>>>) {
+    ! CHECK:   %{{.*}} = fir.do_loop %{{.*}} = %c0{{.*}} to %{{.*}} step %c1{{.*}} unordered iter_args(%{{.*}} = %{{.*}}) -> (!fir.array<?x!fir.char<1,?>>) {
+    ! CHECK:     fir.do_loop %[[ARG_0:.*]] = %{{.*}} to {{.*}} step %c1{{.*}} {
+    ! CHECK:       %{{.*}} = fir.coordinate_of %{{.*}}, %[[ARG_0]] : (!fir.ref<!fir.array<?x!fir.char<1>>>, index) -> !fir.ref<!fir.char<1>>
+    ! CHECK:   fir.if %[[VAL_2]]#0 {
+    ! CHECK:     fir.if %[[VAL_1]] {
+    ! CHECK:     fir.store %[[VAL_2]]#1 to %[[VAL_0]] : !fir.ref<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
+    a = [character(n)::]
+    ! CHECK:   return
+  end subroutine
 
 ! CHECK-LABEL: fir.global linkonce @_QQcl.48656C6C6F20576F726C64
 ! CHECK: %[[lit:.*]] = fir.string_lit "Hello World"(11) : !fir.char<1,11>
