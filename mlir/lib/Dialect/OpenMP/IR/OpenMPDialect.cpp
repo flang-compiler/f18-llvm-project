@@ -1004,9 +1004,8 @@ static ParseResult parseWsLoopOp(OpAsmParser &parser, OperationState &result) {
     return failure();
 
   SmallVector<ClauseType> clauses = {
-      privateClause,   firstprivateClause, lastprivateClause, linearClause,
-      reductionClause, collapseClause,     orderClause,       orderedClause,
-      nowaitClause,    scheduleClause};
+      linearClause,  reductionClause, collapseClause, orderClause,
+      orderedClause, nowaitClause,    scheduleClause};
   SmallVector<int> segments{numIVs, numIVs, numIVs};
   if (failed(parseClauses(parser, result, clauses, segments)))
     return failure();
@@ -1031,10 +1030,6 @@ static void printWsLoopOp(OpAsmPrinter &p, WsLoopOp op) {
     p << "inclusive ";
   }
   p << "step (" << op.step() << ") ";
-
-  printDataVars(p, op.private_vars(), "private");
-  printDataVars(p, op.firstprivate_vars(), "firstprivate");
-  printDataVars(p, op.lastprivate_vars(), "lastprivate");
 
   if (op.linear_vars().size())
     printLinearClause(p, op.linear_vars(), op.linear_step_vars());
@@ -1148,79 +1143,14 @@ static LogicalResult verifyReductionOp(ReductionOp op) {
 void WsLoopOp::build(OpBuilder &builder, OperationState &state,
                      ValueRange lowerBound, ValueRange upperBound,
                      ValueRange step, ArrayRef<NamedAttribute> attributes) {
-  build(builder, state, TypeRange(), lowerBound, upperBound, step,
-        /*private_vars=*/ValueRange(),
-        /*firstprivate_vars=*/ValueRange(), /*lastprivate_vars=*/ValueRange(),
-        /*linear_vars=*/ValueRange(), /*linear_step_vars=*/ValueRange(),
-        /*reduction_vars=*/ValueRange(), /*schedule_val=*/nullptr,
-        /*schedule_chunk_var=*/nullptr, /*collapse_val=*/nullptr,
-        /*nowait=*/nullptr, /*ordered_val=*/nullptr, /*order_val=*/nullptr,
-        /*inclusive=*/nullptr, /*buildBody=*/false);
+  build(builder, state, lowerBound, upperBound, step,
+        /*linear_vars=*/ValueRange(),
+        /*linear_step_vars=*/ValueRange(), /*reduction_vars=*/ValueRange(),
+        /*reductions=*/nullptr, /*schedule_val=*/nullptr,
+        /*schedule_chunk_var=*/nullptr, /*schedule_modifier=*/nullptr,
+        /*simd_modifier=*/nullptr, /*collapse_val=*/nullptr, /*nowait=*/false,
+        /*ordered_val=*/nullptr, /*order_val=*/nullptr, /*inclusive=*/false);
   state.addAttributes(attributes);
-}
-
-void WsLoopOp::build(OpBuilder &, OperationState &state, TypeRange resultTypes,
-                     ValueRange operands, ArrayRef<NamedAttribute> attributes) {
-  state.addOperands(operands);
-  state.addAttributes(attributes);
-  (void)state.addRegion();
-  assert(resultTypes.empty() && "mismatched number of return types");
-  state.addTypes(resultTypes);
-}
-
-void WsLoopOp::build(OpBuilder &builder, OperationState &result,
-                     TypeRange typeRange, ValueRange lowerBounds,
-                     ValueRange upperBounds, ValueRange steps,
-                     ValueRange privateVars, ValueRange firstprivateVars,
-                     ValueRange lastprivateVars, ValueRange linearVars,
-                     ValueRange linearStepVars, ValueRange reductionVars,
-                     StringAttr scheduleVal, Value scheduleChunkVar,
-                     IntegerAttr collapseVal, UnitAttr nowait,
-                     IntegerAttr orderedVal, StringAttr orderVal,
-                     UnitAttr inclusive, bool buildBody) {
-  result.addOperands(lowerBounds);
-  result.addOperands(upperBounds);
-  result.addOperands(steps);
-  result.addOperands(privateVars);
-  result.addOperands(firstprivateVars);
-  result.addOperands(linearVars);
-  result.addOperands(linearStepVars);
-  if (scheduleChunkVar)
-    result.addOperands(scheduleChunkVar);
-
-  if (scheduleVal)
-    result.addAttribute("schedule_val", scheduleVal);
-  if (collapseVal)
-    result.addAttribute("collapse_val", collapseVal);
-  if (nowait)
-    result.addAttribute("nowait", nowait);
-  if (orderedVal)
-    result.addAttribute("ordered_val", orderedVal);
-  if (orderVal)
-    result.addAttribute("order", orderVal);
-  if (inclusive)
-    result.addAttribute("inclusive", inclusive);
-  result.addAttribute(
-      WsLoopOp::getOperandSegmentSizeAttr(),
-      builder.getI32VectorAttr(
-          {static_cast<int32_t>(lowerBounds.size()),
-           static_cast<int32_t>(upperBounds.size()),
-           static_cast<int32_t>(steps.size()),
-           static_cast<int32_t>(privateVars.size()),
-           static_cast<int32_t>(firstprivateVars.size()),
-           static_cast<int32_t>(lastprivateVars.size()),
-           static_cast<int32_t>(linearVars.size()),
-           static_cast<int32_t>(linearStepVars.size()),
-           static_cast<int32_t>(reductionVars.size()),
-           static_cast<int32_t>(scheduleChunkVar != nullptr ? 1 : 0)}));
-
-  Region *bodyRegion = result.addRegion();
-  if (buildBody) {
-    OpBuilder::InsertionGuard guard(builder);
-    unsigned numIVs = steps.size();
-    SmallVector<Type, 8> argTypes(numIVs, steps.getType().front());
-    builder.createBlock(bodyRegion, {}, argTypes);
-  }
 }
 
 static LogicalResult verifyWsLoopOp(WsLoopOp op) {

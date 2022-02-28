@@ -281,9 +281,6 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
   let arguments = (ins Variadic<IntLikeType>:$lowerBound,
              Variadic<IntLikeType>:$upperBound,
              Variadic<IntLikeType>:$step,
-             Variadic<AnyType>:$private_vars,
-             Variadic<AnyType>:$firstprivate_vars,
-             Variadic<AnyType>:$lastprivate_vars,
              Variadic<AnyType>:$linear_vars,
              Variadic<AnyType>:$linear_step_vars,
              Variadic<OpenMP_PointerLikeType>:$reduction_vars,
@@ -298,22 +295,9 @@ def WsLoopOp : OpenMP_Op<"wsloop", [AttrSizedOperandSegments,
              OptionalAttr<OrderKind>:$order_val,
              UnitAttr:$inclusive);
 
-  let skipDefaultBuilders = 1;
-
   let builders = [
     OpBuilder<(ins "ValueRange":$lowerBound, "ValueRange":$upperBound,
                "ValueRange":$step,
-               CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>,
-    OpBuilder<(ins "TypeRange":$resultTypes, "ValueRange":$lowerBound,
-               "ValueRange":$upperBound, "ValueRange":$step,
-               "ValueRange":$privateVars, "ValueRange":$firstprivateVars,
-               "ValueRange":$lastprivate_vars, "ValueRange":$linear_vars,
-               "ValueRange":$linear_step_vars, "ValueRange":$reduction_vars,
-               "StringAttr":$schedule_val, "Value":$schedule_chunk_var,
-               "IntegerAttr":$collapse_val, "UnitAttr":$nowait,
-               "IntegerAttr":$ordered_val, "StringAttr":$order_val,
-               "UnitAttr":$inclusive, CArg<"bool", "true">:$buildBody)>,
-    OpBuilder<(ins "TypeRange":$resultTypes, "ValueRange":$operands,
                CArg<"ArrayRef<NamedAttribute>", "{}">:$attributes)>
   ];
 

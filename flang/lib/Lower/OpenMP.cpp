@@ -531,9 +531,8 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
 
   fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
   mlir::Location currentLocation = converter.getCurrentLocation();
-  llvm::SmallVector<Value, 4> lowerBound, upperBound, step,
-      privateClauseOperands, firstPrivateClauseOperands,
-      lastPrivateClauseOperands, linearVars, linearStepVars, reductionVars;
+  SmallVector<Value, 4> lowerBound, upperBound, step, linearVars,
+      linearStepVars, reductionVars;
   mlir::Value scheduleChunkClauseOperand;
   mlir::Attribute scheduleClauseOperand, collapseClauseOperand,
       noWaitClauseOperand, orderedClauseOperand, orderClauseOperand;
@@ -546,14 +545,6 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
     createParallelOp<Fortran::parser::OmpBeginLoopDirective, true>(
         converter, eval,
         std::get<Fortran::parser::OmpBeginLoopDirective>(loopConstruct.t));
-  }
-  for (const Fortran::parser::OmpClause &clause : wsLoopOpClauseList.v) {
-    if (const auto &lastPrivateClause =
-            std::get_if<Fortran::parser::OmpClause::Lastprivate>(&clause.u)) {
-      const Fortran::parser::OmpObjectList &ompObjectList =
-          lastPrivateClause->v;
-      genObjectList(ompObjectList, converter, lastPrivateClauseOperands);
-    }
   }
 
   for (const Fortran::parser::OmpClause &clause : wsLoopOpClauseList.v) {
@@ -628,18 +619,17 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
   // FIXME: Add support for following clauses:
   // 1. linear
   // 2. order
-  TypeRange resultType;
   auto wsLoopOp = firOpBuilder.create<mlir::omp::WsLoopOp>(
-      currentLocation, resultType, lowerBound, upperBound, step,
-      privateClauseOperands, firstPrivateClauseOperands,
-      lastPrivateClauseOperands, linearVars, linearStepVars, reductionVars,
+      currentLocation, lowerBound, upperBound, step, linearVars, linearStepVars,
+      reductionVars, /*reductions=*/nullptr,
       scheduleClauseOperand.dyn_cast_or_null<StringAttr>(),
-      scheduleChunkClauseOperand,
+      scheduleChunkClauseOperand, /*schedule_modifiers=*/nullptr,
+      /*simd_modifier=*/nullptr,
       collapseClauseOperand.dyn_cast_or_null<IntegerAttr>(),
       noWaitClauseOperand.dyn_cast_or_null<UnitAttr>(),
       orderedClauseOperand.dyn_cast_or_null<IntegerAttr>(),
       orderClauseOperand.dyn_cast_or_null<StringAttr>(),
-      firOpBuilder.getUnitAttr() /* Inclusive stop */, false /* buildBody */);
+      /*inclusive=*/firOpBuilder.getUnitAttr());
 
   // Handle attribute based clauses.
   for (const Fortran::parser::OmpClause &clause : wsLoopOpClauseList.v) {
