@@ -531,7 +531,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
 
   fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
   mlir::Location currentLocation = converter.getCurrentLocation();
-  SmallVector<Value, 4> lowerBound, upperBound, step, linearVars,
+  llvm::SmallVector<mlir::Value> lowerBound, upperBound, step, linearVars,
       linearStepVars, reductionVars;
   mlir::Value scheduleChunkClauseOperand;
   mlir::Attribute scheduleClauseOperand, collapseClauseOperand,

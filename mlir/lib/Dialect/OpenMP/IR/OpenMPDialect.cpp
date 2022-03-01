@@ -1003,7 +1003,7 @@ static ParseResult parseWsLoopOp(OpAsmParser &parser, OperationState &result) {
       parser.resolveOperands(steps, loopVarType, result.operands))
     return failure();
 
-  SmallVector<ClauseType> clauses = {
+  llvm::SmallVector<::ClauseType> clauses = {
       linearClause,  reductionClause, collapseClause, orderClause,
       orderedClause, nowaitClause,    scheduleClause};
   SmallVector<int> segments{numIVs, numIVs, numIVs};
