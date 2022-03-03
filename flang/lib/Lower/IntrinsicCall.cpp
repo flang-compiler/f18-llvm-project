@@ -33,6 +33,7 @@
 #include "flang/Optimizer/Builder/Runtime/Reduction.h"
 #include "flang/Optimizer/Builder/Runtime/Stop.h"
 #include "flang/Optimizer/Builder/Runtime/Transformational.h"
+#include "flang/Optimizer/Dialect/FIROpsSupport.h"
 #include "flang/Optimizer/Support/FatalError.h"
 #include "mlir/Dialect/LLVMIR/LLVMDialect.h"
 #include "llvm/Support/CommandLine.h"
@@ -674,7 +675,7 @@ static constexpr IntrinsicHandler handlers[]{
      /*isElemental=*/false},
     {"associated",
      &I::genAssociated,
-     {{{"pointer", asInquired}, {"target", asBox}}},
+     {{{"pointer", asInquired}, {"target", asInquired}}},
      /*isElemental=*/false},
     {"btest", &I::genBtest},
     {"ceiling", &I::genCeiling},
@@ -1991,13 +1992,32 @@ IntrinsicLibrary::genAssociated(mlir::Type resultType,
                     [&](const auto &) -> const fir::MutableBoxValue * {
                       fir::emitFatalError(loc, "pointer not a MutableBoxValue");
                     });
-  if (isAbsent(args[1]))
+  const fir::ExtendedValue &target = args[1];
+  if (isAbsent(target))
     return fir::factory::genIsAllocatedOrAssociatedTest(builder, loc, *pointer);
+
+  mlir::Value targetBox = builder.createBox(loc, target);
+  if (fir::valueHasFirAttribute(fir::getBase(target),
+                                fir::getOptionalAttrName())) {
+    // Subtle: contrary to other intrinsic optional arguments, disassociated
+    // POINTER and unallocated ALLOCATABLE actual argument are not considered
+    // absent here. This is because ASSOCIATED has special requirements for
+    // TARGET actual arguments that are POINTERs. There is no precise
+    // requirements for ALLOCATABLEs, but all existing Fortran compilers treat
+    // them similarly to POINTERs. That is: unallocated TARGETs cause ASSOCIATED
+    // to rerun false.  The runtime deals with the disassociated/unallocated
+    // case. Simply ensures that TARGET that are OPTIONAL get conditionally
+    // emboxed here to convey the optional aspect to the runtime.
+    auto isPresent = builder.create<fir::IsPresentOp>(loc, builder.getI1Type(),
+                                                      fir::getBase(target));
+    auto absentBox = builder.create<fir::AbsentOp>(loc, targetBox.getType());
+    targetBox =
+        builder.create<mlir::SelectOp>(loc, isPresent, targetBox, absentBox);
+  }
   mlir::Value pointerBoxRef =
       fir::factory::getMutableIRBox(builder, loc, *pointer);
   auto pointerBox = builder.create<fir::LoadOp>(loc, pointerBoxRef);
-  return Fortran::lower::genAssociated(builder, loc, pointerBox,
-                                       fir::getBase(args[1]));
+  return Fortran::lower::genAssociated(builder, loc, pointerBox, targetBox);
 }
 
 // AINT
