@@ -315,6 +315,12 @@ createInMemoryScalarCopy(fir::FirOpBuilder &builder, mlir::Location loc,
   return temp;
 }
 
+// An expression with non-zero rank is an array expression.
+template <typename A>
+static bool isArray(const A &x) {
+  return x.Rank() != 0;
+}
+
 /// Is this a variable wrapped in parentheses?
 template <typename A>
 static bool isParenthesizedVariable(const A &) {
@@ -2711,6 +2717,28 @@ public:
         continue;
       }
       const bool actualArgIsVariable = Fortran::evaluate::IsVariable(*expr);
+      if (arg.passBy == PassBy::BaseAddressValueAttribute) {
+        mlir::Value temp;
+        if (isArray(*expr)) {
+          auto val = genBoxArg(*expr);
+          if (!actualArgIsVariable)
+            temp = getBase(val);
+          else {
+            ExtValue copy = genArrayTempFromMold(val, ".copy");
+            genArrayCopy(copy, val);
+            temp = fir::getBase(copy);
+          }
+        } else {
+          mlir::Value val = fir::getBase(genval(*expr));
+          temp = builder.createTemporary(
+              loc, val.getType(),
+              llvm::ArrayRef<mlir::NamedAttribute>{
+                  Fortran::lower::getAdaptToByRefAttr(builder)});
+          builder.create<fir::StoreOp>(loc, val, temp);
+        }
+        caller.placeInput(arg, temp);
+        continue;
+      }
       if (arg.passBy == PassBy::BaseAddress || arg.passBy == PassBy::BoxChar) {
         const bool actualIsSimplyContiguous =
             !actualArgIsVariable || Fortran::evaluate::IsSimplyContiguous(
@@ -4332,12 +4360,6 @@ private:
   ExtValue asInquired(const A &x) {
     return ScalarExprLowering{getLoc(), converter, symMap, stmtCtx}
         .lowerIntrinsicArgumentAsInquired(x);
-  }
-
-  // An expression with non-zero rank is an array expression.
-  template <typename A>
-  bool isArray(const A &x) const {
-    return x.Rank() != 0;
   }
 
   /// Some temporaries are allocated on an element-by-element basis during the

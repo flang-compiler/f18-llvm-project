@@ -1,4 +1,4 @@
-! Test for PassBy::BaseAddressValueAttribute
+! Test for PassBy::Value
 ! RUN: bbc -emit-fir %s -o - | FileCheck %s
 program call_by_value
   interface
@@ -18,3 +18,4 @@ end program call_by_value
 !CHECK: fir.store %[[VALUE]] to %[[LOGICAL]]
 !CHECK: %[[LOAD:.*]] = fir.load %[[LOGICAL]]
 !CHECK: fir.call @omp_set_nested(%[[LOAD]]) : {{.*}}
+
