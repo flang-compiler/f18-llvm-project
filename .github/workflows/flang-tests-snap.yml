@@ -1,0 +1,65 @@
+name: Flang Tests + SNAP (Ubuntu)
+
+on:
+  push:
+    branches:
+      - fir-dev
+    paths:
+      - 'flang/**'
+      - '.github/workflows/flang-tests-snap.yml'
+  pull_request:
+    branches:
+      - fir-dev
+    paths:
+      - 'flang/**'
+      - '.github/workflows/flang-tests-snap.yml'
+  workflow_dispatch:
+
+jobs:
+  build_snap_with_flang:
+    runs-on: ubuntu-20.04
+    strategy:
+      fail-fast: false
+    steps:
+    - name: Install Ninja
+      uses: llvm/actions/install-ninja@main
+    - uses: actions/checkout@v1
+      with:
+        fetch-depth: 1
+    - name: Install Clang 13
+      run: |
+        wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+        sudo apt-add-repository "deb http://apt.llvm.org/focal/ llvm-toolchain-focal-13 main"
+        sudo apt-get update
+        sudo apt-get install -y clang-13
+    - name: Build Flang with Clang 13
+      run: |
+        mkdir build && cd build
+        CC="/usr/lib/llvm-13/bin/clang-13" CXX="/usr/lib/llvm-13/bin/clang++" cmake -G Ninja \
+          -DLLVM_USE_LINKER=gold -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_PARALLEL_COMPILE_JOBS=2 \
+          -DLLVM_ENABLE_PROJECTS="clang;flang;mlir" \
+          -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=host \
+          -DBUILD_SHARED_LIBS=On ../llvm
+        ninja check-flang
+    - name: Build pgmath
+      run: |
+        # Clone Classic Flang
+        git clone --depth 1 --single-branch --branch master https://github.com/flang-compiler/flang.git classic-flang
+        # Build pgmath
+        cd classic-flang/runtime
+        mkdir build
+        cd build
+        cmake -G Ninja ../libpgmath/
+        ninja
+    - name: Clone and Build SNAP
+      run: |
+        # For SNAP to support LLVM Flang, use: https://github.com/lanl/SNAP/pull/19
+        git clone --depth 1 --single-branch --branch enable_flang https://github.com/banach-space/SNAP
+        cd SNAP/src
+        # Build with MPI turned off (not supported yet). For now, keep OpenMP
+        # OFF as well.
+        make TARGET=fsnap OPENMP=off MPI=off LLVM_FLANG_DIR="${GITHUB_WORKSPACE}"/build/ PGM_DIR="${GITHUB_WORKSPACE}"/classic-flang/runtime/build/
+        # Update the test case. Without this change you will see:
+        # ***ERROR: INPUT_CHECK: NPEY*NPEZ must equal MPI NPROC
+        sed -i 's/npey=4/npey=1/' ../qasnap/mms_src/2d_mms_st.inp ../qasnap/mms_src/2d_mms_st.inp
+        ./fsnap ../qasnap/mms_src/2d_mms_st.inp snap-output
