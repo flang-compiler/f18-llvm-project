@@ -873,7 +873,9 @@ static constexpr IntrinsicHandler handlers[]{
     {"sign", &I::genSign},
     {"size",
      &I::genSize,
-     {{{"array", asBox}, {"dim", asValue}, {"kind", asValue}}},
+     {{{"array", asBox},
+       {"dim", asAddr, handleDynamicOptional},
+       {"kind", asValue}}},
      /*isElemental=*/false},
     {"spacing", &I::genSpacing},
     {"spread",
@@ -3238,16 +3240,32 @@ IntrinsicLibrary::genSize(mlir::Type resultType,
   // an array of SIZE with DIM in most cases, but it may not be
   // possible in some cases like when in SIZE(function_call()).
   if (isAbsent(args, 1))
-    return builder.createConvert(
-        loc, resultType,
-        fir::runtime::genSize(builder, loc, fir::getBase(array)));
+    return builder.createConvert(loc, resultType,
+                                 fir::runtime::genSize(builder, loc, array));
 
   // Get the DIM argument.
   mlir::Value dim = fir::getBase(args[1]);
+  if (!fir::isa_ref_type(dim.getType()))
+    return builder.createConvert(
+        loc, resultType, fir::runtime::genSizeDim(builder, loc, array, dim));
 
-  return builder.createConvert(
-      loc, resultType,
-      fir::runtime::genSizeDim(builder, loc, fir::getBase(array), dim));
+  mlir::Value isDynamicallyAbsent = builder.genIsNull(loc, dim);
+  return builder
+      .genIfOp(loc, {resultType}, isDynamicallyAbsent,
+               /*withElseRegion=*/true)
+      .genThen([&]() {
+        mlir::Value size = builder.createConvert(
+            loc, resultType, fir::runtime::genSize(builder, loc, array));
+        builder.create<fir::ResultOp>(loc, size);
+      })
+      .genElse([&]() {
+        mlir::Value dimValue = builder.create<fir::LoadOp>(loc, dim);
+        mlir::Value size = builder.createConvert(
+            loc, resultType,
+            fir::runtime::genSizeDim(builder, loc, array, dimValue));
+        builder.create<fir::ResultOp>(loc, size);
+      })
+      .getResults()[0];
 }
 
 // LBOUND
