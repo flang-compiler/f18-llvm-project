@@ -270,18 +270,22 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
       groupIsLocal = true;
       continue;
     }
-    std::string mangleName = converter.mangleName(s) + ".desc";
-    if (builder.getNamedGlobal(mangleName))
-      continue;
-    const auto expr = Fortran::evaluate::AsGenericExpr(s);
-    fir::BoxType boxTy =
-        fir::BoxType::get(fir::PointerType::get(converter.genType(s)));
-    auto descFunc = [&](fir::FirOpBuilder &b) {
-      auto box =
-          Fortran::lower::genInitialDataTarget(converter, loc, boxTy, *expr);
-      b.create<fir::HasValueOp>(loc, box);
-    };
-    builder.createGlobalConstant(loc, boxTy, mangleName, descFunc, linkOnce);
+    // We know we have a global item.  It it's not a pointer or allocatable,
+    // create a static pointer to it.
+    if (!IsAllocatableOrPointer(s)) {
+      std::string mangleName = converter.mangleName(s) + ".desc";
+      if (builder.getNamedGlobal(mangleName))
+        continue;
+      const auto expr = Fortran::evaluate::AsGenericExpr(s);
+      fir::BoxType boxTy =
+          fir::BoxType::get(fir::PointerType::get(converter.genType(s)));
+      auto descFunc = [&](fir::FirOpBuilder &b) {
+        auto box =
+            Fortran::lower::genInitialDataTarget(converter, loc, boxTy, *expr);
+        b.create<fir::HasValueOp>(loc, box);
+      };
+      builder.createGlobalConstant(loc, boxTy, mangleName, descFunc, linkOnce);
+    }
   }
 
   // Define the list of Items.
@@ -304,8 +308,10 @@ getNamelistGroup(Fortran::lower::AbstractConverter &converter,
                                                 builder.getArrayAttr(idx));
       idx[1] = one;
       mlir::Value descAddr;
+      // Items that we created end in ".desc".
+      std::string suffix = IsAllocatableOrPointer(s) ? "" : ".desc";
       if (auto desc =
-              builder.getNamedGlobal(converter.mangleName(s) + ".desc")) {
+              builder.getNamedGlobal(converter.mangleName(s) + suffix)) {
         descAddr = builder.create<fir::AddrOfOp>(loc, desc.resultType(),
                                                  desc.getSymbol());
       } else {

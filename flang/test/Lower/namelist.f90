@@ -69,6 +69,20 @@ subroutine sss
   read(*, rrr)
 end
 
+! CHECK-LABEL: global_pointer
+subroutine global_pointer
+  real,pointer,save::ptrarray(:)
+  ! CHECK: %[[a0:.*]] = fir.address_of
+  namelist/mygroup/ptrarray
+  ! CHECK: %[[a1:.*]] = fir.convert %[[a0]]
+  ! CHECK: %[[a2:.*]] = fir.call @_FortranAioBeginExternalListOutput({{.*}}, %[[a1]], {{.*}}) : (i32, !fir.ref<i8>, i32) -> !fir.ref<i8>
+  ! CHECK: %[[a3:.*]] = fir.address_of
+  ! CHECK: %[[a4:.*]] = fir.convert %[[a3]]
+  ! CHECK: %[[a5:.*]] = fir.call @_FortranAioOutputNamelist(%[[a2]], %[[a4]])
+  ! CHECK: %[[a6:.*]] = fir.call @_FortranAioEndIoStatement(%[[a2]])
+  write(10, nml=mygroup)
+end
+
   ! CHECK-DAG: fir.global linkonce @_QQcl.6A6A6A00 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.63636300 constant : !fir.char<1,4>
   ! CHECK-DAG: fir.global linkonce @_QQcl.6E6E6E00 constant : !fir.char<1,4>
