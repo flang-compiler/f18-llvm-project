@@ -20,7 +20,6 @@ func @y() -> !fir.real<10> {
 func @z() -> !fir.logical<2> {
   %1 = arith.constant true
   %0 = fir.convert %1 : (i1) -> !fir.logical<2>
- // CHECK-LABEL: ret i16 -1
- // TODO: Why is it -1?
+ // CHECK-LABEL: ret i16 1
   return %0 : !fir.logical<2>
 }

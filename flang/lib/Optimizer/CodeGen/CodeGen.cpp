@@ -763,8 +763,10 @@ struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
   mlir::LogicalResult
   matchAndRewrite(fir::ConvertOp convert, OpAdaptor adaptor,
                   mlir::ConversionPatternRewriter &rewriter) const override {
-    auto fromTy = convertType(convert.getValue().getType());
-    auto toTy = convertType(convert.getRes().getType());
+    auto fromFirTy = convert.getValue().getType();
+    auto toFirTy = convert.getRes().getType();
+    auto fromTy = convertType(fromFirTy);
+    auto toTy = convertType(toFirTy);
     mlir::Value op0 = adaptor.getOperands()[0];
     if (fromTy == toTy) {
       rewriter.replaceOp(convert, op0);
@@ -786,8 +788,7 @@ struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
       return rewriter.create<mlir::LLVM::FPExtOp>(loc, toTy, val);
     };
     // Complex to complex conversion.
-    if (fir::isa_complex(convert.getValue().getType()) &&
-        fir::isa_complex(convert.getRes().getType())) {
+    if (fir::isa_complex(fromFirTy) && fir::isa_complex(toFirTy)) {
       // Special case: handle the conversion of a complex such that both the
       // real and imaginary parts are converted together.
       auto zero = mlir::ArrayAttr::get(convert.getContext(),
@@ -809,6 +810,22 @@ struct ConvertOpConversion : public FIROpConversion<fir::ConvertOp> {
                                                              ic, one);
       return mlir::success();
     }
+
+    // Follow UNIX F77 convention for logicals:
+    // 1. underlying integer is not zero => logical is .TRUE.
+    // 2. logical is .TRUE. => set underlying integer to 1.
+    auto i1Type = mlir::IntegerType::get(convert.getContext(), 1);
+    if (fromFirTy.isa<fir::LogicalType>() && toFirTy == i1Type) {
+      mlir::Value zero = genConstantIndex(loc, fromTy, rewriter, 0);
+      rewriter.replaceOpWithNewOp<mlir::LLVM::ICmpOp>(
+          convert, mlir::LLVM::ICmpPredicate::ne, op0, zero);
+      return mlir::success();
+    }
+    if (fromFirTy == i1Type && toFirTy.isa<fir::LogicalType>()) {
+      rewriter.replaceOpWithNewOp<mlir::LLVM::ZExtOp>(convert, toTy, op0);
+      return mlir::success();
+    }
+
     // Floating point to floating point conversion.
     if (isFloatingPointTy(fromTy)) {
       if (isFloatingPointTy(toTy)) {
@@ -1868,10 +1885,10 @@ struct EmboxProcOpConversion : public FIROpConversion<fir::EmboxProcOp> {
     auto c0 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(0));
     auto c1 = mlir::ArrayAttr::get(ctx, rewriter.getI32IntegerAttr(1));
     auto un = rewriter.create<mlir::LLVM::UndefOp>(loc, ty);
-    auto r = rewriter.create<mlir::LLVM::InsertValueOp>(loc, ty, un,
-                                                        adaptor.getOperands()[0], c0);
-    rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(emboxproc, ty, r,
-                                                           adaptor.getOperands()[1], c1);
+    auto r = rewriter.create<mlir::LLVM::InsertValueOp>(
+        loc, ty, un, adaptor.getOperands()[0], c0);
+    rewriter.replaceOpWithNewOp<mlir::LLVM::InsertValueOp>(
+        emboxproc, ty, r, adaptor.getOperands()[1], c1);
     return success();
   }
 };
