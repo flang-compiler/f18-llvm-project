@@ -2942,14 +2942,8 @@ public:
     // Designator is being passed as an argument to a procedure. Lower the
     // expression to a boxed value.
     auto someExpr = toEvExpr(x);
-    if (Fortran::evaluate::HasVectorSubscript(someExpr)) {
-      TODO(getLoc(), "boxing an expression with a vector subscript");
-      // Need to create a temporary, box the temporary, and add a cleanup of the
-      // temporary here.
-      return {};
-    }
-    return Fortran::lower::createSomeArrayBox(converter, someExpr, symMap,
-                                              stmtCtx);
+    return Fortran::lower::createBoxValue(getLoc(), converter, someExpr, symMap,
+                                          stmtCtx);
   }
   template <typename A, typename B>
   ExtValue asArrayArg(const A &, const B &x) {
@@ -6912,6 +6906,18 @@ fir::MutableBoxValue Fortran::lower::createMutableBox(
   Fortran::lower::StatementContext dummyStmtCtx;
   return ScalarExprLowering{loc, converter, symMap, dummyStmtCtx}
       .genMutableBoxValue(expr);
+}
+
+fir::ExtendedValue Fortran::lower::createBoxValue(
+    mlir::Location loc, Fortran::lower::AbstractConverter &converter,
+    const Fortran::lower::SomeExpr &expr, Fortran::lower::SymMap &symMap,
+    Fortran::lower::StatementContext &stmtCtx) {
+  if (expr.Rank() > 0 && Fortran::evaluate::IsVariable(expr) &&
+      !Fortran::evaluate::HasVectorSubscript(expr))
+    return Fortran::lower::createSomeArrayBox(converter, expr, symMap, stmtCtx);
+  fir::ExtendedValue addr = Fortran::lower::createSomeExtendedAddress(
+      loc, converter, expr, symMap, stmtCtx);
+  return fir::BoxValue(converter.getFirOpBuilder().createBox(loc, addr));
 }
 
 mlir::Value Fortran::lower::createSubroutineCall(
