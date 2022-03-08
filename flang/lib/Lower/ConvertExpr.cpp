@@ -1959,7 +1959,7 @@ public:
   template <typename A>
   ExtValue genFunctionRef(const Fortran::evaluate::FunctionRef<A> &funcRef) {
     if (!funcRef.GetType().has_value())
-      fir::emitFatalError(getLoc(), "internal: a function must have a type");
+      fir::emitFatalError(getLoc(), "a function must have a type");
     mlir::Type resTy = genType(*funcRef.GetType());
     return genProcedureRef(funcRef, {resTy});
   }
@@ -1969,12 +1969,8 @@ public:
   template <typename A>
   ExtValue gen(const Fortran::evaluate::FunctionRef<A> &funcRef) {
     ExtValue retVal = genFunctionRef(funcRef);
-    mlir::Value retValBase = fir::getBase(retVal);
-    if (fir::conformsWithPassByRef(retValBase.getType()))
-      return retVal;
-    auto mem = builder.create<fir::AllocaOp>(getLoc(), retValBase.getType());
-    builder.create<fir::StoreOp>(getLoc(), retValBase, mem);
-    return fir::substBase(retVal, mem.getResult());
+    mlir::Type resultType = converter.genType(toEvExpr(funcRef));
+    return placeScalarValueInMemory(builder, getLoc(), retVal, resultType);
   }
 
   /// Helper to lower intrinsic arguments for inquiry intrinsic.

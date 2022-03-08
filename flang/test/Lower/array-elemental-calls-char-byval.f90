@@ -125,18 +125,18 @@ subroutine foo4(i, j)
 ! CHECK-DAG:   %[[VAL_69:.*]] = arith.constant 10 : index
 ! CHECK-DAG:   %[[VAL_70:.*]] = arith.constant 0 : index
 ! CHECK-DAG:   %[[VAL_71:.*]] = arith.constant 1 : index
+! CHECK:   %[[VAL_66:.*]] = fir.alloca !fir.char<1> {adapt.valuebyref}
 ! CHECK:   %[[VAL_72:.*]] = fir.shape %[[VAL_69]] : (index) -> !fir.shape<1>
 ! CHECK:   %[[VAL_73:.*]] = fir.coordinate_of %[[VAL_74]], %[[VAL_67]] : (!fir.ref<!fir.array<10xi32>>, i64) -> !fir.ref<i32>
 ! CHECK:   %[[VAL_75:.*]] = fir.load %[[VAL_73]] : !fir.ref<i32>
 ! CHECK:   %[[VAL_76:.*]] = fir.convert %[[VAL_75]] : (i32) -> i8
 ! CHECK:   %[[VAL_77:.*]] = fir.undefined !fir.char<1>
 ! CHECK:   %[[VAL_78:.*]] = fir.insert_value %[[VAL_77]], %[[VAL_76]], [0 : index] : (!fir.char<1>, i8) -> !fir.char<1>
-! CHECK:   %[[VAL_79:.*]] = fir.alloca !fir.char<1>
-! CHECK:   fir.store %[[VAL_78]] to %[[VAL_79]] : !fir.ref<!fir.char<1>>
+! CHECK:   fir.store %[[VAL_78]] to %[[VAL_66]] : !fir.ref<!fir.char<1>>
 ! CHECK:   %[[VAL_80:.*]] = fir.alloca !fir.char<1> {bindc_name = ".chrtmp"}
 ! CHECK:   %[[VAL_81:.*]] = fir.convert %[[VAL_71]] : (index) -> i64
 ! CHECK:   %[[VAL_82:.*]] = fir.convert %[[VAL_80]] : (!fir.ref<!fir.char<1>>) -> !fir.ref<i8>
-! CHECK:   %[[VAL_83:.*]] = fir.convert %[[VAL_79]] : (!fir.ref<!fir.char<1>>) -> !fir.ref<i8>
+! CHECK:   %[[VAL_83:.*]] = fir.convert %[[VAL_66]] : (!fir.ref<!fir.char<1>>) -> !fir.ref<i8>
 ! CHECK:   fir.call @llvm.memmove.p0i8.p0i8.i64(%[[VAL_82]], %[[VAL_83]], %[[VAL_81]], %[[VAL_68]]) : (!fir.ref<i8>, !fir.ref<i8>, i64, i1) -> ()
 ! CHECK:   br ^bb1(%[[VAL_70]], %[[VAL_69]] : index, index)
 ! CHECK: ^bb1(%[[VAL_84:.*]]: index, %[[VAL_85:.*]]: index):

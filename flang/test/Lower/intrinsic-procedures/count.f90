@@ -39,7 +39,7 @@ subroutine test_count3(rslt, mask)
 ! CHECK-DAG:  %[[a1:.*]] = fir.convert %[[arg1]] : (!fir.box<!fir.array<?x!fir.logical<4>>>) -> !fir.box<none>
 ! CHECK:  %[[a3:.*]] = fir.convert %[[c0]] : (index) -> i32
   call bar(count(mask, kind=2))
-! CHECK:  %[[a4:.*]] = fir.call @_FortranACount(%[[a1]], %{{.*}}, %{{.*}}, %3) : (!fir.box<none>, !fir.ref<i8>, i32, i32) -> i64
+! CHECK:  %[[a4:.*]] = fir.call @_FortranACount(%[[a1]], %{{.*}}, %{{.*}}, %[[a3]]) : (!fir.box<none>, !fir.ref<i8>, i32, i32) -> i64
 ! CHECK:  %{{.*}} = fir.convert %[[a4]] : (i64) -> i16
 end subroutine
 

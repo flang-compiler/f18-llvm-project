@@ -12,8 +12,8 @@ subroutine test_nested_calls()
     integer function bar()
     end function
   end interface
+  ! CHECK: %[[result_storage:.*]] = fir.alloca i32 {adapt.valuebyref}
   ! CHECK: %[[result:.*]] = fir.call @_QPbar() : () -> i32
-  ! CHECK: %[[result_storage:.*]] = fir.alloca i32
   ! CHECK: fir.store %[[result]] to %[[result_storage]] : !fir.ref<i32>
   ! CHECK: fir.call @_QPfoo(%[[result_storage]]) : (!fir.ref<i32>) -> ()
   call foo(bar())

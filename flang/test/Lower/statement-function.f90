@@ -26,9 +26,9 @@ end function
 real(4) function test_stmt_only_eval_arg_once()
   real(4) :: only_once, x1
   func(x1) = x1 + x1
+  ! CHECK: %[[x2:.*]] = fir.alloca f32 {adapt.valuebyref}
   ! CHECK: %[[x1:.*]] = fir.call @_QPonly_once()
   ! Note: using -emit-fir, so the faked pass-by-reference is exposed
-  ! CHECK: %[[x2:.*]] = fir.alloca f32
   ! CHECK: fir.store %[[x1]] to %[[x2]]
   ! CHECK: addf %{{.*}}, %{{.*}}
   test_stmt_only_eval_arg_once = func(only_once())

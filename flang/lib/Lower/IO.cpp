@@ -529,6 +529,23 @@ static mlir::FuncOp getInputFunc(mlir::Location loc, fir::FirOpBuilder &builder,
   return getIORuntimeFunc<mkIOKey(InputDescriptor)>(loc, builder);
 }
 
+/// Interpret the lowest byte of a LOGICAL and store that value into the full
+/// storage of the LOGICAL. The load, convert, and store effectively (sign or
+/// zero) extends the lowest byte into the full LOGICAL value storage, as the
+/// runtime is unaware of the LOGICAL value's actual bit width (it was passed
+/// as a `bool&` to the runtime in order to be set).
+static void boolRefToLogical(mlir::Location loc, fir::FirOpBuilder &builder,
+                             mlir::Value addr) {
+  auto boolType = builder.getRefType(builder.getI1Type());
+  auto boolAddr = builder.createConvert(loc, boolType, addr);
+  auto boolValue = builder.create<fir::LoadOp>(loc, boolAddr);
+  auto logicalType = fir::unwrapPassByRefType(addr.getType());
+  // The convert avoid making any assumptions about how LOGICALs are actually
+  // represented (it might end-up being either a signed or zero extension).
+  auto logicalValue = builder.createConvert(loc, logicalType, boolValue);
+  builder.create<fir::StoreOp>(loc, logicalValue, addr);
+}
+
 static mlir::Value createIoRuntimeCallForItem(mlir::Location loc,
                                               fir::FirOpBuilder &builder,
                                               mlir::FuncOp inputFunc,
@@ -555,8 +572,12 @@ static mlir::Value createIoRuntimeCallForItem(mlir::Location loc,
                    itemTy.cast<mlir::IntegerType>().getWidth() / 8)));
     }
   }
-  return builder.create<fir::CallOp>(loc, inputFunc, inputFuncArgs)
-      .getResult(0);
+  auto call = builder.create<fir::CallOp>(loc, inputFunc, inputFuncArgs);
+  auto itemAddr = fir::getBase(item);
+  auto itemTy = fir::unwrapRefType(itemAddr.getType());
+  if (itemTy.isa<fir::LogicalType>())
+    boolRefToLogical(loc, builder, itemAddr);
+  return call.getResult(0);
 }
 
 /// Generate a sequence of input data transfer calls.
@@ -1989,7 +2010,9 @@ mlir::Value genInquireSpec<Fortran::parser::InquireSpec::LogVar>(
             Fortran::parser::InquireSpec::LogVar::EnumToString(logVarKind)
                 .c_str())));
   args.push_back(builder.createConvert(loc, specFuncTy.getInput(2), addr));
-  return builder.create<fir::CallOp>(loc, specFunc, args).getResult(0);
+  auto call = builder.create<fir::CallOp>(loc, specFunc, args);
+  boolRefToLogical(loc, builder, addr);
+  return call.getResult(0);
 }
 
 /// If there is an IdExpr in the list of inquire-specs, then lower it and return
