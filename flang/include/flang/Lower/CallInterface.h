@@ -269,6 +269,10 @@ public:
     return procRef;
   }
 
+  /// Get the SubprogramDetails that defines the interface of this call if it is
+  /// known at the call site. Return nullpt if it is not known.
+  const Fortran::semantics::SubprogramDetails *getInterfaceDetails() const;
+
   bool isMainProgram() const { return false; }
 
   /// Returns true if this is a call to a procedure pointer of a dummy
