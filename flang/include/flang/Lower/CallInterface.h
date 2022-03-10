@@ -270,7 +270,7 @@ public:
   }
 
   /// Get the SubprogramDetails that defines the interface of this call if it is
-  /// known at the call site. Return nullpt if it is not known.
+  /// known at the call site. Return nullptr if it is not known.
   const Fortran::semantics::SubprogramDetails *getInterfaceDetails() const;
 
   bool isMainProgram() const { return false; }
