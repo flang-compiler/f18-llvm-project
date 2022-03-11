@@ -1979,6 +1979,11 @@ public:
     if (Fortran::evaluate::IsAllocatableOrPointerObject(
             expr, converter.getFoldingContext()))
       return genMutableBoxValue(expr);
+    /// Do not create temps for array sections whose properties only need to be
+    /// inquired: create a descriptor that will be inquired.
+    if (Fortran::evaluate::IsVariable(expr) && isArray(expr) &&
+        !Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(expr))
+      return lowerIntrinsicArgumentAsBox(expr);
     return gen(expr);
   }
 
