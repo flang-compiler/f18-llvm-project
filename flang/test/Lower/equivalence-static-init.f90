@@ -2,6 +2,17 @@
 
 ! Test explicit static initialization of equivalence storage
 
+module module_without_init
+  real :: x(2)
+  integer :: i(2)
+  equivalence(i(1), x)
+end module
+! CHECK-LABEL: fir.global @_QMmodule_without_initEi : !fir.array<8xi8> {
+  ! CHECK: %0 = fir.undefined !fir.array<8xi8>
+  ! CHECK: fir.has_value %0 : !fir.array<8xi8>
+! CHECK}
+
+
 subroutine test_eqv_init
   integer, save :: link(3)
   integer :: i = 5

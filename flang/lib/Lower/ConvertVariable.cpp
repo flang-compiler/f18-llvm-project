@@ -663,7 +663,7 @@ static fir::GlobalOp defineGlobalAggregateStore(
           aggregate.getInitialValueSymbol())
     if (const auto *objectDetails =
             initSym->detailsIf<Fortran::semantics::ObjectEntityDetails>())
-      if (objectDetails->init())
+      if (objectDetails->init()) {
         createGlobalInitialization(
             builder, global, [&](fir::FirOpBuilder &builder) {
               Fortran::lower::StatementContext stmtCtx;
@@ -671,6 +671,16 @@ static fir::GlobalOp defineGlobalAggregateStore(
                   converter, loc, objectDetails->init().value(), stmtCtx));
               builder.create<fir::HasValueOp>(loc, initVal);
             });
+        return global;
+      }
+  // Equivalence has no Fortran initial value. Create an undefined FIR initial
+  // value to ensure this is consider an object definition in the IR regardless
+  // of the linkage.
+  createGlobalInitialization(builder, global, [&](fir::FirOpBuilder &builder) {
+    Fortran::lower::StatementContext stmtCtx;
+    mlir::Value initVal = builder.create<fir::UndefOp>(loc, aggTy);
+    builder.create<fir::HasValueOp>(loc, initVal);
+  });
   return global;
 }
 
