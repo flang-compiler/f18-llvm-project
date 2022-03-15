@@ -1622,7 +1622,7 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
     beginArgs.push_back(locToLineNo(converter, loc, beginFuncTy.getInput(2)));
   } else {
     hasNewunitSpec = hasSpec<Fortran::parser::ConnectSpec::Newunit>(stmt);
-    assert(hasNewunitSpec);
+    assert(hasNewunitSpec && "missing unit specifier");
     beginFunc = getIORuntimeFunc<mkIOKey(BeginOpenNewUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     beginArgs.push_back(locToFilename(converter, loc, beginFuncTy.getInput(0)));
