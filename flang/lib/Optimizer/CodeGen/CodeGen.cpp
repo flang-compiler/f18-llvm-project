@@ -2277,8 +2277,9 @@ struct CoordinateOpConversion
     if (baseObjectTy.dyn_cast<fir::BoxType>())
       return doRewriteBox(coor, ty, operands, loc, rewriter);
 
-    // Reference or pointer type
-    if (baseObjectTy.isa<fir::ReferenceType, fir::PointerType>())
+    // Reference, pointer or a heap type
+    if (baseObjectTy
+            .isa<fir::ReferenceType, fir::PointerType, fir::HeapType>())
       return doRewriteRefOrPtr(coor, ty, operands, loc, rewriter);
 
     return rewriter.notifyMatchFailure(
