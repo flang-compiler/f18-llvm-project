@@ -977,24 +977,6 @@ mlir::Value genIOOption<Fortran::parser::ConnectSpec::Recl>(
 }
 
 template <>
-mlir::Value genIOOption<Fortran::parser::ConnectSpec::Newunit>(
-    Fortran::lower::AbstractConverter &converter, mlir::Location loc,
-    mlir::Value cookie, const Fortran::parser::ConnectSpec::Newunit &spec) {
-  Fortran::lower::StatementContext stmtCtx;
-  fir::FirOpBuilder &builder = converter.getFirOpBuilder();
-  mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(GetNewUnit)>(loc, builder);
-  mlir::FunctionType ioFuncTy = ioFunc.getType();
-  const auto *var = Fortran::semantics::GetExpr(spec);
-  mlir::Value addr = builder.createConvert(
-      loc, ioFuncTy.getInput(1),
-      fir::getBase(converter.genExprAddr(var, stmtCtx, loc)));
-  auto kind = builder.createIntegerConstant(loc, ioFuncTy.getInput(2),
-                                            var->GetType().value().kind());
-  llvm::SmallVector<mlir::Value> ioArgs = {cookie, addr, kind};
-  return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
-}
-
-template <>
 mlir::Value genIOOption<Fortran::parser::StatusExpr>(
     Fortran::lower::AbstractConverter &converter, mlir::Location loc,
     mlir::Value cookie, const Fortran::parser::StatusExpr &spec) {
@@ -1114,7 +1096,7 @@ static bool hasX(const A &list) {
 }
 
 template <typename SEEK, typename A>
-static bool hasMem(const A &stmt) {
+static bool hasSpec(const A &stmt) {
   return hasX<SEEK>(stmt.v);
 }
 
@@ -1140,6 +1122,12 @@ static void threadSpecs(Fortran::lower::AbstractConverter &converter,
             [&](const Fortran::parser::IoControlSpec::Size &x) -> mlir::Value {
               // Size must be queried after the related READ runtime calls, not
               // before.
+              return ok;
+            },
+            [&](const Fortran::parser::ConnectSpec::Newunit &x) -> mlir::Value {
+              // Newunit must be queried after OPEN specifier runtime calls
+              // that may fail to avoid modifying the newunit variable if
+              // there is an error.
               return ok;
             },
             [&](const auto &x) {
@@ -1591,6 +1579,29 @@ Fortran::lower::genRewindStatement(Fortran::lower::AbstractConverter &converter,
   return genBasicIOStmt<mkIOKey(BeginRewind)>(converter, stmt);
 }
 
+static mlir::Value
+genNewunitSpec(Fortran::lower::AbstractConverter &converter, mlir::Location loc,
+               mlir::Value cookie,
+               const std::list<Fortran::parser::ConnectSpec> &specList) {
+  for (const auto &spec : specList)
+    if (auto *newunit =
+            std::get_if<Fortran::parser::ConnectSpec::Newunit>(&spec.u)) {
+      Fortran::lower::StatementContext stmtCtx;
+      fir::FirOpBuilder &builder = converter.getFirOpBuilder();
+      mlir::FuncOp ioFunc = getIORuntimeFunc<mkIOKey(GetNewUnit)>(loc, builder);
+      mlir::FunctionType ioFuncTy = ioFunc.getType();
+      const auto *var = Fortran::semantics::GetExpr(newunit->v);
+      mlir::Value addr = builder.createConvert(
+          loc, ioFuncTy.getInput(1),
+          fir::getBase(converter.genExprAddr(var, stmtCtx, loc)));
+      auto kind = builder.createIntegerConstant(loc, ioFuncTy.getInput(2),
+                                                var->GetType().value().kind());
+      llvm::SmallVector<mlir::Value> ioArgs = {cookie, addr, kind};
+      return builder.create<fir::CallOp>(loc, ioFunc, ioArgs).getResult(0);
+    }
+  llvm_unreachable("missing Newunit spec");
+}
+
 mlir::Value
 Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
                                  const Fortran::parser::OpenStmt &stmt) {
@@ -1599,7 +1610,8 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
   mlir::FuncOp beginFunc;
   llvm::SmallVector<mlir::Value> beginArgs;
   mlir::Location loc = converter.getCurrentLocation();
-  if (hasMem<Fortran::parser::FileUnitNumber>(stmt)) {
+  bool hasNewunitSpec = false;
+  if (hasSpec<Fortran::parser::FileUnitNumber>(stmt)) {
     beginFunc = getIORuntimeFunc<mkIOKey(BeginOpenUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     mlir::Value unit = fir::getBase(converter.genExprValue(
@@ -1609,7 +1621,8 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
     beginArgs.push_back(locToFilename(converter, loc, beginFuncTy.getInput(1)));
     beginArgs.push_back(locToLineNo(converter, loc, beginFuncTy.getInput(2)));
   } else {
-    assert(hasMem<Fortran::parser::ConnectSpec::Newunit>(stmt));
+    hasNewunitSpec = hasSpec<Fortran::parser::ConnectSpec::Newunit>(stmt);
+    assert(hasNewunitSpec);
     beginFunc = getIORuntimeFunc<mkIOKey(BeginOpenNewUnit)>(loc, builder);
     mlir::FunctionType beginFuncTy = beginFunc.getType();
     beginArgs.push_back(locToFilename(converter, loc, beginFuncTy.getInput(0)));
@@ -1622,6 +1635,8 @@ Fortran::lower::genOpenStatement(Fortran::lower::AbstractConverter &converter,
   mlir::Value ok;
   auto insertPt = builder.saveInsertionPoint();
   threadSpecs(converter, loc, cookie, stmt.v, csi.hasErrorConditionSpec(), ok);
+  if (hasNewunitSpec)
+    genNewunitSpec(converter, loc, cookie, stmt.v);
   builder.restoreInsertionPoint(insertPt);
   return genEndIO(converter, loc, cookie, csi, stmtCtx);
 }
@@ -1638,7 +1653,7 @@ Fortran::lower::genWaitStatement(Fortran::lower::AbstractConverter &converter,
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   Fortran::lower::StatementContext stmtCtx;
   mlir::Location loc = converter.getCurrentLocation();
-  bool hasId = hasMem<Fortran::parser::IdExpr>(stmt);
+  bool hasId = hasSpec<Fortran::parser::IdExpr>(stmt);
   mlir::FuncOp beginFunc =
       hasId ? getIORuntimeFunc<mkIOKey(BeginWait)>(loc, builder)
             : getIORuntimeFunc<mkIOKey(BeginWaitAll)>(loc, builder);
