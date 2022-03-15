@@ -108,3 +108,30 @@ func @test_rebox_3(%arg0: !fir.box<!fir.array<?xf32>>) {
   fir.call @bar_rebox_test3(%2) : (!fir.box<!fir.array<?x?x?xf32>>) -> ()
   return
 }
+
+
+// Test reboxing of character entities where the input has dynamic length and the output has compile
+// time constant length.
+
+// CHECK-LABEL: define void @test_rebox_4(
+// CHECK-SAME: { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[INPUT:.*]])
+func @test_rebox_4(%arg0: !fir.box<!fir.array<?x!fir.char<1,?>>>) {
+  // CHECK: %[[NEWBOX_STORAGE:.*]] = alloca { [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }
+  // CHECK: %[[EXTENT_GEP:.*]] = getelementptr {{{.*}}}, { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[INPUT]], i32 0, i32 7, i64 0, i32 1
+  // CHECK: %[[EXTENT:.*]] = load i64, i64* %[[EXTENT_GEP]]
+  // CHECK: %[[STRIDE_GEP:.*]] = getelementptr { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }, { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[INPUT]], i32 0, i32 7, i64 0, i32 2
+  // CHECK: %[[STRIDE:.*]] = load i64, i64* %[[STRIDE_GEP]]
+  // CHECK: %[[BASE_GEP:.*]] = getelementptr { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }, { i8*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[INPUT]], i32 0, i32 0
+  // CHECK: %[[BASE:.*]] = load i8*, i8** %[[BASE_GEP]]
+  // CHECK: %[[NEWBOX1:.*]] = insertvalue {{{.*}}} { [10 x i8]* undef, i64 10, i32 20180515, i8 1, i8 40, i8 1, i8 0, [1 x [3 x i64]] [{{.*}} [i64 1, i64 undef, i64 undef]] }, i64 %[[EXTENT]], 7, 0, 1
+  // CHECK: %[[NEWBOX2:.*]] = insertvalue { [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } %[[NEWBOX1]], i64 %[[STRIDE]], 7, 0, 2
+  // CHECK: %[[BASE_CAST:.*]] = bitcast i8* %12 to [10 x i8]*
+  // CHECK: %[[NEWBOX3:.*]] = insertvalue { [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } %[[NEWBOX2]], [10 x i8]* %[[BASE_CAST]], 0
+  // CHECK: store { [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] } %[[NEWBOX3]], { [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[NEWBOX_STORAGE]]
+  // CHECK: call void @bar_test_rebox_4({ [10 x i8]*, i64, i32, i8, i8, i8, i8, [1 x [3 x i64]] }* %[[NEWBOX_STORAGE]])
+
+  %1 = fir.rebox %arg0 : (!fir.box<!fir.array<?x!fir.char<1,?>>>) -> !fir.box<!fir.ptr<!fir.array<?x!fir.char<1,10>>>>
+  fir.call @bar_test_rebox_4(%1) : (!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,10>>>>) -> ()
+  return
+}
+func private @bar_test_rebox_4(!fir.box<!fir.ptr<!fir.array<?x!fir.char<1,10>>>>)
