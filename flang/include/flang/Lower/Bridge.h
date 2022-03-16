@@ -60,7 +60,10 @@ public:
   //===--------------------------------------------------------------------===//
 
   mlir::MLIRContext &getMLIRContext() { return context; }
+
+  /// Get the ModuleOp. It can never be null, which is asserted in the ctor.
   mlir::ModuleOp &getModule() { return *module.get(); }
+
   const Fortran::common::IntrinsicTypeDefaultKinds &getDefaultKinds() const {
     return defaultKinds;
   }
@@ -76,8 +79,6 @@ public:
 
   /// Create a folding context. Careful: this is very expensive.
   Fortran::evaluate::FoldingContext createFoldingContext() const;
-
-  bool validModule() { return getModule(); }
 
   //===--------------------------------------------------------------------===//
   // Perform the creation of an mlir::ModuleOp
