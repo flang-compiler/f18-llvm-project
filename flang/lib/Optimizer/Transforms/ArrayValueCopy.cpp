@@ -13,6 +13,7 @@
 #include "flang/Optimizer/Builder/Character.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Builder/Factory.h"
+#include "flang/Optimizer/Builder/Runtime/Derived.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROpsSupport.h"
 #include "flang/Optimizer/Support/FIRContext.h"
@@ -999,6 +1000,50 @@ findNonconstantExtents(mlir::Type memrefTy,
   return nce;
 }
 
+/// Allocate temporary storage for an ArrayLoadOp \load and initialize any
+/// allocatable direct components of the array elements with an unallocated
+/// status. Returns the temporary address as well as a callback to generate the
+/// temporary clean-up once it has been used. The clean-up will take care of
+/// deallocating all the element allocatable components that may have been
+/// allocated while using the temporary.
+static std::pair<mlir::Value,
+                 std::function<void(mlir::PatternRewriter &rewriter)>>
+allocateArrayTemp(mlir::Location loc, mlir::PatternRewriter &rewriter,
+                  ArrayLoadOp load, llvm::ArrayRef<mlir::Value> extents,
+                  mlir::Value shape) {
+  mlir::Type baseType = load.memref().getType();
+  llvm::SmallVector<mlir::Value> nonconstantExtents =
+      findNonconstantExtents(baseType, extents);
+  llvm::SmallVector<mlir::Value> typeParams =
+      genArrayLoadTypeParameters(loc, rewriter, load);
+  mlir::Value allocmem = rewriter.create<AllocMemOp>(
+      loc, dyn_cast_ptrOrBoxEleTy(baseType), typeParams, nonconstantExtents);
+  mlir::Type eleType =
+      fir::unwrapSequenceType(fir::unwrapPassByRefType(baseType));
+  if (fir::isRecordWithAllocatableMember(eleType)) {
+    // The allocatable component descriptors need to be set to a clean
+    // deallocated status before anything is done with them.
+    mlir::Value box = rewriter.create<fir::EmboxOp>(
+        loc, fir::BoxType::get(baseType), allocmem, shape,
+        /*slice=*/mlir::Value{}, typeParams);
+    auto module = load->getParentOfType<mlir::ModuleOp>();
+    FirOpBuilder builder(rewriter, getKindMapping(module));
+    runtime::genDerivedTypeInitialize(builder, loc, box);
+    // Any allocatable component that may have been allocated must be
+    // deallocated during the clean-up.
+    auto cleanup = [=](mlir::PatternRewriter &r) {
+      FirOpBuilder builder(r, getKindMapping(module));
+      runtime::genDerivedTypeDestroy(builder, loc, box);
+      r.create<FreeMemOp>(loc, allocmem);
+    };
+    return {allocmem, cleanup};
+  }
+  auto cleanup = [=](mlir::PatternRewriter &r) {
+    r.create<FreeMemOp>(loc, allocmem);
+  };
+  return {allocmem, cleanup};
+}
+
 namespace {
 /// Conversion of fir.array_update and fir.array_modify Ops.
 /// If there is a conflict for the update, then we need to perform a
@@ -1030,11 +1075,8 @@ public:
     bool copyUsingSlice = false;
     auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents,
                                               copyUsingSlice);
-    llvm::SmallVector<mlir::Value> nonconstantExtents =
-        findNonconstantExtents(load.memref().getType(), extents);
-    auto allocmem = rewriter.create<AllocMemOp>(
-        loc, dyn_cast_ptrOrBoxEleTy(load.memref().getType()),
-        genArrayLoadTypeParameters(loc, rewriter, load), nonconstantExtents);
+    auto [allocmem, genTempCleanUp] =
+        allocateArrayTemp(loc, rewriter, load, extents, shapeOp);
     genArrayCopy</*copyIn=*/true>(load.getLoc(), rewriter, allocmem,
                                   load.memref(), shapeOp, load.slice(), load);
     // Generate the reference for the access.
@@ -1050,7 +1092,7 @@ public:
     // Copy out.
     genArrayCopy</*copyIn=*/false>(store.getLoc(), rewriter, store.memref(),
                                    allocmem, shapeOp, store.slice(), load);
-    rewriter.create<FreeMemOp>(loc, allocmem);
+    genTempCleanUp(rewriter);
     return coor;
   }
 
@@ -1080,11 +1122,9 @@ public:
       bool copyUsingSlice = false;
       auto shapeOp = getOrReadExtentsAndShapeOp(loc, rewriter, load, extents,
                                                 copyUsingSlice);
-      llvm::SmallVector<mlir::Value> nonconstantExtents =
-          findNonconstantExtents(load.memref().getType(), extents);
-      auto allocmem = rewriter.create<AllocMemOp>(
-          loc, dyn_cast_ptrOrBoxEleTy(load.memref().getType()),
-          genArrayLoadTypeParameters(loc, rewriter, load), nonconstantExtents);
+      auto [allocmem, genTempCleanUp] =
+          allocateArrayTemp(loc, rewriter, load, extents, shapeOp);
+
       genArrayCopy</*copyIn=*/true>(load.getLoc(), rewriter, allocmem,
                                     load.memref(), shapeOp, load.slice(), load);
       rewriter.setInsertionPoint(op);
@@ -1100,7 +1140,7 @@ public:
       // Copy out.
       genArrayCopy</*copyIn=*/false>(store.getLoc(), rewriter, store.memref(),
                                      allocmem, shapeOp, store.slice(), load);
-      rewriter.create<FreeMemOp>(loc, allocmem);
+      genTempCleanUp(rewriter);
       return {coor, load.getResult()};
     }
     // Otherwise, when there is no conflict (a possible loop-carried
