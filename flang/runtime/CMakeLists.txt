@@ -76,6 +76,7 @@ add_flang_library(FortranRuntime PARTIAL_SOURCES_INTENDED
   type-info.cpp
   unit.cpp
   unit-map.cpp
+  utf.cpp
 
   LINK_LIBS
   FortranDecimal
