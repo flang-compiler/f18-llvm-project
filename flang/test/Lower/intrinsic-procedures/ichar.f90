@@ -23,4 +23,10 @@ subroutine ichar_test(c)
   ! CHECK: fir.call @{{.*}}OutputInteger32{{.*}}%[[ARG]]
   ! CHECK: fir.call @{{.*}}EndIoStatement
   print *, ichar(str(J))
+
+  ! "Magic" 88 below is the value returned by IACHAR (’X’)
+  ! CHECK: %[[c88:.*]] = arith.constant 88 : i32
+  ! CHECK-NEXT: fir.call @{{.*}}OutputInteger32({{.*}}, %[[c88]])
+  ! CHECK-NEXT: fir.call @{{.*}}EndIoStatement
+  print *, iachar('X')
 end subroutine
