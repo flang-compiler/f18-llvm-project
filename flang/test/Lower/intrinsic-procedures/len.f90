@@ -71,6 +71,39 @@ subroutine len_test_alloc_explicit_len(i, n, c)
   integer :: n
   character(n), allocatable :: c(:)
 ! CHECK:  %[[VAL_3:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
-! CHECK:  fir.store %[[VAL_3]] to %[[VAL_0]] : !fir.ref<i32>
+! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+! CHECK:  %[[cmp:.*]] = arith.cmpi sgt, %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  %[[len:.*]] = select %[[cmp]], %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  fir.store %[[len]] to %[[VAL_0]] : !fir.ref<i32>
+  i = len(c)
+end subroutine
+
+! CHECK-LABEL: func @_QPlen_test_pointer_explicit_len(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32> {fir.bindc_name = "i"},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i32> {fir.bindc_name = "n"},
+subroutine len_test_pointer_explicit_len(i, n, c)
+  integer :: i
+  integer :: n
+  character(n), pointer :: c(:)
+! CHECK:  %[[VAL_3:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+! CHECK:  %[[cmp:.*]] = arith.cmpi sgt, %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  %[[len:.*]] = select %[[cmp]], %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  fir.store %[[len]] to %[[VAL_0]] : !fir.ref<i32>
+  i = len(c)
+end subroutine
+
+! CHECK-LABEL: func @_QPlen_test_assumed_shape_explicit_len(
+! CHECK-SAME:  %[[VAL_0:.*]]: !fir.ref<i32> {fir.bindc_name = "i"},
+! CHECK-SAME:  %[[VAL_1:.*]]: !fir.ref<i32> {fir.bindc_name = "n"},
+subroutine len_test_assumed_shape_explicit_len(i, n, c)
+  integer :: i
+  integer :: n
+  character(n) :: c(:)
+! CHECK:  %[[VAL_3:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+! CHECK:  %[[cmp:.*]] = arith.cmpi sgt, %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  %[[len:.*]] = select %[[cmp]], %[[VAL_3]], %[[c0_i32]] : i32
+! CHECK:  fir.store %[[len]] to %[[VAL_0]] : !fir.ref<i32>
   i = len(c)
 end subroutine

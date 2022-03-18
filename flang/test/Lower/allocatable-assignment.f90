@@ -177,7 +177,10 @@ end subroutine
 subroutine test_dyn_char_scalar(x, n)
   integer :: n
   character(n), allocatable  :: x
-! CHECK:  %[[VAL_2:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[VAL_2A:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+! CHECK:  %[[VAL_2B:.*]] = arith.cmpi sgt, %[[VAL_2A]], %[[c0_i32]] : i32
+! CHECK:  %[[VAL_2:.*]] = select %[[VAL_2B]], %[[VAL_2A]], %[[c0_i32]] : i32
 ! CHECK:  %[[VAL_3:.*]] = fir.address_of(@_QQcl.48656C6C6F20776F726C6421) : !fir.ref<!fir.char<1,12>>
 ! CHECK:  %[[VAL_4:.*]] = arith.constant 12 : index
 ! CHECK:  %[[VAL_5:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>
@@ -617,7 +620,10 @@ subroutine test_dyn_char(x, n, c)
 ! CHECK:  %[[VAL_3:.*]]:2 = fir.unboxchar %[[VAL_2]] : (!fir.boxchar<1>) -> (!fir.ref<!fir.char<1,?>>, index)
 ! CHECK:  %[[VAL_4:.*]] = fir.convert %[[VAL_3]]#0 : (!fir.ref<!fir.char<1,?>>) -> !fir.ref<!fir.array<20x!fir.char<1,?>>>
 ! CHECK:  %[[VAL_5_0:.*]] = arith.constant 20 : index
-! CHECK:  %[[VAL_6:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[VAL_6A:.*]] = fir.load %[[VAL_1]] : !fir.ref<i32>
+! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+! CHECK:  %[[VAL_6B:.*]] = arith.cmpi sgt, %[[VAL_6A]], %[[c0_i32]] : i32
+! CHECK:  %[[VAL_6:.*]] = select %[[VAL_6B]], %[[VAL_6A]], %[[c0_i32]] : i32
 ! CHECK:  %[[VAL_5:.*]] = arith.constant 20 : index
 ! CHECK:  %[[VAL_7:.*]] = fir.shape %[[VAL_5_0]] : (index) -> !fir.shape<1>
 ! CHECK:  %[[VAL_9:.*]] = fir.load %[[VAL_0]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>

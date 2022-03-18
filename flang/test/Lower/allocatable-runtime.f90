@@ -135,25 +135,31 @@ end subroutine
 subroutine char_explicit_dyn(n, l1, l2)
   integer :: n, l1, l2
   character(l1), allocatable :: scalar
-  ! CHECK-DAG: %[[l1:.*]] = fir.load %arg1 : !fir.ref<i32>
-  ! CHECK-DAG: %[[sBoxAddr:.*]] = fir.alloca !fir.box<!fir.heap<!fir.char<1,?>>> {{{.*}}uniq_name = "_QFchar_explicit_dynEscalar"}
-  ! CHECK-DAG: %[[sNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.char<1,?>>
-  ! CHECK-DAG: %[[sInitBox:.*]] = fir.embox %[[sNullAddr]] typeparams %[[l1]] : (!fir.heap<!fir.char<1,?>>, i32) -> !fir.box<!fir.heap<!fir.char<1,?>>>
-  ! CHECK-DAG: fir.store %[[sInitBox]] to %[[sBoxAddr]] : !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>
+  ! CHECK:  %[[sBoxAddr:.*]] = fir.alloca !fir.box<!fir.heap<!fir.char<1,?>>> {{{.*}}uniq_name = "_QFchar_explicit_dynEscalar"}
+  ! CHECK:  %[[raw_l1:.*]] = fir.load %arg1 : !fir.ref<i32>
+  ! CHECK:  %[[c0_i32:.*]] = arith.constant 0 : i32
+  ! CHECK:  %[[cmp1:.*]] = arith.cmpi sgt, %[[raw_l1]], %[[c0_i32]] : i32
+  ! CHECK:  %[[l1:.*]] = select %[[cmp1]], %[[raw_l1]], %[[c0_i32]] : i32
+  ! CHECK:  %[[sNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.char<1,?>>
+  ! CHECK:  %[[sInitBox:.*]] = fir.embox %[[sNullAddr]] typeparams %[[l1]] : (!fir.heap<!fir.char<1,?>>, i32) -> !fir.box<!fir.heap<!fir.char<1,?>>>
+  ! CHECK:  fir.store %[[sInitBox]] to %[[sBoxAddr]] : !fir.ref<!fir.box<!fir.heap<!fir.char<1,?>>>>
 
-  character(l2), allocatable :: array(:)
-  ! CHECK-DAG: %[[l2:.*]] = fir.load %arg2 : !fir.ref<i32>
-  ! CHECK-DAG: %[[aBoxAddr:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>> {{{.*}}uniq_name = "_QFchar_explicit_dynEarray"}
-  ! CHECK-DAG: %[[aNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1,?>>>
-  ! CHECK-DAG: %[[aNullShape:.*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
-  ! CHECK-DAG: %[[aInitBox:.*]] = fir.embox %[[aNullAddr]](%[[aNullShape]]) typeparams %[[l2]] : (!fir.heap<!fir.array<?x!fir.char<1,?>>>, !fir.shape<1>, i32) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
-  ! CHECK-DAG: fir.store %[[aInitBox]] to %[[aBoxAddr]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>
-  allocate(scalar, array(20))
+  character(l2), allocatable :: zarray(:)
+  ! CHECK:  %[[aBoxAddr:.*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>> {{{.*}}uniq_name = "_QFchar_explicit_dynEzarray"}
+  ! CHECK:  %[[raw_l2:.*]] = fir.load %arg2 : !fir.ref<i32>
+  ! CHECK:  %[[c0_i32_2:.*]] = arith.constant 0 : i32
+  ! CHECK:  %[[cmp2:.*]] = arith.cmpi sgt, %[[raw_l2]], %[[c0_i32_2]] : i32
+  ! CHECK:  %[[l2:.*]] = select %[[cmp2]], %[[raw_l2]], %[[c0_i32_2]] : i32
+  ! CHECK:  %[[aNullAddr:.*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1,?>>>
+  ! CHECK:  %[[aNullShape:.*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK:  %[[aInitBox:.*]] = fir.embox %[[aNullAddr]](%[[aNullShape]]) typeparams %[[l2]] : (!fir.heap<!fir.array<?x!fir.char<1,?>>>, !fir.shape<1>, i32) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>
+  ! CHECK:  fir.store %[[aInitBox]] to %[[aBoxAddr]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1,?>>>>>
+  allocate(scalar, zarray(20))
   ! CHECK-NOT: AllocatableInitCharacter
   ! CHECK: AllocatableAllocate
   ! CHECK-NOT: AllocatableInitCharacter
   ! CHECK: AllocatableAllocate
-  deallocate(scalar, array)
+  deallocate(scalar, zarray)
   ! CHECK: AllocatableDeallocate
   ! CHECK: AllocatableDeallocate
 end subroutine
