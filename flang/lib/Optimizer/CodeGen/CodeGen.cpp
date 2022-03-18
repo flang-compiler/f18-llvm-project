@@ -1585,6 +1585,11 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
         }
       }
       if (!skipNext) {
+        // store extent
+        if (hasSlice)
+          extent = computeTripletExtent(rewriter, loc, operands[sliceOffset],
+                                        operands[sliceOffset + 1],
+                                        operands[sliceOffset + 2], zero, i64Ty);
         // Lower bound is normalized to 0 for BIND(C) interoperability.
         auto lb = zero;
         bool isaPointerOrAllocatable =
@@ -1596,15 +1601,15 @@ struct XEmboxOpConversion : public EmboxCommonConversion<fir::cg::XEmboxOp> {
         // If there is a shifted origin and this is not a normalized descriptor
         // then use the value from the shift op as the lower bound.
         if (hasShift &&
-            (isaPointerOrAllocatable || !normalizedLowerBound(xbox)))
+            (isaPointerOrAllocatable || !normalizedLowerBound(xbox))) {
           lb = operands[shiftOffset];
+          auto extentIsEmpty = rewriter.create<mlir::LLVM::ICmpOp>(
+              loc, mlir::LLVM::ICmpPredicate::eq, extent, zero);
+          lb = rewriter.create<mlir::LLVM::SelectOp>(loc, extentIsEmpty, one,
+                                                     lb);
+        }
         dest = insertLowerBound(rewriter, loc, dest, descIdx, lb);
 
-        // store extent
-        if (hasSlice)
-          extent = computeTripletExtent(rewriter, loc, operands[sliceOffset],
-                                        operands[sliceOffset + 1],
-                                        operands[sliceOffset + 2], zero, i64Ty);
         dest = insertExtent(rewriter, loc, dest, descIdx, extent);
 
         // store step (scaled by shaped extent)
@@ -1729,12 +1734,21 @@ private:
                 mlir::ValueRange strides,
                 mlir::ConversionPatternRewriter &rewriter) const {
     mlir::Location loc = rebox.getLoc();
+    mlir::Value zero =
+        genConstantIndex(loc, lowerTy().indexType(), rewriter, 0);
     mlir::Value one = genConstantIndex(loc, lowerTy().indexType(), rewriter, 1);
     for (auto iter : llvm::enumerate(llvm::zip(extents, strides))) {
+      mlir::Value extent = std::get<0>(iter.value());
       unsigned dim = iter.index();
-      mlir::Value lb = lbounds.empty() ? one : lbounds[dim];
+      mlir::Value lb = one;
+      if (!lbounds.empty()) {
+        lb = lbounds[dim];
+        auto extentIsEmpty = rewriter.create<mlir::LLVM::ICmpOp>(
+            loc, mlir::LLVM::ICmpPredicate::eq, extent, zero);
+        lb = rewriter.create<mlir::LLVM::SelectOp>(loc, extentIsEmpty, one, lb);
+      };
       dest = insertLowerBound(rewriter, loc, dest, dim, lb);
-      dest = insertExtent(rewriter, loc, dest, dim, std::get<0>(iter.value()));
+      dest = insertExtent(rewriter, loc, dest, dim, extent);
       dest = insertStride(rewriter, loc, dest, dim, std::get<1>(iter.value()));
     }
     dest = insertBaseAddress(rewriter, loc, dest, base);
