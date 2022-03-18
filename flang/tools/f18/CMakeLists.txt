@@ -69,3 +69,6 @@ if (NOT WIN32)
     FILE_PERMISSIONS OWNER_EXECUTE OWNER_READ OWNER_WRITE)
   install(PROGRAMS ${CMAKE_BINARY_DIR}/bin/flang DESTINATION bin)
 endif()
+
+# TODO Move this to a more suitable location
+file(COPY ${FLANG_SOURCE_DIR}/module/omp_lib.h DESTINATION "${CMAKE_BINARY_DIR}/include/flang/OpenMP/" FILE_PERMISSIONS OWNER_READ OWNER_WRITE)
