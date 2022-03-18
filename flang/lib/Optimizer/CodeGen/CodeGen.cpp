@@ -2480,7 +2480,7 @@ private:
         const unsigned sz = arrTy.getDimension();
         if (arraysHaveKnownShape(arrTy.getEleTy(),
                                  operands.drop_front(1 + sz))) {
-          llvm::ArrayRef<int64_t> shape = arrTy.getShape();
+          fir::SequenceType::ShapeRef shape = arrTy.getShape();
           bool allConst = true;
           for (unsigned i = 0; i < sz - 1; ++i) {
             if (shape[i] < 0) {
@@ -2494,11 +2494,9 @@ private:
       }
     }
 
-    if (fir::hasDynamicSize(fir::unwrapSequenceType(cpnTy))) {
-      mlir::emitError(
+    if (fir::hasDynamicSize(fir::unwrapSequenceType(cpnTy)))
+      return mlir::emitError(
           loc, "fir.coordinate_of with a dynamic element size is unsupported");
-      return failure();
-    }
 
     if (hasKnownShape || columnIsDeferred) {
       SmallVector<mlir::Value> offs;
@@ -2512,10 +2510,8 @@ private:
       for (std::size_t i = 1,  sz = operands.size(); i < sz; ++i) {
         mlir::Value nxtOpnd = operands[i];
 
-        if (!cpnTy) {
-          mlir::emitError(loc, "invalid coordinate/check failed");
-          return failure();
-        }
+        if (!cpnTy)
+          return mlir::emitError(loc, "invalid coordinate/check failed");
 
         // check if the i-th coordinate relates to an array
         if (dims.hasValue()) {
@@ -2562,8 +2558,8 @@ private:
       return success();
     }
 
-    mlir::emitError(loc, "fir.coordinate_of base operand has unsupported type");
-    return failure();
+    return mlir::emitError(
+        loc, "fir.coordinate_of base operand has unsupported type");
   }
 };
 
