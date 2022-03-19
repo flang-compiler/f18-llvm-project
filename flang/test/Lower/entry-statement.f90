@@ -16,10 +16,25 @@ entry compare2(y, d2, d1)
 end
 
 program entries
+  character c(3)
   character(10) hh, qq, m
   character(len=4) s1, s2
-  integer mm
+  integer mm, x(3), y(5)
   logical r
+  complex xx(3)
+
+  interface
+    subroutine ashapec(asc)
+      character asc(:)
+    end subroutine
+    subroutine ashapei(asi)
+      integer asi(:)
+    end subroutine
+    subroutine ashapex(asx)
+      complex asx(:)
+    end subroutine
+  end interface
+
   s1 = 'a111'
   s2 = 'a222'
   call compare1(r, s1, s2); print*, r
@@ -37,6 +52,13 @@ program entries
   call dd2
   call dd3(6)
 6 continue
+  x = 5
+  y = 7
+  call level3a(x, y, 3)
+  call level3b(x, y, 3)
+  call ashapec(c); print*, c
+  call ashapei(x); print*, x
+  call ashapex(xx); print*, xx
 end
 
 ! CHECK-LABEL: func @_QPss(
@@ -110,49 +132,114 @@ end
 
 ! CHECK-LABEL: func @_QPdd1()
 subroutine dd1
-    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
-    ! "_QFdd1Ekk"}
-    ! CHECK: br ^bb1
-    ! CHECK: ^bb1:  // pred: ^bb0
-    ! CHECK: %[[ten:.*]] = arith.constant 10 : i32
-    ! CHECK: fir.store %[[ten:.*]] to %[[kk]] : !fir.ref<i32>
-    ! CHECK: br ^bb2
-    ! CHECK: ^bb2:  // pred: ^bb1
-    ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
-    ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
-    ! CHECK: br ^bb3
-    ! CHECK: ^bb3:  // pred: ^bb2
-    ! CHECK: return
-    kk = 10
+  ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name = "_QFdd1Ekk"}
+  ! CHECK: br ^bb1
+  ! CHECK: ^bb1:  // pred: ^bb0
+  ! CHECK: %[[ten:.*]] = arith.constant 10 : i32
+  ! CHECK: fir.store %[[ten:.*]] to %[[kk]] : !fir.ref<i32>
+  ! CHECK: br ^bb2
+  ! CHECK: ^bb2:  // pred: ^bb1
+  ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
+  ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
+  ! CHECK: br ^bb3
+  ! CHECK: ^bb3:  // pred: ^bb2
+  ! CHECK: return
+  kk = 10
 
-    ! CHECK-LABEL: func @_QPdd2()
-    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
-    ! "_QFdd1Ekk"}
-    ! CHECK: br ^bb1
-    ! CHECK: ^bb1:  // pred: ^bb0
-    ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
-    ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
-    ! CHECK: br ^bb2
-    ! CHECK: ^bb2:  // pred: ^bb1
-    ! CHECK: return
-    entry dd2
-    kk = 20
-    return
+  ! CHECK-LABEL: func @_QPdd2()
+  ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name = "_QFdd1Ekk"}
+  ! CHECK: br ^bb1
+  ! CHECK: ^bb1:  // pred: ^bb0
+  ! CHECK: %[[twenty:.*]] = arith.constant 20 : i32
+  ! CHECK: fir.store %[[twenty:.*]] to %[[kk]] : !fir.ref<i32>
+  ! CHECK: br ^bb2
+  ! CHECK: ^bb2:  // pred: ^bb1
+  ! CHECK: return
+  entry dd2
+  kk = 20
+  return
 
-    ! CHECK-LABEL: func @_QPdd3
-    ! CHECK: %[[dd3:[0-9]*]] = fir.alloca index {bindc_name = "dd3"}
-    ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name =
-    ! "_QFdd1Ekk"}
-    ! CHECK: %[[zero:.*]] = arith.constant 0 : index
-    ! CHECK: fir.store %[[zero:.*]] to %[[dd3]] : !fir.ref<index>
-    ! CHECK: br ^bb1
-    ! CHECK: ^bb1:  // pred: ^bb0
-    ! CHECK: %[[thirty:.*]] = arith.constant 30 : i32
-    ! CHECK: fir.store %[[thirty:.*]] to %[[kk:[0-9]*]] : !fir.ref<i32>
-    ! CHECK: br ^bb2
-    ! CHECK: ^bb2:  // pred: ^bb1
-    ! CHECK: %[[altret:[0-9]*]] = fir.load %[[dd3]] : !fir.ref<index>
-    ! CHECK: return %[[altret:[0-9]*]] : index
-    entry dd3(*)
-    kk = 30
-  end
+  ! CHECK-LABEL: func @_QPdd3
+  ! CHECK: %[[dd3:[0-9]*]] = fir.alloca index {bindc_name = "dd3"}
+  ! CHECK: %[[kk:[0-9]*]] = fir.alloca i32 {bindc_name = "kk", uniq_name = "_QFdd1Ekk"}
+  ! CHECK: %[[zero:.*]] = arith.constant 0 : index
+  ! CHECK: fir.store %[[zero:.*]] to %[[dd3]] : !fir.ref<index>
+  ! CHECK: br ^bb1
+  ! CHECK: ^bb1:  // pred: ^bb0
+  ! CHECK: %[[thirty:.*]] = arith.constant 30 : i32
+  ! CHECK: fir.store %[[thirty:.*]] to %[[kk:[0-9]*]] : !fir.ref<i32>
+  ! CHECK: br ^bb2
+  ! CHECK: ^bb2:  // pred: ^bb1
+  ! CHECK: %[[altret:[0-9]*]] = fir.load %[[dd3]] : !fir.ref<index>
+  ! CHECK: return %[[altret:[0-9]*]] : index
+  entry dd3(*)
+  kk = 30
+end
+
+! CHECK-LABEL: func @_QPashapec(
+subroutine ashapec(asc)
+  ! CHECK: %[[asx:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>
+  ! CHECK: %[[asi:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: %[[zeroi:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+  ! CHECK: %[[shapei:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxi:[0-9]*]] = fir.embox %[[zeroi]](%[[shapei]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.store %[[boxi]] to %[[asi]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+  ! CHECK: %[[zerox:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.complex<4>>>
+  ! CHECK: %[[shapex:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxx:[0-9].*]] = fir.embox %[[zerox]](%[[shapex]]) : (!fir.heap<!fir.array<?x!fir.complex<4>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>
+  ! CHECK: fir.store %[[boxx]] to %[[asx]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>>
+  character asc(:)
+  integer asi(:)
+  complex asx(:)
+  asc = '?'
+  return
+! CHECK-LABEL: func @_QPashapei(
+entry ashapei(asi)
+  ! CHECK: %[[asx:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>
+  ! CHECK: %[[asc:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>
+  ! CHECK: %[[zeroc:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1>>>
+  ! CHECK: %[[shapec:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxc:[0-9]*]] = fir.embox %[[zeroc]](%[[shapec]]) : (!fir.heap<!fir.array<?x!fir.char<1>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>
+  ! CHECK: fir.store %[[boxc]] to %[[asc]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>>
+  ! CHECK: %[[zerox:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.complex<4>>>
+  ! CHECK: %[[shapex:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxx:[0-9].*]] = fir.embox %[[zerox]](%[[shapex]]) : (!fir.heap<!fir.array<?x!fir.complex<4>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>
+  ! CHECK: fir.store %[[boxx]] to %[[asx]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.complex<4>>>>>
+  asi = 3
+  return
+! CHECK-LABEL: func @_QPashapex(
+entry ashapex(asx)
+  ! CHECK: %[[asi:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: %[[asc:[0-9]*]] = fir.alloca !fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>
+  ! CHECK: %[[zeroc:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?x!fir.char<1>>>
+  ! CHECK: %[[shapec:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxc:[0-9]*]] = fir.embox %[[zeroc]](%[[shapec]]) : (!fir.heap<!fir.array<?x!fir.char<1>>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>
+  ! CHECK: fir.store %[[boxc]] to %[[asc]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?x!fir.char<1>>>>>
+  ! CHECK: %[[zeroi:[0-9]*]] = fir.zero_bits !fir.heap<!fir.array<?xi32>>
+  ! CHECK: %[[shapei:[0-9]*]] = fir.shape %c0{{.*}} : (index) -> !fir.shape<1>
+  ! CHECK: %[[boxi:[0-9].*]] = fir.embox %[[zeroi]](%[[shapei]]) : (!fir.heap<!fir.array<?xi32>>, !fir.shape<1>) -> !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.store %[[boxi]] to %[[asi]] : !fir.ref<!fir.box<!fir.heap<!fir.array<?xi32>>>>
+  asx = (2.0,-2.0)
+end
+
+! CHECK-LABEL: func @_QPlevel3a(
+subroutine level3a(a, b, m)
+  ! CHECK: fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.alloca i32 {bindc_name = "n", uniq_name = "_QFlevel3aEn"}
+  integer :: a(m), b(a(m)), m
+  integer :: x(n), y(x(n)), n
+1 print*, m
+  print*, a
+  print*, b
+  if (m == 3) return
+! CHECK-LABEL: func @_QPlevel3b(
+entry level3b(x, y, n)
+  ! CHECK: fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.alloca !fir.box<!fir.heap<!fir.array<?xi32>>>
+  ! CHECK: fir.alloca i32 {bindc_name = "m", uniq_name = "_QFlevel3aEm"}
+  print*, n
+  print*, x
+  print*, y
+  if (n /= 3) goto 1
+end

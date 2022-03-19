@@ -1597,7 +1597,7 @@ private:
         auto insertPt = builder->saveInsertionPoint();
         // create a 'section' operation for every 'Section Block'
         genOpenMPSectionsBlock(*this, *curEval);
-        for (auto it = block.begin(); it != block.end(); it++) { 
+        for (auto it = block.begin(); it != block.end(); it++) {
           // generate FIR for every 'ExecutionPartConstruct' and encapsulate it
           // within the corresponding 'Section Block'
           genFIR(*sectionsBlockEvalIterator);
@@ -2564,19 +2564,6 @@ private:
     for (const Fortran::lower::CalleeInterface::PassedEntity &arg :
          callee.getPassedArguments())
       mapPassedEntity(arg);
-
-    // Allocate local skeleton instances of dummies from other entry points.
-    // Most of these locals will not survive into final generated code, but
-    // some will.  It is illegal to reference them at run time if they do.
-    for (const Fortran::semantics::Symbol *arg :
-         funit.nonUniversalDummyArguments) {
-      if (lookupSymbol(*arg))
-        continue;
-      mlir::Type type = genType(*arg);
-      // TODO: Account for VALUE arguments (and possibly other variants).
-      type = builder->getRefType(type);
-      addSymbol(*arg, builder->create<fir::UndefOp>(toLocation(), type));
-    }
     if (std::optional<Fortran::lower::CalleeInterface::PassedEntity>
             passedResult = callee.getPassedResult()) {
       mapPassedEntity(*passedResult);
