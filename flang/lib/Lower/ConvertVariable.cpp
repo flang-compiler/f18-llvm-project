@@ -1250,9 +1250,9 @@ void Fortran::lower::mapSymbolAttributes(
   //
   //  - Allocate a heap box/descriptor, initialized to zero.  This always
   //    works, but is more heavyweight and harder to clean up.  It is used
-  //    for dynamic objects via calls to genUnusedBox.
+  //    for dynamic objects via calls to genUnusedEntryPointBox.
 
-  auto genUnusedBox = [&]() {
+  auto genUnusedEntryPointBox = [&]() {
     if (isDeclaredDummy && !isDummy) { // dummy from another entry point
       symMap.addSymbol(sym, fir::factory::createTempMutableBox(
                                 builder, loc, converter.genType(var)));
@@ -1410,7 +1410,7 @@ void Fortran::lower::mapSymbolAttributes(
       //===--------------------------------------------------------------===//
 
       [&](const Fortran::lower::details::ScalarDynamicChar &x) {
-        if (genUnusedBox())
+        if (genUnusedEntryPointBox())
           return;
         // type is a CHARACTER, determine the LEN value
         auto charLen = x.charLen();
@@ -1475,7 +1475,7 @@ void Fortran::lower::mapSymbolAttributes(
       //===--------------------------------------------------------------===//
 
       [&](const Fortran::lower::details::DynamicArray &x) {
-        if (genUnusedBox())
+        if (genUnusedEntryPointBox())
           return;
         // cast to the known constant parts from the declaration
         mlir::Type varType = converter.genType(var);
@@ -1580,7 +1580,7 @@ void Fortran::lower::mapSymbolAttributes(
       //===--------------------------------------------------------------===//
 
       [&](const Fortran::lower::details::StaticArrayDynamicChar &x) {
-        if (genUnusedBox())
+        if (genUnusedEntryPointBox())
           return;
         mlir::Value addr;
         mlir::Value len;
@@ -1651,7 +1651,7 @@ void Fortran::lower::mapSymbolAttributes(
       //===--------------------------------------------------------------===//
 
       [&](const Fortran::lower::details::DynamicArrayStaticChar &x) {
-        if (genUnusedBox())
+        if (genUnusedEntryPointBox())
           return;
         mlir::Value addr;
         mlir::Value len;
@@ -1711,7 +1711,7 @@ void Fortran::lower::mapSymbolAttributes(
       //===--------------------------------------------------------------===//
 
       [&](const Fortran::lower::details::DynamicArrayDynamicChar &x) {
-        if (genUnusedBox())
+        if (genUnusedEntryPointBox())
           return;
         mlir::Value addr;
         mlir::Value len;
