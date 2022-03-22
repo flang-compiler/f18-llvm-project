@@ -1132,3 +1132,11 @@ mlir::Value fir::factory::createZeroValue(fir::FirOpBuilder &builder,
   fir::emitFatalError(loc, "internal: trying to generate zero value of non "
                            "numeric or logical type");
 }
+
+llvm::Optional<std::int64_t> fir::factory::getIntIfConstant(mlir::Value value) {
+  if (auto definingOp = value.getDefiningOp())
+    if (auto cst = mlir::dyn_cast<mlir::arith::ConstantOp>(definingOp))
+      if (auto intAttr = cst.value().dyn_cast<mlir::IntegerAttr>())
+        return intAttr.getInt();
+  return {};
+}
