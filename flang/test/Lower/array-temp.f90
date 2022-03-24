@@ -43,16 +43,18 @@ end
 
 ! CHECK-LABEL: func @_QPss2(
 ! CHECK-SAME:               %[[VAL_0:.*]]: !fir.ref<i32> {fir.bindc_name = "n"}) {
-! CHECK:         %[[VAL_1:.*]] = arith.constant -1 : index
-! CHECK:         %[[VAL_2:.*]] = arith.constant -2 : i32
-! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_5:.*]] = arith.constant 2 : index
-! CHECK:         %[[VAL_6:.*]] = arith.constant 1 : i32
-! CHECK:         %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
-! CHECK:         %[[VAL_8:.*]] = arith.constant -1 : i32
+! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant -1 : index
+! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant -2 : i32
+! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 1 : index
+! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant 0 : index
+! CHECK-DAG:     %[[VAL_5:.*]] = arith.constant 2 : index
+! CHECK-DAG:     %[[VAL_6:.*]] = arith.constant 1 : i32
+! CHECK-DAG:     %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
+! CHECK-DAG:     %[[VAL_8:.*]] = arith.constant -1 : i32
 ! CHECK:         %[[VAL_10:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (i32) -> index
+! CHECK:         %[[VAL_11A:.*]] = fir.convert %[[VAL_10]] : (i32) -> index
+! CHECK:         %[[CMP:.*]] = arith.cmpi sgt, %[[VAL_11A]], %[[VAL_4]] : index 
+! CHECK:         %[[VAL_11:.*]] = select %[[CMP]], %[[VAL_11A]], %[[VAL_4]] : index 
 ! CHECK:         %[[VAL_12:.*]] = fir.alloca !fir.array<?xf32>, %[[VAL_11]] {bindc_name = "aa", uniq_name = "_QFss2Eaa"}
 ! CHECK:         %[[VAL_13:.*]] = fir.shape %[[VAL_11]] : (index) -> !fir.shape<1>
 ! CHECK:         %[[VAL_14:.*]] = fir.convert %[[VAL_2]] : (i32) -> f32
@@ -135,16 +137,18 @@ end
 
 ! CHECK-LABEL: func @_QPss3(
 ! CHECK-SAME:               %[[VAL_0:.*]]: !fir.ref<i32> {fir.bindc_name = "n"}) {
-! CHECK:         %[[VAL_1:.*]] = arith.constant -1 : index
-! CHECK:         %[[VAL_2:.*]] = arith.constant 2 : index
-! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant -2 : i32
-! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_6:.*]] = arith.constant 1 : i32
-! CHECK:         %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
-! CHECK:         %[[VAL_8:.*]] = arith.constant -1 : i32
+! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant -1 : index
+! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
+! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 1 : index
+! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant -2 : i32
+! CHECK-DAG:     %[[VAL_5:.*]] = arith.constant 0 : index
+! CHECK-DAG:     %[[VAL_6:.*]] = arith.constant 1 : i32
+! CHECK-DAG:     %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
+! CHECK-DAG:     %[[VAL_8:.*]] = arith.constant -1 : i32
 ! CHECK:         %[[VAL_10:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
 ! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (i32) -> index
+! CHECK:         %[[CMP:.*]] = arith.cmpi sgt, %[[VAL_11A]], %[[VAL_5]] : index 
+! CHECK:         %[[VAL_11:.*]] = select %[[CMP]], %[[VAL_11A]], %[[VAL_5]] : index 
 ! CHECK:         %[[VAL_12:.*]] = fir.alloca !fir.array<2x?xf32>, %[[VAL_11]] {bindc_name = "aa", uniq_name = "_QFss3Eaa"}
 ! CHECK:         %[[VAL_13:.*]] = fir.shape %[[VAL_2]], %[[VAL_11]] : (index, index) -> !fir.shape<2>
 ! CHECK:         %[[VAL_14:.*]] = fir.convert %[[VAL_4]] : (i32) -> f32
@@ -259,16 +263,18 @@ end
 
 ! CHECK-LABEL: func @_QPss4(
 ! CHECK-SAME:               %[[VAL_0:.*]]: !fir.ref<i32> {fir.bindc_name = "n"}) {
-! CHECK:         %[[VAL_1:.*]] = arith.constant -1 : index
-! CHECK:         %[[VAL_2:.*]] = arith.constant 2 : index
-! CHECK:         %[[VAL_3:.*]] = arith.constant 1 : index
-! CHECK:         %[[VAL_4:.*]] = arith.constant -2 : i32
-! CHECK:         %[[VAL_5:.*]] = arith.constant 0 : index
-! CHECK:         %[[VAL_6:.*]] = arith.constant 1 : i32
-! CHECK:         %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
-! CHECK:         %[[VAL_8:.*]] = arith.constant -1 : i32
+! CHECK-DAG:     %[[VAL_1:.*]] = arith.constant -1 : index
+! CHECK-DAG:     %[[VAL_2:.*]] = arith.constant 2 : index
+! CHECK-DAG:     %[[VAL_3:.*]] = arith.constant 1 : index
+! CHECK-DAG:     %[[VAL_4:.*]] = arith.constant -2 : i32
+! CHECK-DAG:     %[[VAL_5:.*]] = arith.constant 0 : index
+! CHECK-DAG:     %[[VAL_6:.*]] = arith.constant 1 : i32
+! CHECK-DAG:     %[[VAL_7:.*]] = arith.constant 7.000000e+00 : f32
+! CHECK-DAG:     %[[VAL_8:.*]] = arith.constant -1 : i32
 ! CHECK:         %[[VAL_10:.*]] = fir.load %[[VAL_0]] : !fir.ref<i32>
-! CHECK:         %[[VAL_11:.*]] = fir.convert %[[VAL_10]] : (i32) -> index
+! CHECK:         %[[VAL_11A:.*]] = fir.convert %[[VAL_10]] : (i32) -> index
+! CHECK:         %[[CMP:.*]] = arith.cmpi sgt, %[[VAL_11A]], %[[VAL_5]] : index 
+! CHECK:         %[[VAL_11:.*]] = select %[[CMP]], %[[VAL_11A]], %[[VAL_5]] : index 
 ! CHECK:         %[[VAL_12:.*]] = fir.alloca !fir.array<?x2xf32>, %[[VAL_11]] {bindc_name = "aa", uniq_name = "_QFss4Eaa"}
 ! CHECK:         %[[VAL_13:.*]] = fir.shape %[[VAL_11]], %[[VAL_2]] : (index, index) -> !fir.shape<2>
 ! CHECK:         %[[VAL_14:.*]] = fir.convert %[[VAL_4]] : (i32) -> f32
