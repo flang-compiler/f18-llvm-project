@@ -1156,14 +1156,14 @@ void Fortran::lower::mapSymbolAttributes(
   const bool isDeclaredDummy = Fortran::semantics::IsDummy(sym);
   // An active dummy from the current entry point.
   const bool isDummy = isDeclaredDummy && symMap.lookupSymbol(sym).getAddr();
+  // An unused dummy from another entry point.
+  const bool isUnusedEntryDummy = isDeclaredDummy && !isDummy;
   const bool isResult = Fortran::semantics::IsFunctionResult(sym);
   const bool replace = isDummy || isResult;
   fir::factory::CharacterExprHelper charHelp{builder, loc};
 
   if (Fortran::semantics::IsProcedure(sym)) {
-    assert(isDeclaredDummy && "expected a dummy procedure argument");
-    if (!isDummy) {
-      // This is an unused dummy procedure argument from another entry point.
+    if (isUnusedEntryDummy) {
       // Additional discussion below.
       mlir::Value undefOp = builder.create<fir::UndefOp>(
           loc, builder.getRefType(converter.genType(var)));
@@ -1253,7 +1253,7 @@ void Fortran::lower::mapSymbolAttributes(
   //    for dynamic objects via calls to genUnusedEntryPointBox.
 
   auto genUnusedEntryPointBox = [&]() {
-    if (isDeclaredDummy && !isDummy) { // dummy from another entry point
+    if (isUnusedEntryDummy) {
       symMap.addSymbol(sym, fir::factory::createTempMutableBox(
                                 builder, loc, converter.genType(var)));
       return true;
