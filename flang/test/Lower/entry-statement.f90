@@ -67,7 +67,6 @@ subroutine ss(n1)
   ! CHECK: fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Enx"}
   ! CHECK: fir.alloca i32 {{{.*}}uniq_name = "{{.*}}Eny"}
   integer n17, n2
-  procedure(), pointer :: procptr1
   nx = 100
   n1 = nx + 10
   return
@@ -125,7 +124,7 @@ end
 
 ! CHECK-LABEL: func @_QPchar_array()
 function char_array()
-  character(10) c(5)
+  character(10), c(5)
 ! CHECK-LABEL: func @_QPchar_array_entry(
 ! CHECK-SAME: %{{.*}}: !fir.boxchar<1>{{.*}}) -> f32 {
 entry char_array_entry(c)

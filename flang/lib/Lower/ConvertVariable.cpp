@@ -1169,6 +1169,8 @@ void Fortran::lower::mapSymbolAttributes(
           loc, builder.getRefType(converter.genType(var)));
       symMap.addSymbol(sym, undefOp);
     }
+    if (Fortran::semantics::IsPointer(sym))
+      TODO(loc, "procedure pointers");
     return;
   }
 
