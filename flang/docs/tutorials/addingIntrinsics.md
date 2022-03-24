@@ -163,7 +163,7 @@ The categories are:
 - `fir::CharArrayBoxValue` contiguous character arrays.
 - `fir::MutableBoxValue` for allocatable and pointers of all types.
 - `fir::ProcBoxValue` for procedure pointers.
-- `fir::BoxValue` for all the rest (e.g. non-contiguous arrays, polymorphic or parametrized derived types).
+- `fir::BoxValue` for all the rest (e.g. non-contiguous arrays, polymorphic or parameterized derived types).
 See `include/flang/Support/BoxValue.h` for more details.
 
 If the intrinsic has a runtime implementation, the actual binding should be done in another helper function called

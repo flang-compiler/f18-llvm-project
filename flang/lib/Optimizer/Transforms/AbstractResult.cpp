@@ -7,6 +7,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "PassDetail.h"
+#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Dialect/FIRDialect.h"
 #include "flang/Optimizer/Dialect/FIROps.h"
 #include "flang/Optimizer/Dialect/FIRType.h"
@@ -264,8 +265,7 @@ public:
         return true;
       auto resultType = dispatch->getResult(0).getType();
       if (resultType.isa<fir::SequenceType, fir::BoxType, fir::RecordType>()) {
-        mlir::emitError(dispatch.getLoc(),
-                        "TODO: dispatchOp with abstract results");
+        TODO(dispatch.getLoc(), "dispatchOp with abstract results");
         return false;
       }
       return true;

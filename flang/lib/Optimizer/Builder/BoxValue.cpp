@@ -11,6 +11,7 @@
 //===----------------------------------------------------------------------===//
 
 #include "flang/Optimizer/Builder/BoxValue.h"
+#include "flang/Lower/Todo.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "mlir/IR/BuiltinTypes.h"
 #include "llvm/Support/Debug.h"
@@ -55,15 +56,13 @@ llvm::SmallVector<mlir::Value> fir::getTypeParams(const ExtendedValue &exv) {
       [](const fir::CharBoxValue &x) -> RT { return {x.getLen()}; },
       [](const fir::CharArrayBoxValue &x) -> RT { return {x.getLen()}; },
       [&](const fir::BoxValue &) -> RT {
-        LLVM_DEBUG(mlir::emitWarning(
-            loc, "TODO: box value is missing type parameters"));
+        TODO(loc, "box value is missing type parameters");
         return {};
       },
       [&](const fir::MutableBoxValue &) -> RT {
         // In this case, the type params may be bound to the variable in an
         // ALLOCATE statement as part of a type-spec.
-        LLVM_DEBUG(mlir::emitWarning(
-            loc, "TODO: mutable box value is missing type parameters"));
+        TODO(loc, "mutable box value is missing type parameters");
         return {};
       },
       [](const auto &) -> RT { return {}; });

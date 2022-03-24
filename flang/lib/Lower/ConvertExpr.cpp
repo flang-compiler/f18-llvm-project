@@ -1036,7 +1036,7 @@ public:
       TODO(loc, "rank inquiry on assumed rank");
     case Fortran::evaluate::DescriptorInquiry::Field::Stride:
       // So far the front end does not generate this inquiry.
-      TODO(loc, "Stride inquiry");
+      TODO(loc, "stride inquiry");
     }
     llvm_unreachable("unknown descriptor inquiry");
   }
@@ -2289,7 +2289,7 @@ public:
       if (charType.hasDynamicLen() && allocMemTypeParams.empty())
         allocMemTypeParams.push_back(charLen);
     } else if (fir::hasDynamicSize(elementType)) {
-      TODO(loc, "Creating temporary for derived type with length parameters");
+      TODO(loc, "creating temporary for derived type with length parameters");
     }
 
     mlir::Value temp = builder.create<fir::AllocMemOp>(
@@ -4496,8 +4496,9 @@ private:
       const Fortran::evaluate::ProcedureRef &procRef,
       llvm::Optional<mlir::Type> retTy,
       const Fortran::evaluate::SpecificIntrinsic &intrinsic) {
+
     llvm::SmallVector<CC> operands;
-    llvm::StringRef name = intrinsic.name;
+    std::string name = intrinsic.name;
     const Fortran::lower::IntrinsicArgumentLoweringRules *argLowering =
         Fortran::lower::getIntrinsicArgumentLowering(name);
     mlir::Location loc = getLoc();
@@ -4529,7 +4530,6 @@ private:
           converter);
 
       fir::FirOpBuilder *bldr = &converter.getFirOpBuilder();
-      llvm::StringRef name = intrinsic.name;
       return [=](IterSpace iters) -> ExtValue {
         auto getArgument = [&](std::size_t i) -> ExtValue {
           return operands[i].first(iters);
@@ -5320,6 +5320,7 @@ private:
                   // vector subscript with replicated values.
                   assert(!isBoxValue() &&
                          "fir.box cannot be created with vector subscripts");
+                  // TODO: Avoid creating a new evaluate::Expr here
                   auto arrExpr = ignoreEvConvert(e);
                   if (createDestShape) {
                     destShape.push_back(fir::getExtentAtDimension(
@@ -5957,7 +5958,6 @@ private:
 
     if (fir::isRecordWithAllocatableMember(eleTy))
       TODO(loc, "deep copy on allocatable members");
-
     if (!eleSz) {
       // Compute the element size at runtime.
       assert(fir::hasDynamicSize(eleTy));
