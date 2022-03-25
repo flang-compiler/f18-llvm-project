@@ -1094,10 +1094,9 @@ lowerExplicitExtents(Fortran::lower::AbstractConverter &converter,
           loc, idxTy, genScalarValue(converter, loc, expr, symMap, stmtCtx));
       if (lowerBounds.empty())
         result.emplace_back(Fortran::lower::genMaxWithZero(builder, loc, ub));
-      else {
+      else
         result.emplace_back(
             computeExtent(builder, loc, lowerBounds[spec.index()], ub));
-      }
     } else if (spec.value()->ubound().isStar()) {
       // Assumed extent is undefined. Must be provided by user's code.
       result.emplace_back(builder.create<fir::UndefOp>(loc, idxTy));
