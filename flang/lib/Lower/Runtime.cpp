@@ -12,6 +12,7 @@
 #include "flang/Optimizer/Builder/BoxValue.h"
 #include "flang/Optimizer/Builder/FIRBuilder.h"
 #include "flang/Optimizer/Builder/Runtime/RTBuilder.h"
+#include "flang/Optimizer/Dialect/FIROpsSupport.h"
 #include "flang/Parser/parse-tree.h"
 #include "flang/Runtime/misc-intrinsic.h"
 #include "flang/Runtime/pointer.h"
@@ -350,16 +351,20 @@ void Fortran::lower::genSystemClock(fir::FirOpBuilder &builder,
   auto makeCall = [&](mlir::FuncOp func, mlir::Value arg) {
     mlir::Type type = arg.getType();
     fir::IfOp ifOp{};
+    const bool isOptionalArg =
+        fir::valueHasFirAttribute(arg, fir::getOptionalAttrName());
     if (type.dyn_cast<fir::PointerType>() || type.dyn_cast<fir::HeapType>()) {
       // Check for a disassociated pointer or an unallocated allocatable.
-      mlir::IntegerType i64Ty = builder.getIntegerType(64);
-      auto addr = builder.createConvert(loc, i64Ty, arg);
-      auto zero = builder.createIntegerConstant(loc, i64Ty, 0);
-      auto cond = builder.create<mlir::arith::CmpIOp>(
-          loc, mlir::arith::CmpIPredicate::ne, addr, zero);
-      ifOp = builder.create<fir::IfOp>(loc, cond, /*withElseRegion=*/false);
-      builder.setInsertionPointToStart(&ifOp.thenRegion().front());
+      assert(!isOptionalArg && "invalid optional argument");
+      ifOp = builder.create<fir::IfOp>(loc, builder.genIsNotNullAddr(loc, arg),
+                                       /*withElseRegion=*/false);
+    } else if (isOptionalArg) {
+      ifOp = builder.create<fir::IfOp>(
+          loc, builder.create<fir::IsPresentOp>(loc, builder.getI1Type(), arg),
+          /*withElseRegion=*/false);
     }
+    if (ifOp)
+      builder.setInsertionPointToStart(&ifOp.thenRegion().front());
     mlir::Type kindTy = func.getType().getInput(0);
     int integerKind = 8;
     if (auto intType = fir::unwrapRefType(type).dyn_cast<mlir::IntegerType>())
