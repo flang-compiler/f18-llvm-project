@@ -61,8 +61,9 @@ end
 ! CHECK-LABEL: func @_QPss3{{.*}} {
 ! CHECK:   omp.parallel {
 ! CHECK:     fir.alloca i32 {pinned}
-! CHECK-NEXT: %[[ALLOCA_1:.*]] = fir.alloca i32 {adapt.valuebyref, pinned}
-! CHECK-NEXT: %[[ALLOCA_2:.*]] = fir.alloca i32 {adapt.valuebyref, pinned}
+! CHECK: %[[ALLOCA_0:.*]] = fir.alloca i32 {bindc_name = "k", pinned}
+! CHECK: %[[ALLOCA_1:.*]] = fir.alloca i32 {adapt.valuebyref, pinned}
+! CHECK: %[[ALLOCA_2:.*]] = fir.alloca i32 {adapt.valuebyref, pinned}
 ! CHECK:     br ^bb1
 ! CHECK:   ^bb1:  // 2 preds: ^bb0, ^bb2
 ! CHECK:     cond_br %{{[0-9]*}}, ^bb2, ^bb3
@@ -83,8 +84,8 @@ end
 ! CHECK:       cond_br %{{[0-9]*}}, ^bb4, ^bb3
 ! CHECK:     ^bb3:  // pred: ^bb2
 ! CHECK:       @_FortranAioBeginExternalListOutput
-! CHECK:       %[[LOAD_2:.*]] = fir.load %[[ALLOCA_2]] : !fir.ref<i32>
-! CHECK:     @_FortranAioOutputInteger32(%{{.*}}, %[[LOAD_2]])
+! CHECK:       %[[LOAD_0:.*]] = fir.load %[[ALLOCA_0]] : !fir.ref<i32>
+! CHECK:     @_FortranAioOutputInteger32(%{{.*}}, %[[LOAD_0]])
 ! CHECK:       br ^bb1
 ! CHECK:     ^bb4:  // 2 preds: ^bb1, ^bb2
 ! CHECK:       omp.yield

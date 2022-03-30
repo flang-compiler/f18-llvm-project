@@ -73,9 +73,9 @@ program sample
 end program sample
 
 !FIRDialect: func @_QPfirstprivate(%[[ARG:.*]]: !fir.ref<f32> {fir.bindc_name = "alpha"}) {
-!FIRDialect: %[[ALPHA:.*]] = fir.alloca f32 {bindc_name = "alpha", pinned, uniq_name = "_QFfirstprivateEalpha"}
-!FIRDialect: %[[ALPHA_STORE:.*]] = fir.load %[[ARG]] : !fir.ref<f32>
-!FIRDialect: fir.store %[[ALPHA_STORE]] to %[[ALPHA]] : !fir.ref<f32>
+!FIRDialect: %[[ALPHA_PRIVATE:.*]] = fir.alloca f32 {bindc_name = "alpha", pinned, uniq_name = "_QFfirstprivateEalpha"}
+!FIRDialect: %[[ALPHA_VAL:.*]] = fir.load %[[ARG]] : !fir.ref<f32>
+!FIRDialect: fir.store %[[ALPHA_VAL]] to %[[ALPHA_PRIVATE]] : !fir.ref<f32>
 !FIRDialect: omp.sections {
 !FIRDialect: omp.section  {
 !FIRDialect: omp.terminator
@@ -84,10 +84,10 @@ end program sample
 !FIRDialect: }
 !FIRDialect: omp.sections {
 !FIRDialect: omp.section  {
-!FIRDialect: %[[PRIVATE_VAR:.*]] = fir.load %[[ARG]] : !fir.ref<f32>
+!FIRDialect: %[[PRIVATE_VAR:.*]] = fir.load %[[ALPHA_PRIVATE]] : !fir.ref<f32>
 !FIRDialect: %[[CONSTANT:.*]] = arith.constant 5.000000e+00 : f32
 !FIRDialect: %[[PRIVATE_VAR_2:.*]] = arith.mulf %[[PRIVATE_VAR]], %[[CONSTANT]] : f32
-!FIRDialect: fir.store %[[PRIVATE_VAR_2]] to %[[ARG]] : !fir.ref<f32>
+!FIRDialect: fir.store %[[PRIVATE_VAR_2]] to %[[ALPHA_PRIVATE]] : !fir.ref<f32>
 !FIRDialect: omp.terminator
 !FIRDialect: }
 !FIRDialect: omp.terminator

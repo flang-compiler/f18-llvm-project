@@ -625,7 +625,7 @@ private:
         // to the Do concurrent scope (same for OpenMP loops).
         auto newVal = builder->createTemporary(loc, genType(sym),
                                                toStringRef(sym.name()));
-        addSymbol(sym, newVal);
+        bindIfNewSymbol(sym, newVal);
         return newVal;
       }
     }
@@ -1556,8 +1556,7 @@ private:
 
   void genFIR(const Fortran::parser::OpenMPConstruct &omp) {
     mlir::OpBuilder::InsertPoint insertPt = builder->saveInsertionPoint();
-    if (constructDepth++ == 0)
-      localSymbols.pushScope();
+    localSymbols.pushScope();
     genOpenMPConstruct(*this, getEval(), omp);
 
     const auto *ompLoop =
@@ -1605,16 +1604,13 @@ private:
         }
         builder->restoreInsertionPoint(insertPt);
       }
-      if (--constructDepth == 0)
-        localSymbols.popScope();
       builder->restoreInsertionPoint(insertPt);
       return;
     }
 
     for (Fortran::lower::pft::Evaluation &e : curEval->getNestedEvaluations())
       genFIR(e);
-    if (--constructDepth == 0)
-      localSymbols.popScope();
+    localSymbols.popScope();
     builder->restoreInsertionPoint(insertPt);
   }
 
@@ -3115,8 +3111,6 @@ private:
 
   /// Tuple of host assoicated variables.
   mlir::Value hostAssocTuple;
-
-  std::size_t constructDepth = 0;
 };
 
 } // namespace

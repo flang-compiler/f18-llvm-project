@@ -49,7 +49,9 @@ static void createPrivateVarSyms(Fortran::lower::AbstractConverter &converter,
         ompObject.u);
 
     // Privatization for symbols which are pre-determined (like loop index
-    // variables) happen separately, for everything else privatize here
+    // variables) happen separately, for everything else privatize here.
+    if (sym->test(Fortran::semantics::Symbol::Flag::OmpPreDetermined))
+      continue;
     if constexpr (std::is_same_v<T, Fortran::parser::OmpClause::Firstprivate>) {
       converter.copyHostAssociateVar(*sym);
     } else {
