@@ -1507,7 +1507,7 @@ std::optional<SpecificCall> IntrinsicInterface::Match(
           if (auto shape{GetShape(context, *arg)}) {
             if (auto constShape{AsConstantShape(context, *shape)}) {
               shapeArgSize = constShape->At(ConstantSubscripts{1}).ToInt64();
-              CHECK(shapeArgSize >= 0);
+              CHECK(*shapeArgSize >= 0);
               argOk = true;
             }
           }
