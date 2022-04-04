@@ -2646,15 +2646,12 @@ private:
       }
     }
 
-    // If this is a host procedure with host associations, then create the tuple
-    // of pointers for passing to the internal procedures.
-    if (!funit.getHostAssoc().empty())
-      funit.getHostAssoc().hostProcedureBindings(*this, localSymbols);
-
-    /// TODO: should use same mechanism as equivalence?
-    /// One blocking point is character entry returns that need special handling
-    /// since they are not locally allocated but come as argument. CHARACTER(*)
-    /// is not something that fit wells with equivalence lowering.
+    // TODO: should use same mechanism as equivalence?
+    // One blocking point is character entry returns that need special handling
+    // since they are not locally allocated but come as argument. CHARACTER(*)
+    // is not something that fit wells with equivalence lowering.
+    // An alternate function result may be referenced by a contained
+    // subprogram.  So map them before getting host bindings.
     for (const Fortran::lower::pft::Variable &altResult :
          deferredFuncResultList) {
       if (std::optional<Fortran::lower::CalleeInterface::PassedEntity>
@@ -2664,6 +2661,11 @@ private:
       Fortran::lower::mapSymbolAttributes(*this, altResult, localSymbols,
                                           stmtCtx, primaryFuncResultStorage);
     }
+
+    // If this is a host procedure with host associations, then create the tuple
+    // of pointers for passing to the internal procedures.
+    if (!funit.getHostAssoc().empty())
+      funit.getHostAssoc().hostProcedureBindings(*this, localSymbols);
 
     // Create most function blocks in advance.
     createEmptyBlocks(funit.evaluationList);
