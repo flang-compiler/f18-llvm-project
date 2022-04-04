@@ -80,6 +80,92 @@ static void privatizeVars(Fortran::lower::AbstractConverter &converter,
   firOpBuilder.restoreInsertionPoint(insPt);
 }
 
+static mlir::Value genCommonMember(Fortran::lower::AbstractConverter &converter,
+                                   const Fortran::semantics::Symbol &sym,
+                                   mlir::Value commonValue) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
+  mlir::IntegerType i8Ty = firOpBuilder.getIntegerType(8);
+  mlir::Type i8Ptr = firOpBuilder.getRefType(i8Ty);
+  mlir::Type seqTy = firOpBuilder.getRefType(firOpBuilder.getVarLenSeqTy(i8Ty));
+  mlir::Value base =
+      firOpBuilder.createConvert(currentLocation, seqTy, commonValue);
+  std::size_t byteOffset = sym.GetUltimate().offset();
+  mlir::Value offs = firOpBuilder.createIntegerConstant(
+      currentLocation, firOpBuilder.getIndexType(), byteOffset);
+  mlir::Value varAddr = firOpBuilder.create<fir::CoordinateOp>(
+      currentLocation, i8Ptr, base, mlir::ValueRange{offs});
+  mlir::Type symType = converter.genType(sym);
+  return firOpBuilder.createConvert(currentLocation,
+                                    firOpBuilder.getRefType(symType), varAddr);
+}
+
+static fir::ExtendedValue getExtValue(fir::ExtendedValue base,
+                                      mlir::Value val) {
+  return base.match(
+      [&](const fir::MutableBoxValue &box) -> fir::ExtendedValue {
+        return fir::MutableBoxValue(val, box.nonDeferredLenParams(), {});
+      },
+      [&](const auto &) -> fir::ExtendedValue {
+        return fir::substBase(base, val);
+      });
+}
+
+static void threadPrivatizeVars(Fortran::lower::AbstractConverter &converter,
+                                Fortran::lower::pft::Evaluation &eval) {
+  auto &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
+  auto insPt = firOpBuilder.saveInsertionPoint();
+  firOpBuilder.setInsertionPointToStart(firOpBuilder.getAllocaBlock());
+
+  auto getSymbolAddress = [&](Fortran::lower::SymbolRef sym) -> mlir::Value {
+    return converter.getSymbolAddress(sym);
+  };
+
+  auto genThreadprivateOp = [&](Fortran::lower::SymbolRef sym) -> mlir::Value {
+    mlir::Value symOriThreadprivateValue = getSymbolAddress(sym);
+    mlir::Operation *op = symOriThreadprivateValue.getDefiningOp();
+    assert(mlir::isa<mlir::omp::ThreadprivateOp>(op) &&
+           "The threadprivate operation not created");
+    mlir::Value symValue = op->getOperand(0);
+    return firOpBuilder.create<mlir::omp::ThreadprivateOp>(
+        currentLocation, symValue.getType(), symValue);
+  };
+
+  llvm::SetVector<const Fortran::semantics::Symbol *> threadprivateSyms;
+  converter.collectSymbolSet(
+      eval, threadprivateSyms,
+      Fortran::semantics::Symbol::Flag::OmpThreadprivate);
+
+  llvm::SetVector<const Fortran::semantics::Symbol *> commonSyms;
+  for (std::size_t i = 0; i < threadprivateSyms.size(); i++) {
+    auto sym = threadprivateSyms[i];
+    mlir::Value symThreadprivateValue;
+    if (const Fortran::semantics::Symbol *common =
+            Fortran::semantics::FindCommonBlockContaining(sym->GetUltimate())) {
+      mlir::Value commonThreadprivateValue;
+      if (commonSyms.contains(common)) {
+        commonThreadprivateValue = getSymbolAddress(*common);
+      } else {
+        commonThreadprivateValue = genThreadprivateOp(*common);
+        converter.bindSymbol(*common, commonThreadprivateValue);
+        commonSyms.insert(common);
+      }
+      symThreadprivateValue =
+          genCommonMember(converter, *sym, commonThreadprivateValue);
+    } else {
+      symThreadprivateValue = genThreadprivateOp(*sym);
+    }
+
+    fir::ExtendedValue sexv = converter.getSymbolExtValue(*sym);
+    fir::ExtendedValue symThreadprivateExv =
+        getExtValue(sexv, symThreadprivateValue);
+    converter.bindSymbol(*sym, symThreadprivateExv);
+  }
+
+  firOpBuilder.restoreInsertionPoint(insPt);
+}
+
 static void genObjectList(const Fortran::parser::OmpObjectList &objectList,
                           Fortran::lower::AbstractConverter &converter,
                           llvm::SmallVectorImpl<Value> &operands) {
@@ -261,6 +347,9 @@ static void createBodyOfOp(
   // Handle privatization. Do not privatize if this is the outer operation.
   if (clauses && !outerCombined)
     privatizeVars(converter, *clauses);
+
+  if (std::is_same_v<Op, omp::ParallelOp>)
+    threadPrivatizeVars(converter, eval);
 }
 
 static void genOMP(Fortran::lower::AbstractConverter &converter,
@@ -858,6 +947,86 @@ void Fortran::lower::genOpenMPConstruct(
       ompConstruct.u);
 }
 
+void Fortran::lower::genThreadprivateOp(
+    Fortran::lower::AbstractConverter &converter,
+    const Fortran::lower::pft::Variable &var) {
+  fir::FirOpBuilder &firOpBuilder = converter.getFirOpBuilder();
+  mlir::Location currentLocation = converter.getCurrentLocation();
+
+  auto getSymbolAddress = [&](Fortran::lower::SymbolRef sym) -> mlir::Value {
+    return converter.getSymbolAddress(sym);
+  };
+
+  const Fortran::semantics::Symbol &sym = var.getSymbol();
+  mlir::Value symThreadprivateValue;
+  if (const Fortran::semantics::Symbol *common =
+          Fortran::semantics::FindCommonBlockContaining(sym.GetUltimate())) {
+    mlir::Value commonValue = getSymbolAddress(*common);
+    if (mlir::isa<mlir::omp::ThreadprivateOp>(commonValue.getDefiningOp())) {
+      // Generate ThreadprivateOp for a common block instead of its members and
+      // only do it once for a common block.
+      return;
+    }
+    // Generate ThreadprivateOp and rebind the common block.
+    mlir::Value commonThreadprivateValue =
+        firOpBuilder.create<mlir::omp::ThreadprivateOp>(
+            currentLocation, commonValue.getType(), commonValue);
+    converter.bindSymbol(*common, commonThreadprivateValue);
+    // Generate the threadprivate value for the common block member.
+    symThreadprivateValue =
+        genCommonMember(converter, sym, commonThreadprivateValue);
+  } else if (!var.isGlobal()) {
+    // Non-global variable which can be in threadprivate directive must be one
+    // variable in main program, and it has implicit SAVE attribute. Take it as
+    // with SAVE attribute, so to create GlobalOp for it to simplify the
+    // translation to LLVM IR.
+    mlir::Type ty = converter.genType(sym);
+    std::string globalName = converter.mangleName(sym);
+    mlir::StringAttr linkage = firOpBuilder.createInternalLinkage();
+    fir::GlobalOp global =
+        firOpBuilder.createGlobal(currentLocation, ty, globalName, linkage);
+
+    auto createInit = [&](std::function<void(fir::FirOpBuilder &)> genInit) {
+      mlir::Region &region = global.getRegion();
+      region.push_back(new mlir::Block);
+      mlir::Block &block = region.back();
+      auto insertPt = firOpBuilder.saveInsertionPoint();
+      firOpBuilder.setInsertionPointToStart(&block);
+      genInit(firOpBuilder);
+      firOpBuilder.restoreInsertionPoint(insertPt);
+    };
+
+    // Create default initialization for non-character scalar.
+    if (Fortran::semantics::IsAllocatableOrPointer(sym)) {
+      mlir::Type baseAddrType = ty.dyn_cast<fir::BoxType>().getEleTy();
+      createInit([&](fir::FirOpBuilder &b) {
+        mlir::Value nullAddr =
+            b.createNullConstant(currentLocation, baseAddrType);
+        mlir::Value box = b.create<fir::EmboxOp>(currentLocation, ty, nullAddr);
+        b.create<fir::HasValueOp>(currentLocation, box);
+      });
+    } else {
+      createInit([&](fir::FirOpBuilder &b) {
+        mlir::Value undef = b.create<fir::UndefOp>(currentLocation, ty);
+        b.create<fir::HasValueOp>(currentLocation, undef);
+      });
+    }
+    mlir::Value symValue = firOpBuilder.create<fir::AddrOfOp>(
+        currentLocation, global.resultType(), global.getSymbol());
+    symThreadprivateValue = firOpBuilder.create<mlir::omp::ThreadprivateOp>(
+        currentLocation, symValue.getType(), symValue);
+  } else {
+    mlir::Value symValue = getSymbolAddress(sym);
+    symThreadprivateValue = firOpBuilder.create<mlir::omp::ThreadprivateOp>(
+        currentLocation, symValue.getType(), symValue);
+  }
+
+  fir::ExtendedValue sexv = converter.getSymbolExtValue(sym);
+  fir::ExtendedValue symThreadprivateExv =
+      getExtValue(sexv, symThreadprivateValue);
+  converter.bindSymbol(sym, symThreadprivateExv);
+}
+
 void Fortran::lower::genOpenMPDeclarativeConstruct(
     Fortran::lower::AbstractConverter &converter,
     Fortran::lower::pft::Evaluation &eval,
@@ -884,7 +1053,8 @@ void Fortran::lower::genOpenMPDeclarativeConstruct(
                  "OpenMPDeclareTargetConstruct");
           },
           [&](const Fortran::parser::OpenMPThreadprivate &threadprivate) {
-            TODO(converter.getCurrentLocation(), "OpenMPThreadprivate");
+            // The directive is lowered when instantiating the variable to
+            // support the case of threadprivate variable declared in module.
           },
       },
       ompDeclConstruct.u);
