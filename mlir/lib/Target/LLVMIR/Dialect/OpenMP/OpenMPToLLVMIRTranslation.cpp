@@ -839,6 +839,41 @@ convertOmpReductionOp(omp::ReductionOp reductionOp,
   return success();
 }
 
+/// Converts an OpenMP Threadprivate operation into LLVM IR using
+/// OpenMPIRBuilder.
+static LogicalResult
+convertOmpThreadprivate(Operation &opInst, llvm::IRBuilderBase &builder,
+                        LLVM::ModuleTranslation &moduleTranslation) {
+  llvm::OpenMPIRBuilder::LocationDescription ompLoc(
+      builder.saveIP(), builder.getCurrentDebugLocation());
+  auto threadprivateOp = cast<omp::ThreadprivateOp>(opInst);
+
+  Value symAddr = threadprivateOp.sym_addr();
+  auto symOp = symAddr.getDefiningOp();
+  assert(isa<LLVM::AddressOfOp>(symOp) && "Addressing symbol not found");
+  auto addressOfOp = dyn_cast<LLVM::AddressOfOp>(symOp);
+
+  LLVM::GlobalOp global = addressOfOp.getGlobal();
+  llvm::GlobalValue *globalValue = moduleTranslation.lookupGlobal(global);
+  llvm::LLVMContext &ctx = builder.getContext();
+  llvm::Value *data =
+      builder.CreateBitCast(globalValue, llvm::Type::getInt8PtrTy(ctx));
+  llvm::Type *type = globalValue->getValueType();
+  llvm::TypeSize typeSize =
+      moduleTranslation.getDataLayout()->getTypeStoreSize(type);
+  llvm::ConstantInt *size = llvm::ConstantInt::get(llvm::Type::getInt64Ty(ctx),
+                                                   typeSize.getFixedSize());
+  llvm::StringRef suffix = llvm::StringRef(".cache", 6);
+  llvm::Twine cacheName = Twine(global.sym_name().str()).concat(suffix);
+  // Emit runtime function and bitcast its type (i8*) to real data type.
+  llvm::Value *callInst =
+      moduleTranslation.getOpenMPBuilder()->createCachedThreadPrivate(
+          ompLoc, data, size, cacheName);
+  llvm::Value *result = builder.CreateBitCast(callInst, globalValue->getType());
+  moduleTranslation.mapValue(opInst.getResult(0), result);
+  return success();
+}
+
 namespace {
 
 /// Implementation of the dialect interface that converts operations belonging
@@ -922,6 +957,9 @@ LogicalResult OpenMPDialectLLVMIRTranslationInterface::convertOperation(
         // ignored for lowering. The OpenMP IRBuilder will create unique
         // name for critical section names.
         return success();
+      })
+      .Case([&](omp::ThreadprivateOp) {
+        return convertOmpThreadprivate(*op, builder, moduleTranslation);
       })
       .Default([&](Operation *inst) {
         return inst->emitError("unsupported OpenMP operation: ")

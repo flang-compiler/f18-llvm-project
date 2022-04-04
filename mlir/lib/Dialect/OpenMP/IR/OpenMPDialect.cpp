@@ -1396,5 +1396,35 @@ static LogicalResult verifyAtomicUpdateOp(AtomicUpdateOp op) {
   return success();
 }
 
+//===----------------------------------------------------------------------===//
+// ThreadprivateOp
+//===----------------------------------------------------------------------===//
+
+/// Parser for ThreadprivateOp
+///
+/// operation ::= `omp.threadprivate` sym_addr `->` result-type
+/// address ::= operand `:` type
+static ParseResult parseThreadprivateOp(OpAsmParser &parser,
+                                        OperationState &result) {
+  OpAsmParser::OperandType sym_addr;
+  Type sym_addrType;
+  SmallVector<Type> resultType;
+
+  if (parser.parseOperand(sym_addr) || parser.parseColonType(sym_addrType) ||
+      parser.resolveOperand(sym_addr, sym_addrType, result.operands))
+    return failure();
+  if (parser.parseArrowTypeList(resultType))
+    return failure();
+  result.addTypes(resultType);
+  return success();
+}
+
+/// Printer for ThreadprivateOp
+static void printThreadprivateOp(OpAsmPrinter &p, ThreadprivateOp op) {
+  p << " " << op.sym_addr() << " : " << op.sym_addr().getType() << " -> "
+    << op.getType();
+  return;
+}
+
 #define GET_OP_CLASSES
 #include "mlir/Dialect/OpenMP/OpenMPOps.cpp.inc"

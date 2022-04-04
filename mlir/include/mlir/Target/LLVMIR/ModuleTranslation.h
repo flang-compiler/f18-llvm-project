@@ -22,6 +22,7 @@
 
 #include "llvm/ADT/SetVector.h"
 #include "llvm/Frontend/OpenMP/OMPIRBuilder.h"
+#include "llvm/IR/DataLayout.h"
 
 namespace llvm {
 class BasicBlock;
@@ -171,6 +172,14 @@ public:
     return ompBuilder.get();
   }
 
+  /// Returns the DataLayout associated with the LLVM IR module being
+  /// constructed.
+  llvm::DataLayout *getDataLayout() {
+    if (!dataLayout)
+      dataLayout = std::make_unique<llvm::DataLayout>(&*llvmModule);
+    return dataLayout.get();
+  }
+
   /// Translates the given location.
   const llvm::DILocation *translateLoc(Location loc, llvm::DILocalScope *scope);
 
@@ -295,6 +304,9 @@ private:
 
   /// Builder for LLVM IR generation of OpenMP constructs.
   std::unique_ptr<llvm::OpenMPIRBuilder> ompBuilder;
+
+  /// Provide methods for querying the target data layout string.
+  std::unique_ptr<llvm::DataLayout> dataLayout;
 
   /// Mappings between llvm.mlir.global definitions and corresponding globals.
   DenseMap<Operation *, llvm::GlobalValue *> globalsMapping;

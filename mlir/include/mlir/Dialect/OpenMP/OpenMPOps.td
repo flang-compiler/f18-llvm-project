@@ -619,6 +619,29 @@ def AtomicUpdateOp : OpenMP_Op<"atomic.update"> {
 }
 
 //===----------------------------------------------------------------------===//
+// [5.1] 2.21.2 threadprivate Directive
+//===----------------------------------------------------------------------===//
+
+def ThreadprivateOp : OpenMP_Op<"threadprivate"> {
+  let summary = "threadprivate directive";
+  let description = [{
+    The threadprivate directive specifies that variables are replicated, with
+    each thread having its own copy.
+
+    This model takes in the addressing of symbol and returns the addressing of
+    thread local storage (TLS) for the original variable.
+
+    The `sym_addr` refers to the addressing of the symbol, which is pointer to
+    original global variable.
+  }];
+
+  let arguments = (ins OpenMP_PointerLikeType:$sym_addr);
+  let results = (outs OpenMP_PointerLikeType);
+  let parser = [{ return parseThreadprivateOp(parser, result); }];
+  let printer = [{ return printThreadprivateOp(p, *this); }];
+}
+
+//===----------------------------------------------------------------------===//
 // 2.19.5.7 declare reduction Directive
 //===----------------------------------------------------------------------===//
 
