@@ -8,6 +8,7 @@
 #ifndef MLIR_CONVERSION_OPENMPTOLLVM_OPENMPTOLLVM_H_
 #define MLIR_CONVERSION_OPENMPTOLLVM_OPENMPTOLLVM_H_
 
+#include "mlir/Conversion/LLVMCommon/ConversionTarget.h"
 #include <memory>
 
 namespace mlir {
@@ -18,6 +19,10 @@ template <typename T>
 class OperationPass;
 class RewritePatternSet;
 using OwningRewritePatternList = RewritePatternSet;
+
+/// Legalise operations for a given target
+void addDynamicallyLegalOperations(ConversionTarget &target,
+                                   LLVMTypeConverter &typeConverter);
 
 /// Populate the given list with patterns that convert from OpenMP to LLVM.
 void populateOpenMPToLLVMConversionPatterns(LLVMTypeConverter &converter,

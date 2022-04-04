@@ -44,13 +44,42 @@ struct RegionOpConversion : public ConvertOpToLLVMPattern<OpType> {
     return success();
   }
 };
+
+template <typename T>
+struct RegionLessOpConversion : public ConvertOpToLLVMPattern<T> {
+  using ConvertOpToLLVMPattern<T>::ConvertOpToLLVMPattern;
+  LogicalResult
+  matchAndRewrite(T curOp, typename T::Adaptor adaptor,
+                  ConversionPatternRewriter &rewriter) const override {
+    Type resType = nullptr;
+    TypeConverter *converter = ConvertToLLVMPattern::getTypeConverter();
+    if (curOp.getType())
+      resType = converter->convertType(curOp.getType());
+    rewriter.replaceOpWithNewOp<T>(curOp,
+                                   resType ? TypeRange(resType) : TypeRange(),
+                                   adaptor.getOperands(), curOp->getAttrs());
+    return success();
+  }
+};
 } // namespace
+
+void mlir::addDynamicallyLegalOperations(ConversionTarget &target,
+                                         LLVMTypeConverter &typeConverter) {
+  target.addDynamicallyLegalOp<mlir::omp::ParallelOp, mlir::omp::WsLoopOp,
+                               mlir::omp::MasterOp>(
+      [&](Operation *op) { return typeConverter.isLegal(&op->getRegion(0)); });
+  target.addDynamicallyLegalOp<mlir::omp::ThreadprivateOp>(
+      [&](Operation *op) {
+          return typeConverter.isLegal(op->getOperandTypes());
+      });
+}
 
 void mlir::populateOpenMPToLLVMConversionPatterns(LLVMTypeConverter &converter,
                                                   RewritePatternSet &patterns) {
   patterns.add<RegionOpConversion<omp::MasterOp>,
                RegionOpConversion<omp::ParallelOp>,
-               RegionOpConversion<omp::WsLoopOp>>(converter);
+               RegionOpConversion<omp::WsLoopOp>,
+               RegionLessOpConversion<omp::ThreadprivateOp>>(converter);
 }
 
 namespace {
@@ -72,10 +101,9 @@ void ConvertOpenMPToLLVMPass::runOnOperation() {
   populateOpenMPToLLVMConversionPatterns(converter, patterns);
 
   LLVMConversionTarget target(getContext());
-  target.addDynamicallyLegalOp<omp::MasterOp, omp::ParallelOp, omp::WsLoopOp>(
-      [&](Operation *op) { return converter.isLegal(&op->getRegion(0)); });
   target.addLegalOp<omp::TerminatorOp, omp::TaskyieldOp, omp::FlushOp,
                     omp::BarrierOp, omp::TaskwaitOp>();
+  addDynamicallyLegalOperations(target, converter);
   if (failed(applyPartialConversion(module, target, std::move(patterns))))
     signalPassFailure();
 }

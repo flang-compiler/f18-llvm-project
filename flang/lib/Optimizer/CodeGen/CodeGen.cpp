@@ -3419,10 +3419,8 @@ public:
     // The OpenMP dialect is legal for Operations without regions, for those
     // which contains regions it is legal if the region contains only the
     // LLVM dialect.
-    target.addDynamicallyLegalOp<mlir::omp::ParallelOp, mlir::omp::WsLoopOp,
-                                 mlir::omp::MasterOp>([&](Operation *op) {
-      return typeConverter.isLegal(&op->getRegion(0));
-    });
+
+    mlir::addDynamicallyLegalOperations(target, typeConverter);
     target.addLegalDialect<mlir::omp::OpenMPDialect>();
 
     // required NOPs for applying a full conversion
