@@ -666,15 +666,15 @@ llvm.func @omp_ordered(%arg0 : i32, %arg1 : i32, %arg2 : i32, %arg3 : i64,
 llvm.func @_QPsub() {
 // CHECK:  [[THREAD:%.*]] = call i32 @__kmpc_global_thread_num(%struct.ident_t* @[[GLOB:[0-9]+]])
 // CHECK:  [[TMP1:%.*]] = call i8* @__kmpc_threadprivate_cached(%struct.ident_t* @[[GLOB]], i32 [[THREAD]], i8* bitcast (i32* @_QFsubEx to i8*), i64 4, i8*** @_QFsubEx.cache)
-// CHECK:  [[TMP2:%.*]] = bitcast i8* [[TMP1]] to i32*, !dbg !7
-// CHECK:  store i32 1, i32* [[TMP2]], align 4, !dbg !9
-// CHECK:  store i32 3, i32* [[TMP2]], align 4, !dbg !12
+// CHECK:  [[TMP2:%.*]] = bitcast i8* [[TMP1]] to i32*
+// CHECK:  store i32 1, i32* [[TMP2]], align 4
+// CHECK:  store i32 3, i32* [[TMP2]], align 4
 
 // CHECK-LABEL: omp.par.region{{.*}}
 // CHECK:  [[THREAD2:%.*]] = call i32 @__kmpc_global_thread_num(%struct.ident_t* @[[GLOB2:[0-9]+]])
 // CHECK:  [[TMP3:%.*]] = call i8* @__kmpc_threadprivate_cached(%struct.ident_t* @[[GLOB2]], i32 [[THREAD2]], i8* bitcast (i32* @_QFsubEx to i8*), i64 4, i8*** @_QFsubEx.cache)
-// CHECK:  [[TMP4:%.*]] = bitcast i8* [[TMP3]] to i32*, !dbg !16
-// CHECK:  store i32 2, i32* [[TMP4]], align 4, !dbg !17
+// CHECK:  [[TMP4:%.*]] = bitcast i8* [[TMP3]] to i32*
+// CHECK:  store i32 2, i32* [[TMP4]], align 4
 
   %0 = llvm.mlir.constant(1 : i32) : i32
   %1 = llvm.mlir.constant(2 : i32) : i32
