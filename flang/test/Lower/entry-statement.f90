@@ -248,8 +248,8 @@ entry level3b(x, y, n)
   if (n /= 3) goto 1
 end
 
-function f1(n1) result(res1)
 ! CHECK-LABEL: @_QPf1
+function f1(n1) result(res1)
   ! CHECK:   %[[V_0:[0-9]+]] = fir.convert %arg0 : (!fir.ref<!fir.char<1,5>>) -> !fir.ref<!fir.char<1,?>>
   ! CHECK:   %[[V_1:[0-9]+]] = fir.alloca i32 {bindc_name = "n2", uniq_name = "_QFf1En2"}
   ! CHECK:   %[[V_2:[0-9]+]] = fir.alloca tuple<!fir.boxchar<1>, !fir.boxchar<1>>

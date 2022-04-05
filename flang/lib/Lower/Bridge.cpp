@@ -2649,9 +2649,7 @@ private:
     // TODO: should use same mechanism as equivalence?
     // One blocking point is character entry returns that need special handling
     // since they are not locally allocated but come as argument. CHARACTER(*)
-    // is not something that fit wells with equivalence lowering.
-    // An alternate function result may be referenced by a contained
-    // subprogram.  So map them before getting host bindings.
+    // is not something that fits well with equivalence lowering.
     for (const Fortran::lower::pft::Variable &altResult :
          deferredFuncResultList) {
       if (std::optional<Fortran::lower::CalleeInterface::PassedEntity>
