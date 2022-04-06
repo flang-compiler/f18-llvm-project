@@ -1697,7 +1697,7 @@ module {
 // CHECK:   call void @qux
 
 llvm.func @duplicate_block_in_switch(%cond : i32, %arg1: f32, %arg2: f32) {
-  llvm.switch %cond : i32, ^bb1(%arg1: f32) [
+  llvm.switch %cond, ^bb1(%arg1: f32) [
     105: ^bb2,
     108: ^bb3(%arg2: f32),
     106: ^bb2
@@ -1745,7 +1745,7 @@ llvm.func @duplicate_block_in_switch(%cond : i32, %arg1: f32, %arg2: f32) {
 // CHECK:   br label %[[DUPLICATE]]
 
 llvm.func @duplicate_block_with_args_in_switch(%cond : i32, %arg1: f32, %arg2: f32) {
-  llvm.switch %cond : i32, ^bb1(%arg1: f32) [
+  llvm.switch %cond, ^bb1(%arg1: f32) [
     106: ^bb3(%arg1: f32),
     105: ^bb2,
     108: ^bb3(%arg2: f32)
