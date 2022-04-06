@@ -136,7 +136,7 @@ template <typename D>
 static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                       mlir::Value cookie, const D &ioImpliedDo,
                       bool isFormatted, bool checkResult, mlir::Value &ok,
-                      bool inLoop, Fortran::lower::StatementContext &stmtCtx);
+                      bool inLoop);
 
 /// Helper function to retrieve the name of the IO function given the key `A`
 template <typename A>
@@ -453,22 +453,21 @@ static mlir::FuncOp getOutputFunc(mlir::Location loc,
 }
 
 /// Generate a sequence of output data transfer calls.
-static void
-genOutputItemList(Fortran::lower::AbstractConverter &converter,
-                  mlir::Value cookie,
-                  const std::list<Fortran::parser::OutputItem> &items,
-                  bool isFormatted, bool checkResult, mlir::Value &ok,
-                  bool inLoop, Fortran::lower::StatementContext &stmtCtx) {
+static void genOutputItemList(
+    Fortran::lower::AbstractConverter &converter, mlir::Value cookie,
+    const std::list<Fortran::parser::OutputItem> &items, bool isFormatted,
+    bool checkResult, mlir::Value &ok, bool inLoop) {
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   for (const Fortran::parser::OutputItem &item : items) {
     if (const auto &impliedDo = std::get_if<1>(&item.u)) {
       genIoLoop(converter, cookie, impliedDo->value(), isFormatted, checkResult,
-                ok, inLoop, stmtCtx);
+                ok, inLoop);
       continue;
     }
     auto &pExpr = std::get<Fortran::parser::Expr>(item.u);
     mlir::Location loc = converter.genLocation(pExpr.source);
     makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
+    Fortran::lower::StatementContext stmtCtx;
 
     const auto *expr = Fortran::semantics::GetExpr(pExpr);
     if (!expr)
@@ -602,18 +601,18 @@ static void genInputItemList(Fortran::lower::AbstractConverter &converter,
                              mlir::Value cookie,
                              const std::list<Fortran::parser::InputItem> &items,
                              bool isFormatted, bool checkResult,
-                             mlir::Value &ok, bool inLoop,
-                             Fortran::lower::StatementContext &stmtCtx) {
+                             mlir::Value &ok, bool inLoop) {
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   for (const Fortran::parser::InputItem &item : items) {
     if (const auto &impliedDo = std::get_if<1>(&item.u)) {
       genIoLoop(converter, cookie, impliedDo->value(), isFormatted, checkResult,
-                ok, inLoop, stmtCtx);
+                ok, inLoop);
       continue;
     }
     auto &pVar = std::get<Fortran::parser::Variable>(item.u);
     mlir::Location loc = converter.genLocation(pVar.GetSource());
     makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
+    Fortran::lower::StatementContext stmtCtx;
     const auto *expr = Fortran::semantics::GetExpr(pVar);
     if (!expr)
       fir::emitFatalError(loc, "internal error: could not get evaluate::Expr");
@@ -658,7 +657,8 @@ template <typename D>
 static void genIoLoop(Fortran::lower::AbstractConverter &converter,
                       mlir::Value cookie, const D &ioImpliedDo,
                       bool isFormatted, bool checkResult, mlir::Value &ok,
-                      bool inLoop, Fortran::lower::StatementContext &stmtCtx) {
+                      bool inLoop) {
+  Fortran::lower::StatementContext stmtCtx;
   fir::FirOpBuilder &builder = converter.getFirOpBuilder();
   mlir::Location loc = converter.getCurrentLocation();
   makeNextConditionalOn(builder, loc, checkResult, ok, inLoop);
@@ -678,13 +678,12 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
           ? genControlValue(*control.step)
           : builder.create<mlir::arith::ConstantIndexOp>(loc, 1);
   auto genItemList = [&](const D &ioImpliedDo) {
-    Fortran::lower::StatementContext loopCtx;
     if constexpr (std::is_same_v<D, Fortran::parser::InputImpliedDo>)
       genInputItemList(converter, cookie, itemList, isFormatted, checkResult,
-                       ok, /*inLoop=*/true, loopCtx);
+                       ok, /*inLoop=*/true);
     else
       genOutputItemList(converter, cookie, itemList, isFormatted, checkResult,
-                        ok, /*inLoop=*/true, loopCtx);
+                        ok, /*inLoop=*/true);
   };
   if (!checkResult) {
     // No IO call result checks - the loop is a fir.do_loop op.
@@ -1868,8 +1867,7 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
                     csi.hasTransferConditionSpec(), ok, stmtCtx);
     else
       genInputItemList(converter, cookie, stmt.items, isFormatted,
-                       csi.hasTransferConditionSpec(), ok, /*inLoop=*/false,
-                       stmtCtx);
+                       csi.hasTransferConditionSpec(), ok, /*inLoop=*/false);
   } else if constexpr (std::is_same_v<A, Fortran::parser::WriteStmt>) {
     if (isNml)
       genNamelistIO(converter, cookie,
@@ -1879,11 +1877,11 @@ genDataTransferStmt(Fortran::lower::AbstractConverter &converter,
     else
       genOutputItemList(converter, cookie, stmt.items, isFormatted,
                         csi.hasTransferConditionSpec(), ok,
-                        /*inLoop=*/false, stmtCtx);
+                        /*inLoop=*/false);
   } else { // PRINT
     genOutputItemList(converter, cookie, std::get<1>(stmt.t), isFormatted,
                       csi.hasTransferConditionSpec(), ok,
-                      /*inLoop=*/false, stmtCtx);
+                      /*inLoop=*/false);
   }
   stmtCtx.finalize();
 
@@ -2139,8 +2137,7 @@ mlir::Value Fortran::lower::genInquireStatement(
     genOutputItemList(
         converter, cookie,
         std::get<std::list<Fortran::parser::OutputItem>>(ioLength->t),
-        /*isFormatted=*/false, /*checkResult=*/false, ok, /*inLoop=*/false,
-        stmtCtx);
+        /*isFormatted=*/false, /*checkResult=*/false, ok, /*inLoop=*/false);
     auto *ioLengthVar = Fortran::semantics::GetExpr(
         std::get<Fortran::parser::ScalarIntVariable>(ioLength->t));
     mlir::Value ioLengthVarAddr =
