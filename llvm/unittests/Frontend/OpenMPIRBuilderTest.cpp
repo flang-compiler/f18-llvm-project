@@ -2269,6 +2269,7 @@ TEST_F(OpenMPIRBuilderTest, OrderedDirectiveDependSource) {
     ASSERT_NE(StoreValue, nullptr);
     EXPECT_EQ(StoreValue->getValueOperand(), StoreValues[Iter]);
     EXPECT_EQ(StoreValue->getPointerOperand(), DependAddrGEPIter);
+    EXPECT_EQ(StoreValue->getAlignment(), 8);
     IterInst = dyn_cast<Instruction>(StoreValue);
   }
 
@@ -2353,6 +2354,7 @@ TEST_F(OpenMPIRBuilderTest, OrderedDirectiveDependSink) {
     ASSERT_NE(StoreValue, nullptr);
     EXPECT_EQ(StoreValue->getValueOperand(), StoreValues[Iter]);
     EXPECT_EQ(StoreValue->getPointerOperand(), DependAddrGEPIter);
+    EXPECT_EQ(StoreValue->getAlignment(), 8);
     IterInst = dyn_cast<Instruction>(StoreValue);
   }
 
