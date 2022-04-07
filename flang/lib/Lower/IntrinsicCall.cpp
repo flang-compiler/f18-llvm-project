@@ -108,19 +108,28 @@ fir::ExtendedValue Fortran::lower::getAbsentIntrinsicArgument() {
   return fir::UnboxedValue{};
 }
 
-/// Test if an ExtendedValue is absent.
-static bool isAbsent(const fir::ExtendedValue &exv) {
+/// Test if an ExtendedValue is absent. This is used to test if an intrinsic
+/// argument are absent at compile time.
+static bool isStaticallyAbsent(const fir::ExtendedValue &exv) {
   return !fir::getBase(exv);
 }
-static bool isAbsent(llvm::ArrayRef<fir::ExtendedValue> args, size_t argIndex) {
-  return args.size() <= argIndex || isAbsent(args[argIndex]);
+static bool isStaticallyAbsent(llvm::ArrayRef<fir::ExtendedValue> args,
+                               size_t argIndex) {
+  return args.size() <= argIndex || isStaticallyAbsent(args[argIndex]);
 }
-static bool isAbsent(llvm::ArrayRef<mlir::Value> args, size_t argIndex) {
+static bool isStaticallyAbsent(llvm::ArrayRef<mlir::Value> args,
+                               size_t argIndex) {
   return args.size() <= argIndex || !args[argIndex];
 }
 
-/// Test if an ExtendedValue is present.
-static bool isPresent(const fir::ExtendedValue &exv) { return !isAbsent(exv); }
+/// Test if an ExtendedValue is present. This is used to test if an intrinsic
+/// argument is present at compile time. This does not imply that the related
+/// value may not be an absent dummy optional, disassociated pointer, or a
+/// deallocated allocatable. See `handleDynamicOptional` to deal with these
+/// cases when it makes sense.
+static bool isStaticallyPresent(const fir::ExtendedValue &exv) {
+  return !isStaticallyAbsent(exv);
+}
 
 /// Process calls to Maxval, Minval, Product, Sum intrinsic functions that
 /// take a DIM argument.
@@ -139,7 +148,7 @@ genFuncDim(FD funcDim, mlir::Type resultType, fir::FirOpBuilder &builder,
       fir::factory::getMutableIRBox(builder, loc, resultMutableBox);
 
   mlir::Value dim =
-      isAbsent(dimArg)
+      isStaticallyAbsent(dimArg)
           ? builder.createIntegerConstant(loc, builder.getIndexType(), 0)
           : fir::getBase(dimArg);
   funcDim(builder, loc, resultIrBox, array, dim, mask);
@@ -187,12 +196,12 @@ genProdOrSum(FN func, FD funcDim, mlir::Type resultType,
   assert(rank >= 1);
 
   // Handle optional mask argument
-  auto mask = isAbsent(args[2])
+  auto mask = isStaticallyAbsent(args[2])
                   ? builder.create<fir::AbsentOp>(
                         loc, fir::BoxType::get(builder.getI1Type()))
                   : builder.createBox(loc, args[2]);
 
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
 
   // We call the type specific versions because the result is scalar
   // in the case below.
@@ -260,12 +269,12 @@ genExtremumVal(FN func, FD funcDim, FC funcChar, mlir::Type resultType,
   bool hasCharacterResult = arryTmp.isCharacter();
 
   // Handle optional mask argument
-  auto mask = isAbsent(args[2])
+  auto mask = isStaticallyAbsent(args[2])
                   ? builder.create<fir::AbsentOp>(
                         loc, fir::BoxType::get(builder.getI1Type()))
                   : builder.createBox(loc, args[2]);
 
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
 
   // For Maxval/MinVal, we call the type specific versions of
   // Maxval/Minval because the result is scalar in the case below.
@@ -319,22 +328,23 @@ static fir::ExtendedValue genExtremumloc(
   assert(rank >= 1);
 
   // Handle optional mask argument
-  auto mask = isAbsent(args[2])
+  auto mask = isStaticallyAbsent(args[2])
                   ? builder.create<fir::AbsentOp>(
                         loc, fir::BoxType::get(builder.getI1Type()))
                   : builder.createBox(loc, args[2]);
 
   // Handle optional kind argument
-  auto kind = isAbsent(args[3]) ? builder.createIntegerConstant(
-                                      loc, builder.getIndexType(),
-                                      builder.getKindMap().defaultIntegerKind())
-                                : fir::getBase(args[3]);
+  auto kind = isStaticallyAbsent(args[3])
+                  ? builder.createIntegerConstant(
+                        loc, builder.getIndexType(),
+                        builder.getKindMap().defaultIntegerKind())
+                  : fir::getBase(args[3]);
 
   // Handle optional back argument
-  auto back = isAbsent(args[4]) ? builder.createBool(loc, false)
-                                : fir::getBase(args[4]);
+  auto back = isStaticallyAbsent(args[4]) ? builder.createBool(loc, false)
+                                          : fir::getBase(args[4]);
 
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
 
   if (!absentDim && rank == 1) {
     // If dim argument is present and the array is rank 1, then the result is
@@ -1882,7 +1892,7 @@ IntrinsicLibrary::genAll(mlir::Type resultType,
   assert(rank >= 1);
 
   // Handle optional dim argument
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
   mlir::Value dim =
       absentDim ? builder.createIntegerConstant(loc, builder.getIndexType(), 1)
                 : fir::getBase(args[1]);
@@ -1952,7 +1962,7 @@ IntrinsicLibrary::genAny(mlir::Type resultType,
   assert(rank >= 1);
 
   // Handle optional dim argument
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
   mlir::Value dim =
       absentDim ? builder.createIntegerConstant(loc, builder.getIndexType(), 1)
                 : fir::getBase(args[1]);
@@ -1995,7 +2005,7 @@ IntrinsicLibrary::genAssociated(mlir::Type resultType,
                       fir::emitFatalError(loc, "pointer not a MutableBoxValue");
                     });
   const fir::ExtendedValue &target = args[1];
-  if (isAbsent(target))
+  if (isStaticallyAbsent(target))
     return fir::factory::genIsAllocatedOrAssociatedTest(builder, loc, *pointer);
 
   mlir::Value targetBox = builder.createBox(loc, target);
@@ -2084,7 +2094,7 @@ mlir::Value IntrinsicLibrary::genCmplx(mlir::Type resultType,
   fir::factory::Complex complexHelper(builder, loc);
   mlir::Type partType = complexHelper.getComplexPartType(resultType);
   mlir::Value real = builder.createConvert(loc, partType, args[0]);
-  mlir::Value imag = isAbsent(args, 1)
+  mlir::Value imag = isStaticallyAbsent(args, 1)
                          ? builder.createRealZeroConstant(loc, partType)
                          : builder.createConvert(loc, partType, args[1]);
   return fir::factory::Complex{builder, loc}.createComplex(resultType, real,
@@ -2130,7 +2140,7 @@ IntrinsicLibrary::genCount(mlir::Type resultType,
   assert(maskRank > 0);
 
   // Handle optional dim argument
-  bool absentDim = isAbsent(args[1]);
+  bool absentDim = isStaticallyAbsent(args[1]);
   mlir::Value dim =
       absentDim ? builder.createIntegerConstant(loc, builder.getIndexType(), 0)
                 : fir::getBase(args[1]);
@@ -2146,7 +2156,7 @@ IntrinsicLibrary::genCount(mlir::Type resultType,
   // Call general CountDim runtime routine.
 
   // Handle optional kind argument
-  bool absentKind = isAbsent(args[2]);
+  bool absentKind = isStaticallyAbsent(args[2]);
   mlir::Value kind = absentKind ? builder.createIntegerConstant(
                                       loc, builder.getIndexType(),
                                       builder.getKindMap().defaultIntegerKind())
@@ -2221,7 +2231,7 @@ IntrinsicLibrary::genCshift(mlir::Type resultType,
 
     // Handle optional DIM argument
     mlir::Value dim =
-        isAbsent(args[2])
+        isStaticallyAbsent(args[2])
             ? builder.createIntegerConstant(loc, builder.getIndexType(), 1)
             : fir::getBase(args[2]);
     fir::runtime::genCshift(builder, loc, resultIrBox, array, shift, dim);
@@ -2304,9 +2314,10 @@ IntrinsicLibrary::genEoshift(mlir::Type resultType,
 
   // Handle optional BOUNDARY argument
   mlir::Value boundary =
-      isAbsent(args[2]) ? builder.create<fir::AbsentOp>(
-                              loc, fir::BoxType::get(builder.getNoneType()))
-                        : builder.createBox(loc, args[2]);
+      isStaticallyAbsent(args[2])
+          ? builder.create<fir::AbsentOp>(
+                loc, fir::BoxType::get(builder.getNoneType()))
+          : builder.createBox(loc, args[2]);
 
   if (arrayRank == 1) {
     // Vector case
@@ -2323,7 +2334,7 @@ IntrinsicLibrary::genEoshift(mlir::Type resultType,
 
     // Handle optional DIM argument
     mlir::Value dim =
-        isAbsent(args[3])
+        isStaticallyAbsent(args[3])
             ? builder.createIntegerConstant(loc, builder.getIndexType(), 1)
             : fir::getBase(args[3]);
     fir::runtime::genEoshift(builder, loc, resultIrBox, array, shift, boundary,
@@ -2338,7 +2349,7 @@ void IntrinsicLibrary::genExit(llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 1);
 
   mlir::Value status =
-      isAbsent(args[0])
+      isStaticallyAbsent(args[0])
           ? builder.createIntegerConstant(loc, builder.getDefaultIntegerType(),
                                           EXIT_SUCCESS)
           : fir::getBase(args[0]);
@@ -2466,8 +2477,9 @@ void IntrinsicLibrary::genGetEnvironmentVariable(
   mlir::Value status = fir::getBase(args[3]);
 
   // Handle optional TRIM_NAME argument
-  mlir::Value trim_name =
-      isAbsent(args[4]) ? builder.createBool(loc, true) : fir::getBase(args[4]);
+  mlir::Value trim_name = isStaticallyAbsent(args[4])
+                              ? builder.createBool(loc, true)
+                              : fir::getBase(args[4]);
 
   // Handle optional ERRMSG argument
   mlir::Value errmsg;
@@ -2601,10 +2613,10 @@ IntrinsicLibrary::genIndex(mlir::Type resultType,
   mlir::Value substringBase = fir::getBase(args[1]);
   mlir::Value substringLen = fir::getLen(args[1]);
   mlir::Value back =
-      isAbsent(args, 2)
+      isStaticallyAbsent(args, 2)
           ? builder.createIntegerConstant(loc, builder.getI1Type(), 0)
           : fir::getBase(args[2]);
-  if (isAbsent(args, 3))
+  if (isStaticallyAbsent(args, 3))
     return builder.createConvert(
         loc, resultType,
         fir::runtime::genIndex(builder, loc, kind, stringBase, stringLen,
@@ -2621,11 +2633,11 @@ IntrinsicLibrary::genIndex(mlir::Type resultType,
     builder.create<fir::StoreOp>(loc, castb, temp);
     return builder.createBox(loc, temp);
   };
-  mlir::Value backOpt = isAbsent(args, 2)
+  mlir::Value backOpt = isStaticallyAbsent(args, 2)
                             ? builder.create<fir::AbsentOp>(
                                   loc, fir::BoxType::get(builder.getI1Type()))
                             : makeRefThenEmbox(fir::getBase(args[2]));
-  mlir::Value kindVal = isAbsent(args, 3)
+  mlir::Value kindVal = isStaticallyAbsent(args, 3)
                             ? builder.createIntegerConstant(
                                   loc, builder.getIndexType(),
                                   builder.getKindMap().defaultIntegerKind())
@@ -2965,7 +2977,7 @@ fir::ExtendedValue
 IntrinsicLibrary::genNull(mlir::Type, llvm::ArrayRef<fir::ExtendedValue> args) {
   // NULL() without MOLD must be handled in the contexts where it can appear
   // (see table 16.5 of Fortran 2018 standard).
-  assert(args.size() == 1 && isPresent(args[0]) &&
+  assert(args.size() == 1 && isStaticallyPresent(args[0]) &&
          "MOLD argument required to lower NULL outside of any context");
   const auto *mold = args[0].getBoxOf<fir::MutableBoxValue>();
   assert(mold && "MOLD must be a pointer or allocatable");
@@ -2991,7 +3003,7 @@ IntrinsicLibrary::genPack(mlir::Type resultType,
   mlir::Value mask = builder.createBox(loc, args[1]);
 
   // Handle optional vector argument
-  mlir::Value vector = isAbsent(args, 2)
+  mlir::Value vector = isStaticallyAbsent(args, 2)
                            ? builder.create<fir::AbsentOp>(
                                  loc, fir::BoxType::get(builder.getI1Type()))
                            : builder.createBox(loc, args[2]);
@@ -3045,7 +3057,7 @@ void IntrinsicLibrary::genRandomNumber(
 void IntrinsicLibrary::genRandomSeed(llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 3);
   for (int i = 0; i < 3; ++i)
-    if (isPresent(args[i])) {
+    if (isStaticallyPresent(args[i])) {
       Fortran::lower::genRandomSeed(builder, loc, i, fir::getBase(args[i]));
       return;
     }
@@ -3091,13 +3103,13 @@ IntrinsicLibrary::genReshape(mlir::Type resultType,
          "shape arg must have constant size");
 
   // Handle optional pad argument
-  mlir::Value pad = isAbsent(args[2])
+  mlir::Value pad = isStaticallyAbsent(args[2])
                         ? builder.create<fir::AbsentOp>(
                               loc, fir::BoxType::get(builder.getI1Type()))
                         : builder.createBox(loc, args[2]);
 
   // Handle optional order argument
-  mlir::Value order = isAbsent(args[3])
+  mlir::Value order = isStaticallyAbsent(args[3])
                           ? builder.create<fir::AbsentOp>(
                                 loc, fir::BoxType::get(builder.getI1Type()))
                           : builder.createBox(loc, args[3]);
@@ -3146,7 +3158,7 @@ IntrinsicLibrary::genScan(mlir::Type resultType,
 
   assert(args.size() == 4);
 
-  if (isAbsent(args[3])) {
+  if (isStaticallyAbsent(args[3])) {
     // Kind not specified, so call scan/verify runtime routine that is
     // specialized on the kind of characters in string.
 
@@ -3169,7 +3181,7 @@ IntrinsicLibrary::genScan(mlir::Type resultType,
 
     // Handle optional back argument
     mlir::Value back =
-        isAbsent(args[2])
+        isStaticallyAbsent(args[2])
             ? builder.createIntegerConstant(loc, builder.getI1Type(), 0)
             : fir::getBase(args[2]);
 
@@ -3259,7 +3271,7 @@ IntrinsicLibrary::genSize(mlir::Type resultType,
   // The front-end rewrites SIZE without the DIM argument to
   // an array of SIZE with DIM in most cases, but it may not be
   // possible in some cases like when in SIZE(function_call()).
-  if (isAbsent(args, 1))
+  if (isStaticallyAbsent(args, 1))
     return builder.createConvert(loc, resultType,
                                  fir::runtime::genSize(builder, loc, array));
 
@@ -3330,7 +3342,7 @@ IntrinsicLibrary::genLbound(mlir::Type resultType,
   //===----------------------------------------------------------------------===//
   mlir::Type indexType = builder.getIndexType();
 
-  if (isAbsent(args, 1)) {
+  if (isStaticallyAbsent(args, 1)) {
     mlir::Type lbType = fir::unwrapSequenceType(resultType);
     unsigned rank = array.rank();
     mlir::Type lbArrayType = fir::SequenceType::get(
@@ -3403,7 +3415,7 @@ IntrinsicLibrary::genUbound(mlir::Type resultType,
     return builder.create<mlir::arith::AddIOp>(loc, ubound, extent);
   } else {
     // Handle calls to UBOUND without the DIM argument, which return an array
-    mlir::Value kind = isAbsent(args[1])
+    mlir::Value kind = isStaticallyAbsent(args[1])
                            ? builder.createIntegerConstant(
                                  loc, builder.getIndexType(),
                                  builder.getKindMap().defaultIntegerKind())
@@ -3668,7 +3680,7 @@ IntrinsicLibrary::genVerify(mlir::Type resultType,
 
   assert(args.size() == 4);
 
-  if (isAbsent(args[3])) {
+  if (isStaticallyAbsent(args[3])) {
     // Kind not specified, so call scan/verify runtime routine that is
     // specialized on the kind of characters in string.
 
@@ -3691,7 +3703,7 @@ IntrinsicLibrary::genVerify(mlir::Type resultType,
 
     // Handle optional back argument
     mlir::Value back =
-        isAbsent(args[2])
+        isStaticallyAbsent(args[2])
             ? builder.createIntegerConstant(loc, builder.getI1Type(), 0)
             : fir::getBase(args[2]);
 
