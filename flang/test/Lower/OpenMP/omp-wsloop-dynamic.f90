@@ -43,7 +43,7 @@ program wsloop_dynamic
 !LLVMIR:    br label %omp_loop.preheader
 !LLVMIR:  omp_loop.preheader:                               ; preds = %omp.par.region1
 !LLVMIR:    @__kmpc_global_thread_num
-!LLVMIR:    @__kmpc_dispatch_init_4u(%struct.ident_t* @{{.*}}, i32 %omp_global_thread_num{{.*}}, i32 35, i32 {{.*}}, i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
+!LLVMIR:    @__kmpc_dispatch_init_4u(%struct.ident_t* @{{.*}}, i32 %omp_global_thread_num{{.*}}, i32 1073741859, i32 {{.*}}, i32 {{.*}}, i32 {{.*}}, i32 {{.*}})
 !LLVMIR:    br label %omp_loop.preheader.outer.cond
 !LLVMIR:  omp_loop.preheader.outer.cond:
 !LLVMIR:    @__kmpc_dispatch_next_4u
