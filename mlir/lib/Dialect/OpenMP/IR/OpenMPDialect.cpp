@@ -254,7 +254,8 @@ static void printLinearClause(OpAsmPrinter &p, OperandRange linearVars,
 static ParseResult
 parseScheduleClause(OpAsmParser &parser, SmallString<8> &schedule,
                     SmallVectorImpl<SmallString<12>> &modifiers,
-                    Optional<OpAsmParser::OperandType> &chunkSize) {
+                    Optional<OpAsmParser::OperandType> &chunkSize,
+                    Type &chunkType) {
   if (parser.parseLParen())
     return failure();
 
@@ -266,7 +267,7 @@ parseScheduleClause(OpAsmParser &parser, SmallString<8> &schedule,
   if (keyword == "static" || keyword == "dynamic" || keyword == "guided") {
     if (succeeded(parser.parseOptionalEqual())) {
       chunkSize = OpAsmParser::OperandType{};
-      if (parser.parseOperand(*chunkSize))
+      if (parser.parseOperand(*chunkSize) || parser.parseColonType(chunkType))
         return failure();
     } else {
       chunkSize = llvm::NoneType::None;
@@ -305,7 +306,7 @@ static void printScheduleClause(OpAsmPrinter &p, StringRef &sched,
   std::string schedLower = sched.lower();
   p << "schedule(" << schedLower;
   if (scheduleChunkVar)
-    p << " = " << scheduleChunkVar;
+    p << " = " << scheduleChunkVar << " : " << scheduleChunkVar.getType();
   if (modifier && modifier.getValue() != "none")
     p << ", " << modifier;
   if (simd && simd.getValue() != "none") {
@@ -578,6 +579,7 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
   SmallString<8> schedule;
   SmallVector<SmallString<12>> modifiers;
   Optional<OpAsmParser::OperandType> scheduleChunkSize;
+  Type scheduleChunkType;
 
   // Compute the position of clauses in operand segments
   int currPos = 0;
@@ -695,7 +697,8 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
       clauseSegments[pos[linearClause] + 1] = linearSteps.size();
     } else if (clauseKeyword == "schedule") {
       if (checkAllowed(scheduleClause) ||
-          parseScheduleClause(parser, schedule, modifiers, scheduleChunkSize))
+          parseScheduleClause(parser, schedule, modifiers, scheduleChunkSize,
+                              scheduleChunkType))
         return failure();
       if (scheduleChunkSize) {
         clauseSegments[pos[scheduleClause]] = 1;
@@ -838,10 +841,9 @@ static ParseResult parseClauses(OpAsmParser &parser, OperationState &result,
         result.addAttribute("simd_modifier", mod);
       }
     }
-    if (scheduleChunkSize) {
-      auto chunkSizeType = parser.getBuilder().getI32Type();
-      parser.resolveOperand(*scheduleChunkSize, chunkSizeType, result.operands);
-    }
+    if (scheduleChunkSize)
+      parser.resolveOperand(*scheduleChunkSize, scheduleChunkType,
+                            result.operands);
   }
 
   segments.insert(segments.end(), clauseSegments.begin(), clauseSegments.end());
