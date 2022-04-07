@@ -32,5 +32,5 @@ jobs:
     - name: Test flang
       uses: llvm/actions/build-test-llvm-project@main
       with:
-        cmake_args: -G Ninja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_PARALLEL_COMPILE_JOBS=2 -DLLVM_ENABLE_PROJECTS="clang;flang;mlir" -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=host
+        cmake_args: -G Ninja -DLLVM_PARALLEL_LINK_JOBS=1 -DLLVM_PARALLEL_COMPILE_JOBS=2 -DLLVM_ENABLE_PROJECTS="clang;flang;mlir" -DCMAKE_BUILD_TYPE=Release -DLLVM_TARGETS_TO_BUILD=host -DBUILD_SHARED_LIBS=On
         build_target: check-flang
