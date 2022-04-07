@@ -55,54 +55,31 @@ mlir::Value fir::runtime::genArgumentLength(fir::FirOpBuilder &builder,
       .getResult(0);
 }
 
-void fir::runtime::genGetEnvironmentVariable(
+mlir::Value fir::runtime::genEnvVariableValue(
     fir::FirOpBuilder &builder, mlir::Location loc, mlir::Value name,
-    mlir::Value value, mlir::Value length, mlir::Value status,
-    mlir::Value trimName, mlir::Value errmsg) {
+    mlir::Value value, mlir::Value trimName, mlir::Value errmsg) {
   auto valueFunc =
       fir::runtime::getRuntimeFunc<mkRTKey(EnvVariableValue)>(loc, builder);
+  mlir::Value sourceFile = fir::factory::locationToFilename(builder, loc);
+  mlir::Value sourceLine = fir::factory::locationToLineNo(
+      builder, loc, valueFunc.getType().getInput(5));
+  llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
+      builder, loc, valueFunc.getType(), name, value, trimName, errmsg,
+      sourceFile, sourceLine);
+  return builder.create<fir::CallOp>(loc, valueFunc, args).getResult(0);
+}
+
+mlir::Value fir::runtime::genEnvVariableLength(fir::FirOpBuilder &builder,
+                                               mlir::Location loc,
+                                               mlir::Value name,
+                                               mlir::Value trimName) {
   auto lengthFunc =
       fir::runtime::getRuntimeFunc<mkRTKey(EnvVariableLength)>(loc, builder);
-
-  mlir::Value sourceFile;
-  mlir::Value sourceLine;
-  // We only need `sourceFile` and `sourceLine` variables when calling either
-  // `EnvVariableValue` or `EnvVariableLength` below.
-  if (!isAbsent(value) || status || !isAbsent(errmsg) || length) {
-    sourceFile = fir::factory::locationToFilename(builder, loc);
-    sourceLine = fir::factory::locationToLineNo(
-        builder, loc, valueFunc.getType().getInput(5));
-  }
-
-  mlir::Value valueResult;
-  // Run `EnvVariableValue` intrinsic only if we have a "value" in either
-  // "VALUE", "STATUS" or "ERRMSG" parameters.
-  if (!isAbsent(value) || status || !isAbsent(errmsg)) {
-    llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
-        builder, loc, valueFunc.getType(), name, value, trimName, errmsg,
-        sourceFile, sourceLine);
-    valueResult =
-        builder.create<fir::CallOp>(loc, valueFunc, args).getResult(0);
-  }
-
-  // Only save result of `EnvVariableValue` if "STATUS" parameter provided
-  if (status) {
-    const mlir::Value statusLoaded = builder.create<fir::LoadOp>(loc, status);
-    mlir::Value resultCast =
-        builder.createConvert(loc, statusLoaded.getType(), valueResult);
-    builder.create<fir::StoreOp>(loc, resultCast, status);
-  }
-
-  // Only run `EnvVariableLength` intrinsic if "LENGTH" parameter provided
-  if (length) {
-    llvm::SmallVector<mlir::Value> args =
-        fir::runtime::createArguments(builder, loc, lengthFunc.getType(), name,
-                                      trimName, sourceFile, sourceLine);
-    mlir::Value result =
-        builder.create<fir::CallOp>(loc, lengthFunc, args).getResult(0);
-    const mlir::Value lengthLoaded = builder.create<fir::LoadOp>(loc, length);
-    mlir::Value resultCast =
-        builder.createConvert(loc, lengthLoaded.getType(), result);
-    builder.create<fir::StoreOp>(loc, resultCast, length);
-  }
+  mlir::Value sourceFile = fir::factory::locationToFilename(builder, loc);
+  mlir::Value sourceLine = fir::factory::locationToLineNo(
+      builder, loc, lengthFunc.getType().getInput(3));
+  llvm::SmallVector<mlir::Value> args =
+      fir::runtime::createArguments(builder, loc, lengthFunc.getType(), name,
+                                    trimName, sourceFile, sourceLine);
+  return builder.create<fir::CallOp>(loc, lengthFunc, args).getResult(0);
 }
