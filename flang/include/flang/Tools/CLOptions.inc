@@ -153,12 +153,12 @@ inline void createDefaultFIROptimizerPassPipeline(mlir::PassManager &pm) {
   // simplify the IR
   mlir::GreedyRewriteConfig config;
   config.enableRegionSimplification = false;
-  fir::addCSE(pm);
+  pm.addPass(mlir::createCSEPass());
   fir::addAVC(pm);
   pm.addNestedPass<mlir::FuncOp>(fir::createCharacterConversionPass());
   pm.addPass(mlir::createCanonicalizerPass(config));
   pm.addPass(fir::createSimplifyRegionLitePass());
-  fir::addCSE(pm);
+  pm.addPass(mlir::createCSEPass());
   fir::addMemoryAllocationOpt(pm);
 
   // The default inliner pass adds the canonicalizer pass with the default
@@ -175,7 +175,7 @@ inline void createDefaultFIROptimizerPassPipeline(mlir::PassManager &pm) {
 
   pm.addPass(mlir::createCanonicalizerPass(config));
   pm.addPass(fir::createSimplifyRegionLitePass());
-  fir::addCSE(pm);
+  pm.addPass(mlir::createCSEPass());
 }
 
 #if !defined(FLANG_EXCLUDE_CODEGEN)
