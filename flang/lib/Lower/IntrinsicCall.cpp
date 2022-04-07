@@ -738,10 +738,10 @@ static constexpr IntrinsicHandler handlers[]{
     {"get_command_argument",
      &I::genGetCommandArgument,
      {{{"number", asValue},
-       {"value", asAddr},
+       {"value", asBox, handleDynamicOptional},
        {"length", asAddr},
        {"status", asAddr},
-       {"errmsg", asAddr}}},
+       {"errmsg", asBox, handleDynamicOptional}}},
      /*isElemental=*/false},
     {"get_environment_variable",
      &I::genGetEnvironmentVariable,
@@ -2396,46 +2396,48 @@ mlir::Value IntrinsicLibrary::genFraction(mlir::Type resultType,
 void IntrinsicLibrary::genGetCommandArgument(
     llvm::ArrayRef<fir::ExtendedValue> args) {
   assert(args.size() == 5);
-
-  auto processCharBox = [&](llvm::Optional<fir::CharBoxValue> arg,
-                            mlir::Value &value) -> void {
-    if (arg.hasValue()) {
-      value = builder.createBox(loc, *arg);
-    } else {
-      value = builder
-                  .create<fir::AbsentOp>(
-                      loc, fir::BoxType::get(builder.getNoneType()))
-                  .getResult();
-    }
-  };
-
-  // Handle NUMBER argument
   mlir::Value number = fir::getBase(args[0]);
+  const fir::ExtendedValue &value = args[1];
+  const fir::ExtendedValue &length = args[2];
+  const fir::ExtendedValue &status = args[3];
+  const fir::ExtendedValue &errmsg = args[4];
+
   if (!number)
     fir::emitFatalError(loc, "expected NUMBER parameter");
 
-  // Handle optional VALUE argument
-  mlir::Value value;
-  llvm::Optional<fir::CharBoxValue> valBox;
-  if (const fir::CharBoxValue *charBox = args[1].getCharBox())
-    valBox = *charBox;
-  processCharBox(valBox, value);
-
-  // Handle optional LENGTH argument
-  mlir::Value length = fir::getBase(args[2]);
-
-  // Handle optional STATUS argument
-  mlir::Value status = fir::getBase(args[3]);
-
-  // Handle optional ERRMSG argument
-  mlir::Value errmsg;
-  llvm::Optional<fir::CharBoxValue> errmsgBox;
-  if (const fir::CharBoxValue *charBox = args[4].getCharBox())
-    errmsgBox = *charBox;
-  processCharBox(errmsgBox, errmsg);
-
-  fir::runtime::genGetCommandArgument(builder, loc, number, value, length,
-                                      status, errmsg);
+  if (isPresent(value) || isPresent(status) || isPresent(errmsg)) {
+    mlir::Type boxNoneTy = fir::BoxType::get(builder.getNoneType());
+    mlir::Value valBox =
+        isPresent(value)
+            ? fir::getBase(value)
+            : builder.create<fir::AbsentOp>(loc, boxNoneTy).getResult();
+    mlir::Value errBox =
+        isPresent(errmsg)
+            ? fir::getBase(errmsg)
+            : builder.create<fir::AbsentOp>(loc, boxNoneTy).getResult();
+    mlir::Value stat =
+        fir::runtime::genArgumentValue(builder, loc, number, valBox, errBox);
+    if (isPresent(status)) {
+      mlir::Value statAddr = fir::getBase(status);
+      mlir::Value statIsPresentAtRuntime =
+          builder.genIsNotNullAddr(loc, statAddr);
+      builder.genIfThen(loc, statIsPresentAtRuntime)
+          .genThen(
+              [&]() { builder.createStoreWithConvert(loc, stat, statAddr); })
+          .end();
+    }
+  }
+  if (isPresent(length)) {
+    mlir::Value lenAddr = fir::getBase(length);
+    mlir::Value lenIsPresentAtRuntime = builder.genIsNotNullAddr(loc, lenAddr);
+    builder.genIfThen(loc, lenIsPresentAtRuntime)
+        .genThen([&]() {
+          mlir::Value len =
+              fir::runtime::genArgumentLength(builder, loc, number);
+          builder.createStoreWithConvert(loc, len, lenAddr);
+        })
+        .end();
+  }
 }
 
 // GET_ENVIRONMENT_VARIABLE

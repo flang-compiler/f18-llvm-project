@@ -32,45 +32,27 @@ mlir::Value fir::runtime::genCommandArgumentCount(fir::FirOpBuilder &builder,
   return builder.create<fir::CallOp>(loc, argumentCountFunc).getResult(0);
 }
 
-void fir::runtime::genGetCommandArgument(fir::FirOpBuilder &builder,
-                                         mlir::Location loc, mlir::Value number,
-                                         mlir::Value value, mlir::Value length,
-                                         mlir::Value status,
-                                         mlir::Value errmsg) {
+mlir::Value fir::runtime::genArgumentValue(fir::FirOpBuilder &builder,
+                                           mlir::Location loc,
+                                           mlir::Value number,
+                                           mlir::Value value,
+                                           mlir::Value errmsg) {
   auto argumentValueFunc =
       fir::runtime::getRuntimeFunc<mkRTKey(ArgumentValue)>(loc, builder);
+  llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
+      builder, loc, argumentValueFunc.getType(), number, value, errmsg);
+  return builder.create<fir::CallOp>(loc, argumentValueFunc, args).getResult(0);
+}
+
+mlir::Value fir::runtime::genArgumentLength(fir::FirOpBuilder &builder,
+                                            mlir::Location loc,
+                                            mlir::Value number) {
   auto argumentLengthFunc =
       fir::runtime::getRuntimeFunc<mkRTKey(ArgumentLength)>(loc, builder);
-
-  mlir::Value valueResult;
-  // Run `ArgumentValue` intrinsic only if we have a "value" in either "VALUE",
-  // "STATUS" or "ERRMSG" parameters.
-  if (!isAbsent(value) || status || !isAbsent(errmsg)) {
-    llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
-        builder, loc, argumentValueFunc.getType(), number, value, errmsg);
-    valueResult =
-        builder.create<fir::CallOp>(loc, argumentValueFunc, args).getResult(0);
-  }
-
-  // Only save result of `ArgumentValue` if "STATUS" parameter has been given
-  if (status) {
-    const mlir::Value statusLoaded = builder.create<fir::LoadOp>(loc, status);
-    mlir::Value resultCast =
-        builder.createConvert(loc, statusLoaded.getType(), valueResult);
-    builder.create<fir::StoreOp>(loc, resultCast, status);
-  }
-
-  // Only run `ArgumentLength` intrinsic if "LENGTH" parameter provided
-  if (length) {
-    llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
-        builder, loc, argumentLengthFunc.getType(), number);
-    mlir::Value result =
-        builder.create<fir::CallOp>(loc, argumentLengthFunc, args).getResult(0);
-    const mlir::Value valueLoaded = builder.create<fir::LoadOp>(loc, length);
-    mlir::Value resultCast =
-        builder.createConvert(loc, valueLoaded.getType(), result);
-    builder.create<fir::StoreOp>(loc, resultCast, length);
-  }
+  llvm::SmallVector<mlir::Value> args = fir::runtime::createArguments(
+      builder, loc, argumentLengthFunc.getType(), number);
+  return builder.create<fir::CallOp>(loc, argumentLengthFunc, args)
+      .getResult(0);
 }
 
 void fir::runtime::genGetEnvironmentVariable(

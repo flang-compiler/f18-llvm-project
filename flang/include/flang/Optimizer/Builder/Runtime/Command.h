@@ -23,14 +23,19 @@ namespace fir::runtime {
 /// Generate call to COMMAND_ARGUMENT_COUNT intrinsic runtime routine.
 mlir::Value genCommandArgumentCount(fir::FirOpBuilder &, mlir::Location);
 
-/// Generate call to GET_COMMAND_ARGUMENT intrinsic runtime routine.
-/// Note that GET_COMMAND_ARGUMENT intrinsic is split between 2 functions in
-/// implementation; ArgumentValue and ArgumentLength. So we handle each
-/// seperately.
-void genGetCommandArgument(fir::FirOpBuilder &, mlir::Location,
-                           mlir::Value number, mlir::Value value,
-                           mlir::Value length, mlir::Value status,
-                           mlir::Value errmsg);
+/// Generate a call to ArgumentValue runtime function which implements
+/// the part of GET_COMMAND_ARGUMENT related to VALUE, ERRMSG, and STATUS.
+/// \p value and \p errmsg must be fir.box that can be absent (but not null
+/// mlir values). The status value is returned.
+mlir::Value genArgumentValue(fir::FirOpBuilder &, mlir::Location,
+                             mlir::Value number, mlir::Value value,
+                             mlir::Value errmsg);
+
+/// Generate a call to ArgumentLength runtime function which implements
+/// the part of GET_COMMAND_ARGUMENT related to LENGTH.
+/// It returns the length of the \p number command arguments.
+mlir::Value genArgumentLength(fir::FirOpBuilder &, mlir::Location,
+                              mlir::Value number);
 
 /// Generate call to GET_ENVIRONMENT_VARIABLE intrinsic runtime routine.
 /// Note that GET_ENVIRONMENT_ARGUMENT intrinsic is split between 2 functions in
