@@ -519,6 +519,27 @@ createBoxProcCharTuple(Fortran::lower::AbstractConverter &converter,
                                                      boxProc, charLen);
 }
 
+/// Given an optional fir.box, returns an fir.box that is the original one if
+/// it is present and it otherwise an unallocated box.
+/// Absent fir.box are implemented as a null pointer descriptor. Generated
+/// code may need to unconditionally read a fir.box that can be absent.
+/// This helper allows creating a fir.box that can be read in all cases
+/// outside of a fir.if (isPresent) region. However, the usages of the value
+/// read from such box should still only be done in a fir.if(isPresent).
+static fir::ExtendedValue
+absentBoxToUnallocatedBox(fir::FirOpBuilder &builder, mlir::Location loc,
+                          const fir::ExtendedValue &exv,
+                          mlir::Value isPresent) {
+  mlir::Value box = fir::getBase(exv);
+  mlir::Type boxType = box.getType();
+  assert(boxType.isa<fir::BoxType>() && "argument must be a fir.box");
+  mlir::Value emptyBox =
+      fir::factory::createUnallocatedBox(builder, loc, boxType, llvm::None);
+  auto safeToReadBox =
+      builder.create<mlir::SelectOp>(loc, isPresent, box, emptyBox);
+  return fir::substBase(exv, safeToReadBox);
+}
+
 // Helper to get the ultimate first symbol. This works around the fact that
 // symbol resolution in the front end doesn't always resolve a symbol to its
 // ultimate symbol but may leave placeholder indirections for use and host
@@ -2877,13 +2898,8 @@ public:
                 // fir.box is absent.
                 mlir::Value isPresent = builder.create<fir::IsPresentOp>(
                     loc, builder.getI1Type(), actualArgBase);
-                mlir::Type boxType = actualArgBase.getType();
-                mlir::Value emptyBox = fir::factory::createUnallocatedBox(
-                    builder, loc, boxType, llvm::None);
-                auto safeToReadBox = builder.create<mlir::SelectOp>(
-                    loc, isPresent, actualArgBase, emptyBox);
-                fir::ExtendedValue safeToReadExv =
-                    fir::substBase(actualArg, safeToReadBox);
+                fir::ExtendedValue safeToReadExv = absentBoxToUnallocatedBox(
+                    builder, loc, actualArg, isPresent);
                 if (actualIsSimplyContiguous)
                   return safeToReadExv;
                 return genCopyIn(safeToReadExv, arg, copyOutPairs, isPresent);
@@ -5680,27 +5696,6 @@ private:
     };
   }
 
-  /// Given an optional fir.box, returns an fir.box that is the original one if
-  /// it is present and it otherwise an unallocated box.
-  /// Absent fir.box are implemented as a null pointer descriptor. Generated
-  /// code may need to unconditionally read a fir.box that can be absent.
-  /// This helper allows creating a fir.box that can be read in all cases
-  /// outside of a fir.if (isPresent) region. However, the usages of the value
-  /// read from such box should still only be done in a fir.if(isPresent).
-  static fir::ExtendedValue
-  absentBoxToUnalllocatedBox(fir::FirOpBuilder &builder, mlir::Location loc,
-                             const fir::ExtendedValue &exv,
-                             mlir::Value isPresent) {
-    mlir::Value box = fir::getBase(exv);
-    mlir::Type boxType = box.getType();
-    assert(boxType.isa<fir::BoxType>() && "argument must be a fir.box");
-    mlir::Value emptyBox =
-        fir::factory::createUnallocatedBox(builder, loc, boxType, llvm::None);
-    auto safeToReadBox =
-        builder.create<mlir::SelectOp>(loc, isPresent, box, emptyBox);
-    return fir::substBase(exv, safeToReadBox);
-  }
-
   std::tuple<CC, mlir::Value, mlir::Type>
   genOptionalArrayFetch(const Fortran::lower::SomeExpr &expr) {
     assert(expr.Rank() > 0 && "expr must be an array");
@@ -5724,7 +5719,7 @@ private:
       // Hence, per 15.5.2.12 3 (8) and (9), the provided Allocatable and
       // Pointer optional arrays cannot be absent. The only kind of entities
       // that can get here are optional assumed shape and polymorphic entities.
-      exv = absentBoxToUnalllocatedBox(builder, loc, exv, isPresent);
+      exv = absentBoxToUnallocatedBox(builder, loc, exv, isPresent);
     }
     // All the properties can be read from any fir.box but the read values may
     // be undefined and should only be used inside a fir.if (canBeRead) region.
