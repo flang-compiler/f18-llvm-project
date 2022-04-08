@@ -2683,13 +2683,16 @@ public:
   ExtValue genCopyIn(const ExtValue &actualArg,
                      const Fortran::lower::CallerInterface::PassedEntity &arg,
                      CopyOutPairs &copyOutPairs,
-                     llvm::Optional<mlir::Value> restrictCopyAtRuntime) {
+                     llvm::Optional<mlir::Value> restrictCopyAtRuntime,
+                     bool byValue) {
+    const bool doCopyOut = !byValue && arg.mayBeModifiedByCall();
+    llvm::StringRef tempName = byValue ? ".copy" : ".copyinout";
     if (!restrictCopyAtRuntime) {
-      ExtValue temp = genArrayTempFromMold(actualArg, ".copyinout");
+      ExtValue temp = genArrayTempFromMold(actualArg, tempName);
       if (arg.mayBeReadByCall())
         genArrayCopy(temp, actualArg);
-      copyOutPairs.emplace_back(CopyOutPair{
-          actualArg, temp, arg.mayBeModifiedByCall(), restrictCopyAtRuntime});
+      copyOutPairs.emplace_back(
+          CopyOutPair{actualArg, temp, doCopyOut, restrictCopyAtRuntime});
       return temp;
     }
     // Otherwise, need to be careful to only copy-in if allowed at runtime.
@@ -2701,7 +2704,7 @@ public:
             .genIfOp(loc, {addrType}, *restrictCopyAtRuntime,
                      /*withElseRegion=*/true)
             .genThen([&]() {
-              auto temp = genArrayTempFromMold(actualArg, ".copyinout");
+              auto temp = genArrayTempFromMold(actualArg, tempName);
               if (arg.mayBeReadByCall())
                 genArrayCopy(temp, actualArg);
               builder.create<fir::ResultOp>(loc, fir::getBase(temp));
@@ -2713,8 +2716,8 @@ public:
             .getResults()[0];
     // Associate the temp address with actualArg lengths and extents.
     fir::ExtendedValue temp = fir::substBase(readIfBoxValue(actualArg), addr);
-    copyOutPairs.emplace_back(CopyOutPair{
-        actualArg, temp, arg.mayBeModifiedByCall(), restrictCopyAtRuntime});
+    copyOutPairs.emplace_back(
+        CopyOutPair{actualArg, temp, doCopyOut, restrictCopyAtRuntime});
     return temp;
   }
 
@@ -2735,6 +2738,157 @@ public:
           builder.create<fir::FreeMemOp>(loc, fir::getBase(copyOutPair.temp));
         })
         .end();
+  }
+
+  /// Lower a designator to a variable that may be absent at runtime into an
+  /// ExtendedValue where all the properties (base address, shape and length
+  /// parameters) can be safely read (set to zero if not present). It also
+  /// returns a boolean mlir::Value telling if the variable is present at
+  /// runtime.
+  /// This is useful to later be able to do conditional copy-in/copy-out
+  /// or to retrieve the base address without having to deal with the case
+  /// where the actual may be an absent fir.box.
+  std::pair<ExtValue, mlir::Value>
+  prepareActualThatMayBeAbsent(const Fortran::lower::SomeExpr &expr) {
+    mlir::Location loc = getLoc();
+    if (Fortran::evaluate::IsAllocatableOrPointerObject(
+            expr, converter.getFoldingContext())) {
+      // Fortran 2018 15.5.2.12 point 1: If unallocated/disassociated,
+      // it is as if the argument was absent. The main care here is to
+      // not do a copy-in/copy-out because the temp address, even though
+      // pointing to a null size storage, would not be a nullptr and
+      // therefore the argument would not be considered absent on the
+      // callee side. Note: if wholeSymbol is optional, it cannot be
+      // absent as per 15.5.2.12 point 7. and 8. We rely on this to
+      // un-conditionally read the allocatable/pointer descriptor here.
+      fir::MutableBoxValue mutableBox = genMutableBoxValue(expr);
+      mlir::Value isPresent = fir::factory::genIsAllocatedOrAssociatedTest(
+          builder, loc, mutableBox);
+      fir::ExtendedValue actualArg =
+          fir::factory::genMutableBoxRead(builder, loc, mutableBox);
+      return {actualArg, isPresent};
+    }
+    // Absent descriptor cannot be read. To avoid any issue in
+    // copy-in/copy-out, and when retrieving the address/length
+    // create an descriptor pointing to a null address here if the
+    // fir.box is absent.
+    ExtValue actualArg = gen(expr);
+    mlir::Value actualArgBase = fir::getBase(actualArg);
+    mlir::Value isPresent = builder.create<fir::IsPresentOp>(
+        loc, builder.getI1Type(), actualArgBase);
+    if (!actualArgBase.getType().isa<fir::BoxType>())
+      return {actualArg, isPresent};
+    ExtValue safeToReadBox =
+        absentBoxToUnallocatedBox(builder, loc, actualArg, isPresent);
+    return {safeToReadBox, isPresent};
+  }
+
+  /// Create a temp on the stack for scalar actual arguments that may be absent
+  /// at runtime, but must be passed via a temp if they are presents.
+  fir::ExtendedValue
+  createScalarTempForArgThatMayBeAbsent(ExtValue actualArg,
+                                        mlir::Value isPresent) {
+    mlir::Location loc = getLoc();
+    mlir::Type type = fir::unwrapRefType(fir::getBase(actualArg).getType());
+    if (fir::isDerivedWithLenParameters(actualArg))
+      TODO(loc, "parametrized derived type optional scalar argument copy-in");
+    if (const fir::CharBoxValue *charBox = actualArg.getCharBox()) {
+      mlir::Value len = charBox->getLen();
+      mlir::Value zero = builder.createIntegerConstant(loc, len.getType(), 0);
+      len = builder.create<mlir::SelectOp>(loc, isPresent, len, zero);
+      mlir::Value temp = builder.createTemporary(
+          loc, type, /*name=*/{}, /*shape=*/{}, mlir::ValueRange{len},
+          llvm::ArrayRef<mlir::NamedAttribute>{
+              Fortran::lower::getAdaptToByRefAttr(builder)});
+      return fir::CharBoxValue{temp, len};
+    }
+    assert(fir::isa_trivial(type) ||
+           type.isa<fir::RecordType>() && "must be simple scalar");
+    return builder.createTemporary(
+        loc, type,
+        llvm::ArrayRef<mlir::NamedAttribute>{
+            Fortran::lower::getAdaptToByRefAttr(builder)});
+  }
+
+  /// Lower an actual argument that must be passed via an address.
+  /// This generates of the copy-in/copy-out if the actual is not contiguous, or
+  /// the creation of the temp if the actual is a variable and \p byValue is
+  /// true. It handles the cases where the actual may be absent, and all of the
+  /// copying has to be conditional at runtime.
+  ExtValue prepareActualToBaseAddressLike(
+      const Fortran::lower::SomeExpr &expr,
+      const Fortran::lower::CallerInterface::PassedEntity &arg,
+      CopyOutPairs &copyOutPairs, bool byValue) {
+    mlir::Location loc = getLoc();
+    const bool isArray = expr.Rank() > 0;
+    const bool actualArgIsVariable = Fortran::evaluate::IsVariable(expr);
+    const bool needsCopy =
+        actualArgIsVariable &&
+        (byValue || (isArray && !Fortran::evaluate::IsSimplyContiguous(
+                                    expr, converter.getFoldingContext())));
+    auto argAddr = [&]() -> ExtValue {
+      if (!actualArgIsVariable)
+        // Actual argument is not a variable. Make sure a variable address is
+        // not passed.
+        return genTempExtAddr(expr);
+      ExtValue baseAddr;
+      if (arg.isOptional() && Fortran::evaluate::MayBePassedAsAbsentOptional(
+                                  expr, converter.getFoldingContext())) {
+        auto [actualArgBind, isPresent] = prepareActualThatMayBeAbsent(expr);
+        const ExtValue &actualArg = actualArgBind;
+        if (!needsCopy)
+          return actualArg;
+
+        if (isArray)
+          return genCopyIn(actualArg, arg, copyOutPairs, isPresent, byValue);
+        // Scalars, create a temp, and use it conditionally at runtime if
+        // the argument is present.
+        ExtValue temp =
+            createScalarTempForArgThatMayBeAbsent(actualArg, isPresent);
+        mlir::Type tempAddrTy = fir::getBase(temp).getType();
+        mlir::Value selectAddr =
+            builder
+                .genIfOp(loc, {tempAddrTy}, isPresent,
+                         /*withElseRegion=*/true)
+                .genThen([&]() {
+                  fir::factory::genScalarAssignment(builder, loc, temp,
+                                                    actualArg);
+                  builder.create<fir::ResultOp>(loc, fir::getBase(temp));
+                })
+                .genElse([&]() {
+                  mlir::Value absent =
+                      builder.create<fir::AbsentOp>(loc, tempAddrTy);
+                  builder.create<fir::ResultOp>(loc, absent);
+                })
+                .getResults()[0];
+        return fir::substBase(temp, selectAddr);
+      }
+      // Actual cannot be absent, the actual argument can safely be
+      // copied-in/copied-out without any care if needed.
+      if (isArray) {
+        ExtValue box = genBoxArg(expr);
+        if (needsCopy)
+          return genCopyIn(box, arg, copyOutPairs,
+                           /*restrictCopyAtRuntime=*/llvm::None, byValue);
+        // Contiguous: just use the box we created above!
+        // This gets "unboxed" below, if needed.
+        return box;
+      }
+      // Actual argument is a non-optional, non-pointer, non-allocatable
+      // scalar variable.
+      ExtValue actualArg = genExtAddr(expr);
+      if (needsCopy)
+        return createInMemoryScalarCopy(builder, loc, actualArg);
+      return actualArg;
+    }();
+    // Scalar and contiguous expressions may be lowered to a fir.box,
+    // either to account for potential polymorphism, or because lowering
+    // did not account for some contiguity hints.
+    // Here, polymorphism does not matter (an entity of the declared type
+    // is passed, not one of the dynamic type), and the expr is known to
+    // be simply contiguous, so it is safe to unbox it and pass the
+    // address without making a copy.
+    return readIfBoxValue(argAddr);
   }
 
   /// Lower a non-elemental procedure reference.
@@ -2832,111 +2986,19 @@ public:
           mutableModifiedByCall.emplace_back(std::move(mutableBox));
         continue;
       }
-      const bool actualArgIsVariable = Fortran::evaluate::IsVariable(*expr);
-      if (arg.passBy == PassBy::BaseAddressValueAttribute) {
-        mlir::Value temp;
-        if (isArray(*expr)) {
-          auto val = genBoxArg(*expr);
-          if (!actualArgIsVariable)
-            temp = getBase(val);
-          else {
-            ExtValue copy = genArrayTempFromMold(val, ".copy");
-            genArrayCopy(copy, val);
-            temp = fir::getBase(copy);
-          }
-        } else {
-          mlir::Value val = fir::getBase(genval(*expr));
-          temp = builder.createTemporary(
-              loc, val.getType(),
-              llvm::ArrayRef<mlir::NamedAttribute>{
-                  Fortran::lower::getAdaptToByRefAttr(builder)});
-          builder.create<fir::StoreOp>(loc, val, temp);
-        }
-        caller.placeInput(arg, temp);
-        continue;
-      }
-      if (arg.passBy == PassBy::BaseAddress || arg.passBy == PassBy::BoxChar) {
-        const bool actualIsSimplyContiguous =
-            !actualArgIsVariable || Fortran::evaluate::IsSimplyContiguous(
-                                        *expr, converter.getFoldingContext());
-        auto argAddr = [&]() -> ExtValue {
-          ExtValue baseAddr;
-          if (actualArgIsVariable && arg.isOptional()) {
-            if (Fortran::evaluate::IsAllocatableOrPointerObject(
-                    *expr, converter.getFoldingContext())) {
-              // Fortran 2018 15.5.2.12 point 1: If unallocated/disassociated,
-              // it is as if the argument was absent. The main care here is to
-              // not do a copy-in/copy-out because the temp address, even though
-              // pointing to a null size storage, would not be a nullptr and
-              // therefore the argument would not be considered absent on the
-              // callee side. Note: if wholeSymbol is optional, it cannot be
-              // absent as per 15.5.2.12 point 7. and 8. We rely on this to
-              // un-conditionally read the allocatable/pointer descriptor here.
-              if (actualIsSimplyContiguous)
-                return genBoxArg(*expr);
-              fir::MutableBoxValue mutableBox = genMutableBoxValue(*expr);
-              mlir::Value isAssociated =
-                  fir::factory::genIsAllocatedOrAssociatedTest(builder, loc,
-                                                               mutableBox);
-              fir::ExtendedValue actualExv =
-                  fir::factory::genMutableBoxRead(builder, loc, mutableBox);
-              return genCopyIn(actualExv, arg, copyOutPairs, isAssociated);
-            }
-            if (const Fortran::semantics::Symbol *wholeSymbol =
-                    Fortran::evaluate::UnwrapWholeSymbolOrComponentDataRef(
-                        *expr))
-              if (Fortran::semantics::IsOptional(*wholeSymbol)) {
-                ExtValue actualArg = gen(*expr);
-                mlir::Value actualArgBase = fir::getBase(actualArg);
-                if (!actualArgBase.getType().isa<fir::BoxType>())
-                  return actualArg;
-                // Do not read wholeSymbol descriptor that may be a nullptr in
-                // case wholeSymbol is absent.
-                // Absent descriptor cannot be read. To avoid any issue in
-                // copy-in/copy-out, and when retrieving the address/length
-                // create an descriptor pointing to a null address here if the
-                // fir.box is absent.
-                mlir::Value isPresent = builder.create<fir::IsPresentOp>(
-                    loc, builder.getI1Type(), actualArgBase);
-                fir::ExtendedValue safeToReadExv = absentBoxToUnallocatedBox(
-                    builder, loc, actualArg, isPresent);
-                if (actualIsSimplyContiguous)
-                  return safeToReadExv;
-                return genCopyIn(safeToReadExv, arg, copyOutPairs, isPresent);
-              }
-            // Fall through: The actual argument can safely be
-            // copied-in/copied-out without any care if needed.
-          }
-          if (actualArgIsVariable && expr->Rank() > 0) {
-            ExtValue box = genBoxArg(*expr);
-            if (!actualIsSimplyContiguous)
-              return genCopyIn(box, arg, copyOutPairs,
-                               /*restrictCopyAtRuntime=*/llvm::None);
-            // Contiguous: just use the box we created above!
-            // This gets "unboxed" below, if needed.
-            return box;
-          }
-          // Actual argument is a non optional/non pointer/non allocatable
-          // scalar.
-          if (actualArgIsVariable)
-            return genExtAddr(*expr);
-          // Actual argument is not a variable. Make sure a variable address is
-          // not passed.
-          return genTempExtAddr(*expr);
-        }();
-        // Scalar and contiguous expressions may be lowered to a fir.box,
-        // either to account for potential polymorphism, or because lowering
-        // did not account for some contiguity hints.
-        // Here, polymorphism does not matter (an entity of the declared type
-        // is passed, not one of the dynamic type), and the expr is known to
-        // be simply contiguous, so it is safe to unbox it and pass the
-        // address without making a copy.
-        argAddr = readIfBoxValue(argAddr);
-
-        if (arg.passBy == PassBy::BaseAddress) {
+      if (arg.passBy == PassBy::BaseAddress || arg.passBy == PassBy::BoxChar ||
+          arg.passBy == PassBy::BaseAddressValueAttribute ||
+          arg.passBy == PassBy::CharBoxValueAttribute) {
+        const bool byValue = arg.passBy == PassBy::BaseAddressValueAttribute ||
+                             arg.passBy == PassBy::CharBoxValueAttribute;
+        ExtValue argAddr =
+            prepareActualToBaseAddressLike(*expr, arg, copyOutPairs, byValue);
+        if (arg.passBy == PassBy::BaseAddress ||
+            arg.passBy == PassBy::BaseAddressValueAttribute) {
           caller.placeInput(arg, fir::getBase(argAddr));
         } else {
-          assert(arg.passBy == PassBy::BoxChar);
+          assert(arg.passBy == PassBy::BoxChar ||
+                 arg.passBy == PassBy::CharBoxValueAttribute);
           auto helper = fir::factory::CharacterExprHelper{builder, loc};
           auto boxChar = argAddr.match(
               [&](const fir::CharBoxValue &x) { return helper.createEmbox(x); },
@@ -2990,7 +3052,7 @@ public:
           // Make sure a variable address is only passed if the expression is
           // actually a variable.
           mlir::Value box =
-              actualArgIsVariable
+              Fortran::evaluate::IsVariable(*expr)
                   ? builder.createBox(loc, genBoxArg(*expr))
                   : builder.createBox(getLoc(), genTempExtAddr(*expr));
           caller.placeInput(arg, box);
