@@ -2822,12 +2822,22 @@ public:
     mlir::Location loc = getLoc();
     const bool isArray = expr.Rank() > 0;
     const bool actualArgIsVariable = Fortran::evaluate::IsVariable(expr);
-    const bool needsCopy =
+    // It must be possible to modify VALUE arguments on the callee side, even
+    // if the actual argument is a literal or named constant. Hence, the
+    // address of static storage must not be passed in that case, and a copy
+    // must be made even if this is not a variable.
+    // Note: isArray should be used here, but genBoxArg already creates copies
+    // for it, so do not duplicate the copy until genBoxArg behavior is changed.
+    const bool isStaticConstantByValue =
+        byValue && Fortran::evaluate::IsActuallyConstant(expr) &&
+        (isCharacterType(expr));
+    const bool variableNeedsCopy =
         actualArgIsVariable &&
         (byValue || (isArray && !Fortran::evaluate::IsSimplyContiguous(
                                     expr, converter.getFoldingContext())));
+    const bool needsCopy = isStaticConstantByValue || variableNeedsCopy;
     auto argAddr = [&]() -> ExtValue {
-      if (!actualArgIsVariable)
+      if (!actualArgIsVariable && !needsCopy)
         // Actual argument is not a variable. Make sure a variable address is
         // not passed.
         return genTempExtAddr(expr);
@@ -2875,7 +2885,7 @@ public:
         return box;
       }
       // Actual argument is a non-optional, non-pointer, non-allocatable
-      // scalar variable.
+      // scalar.
       ExtValue actualArg = genExtAddr(expr);
       if (needsCopy)
         return createInMemoryScalarCopy(builder, loc, actualArg);
