@@ -91,7 +91,9 @@ public:
   virtual bool
   createHostAssociateVarClone(const Fortran::semantics::Symbol &sym) = 0;
 
-  virtual void copyHostAssociateVar(const Fortran::semantics::Symbol &sym) = 0;
+  virtual void copyHostAssociateVar(const Fortran::semantics::Symbol &sym,
+                                    bool firstPrivate = false,
+                                    bool lastPrivate = false) = 0;
 
   //===--------------------------------------------------------------------===//
   // Expressions

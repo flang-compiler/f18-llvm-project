@@ -52,8 +52,13 @@ static void createPrivateVarSyms(Fortran::lower::AbstractConverter &converter,
     // variables) happen separately, for everything else privatize here.
     if (sym->test(Fortran::semantics::Symbol::Flag::OmpPreDetermined))
       continue;
+    bool firstPrivate = false;
     if constexpr (std::is_same_v<T, Fortran::parser::OmpClause::Firstprivate>) {
-      converter.copyHostAssociateVar(*sym);
+      firstPrivate = true;
+      converter.copyHostAssociateVar(*sym, firstPrivate, /*lastPrivate*/ false);
+    }
+    if constexpr (std::is_same_v<T, Fortran::parser::OmpClause::Lastprivate>) {
+      converter.copyHostAssociateVar(*sym, firstPrivate, /*lastPrivate*/ true);
     } else {
       bool success = converter.createHostAssociateVarClone(*sym);
       (void)success;
@@ -75,6 +80,10 @@ static void privatizeVars(Fortran::lower::AbstractConverter &converter,
                    std::get_if<Fortran::parser::OmpClause::Firstprivate>(
                        &clause.u)) {
       createPrivateVarSyms(converter, firstPrivateClause);
+    } else if (const auto &lastPrivateClause =
+                   std::get_if<Fortran::parser::OmpClause::Lastprivate>(
+                       &clause.u)) {
+      createPrivateVarSyms(converter, lastPrivateClause);
     }
   }
   firOpBuilder.restoreInsertionPoint(insPt);
@@ -714,6 +723,7 @@ static void genOMP(Fortran::lower::AbstractConverter &converter,
 
   createBodyOfOp<omp::WsLoopOp>(wsLoopOp, converter, currentLocation, eval,
                                 &wsLoopOpClauseList, iv);
+ 
 }
 
 static void
