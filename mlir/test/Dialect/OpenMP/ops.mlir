@@ -896,3 +896,24 @@ func @omp_single_allocate_nowait(%data_var: memref<i32>) {
   }
   return
 }
+
+func @omp_cancel(%if_cond : i1) -> () {
+    // Test with optional operand; if_expr.
+    // CHECK: omp.cancel parallel if(%{{.*}})
+    omp.cancel parallel if(%if_cond)
+    // CHECK: omp.cancel sections
+    omp.cancel sections
+    // CHECK: omp.cancel taskgroup
+    omp.cancel taskgroup
+    return
+}
+
+func @omp_cancellationpoint() -> () {
+    // CHECK: omp.cancellationpoint parallel
+    omp.cancellationpoint parallel
+    // CHECK: omp.cancellationpoint sections
+    omp.cancellationpoint sections
+    // CHECK: omp.cancellationpoint taskgroup
+    omp.cancellationpoint taskgroup
+    return
+}

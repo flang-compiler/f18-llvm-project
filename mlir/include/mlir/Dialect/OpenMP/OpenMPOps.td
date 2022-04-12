@@ -882,6 +882,57 @@ def AtomicCaptureOp : OpenMP_Op<"atomic.capture",
   }];
 }
 
+def OMP_CancelConstructTypeNone : I32EnumAttrCase<"none", 0>;
+def OMP_CancelConstructTypeParallel : I32EnumAttrCase<"parallel", 1>;
+def OMP_CancelConstructTypeLoop : I32EnumAttrCase<"loop", 2>;
+def OMP_CancelConstructTypeSections : I32EnumAttrCase<"sections", 3>;
+def OMP_CancelConstructTypeTaskgroup : I32EnumAttrCase<"taskgroup", 4>;
+
+def CancelConstructType
+    : I32EnumAttr<"CancelConstructType",
+                  "OpenMP Cancel / Cancellation Point Construct Type",
+                  [OMP_CancelConstructTypeNone,
+                   OMP_CancelConstructTypeParallel,
+                   OMP_CancelConstructTypeLoop,
+                   OMP_CancelConstructTypeSections,
+                   OMP_CancelConstructTypeTaskgroup]> {
+  let genSpecializedAttr = 0;
+  let cppNamespace = "::mlir::omp";
+}
+def CancelConstructTypeAttr : EnumAttr<OpenMP_Dialect, CancelConstructType,
+                                    "construct_type">;
+
+//===----------------------------------------------------------------------===//
+// 2.18.1 Cancel Construct
+//===----------------------------------------------------------------------===//
+def CancelOp : OpenMP_Op<"cancel"> {
+  let summary = "cancel directive";
+  let description = [{
+    The cancel construct activates cancellation of the innermost enclosing
+    region of the type specified.
+  }];
+  let arguments = (ins CancelConstructTypeAttr:$construct_type_val,
+                       Optional<I1>:$if_expr);
+
+  let assemblyFormat = [{ custom<ClauseAttr>($construct_type_val)
+                          oilist( `if` `(` $if_expr `)` ) attr-dict}];
+}
+
+//===----------------------------------------------------------------------===//
+// 2.18.2 Cancellation Point Construct
+//===----------------------------------------------------------------------===//
+def CancellationPointOp : OpenMP_Op<"cancellationpoint"> {
+  let summary = "cancellation point directive";
+  let description = [{
+    The cancellation point construct introduces a user-defined cancellation
+    point at which implicit or explicit tasks check if cancellation of the
+    innermost enclosing region of the type specified has been activated.
+  }];
+  let arguments = (ins CancelConstructTypeAttr:$construct_type_val);
+
+  let assemblyFormat = [{ custom<ClauseAttr>($construct_type_val) attr-dict}];
+}
+
 //===----------------------------------------------------------------------===//
 // 2.19.5.7 declare reduction Directive
 //===----------------------------------------------------------------------===//
