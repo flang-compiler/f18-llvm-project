@@ -14,14 +14,14 @@ subroutine test4_forall_construct()
 end subroutine test4_forall_construct
 
 ! CHECK-LABEL: func @_QPtest4_forall_construct
-! CHECK:   cf.br ^bb1
+! CHECK:   br ^bb1
 ! CHECK: ^bb1:  // 2 preds: ^bb0, ^bb2
 ! CHECK:   %{{.*}} = fir.do_loop
-! CHECK:   cf.cond_br %{{.*}}, ^bb2, ^bb3
+! CHECK:   cond_br %{{.*}}, ^bb2, ^bb3
 ! CHECK: ^bb2:  // pred: ^bb1
-! CHECK:   cf.br ^bb1
+! CHECK:   br ^bb1
 ! CHECK: ^bb3:  // pred: ^bb1
-! CHECK:   cf.br ^bb4
+! CHECK:   br ^bb4
 ! CHECK: ^bb4:  // pred: ^bb3
 ! CHECK:   return
 
@@ -34,13 +34,13 @@ subroutine test4_forall_construct2()
 end subroutine test4_forall_construct2
 
 ! CHECK-LABEL: func @_QPtest4_forall_construct2
-! CHECK:   cf.br ^bb1
+! CHECK:   br ^bb1
 ! CHECK: ^bb1:  // 2 preds: ^bb0, ^bb2
 ! CHECK:   %{{.*}} = fir.do_loop
-! CHECK:   cf.cond_br %{{.*}}, ^bb2, ^bb3
+! CHECK:   cond_br %{{.*}}, ^bb2, ^bb3
 ! CHECK: ^bb2:  // pred: ^bb1
-! CHECK:   cf.br ^bb1
+! CHECK:   br ^bb1
 ! CHECK: ^bb3:  // pred: ^bb1
-! CHECK:   cf.br ^bb4
+! CHECK:   br ^bb4
 ! CHECK: ^bb4:  // pred: ^bb3
 ! CHECK:   return
