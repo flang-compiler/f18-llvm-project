@@ -672,7 +672,8 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   const auto &itemList = std::get<0>(ioImpliedDo.t);
   const auto &control = std::get<1>(ioImpliedDo.t);
   const auto &loopSym = *control.name.thing.thing.symbol;
-  mlir::Value loopVar = converter.getSymbolAddress(loopSym);
+  mlir::Value loopVar = fir::getBase(converter.genExprAddr(
+      Fortran::evaluate::AsGenericExpr(loopSym).value(), stmtCtx));
   auto genControlValue = [&](const Fortran::parser::ScalarIntExpr &expr) {
     mlir::Value v = fir::getBase(
         converter.genExprValue(*Fortran::semantics::GetExpr(expr), stmtCtx));
@@ -698,8 +699,8 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
         loc, lowerValue, upperValue, stepValue, /*unordered=*/false,
         /*finalCountValue=*/true);
     builder.setInsertionPointToStart(doLoopOp.getBody());
-    mlir::Value lcv = builder.createConvert(loc, converter.genType(loopSym),
-                                            doLoopOp.getInductionVar());
+    mlir::Value lcv = builder.createConvert(
+        loc, fir::unwrapRefType(loopVar.getType()), doLoopOp.getInductionVar());
     builder.create<fir::StoreOp>(loc, lcv, loopVar);
     genItemList(ioImpliedDo);
     builder.setInsertionPointToEnd(doLoopOp.getBody());
@@ -708,7 +709,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
     builder.create<fir::ResultOp>(loc, result);
     builder.setInsertionPointAfter(doLoopOp);
     // The loop control variable may be used after the loop.
-    lcv = builder.createConvert(loc, converter.genType(loopSym),
+    lcv = builder.createConvert(loc, fir::unwrapRefType(loopVar.getType()),
                                 doLoopOp.getResult(0));
     builder.create<fir::StoreOp>(loc, lcv, loopVar);
     return;
@@ -719,8 +720,9 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   auto iterWhileOp = builder.create<fir::IterWhileOp>(
       loc, lowerValue, upperValue, stepValue, ok, /*finalCountValue*/ true);
   builder.setInsertionPointToStart(iterWhileOp.getBody());
-  mlir::Value lcv = builder.createConvert(loc, converter.genType(loopSym),
-                                          iterWhileOp.getInductionVar());
+  mlir::Value lcv =
+      builder.createConvert(loc, fir::unwrapRefType(loopVar.getType()),
+                            iterWhileOp.getInductionVar());
   builder.create<fir::StoreOp>(loc, lcv, loopVar);
   ok = iterWhileOp.getIterateVar();
   mlir::Value falseValue =
@@ -753,7 +755,7 @@ static void genIoLoop(Fortran::lower::AbstractConverter &converter,
   ok = iterWhileOp.getResult(1);
   builder.setInsertionPointAfter(iterWhileOp);
   // The loop control variable may be used after the loop.
-  lcv = builder.createConvert(loc, converter.genType(loopSym),
+  lcv = builder.createConvert(loc, fir::unwrapRefType(loopVar.getType()),
                               iterWhileOp.getResult(0));
   builder.create<fir::StoreOp>(loc, lcv, loopVar);
 }
