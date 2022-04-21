@@ -467,8 +467,9 @@ public:
     return bindIfNewSymbol(sym, exv);
   }
 
-  void
-  copyHostAssociateVar(const Fortran::semantics::Symbol &sym) override final {
+  void copyHostAssociateVar(const Fortran::semantics::Symbol &sym,
+                            bool firstPrivate,
+                            bool lastPrivate) override final {
     // 1) Fetch the original copy of the variable.
     assert(sym.has<Fortran::semantics::HostAssocDetails>() &&
            "No host-association found");
@@ -477,25 +478,47 @@ public:
     fir::ExtendedValue hexv = getExtendedValue(hsb);
 
     // 2) Create a copy that will mask the original.
-    createHostAssociateVarClone(sym);
+    // Make sure you do not create multiple clones when a variable is
+    // both firstPrivate and lastPrivate, as in that case, a clone will
+    // already be created for you during the function call with firstPrivate.
+    if (!(firstPrivate && lastPrivate)) {
+      createHostAssociateVarClone(sym);
+    }
+
     Fortran::lower::SymbolBox sb = lookupSymbol(sym);
     fir::ExtendedValue exv = getExtendedValue(sb);
+
+    if (lastPrivate) {
+      // Copy back to the original value right before exiting the block.
+      builder->setInsertionPoint(
+          getSymbolAddress(sym).getParentBlock()->getTerminator());
+    }
+
+    fir::ExtendedValue lhs, rhs;
+
+    if (lastPrivate) {
+      lhs = hexv;
+      rhs = exv;
+    } else {
+      lhs = exv;
+      rhs = hexv;
+    }
 
     // 3) Perform the assignment.
     mlir::Location loc = genLocation(sym.name());
     mlir::Type symType = genType(sym);
     if (auto seqTy = symType.dyn_cast<fir::SequenceType>()) {
       Fortran::lower::StatementContext stmtCtx;
-      Fortran::lower::createSomeArrayAssignment(*this, exv, hexv, localSymbols,
+      Fortran::lower::createSomeArrayAssignment(*this, lhs, rhs, localSymbols,
                                                 stmtCtx);
       stmtCtx.finalize();
     } else if (hexv.getBoxOf<fir::CharBoxValue>()) {
-      fir::factory::CharacterExprHelper{*builder, loc}.createAssign(exv, hexv);
+      fir::factory::CharacterExprHelper{*builder, loc}.createAssign(lhs, rhs);
     } else if (hexv.getBoxOf<fir::MutableBoxValue>()) {
       TODO(loc, "firstprivatisation of allocatable variables");
     } else {
-      auto loadVal = builder->create<fir::LoadOp>(loc, fir::getBase(hexv));
-      builder->create<fir::StoreOp>(loc, loadVal, fir::getBase(exv));
+      auto loadVal = builder->create<fir::LoadOp>(loc, fir::getBase(rhs));
+      builder->create<fir::StoreOp>(loc, loadVal, fir::getBase(lhs));
     }
   }
 
